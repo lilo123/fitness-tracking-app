@@ -416,9 +416,12 @@
                 if (!navigator.onLine) {
                     badge.className = "text-xs font-bold text-rose-400 bg-rose-500/10 px-2.5 py-1 rounded-full border border-rose-500/30 flex items-center gap-1.5";
                     badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500 inline-block"></span> Offline (${q.length})`;
-                } else if (q.length > 0) {
+                } else if (this.isSyncing) {
                     badge.className = "text-xs font-bold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/30 flex items-center gap-1.5 shadow-[0_0_10px_rgba(245,158,11,0.15)]";
                     badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-500 inline-block animate-spin"></span> Syncing (${q.length})`;
+                } else if (q.length > 0) {
+                    badge.className = "text-xs font-bold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/30 flex items-center gap-1.5";
+                    badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-500 inline-block"></span> Pending (${q.length})`;
                 } else {
                     badge.className = "text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/30 flex items-center gap-1.5 shadow-[0_0_10px_rgba(16,185,129,0.15)]";
                     badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span> Synced`;
@@ -436,12 +439,15 @@
                 }
                 
                 this.isSyncing = true;
+                this.updateSyncBadge();
                 try {
                     const batchItems = q.filter(item => item.action === "BATCH_APPEND").map(i => i.data);
                     const deleteItems = q.filter(item => item.action === "DELETE");
                     const updateItems = q.filter(item => item.action === "UPDATE");
                     const updateTplItems = q.filter(item => item.action === "UPDATE_TEMPLATE");
                     const delTplItems = q.filter(item => item.action === "DELETE_TEMPLATE");
+                    const addExItems = q.filter(item => item.action === "ADD_EXERCISE");
+                    const delExItems = q.filter(item => item.action === "DELETE_EXERCISE");
                     
                     if (batchItems.length > 0) {
                         const res = await apiCall('POST', { type: "Logs", action: "BATCH_APPEND", items: batchItems });
@@ -495,6 +501,26 @@
                             this.saveQueue(remaining);
                         }
                     }
+
+                    for (const addEx of addExItems) {
+                        const res = await apiCall('POST', { type: "Exercises", data: addEx.data });
+                        if (res && res.success) {
+                            const remaining = this.getQueue().filter(i => i.id !== addEx.id);
+                            this.saveQueue(remaining);
+                        }
+                    }
+
+                    for (const delEx of delExItems) {
+                        const res = await apiCall('POST', {
+                            type: "Exercises",
+                            action: "DELETE_EXERCISE",
+                            Name: delEx.Name
+                        });
+                        if (res && res.success) {
+                            const remaining = this.getQueue().filter(i => i.id !== delEx.id);
+                            this.saveQueue(remaining);
+                        }
+                    }
                 } finally {
                     this.isSyncing = false;
                     this.updateSyncBadge();
@@ -504,6 +530,10 @@
 
         window.addEventListener('online', () => Outbox.sync());
         window.addEventListener('offline', () => Outbox.updateSyncBadge());
+        window.addEventListener('focus', () => Outbox.sync());
+        window.addEventListener('pageshow', (e) => { if (e.persisted) Outbox.sync(); });
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') Outbox.sync(); });
+        setInterval(() => { if (navigator.onLine && Outbox.getQueue().length > 0) Outbox.sync(); }, 30000);
 
         // --- 3. Benchmark Engine (PR + Last Session Stats) ---
         function getExerciseBenchmarks(exerciseId, currentDateVal) {
@@ -566,11 +596,19 @@
         // --- Active Input Preservation During Renders ---
         let drafts = {};
         function captureInputDrafts() {
-            activeWorkout.exercises.forEach((exName, exIndex) => {
-                const wEl = document.getElementById(`weight-${exIndex}`);
-                const rEl = document.getElementById(`ghost-r-${exIndex}-0`) || document.getElementById(`reps-${exIndex}`);
-                if (wEl && rEl && (wEl.value !== "" || rEl.value !== "")) {
-                    drafts[exName] = { weight: wEl.value, reps: rEl.value };
+            const inputs = document.querySelectorAll('input[id^="ghost-w-"], input[id^="ghost-r-"]');
+            inputs.forEach(input => {
+                if (input && input.value !== "" && input.value !== null) {
+                    drafts[input.id] = input.value;
+                }
+            });
+        }
+
+        function restoreInputDrafts() {
+            Object.keys(drafts).forEach(id => {
+                const el = document.getElementById(id);
+                if (el && drafts[id] !== undefined) {
+                    el.value = drafts[id];
                 }
             });
         }
@@ -669,7 +707,6 @@
             appData.logs.push(newLog);
             StateManager.saveCache();
 
-            delete drafts[exName];
             renderActiveWorkout();
             renderDashboard();
 
@@ -914,10 +951,13 @@
         async function apiCall(method, payload = null, typeParam = "") {
             if (!API_URL) return { success: false, error: "Offline / Local Mode" };
             const url = typeParam ? `${API_URL}?type=${encodeURIComponent(typeParam)}` : API_URL;
-            const options = { method };
+            const options = {
+                method,
+                redirect: 'follow'
+            };
             if (payload) {
                 options.body = JSON.stringify(payload);
-                options.headers = { "Content-Type": "text/plain;charset=utf-8" };
+                options.headers = { "Content-Type": "text/plain" };
             }
             try {
                 const res = await fetch(url, options);
@@ -1223,6 +1263,7 @@
             }).join('');
 
             container.innerHTML = toolbarHtml + cardsHtml;
+            restoreInputDrafts();
         }
 
         // --- 8. Training History Dashboard Smart Accordions & Inline Set Editing ---
@@ -1436,12 +1477,20 @@
         }
 
         function renderExerciseLibrary() {
-            const exHtml = appData.exercises.map(ex => `
+            const exHtml = appData.exercises.map(ex => {
+                const escapedName = ex.Name.replace(/'/g, "\\'");
+                return `
                 <div class="flex justify-between items-center p-3.5 bg-zinc-900 border border-zinc-800/80 rounded-xl text-white shadow-sm">
                     <span class="font-bold text-sm">${ex.Name}</span>
-                    <span class="text-xs bg-zinc-800 border border-zinc-700/60 text-zinc-400 px-2.5 py-1 rounded-lg font-medium">${ex.Category}</span>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs bg-zinc-800 border border-zinc-700/60 text-zinc-400 px-2.5 py-1 rounded-lg font-medium">${ex.Category}</span>
+                        <button onclick="deleteExercise('${escapedName}')" class="text-zinc-500 hover:text-rose-400 p-1.5 transition rounded-lg hover:bg-rose-500/10" title="Delete Exercise">
+                            <i class="fas fa-trash-alt text-xs"></i>
+                        </button>
+                    </div>
                 </div>
-            `).join('');
+                `;
+            }).join('');
             const el = document.getElementById('exercise-list');
             if (el) {
                 el.innerHTML = exHtml || '<p class="text-sm text-zinc-400 italic">No exercises added to database yet.</p>';
@@ -1758,7 +1807,6 @@
 
             if (repsEl) repsEl.value = "";
             if (weightEl) weightEl.value = "";
-            delete drafts[exName];
             renderActiveWorkout();
             renderDashboard();
 
@@ -1817,28 +1865,46 @@
             switchTab('log');
         }
 
-        async function addExercise() {
-            const name = document.getElementById("new-ex-name").value;
-            const cat = document.getElementById("new-ex-cat").value;
-            if(!name) return alert("Please provide an exercise name.");
+        function addExercise() {
+            const nameEl = document.getElementById("new-ex-name");
+            const catEl = document.getElementById("new-ex-cat");
+            const name = nameEl ? nameEl.value.trim() : "";
+            const cat = catEl ? catEl.value : "Chest";
+            if (!name) return alert("Please provide an exercise name.");
 
-            showLoading();
-            const payload = {
-                type: "Exercises",
-                data: { ID: 'EX-'+Date.now(), Name: name, Category: cat }
+            const newEx = {
+                ID: 'EX-' + Date.now(),
+                Name: name,
+                Category: cat
             };
-            const res = await apiCall('POST', payload);
-            hideLoading();
-            
-            if (!res.success) {
-                return alert("Failed to add exercise: " + (res.error || "Unknown error"));
-            }
-            
-            appData.exercises.push(payload.data);
+
+            appData.exercises.push(newEx);
             StateManager.saveCache();
-            document.getElementById("new-ex-name").value = "";
+            if (nameEl) nameEl.value = "";
             renderAll();
-            alert(`Added ${name} to your library!`);
+            alert(`Added "${name}" to your library!`);
+
+            Outbox.enqueue({
+                id: newEx.ID,
+                type: "Exercises",
+                action: "ADD_EXERCISE",
+                data: newEx
+            });
+        }
+
+        function deleteExercise(exName) {
+            if (!confirm(`Are you sure you want to delete "${exName}" from your library?`)) return;
+
+            appData.exercises = appData.exercises.filter(ex => ex.Name !== exName);
+            StateManager.saveCache();
+            renderAll();
+
+            Outbox.enqueue({
+                id: 'del-ex-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+                type: "Exercises",
+                action: "DELETE_EXERCISE",
+                Name: exName
+            });
         }
 
         // Init App On Load

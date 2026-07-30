@@ -106,7 +106,7 @@ function doPost(e) {
   try {
     var body = JSON.parse(e.postData.contents);
     if (!body) throw new Error("Invalid payload: missing body");
-    var sheetType = body.type || (body.action && body.action.indexOf("TEMPLATE") !== -1 ? "Templates" : "Logs");
+    var sheetType = body.type || (body.action && body.action.indexOf("EXERCISE") !== -1 ? "Exercises" : (body.action && body.action.indexOf("TEMPLATE") !== -1 ? "Templates" : "Logs"));
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetType);
     
     if (!sheet) {
@@ -114,6 +114,24 @@ function doPost(e) {
     }
     
     var headers = ensureSchema(sheet, sheetType);
+
+    // Handle DELETE_EXERCISE action
+    if (body.action === "DELETE_EXERCISE") {
+      var targetName = body.Name || (body.data && body.data.Name);
+      var targetId = body.ID || (body.data && body.data.ID);
+      var data = sheet.getDataRange().getValues();
+      var nameIndex = headers.indexOf("Name");
+      var idIndex = headers.indexOf("ID");
+
+      for (var r = data.length - 1; r >= 1; r--) {
+        if ((targetName && nameIndex !== -1 && String(data[r][nameIndex]) === String(targetName)) ||
+            (targetId && idIndex !== -1 && String(data[r][idIndex]) === String(targetId))) {
+          sheet.deleteRow(r + 1);
+          return createJsonResponse({ success: true, message: "Exercise deleted successfully!" });
+        }
+      }
+      return createJsonResponse({ success: true, message: "Exercise already deleted or not found" });
+    }
     
     // Handle DELETE action
     if (body.action === "DELETE") {
