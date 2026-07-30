@@ -215,6 +215,9 @@
                         <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider">Select Exercises (Tap to add/remove)</label>
                         <button type="button" onclick="clearSelectedRoutineExercises()" class="text-xs font-bold text-zinc-400 hover:text-white transition">Clear All</button>
                     </div>
+                    <div id="routine-category-filters" class="flex flex-wrap gap-1.5 mb-2.5">
+                        <!-- Populated by JS -->
+                    </div>
                     <div id="routine-pill-picker" class="flex flex-wrap gap-2 max-h-52 overflow-y-auto p-2 bg-zinc-950/80 border border-zinc-800/80 rounded-xl">
                         <!-- Populated by JS -->
                     </div>
@@ -607,6 +610,16 @@
                 activeWorkout.targetSets[exName] = currentTarget - 1;
                 renderActiveWorkout();
             }
+        }
+
+        function moveActiveWorkoutExercise(exIndex, direction) {
+            if (!activeWorkout.exercises) return;
+            const newIdx = exIndex + direction;
+            if (newIdx < 0 || newIdx >= activeWorkout.exercises.length) return;
+            const temp = activeWorkout.exercises[exIndex];
+            activeWorkout.exercises[exIndex] = activeWorkout.exercises[newIdx];
+            activeWorkout.exercises[newIdx] = temp;
+            renderActiveWorkout();
         }
 
         function logGhostSet(exName, exIndex, rowIdx) {
@@ -1141,8 +1154,18 @@
                                 </span>
                                 <span class="font-extrabold text-white text-base tracking-tight truncate block">${exName}</span>
                             </div>
-                            <div class="flex items-center gap-2 shrink-0">
+                            <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
                                 ${completionBadgeHtml}
+                                ${exIndex > 0 ? `
+                                <button type="button" onclick="event.stopPropagation(); moveActiveWorkoutExercise(${exIndex}, -1)" class="w-7 h-7 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700/80 flex items-center justify-center text-zinc-400 hover:text-cyan-400 transition" title="Move Exercise Up">
+                                    <i class="fas fa-arrow-up text-xs"></i>
+                                </button>
+                                ` : ''}
+                                ${exIndex < activeWorkout.exercises.length - 1 ? `
+                                <button type="button" onclick="event.stopPropagation(); moveActiveWorkoutExercise(${exIndex}, 1)" class="w-7 h-7 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700/80 flex items-center justify-center text-zinc-400 hover:text-cyan-400 transition" title="Move Exercise Down">
+                                    <i class="fas fa-arrow-down text-xs"></i>
+                                </button>
+                                ` : ''}
                                 <button type="button" class="w-7 h-7 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700/80 flex items-center justify-center text-zinc-400 hover:text-white transition">
                                     <i class="fas fa-chevron-down text-xs transition-transform duration-200 accordion-chevron ${isExpanded ? 'rotate-180 text-cyan-400' : ''}"></i>
                                 </button>
@@ -1423,9 +1446,25 @@
             renderRoutinePillPicker();
         }
 
+        let routineFilterCategory = "All";
+        function setRoutineFilterCategory(cat) {
+            routineFilterCategory = cat;
+            renderRoutinePillPicker();
+        }
+
+        function moveRoutineExercise(index, direction) {
+            const newIdx = index + direction;
+            if (newIdx < 0 || newIdx >= selectedRoutineExercises.length) return;
+            const temp = selectedRoutineExercises[index];
+            selectedRoutineExercises[index] = selectedRoutineExercises[newIdx];
+            selectedRoutineExercises[newIdx] = temp;
+            renderRoutinePillPicker();
+        }
+
         function renderRoutinePillPicker() {
             const container = document.getElementById('routine-pill-picker');
             const summaryContainer = document.getElementById('selected-routine-summary');
+            const filterContainer = document.getElementById('routine-category-filters');
             if (!container) return;
 
             if (!appData.exercises || appData.exercises.length === 0) {
@@ -1433,7 +1472,24 @@
                 return;
             }
 
-            container.innerHTML = appData.exercises.map(ex => {
+            if (filterContainer) {
+                const categories = ["All", ...Array.from(new Set(appData.exercises.map(e => e.Category || "Other")))];
+                filterContainer.innerHTML = categories.map(cat => {
+                    const isCurrent = routineFilterCategory === cat;
+                    const btnClass = isCurrent
+                        ? "bg-violet-500/20 border-violet-500 text-violet-300 font-bold shadow-[0_0_10px_rgba(139,92,246,0.2)]"
+                        : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white";
+                    return `
+                        <button type="button" onclick="setRoutineFilterCategory('${cat.replace(/'/g, "\\'")}')" class="px-3 py-1.5 rounded-lg border text-xs transition ${btnClass}">
+                            ${cat}
+                        </button>
+                    `;
+                }).join('');
+            }
+
+            const filteredExercises = appData.exercises.filter(ex => routineFilterCategory === "All" || (ex.Category || "Other") === routineFilterCategory);
+
+            container.innerHTML = filteredExercises.map(ex => {
                 const isSelected = selectedRoutineExercises.includes(ex.Name);
                 const escapedName = ex.Name.replace(/'/g, "\\'");
                 const pillClass = isSelected
@@ -1451,11 +1507,20 @@
                 if (selectedRoutineExercises.length === 0) {
                     summaryContainer.innerHTML = `<span class="italic text-zinc-500">No exercises selected yet</span>`;
                 } else {
-                    summaryContainer.innerHTML = selectedRoutineExercises.map((exName, idx) => `
-                        <span class="inline-flex items-center gap-1 bg-zinc-800/80 border border-zinc-700 text-zinc-300 text-xs px-2.5 py-1 rounded-lg font-medium">
-                            <span class="text-cyan-400 font-bold">${idx + 1}.</span> ${exName}
+                    summaryContainer.innerHTML = selectedRoutineExercises.map((exName, idx) => {
+                        const escapedName = exName.replace(/'/g, "\\'");
+                        return `
+                        <span class="inline-flex items-center gap-1.5 bg-zinc-900 border border-cyan-500/30 text-white text-xs px-2.5 py-1.5 rounded-lg font-semibold shadow-xs">
+                            <span class="text-cyan-400 font-bold">${idx + 1}.</span> 
+                            <span>${exName}</span>
+                            <span class="flex items-center gap-1 ml-1 border-l border-zinc-700/80 pl-1.5">
+                                ${idx > 0 ? `<button type="button" onclick="event.stopPropagation(); moveRoutineExercise(${idx}, -1)" class="w-5 h-5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-cyan-400 flex items-center justify-center transition" title="Move Up"><i class="fas fa-arrow-up text-[9px]"></i></button>` : ''}
+                                ${idx < selectedRoutineExercises.length - 1 ? `<button type="button" onclick="event.stopPropagation(); moveRoutineExercise(${idx}, 1)" class="w-5 h-5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-cyan-400 flex items-center justify-center transition" title="Move Down"><i class="fas fa-arrow-down text-[9px]"></i></button>` : ''}
+                                <button type="button" onclick="event.stopPropagation(); toggleRoutineExercise('${escapedName}')" class="w-5 h-5 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 flex items-center justify-center transition" title="Remove"><i class="fas fa-times text-[9px]"></i></button>
+                            </span>
                         </span>
-                    `).join('');
+                        `;
+                    }).join('');
                 }
             }
         }
