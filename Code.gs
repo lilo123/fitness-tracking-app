@@ -2,7 +2,18 @@
 // This acts as the backend API for your fitness tracker.
 
 function formatDateLocal(dateObj) {
-  return Utilities.formatDate(dateObj, SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(), "yyyy-MM-dd");
+  if (!dateObj) return "";
+  if (typeof dateObj === "string") {
+    var match = dateObj.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (match) {
+      return match[1] + "-" + ("0" + match[2]).slice(-2) + "-" + ("0" + match[3]).slice(-2);
+    }
+    dateObj = new Date(dateObj);
+  }
+  if (dateObj instanceof Date && !isNaN(dateObj.getTime())) {
+    return Utilities.formatDate(dateObj, SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(), "yyyy-MM-dd");
+  }
+  return String(dateObj);
 }
 
 function doGet(e) {
@@ -48,7 +59,7 @@ function doGet(e) {
   var result = data.map(function(row) {
     var obj = {};
     headers.forEach(function(header, i) {
-      obj[header] = (header === 'Date' && row[i] instanceof Date) ? formatDateLocal(row[i]) : row[i];
+      obj[header] = (header === 'Date' && row[i]) ? formatDateLocal(row[i]) : row[i];
     });
     return obj;
   });
@@ -73,6 +84,16 @@ function ensureSchema(sheet, sheetType) {
       }
     });
   }
+  if (sheetType === 'Templates') {
+    var requiredCols = ["Template_ID", "Template_Name", "Exercise_Sequence"];
+    requiredCols.forEach(function(col) {
+      if (headers.indexOf(col) === -1) {
+        lastCol++;
+        sheet.getRange(1, lastCol).setValue(col);
+        headers.push(col);
+      }
+    });
+  }
   return headers;
 }
 
@@ -84,8 +105,8 @@ function doPost(e) {
   
   try {
     var body = JSON.parse(e.postData.contents);
-    if (!body || !body.type) throw new Error("Invalid payload: missing type");
-    var sheetType = body.type; 
+    if (!body) throw new Error("Invalid payload: missing body");
+    var sheetType = body.type || (body.action && body.action.indexOf("TEMPLATE") !== -1 ? "Templates" : "Logs");
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetType);
     
     if (!sheet) {
@@ -96,7 +117,7 @@ function doPost(e) {
     
     // Handle DELETE action
     if (body.action === "DELETE") {
-      var targetId = String(body.Log_ID);
+      var targetId = String(body.Log_ID || (body.data && body.data.Log_ID));
       var data = sheet.getDataRange().getValues();
       var idIndex = headers.indexOf("Log_ID");
       if (idIndex === -1) throw new Error("Log_ID column not found");
@@ -110,6 +131,83 @@ function doPost(e) {
       return createJsonResponse({ success: true, message: "Log_ID already deleted or not found" });
     }
     
+    // Handle UPDATE action
+    if (body.action === "UPDATE") {
+      var targetId = String(body.Log_ID || (body.data && body.data.Log_ID));
+      var newWeight = body.Weight != null ? body.Weight : (body.data && body.data.Weight != null ? body.data.Weight : "");
+      var newReps = body.Reps != null ? body.Reps : (body.data && body.data.Reps != null ? body.data.Reps : "");
+      var data = sheet.getDataRange().getValues();
+      var idIndex = headers.indexOf("Log_ID");
+      var weightIndex = headers.indexOf("Weight");
+      var repsIndex = headers.indexOf("Reps");
+      if (idIndex === -1) throw new Error("Log_ID column not found");
+      
+      for (var r = 1; r < data.length; r++) {
+        if (String(data[r][idIndex]) === targetId) {
+          var updatedRow = data[r].slice();
+          if (weightIndex !== -1) updatedRow[weightIndex] = newWeight;
+          if (repsIndex !== -1) updatedRow[repsIndex] = newReps;
+          sheet.getRange(r + 1, 1, 1, headers.length).setValues([updatedRow]);
+          return createJsonResponse({ success: true, message: "Log updated successfully!" });
+        }
+      }
+      return createJsonResponse({ success: false, error: "Log_ID not found: " + targetId });
+    }
+
+    // Handle UPDATE_TEMPLATE action
+    if (body.action === "UPDATE_TEMPLATE") {
+      var targetId = body.Template_ID || (body.data && body.data.Template_ID);
+      var oldName = body.old_Template_Name || body.Template_Name || (body.data && (body.data.old_Template_Name || body.data.Template_Name));
+      var newName = body.new_Template_Name || body.Template_Name || (body.data && (body.data.new_Template_Name || body.data.Template_Name));
+      var newSeq = body.Exercise_Sequence || (body.data && body.data.Exercise_Sequence) || "";
+      
+      var data = sheet.getDataRange().getValues();
+      var idIndex = headers.indexOf("Template_ID");
+      var nameIndex = headers.indexOf("Template_Name");
+      var seqIndex = headers.indexOf("Exercise_Sequence");
+      
+      for (var r = 1; r < data.length; r++) {
+        var match = false;
+        if (targetId && idIndex !== -1 && String(data[r][idIndex]) === String(targetId)) {
+          match = true;
+        } else if (oldName && nameIndex !== -1 && String(data[r][nameIndex]) === String(oldName)) {
+          match = true;
+        }
+        if (match) {
+          var updatedRow = data[r].slice();
+          if (nameIndex !== -1 && newName) updatedRow[nameIndex] = newName;
+          if (seqIndex !== -1) updatedRow[seqIndex] = newSeq;
+          sheet.getRange(r + 1, 1, 1, headers.length).setValues([updatedRow]);
+          return createJsonResponse({ success: true, message: "Template updated successfully!" });
+        }
+      }
+      return createJsonResponse({ success: false, error: "Template not found" });
+    }
+
+    // Handle DELETE_TEMPLATE action
+    if (body.action === "DELETE_TEMPLATE") {
+      var targetId = body.Template_ID || (body.data && body.data.Template_ID);
+      var targetName = body.Template_Name || (body.data && body.data.Template_Name);
+      
+      var data = sheet.getDataRange().getValues();
+      var idIndex = headers.indexOf("Template_ID");
+      var nameIndex = headers.indexOf("Template_Name");
+      
+      for (var r = data.length - 1; r >= 1; r--) {
+        var match = false;
+        if (targetId && idIndex !== -1 && String(data[r][idIndex]) === String(targetId)) {
+          match = true;
+        } else if (targetName && nameIndex !== -1 && String(data[r][nameIndex]) === String(targetName)) {
+          match = true;
+        }
+        if (match) {
+          sheet.deleteRow(r + 1);
+          return createJsonResponse({ success: true, message: "Template deleted successfully!" });
+        }
+      }
+      return createJsonResponse({ success: true, message: "Template already deleted or not found" });
+    }
+
     // Handle BATCH_APPEND action
     if (body.action === "BATCH_APPEND" && Array.isArray(body.items)) {
       var clientIndex = headers.indexOf("Client_ID");

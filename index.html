@@ -1,132 +1,195 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fitness Tracker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Fitness Tracker - Obsidian Cyber-Gym</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        zinc: {
+                            850: '#1a1a1e',
+                            925: '#121215',
+                            950: '#09090b',
+                        }
+                    },
+                    boxShadow: {
+                        'neon-cyan': '0 0 15px rgba(6, 182, 212, 0.3)',
+                        'neon-emerald': '0 0 15px rgba(16, 185, 129, 0.3)',
+                        'neon-violet': '0 0 15px rgba(139, 92, 246, 0.3)',
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        ::-webkit-scrollbar { display: none; }
-        .tab-btn.active { color: #06b6d4; font-weight: 800; }
+        body {
+            background-color: #09090b;
+            color: #f4f4f5;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        /* Custom Scrollbar for High-Density UI */
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #09090b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #27272a;
+            border-radius: 2px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #3f3f46;
+        }
+        .pb-safe {
+            padding-bottom: env(safe-area-inset-bottom, 20px);
+        }
+        /* Hide number spinner arrows */
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
     </style>
 </head>
-<body class="bg-[#09090b] text-zinc-100 font-sans antialiased h-screen flex flex-col selection:bg-cyan-500 selection:text-black relative">
-    <!-- Ambient glowing cyber-gym backdrop -->
-    <div class="fixed inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(6,182,212,0.12),rgba(255,255,255,0))] pointer-events-none z-0"></div>
+<body class="min-h-screen flex flex-col bg-zinc-950 text-zinc-100 pb-24 selection:bg-cyan-500/20 selection:text-cyan-300">
 
-    <!-- Header -->
-    <header class="bg-zinc-900/80 backdrop-blur-xl sticky top-0 border-b border-zinc-800/80 px-4 h-14 flex justify-between items-center z-30 shadow-lg">
+    <!-- Top Navbar (OLED Obsidian Cyber-Gym style) -->
+    <header class="bg-zinc-900/90 backdrop-blur-xl border-b border-zinc-800/80 sticky top-0 z-30 px-4 py-3 flex items-center justify-between shadow-lg">
         <div class="flex items-center gap-2.5">
-            <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-zinc-950 font-black text-sm shadow-[0_0_15px_rgba(6,182,212,0.35)]">
-                <i class="fas fa-dumbbell"></i>
+            <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-neon-cyan">
+                <i class="fas fa-bolt text-zinc-950 font-black text-sm"></i>
             </div>
-            <h1 class="text-lg font-black tracking-tight text-white">Workout Log</h1>
+            <div>
+                <h1 class="font-black tracking-wider text-base uppercase bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">Cyber-Gym</h1>
+                <div class="text-[10px] font-mono tracking-widest uppercase text-cyan-400 font-semibold -mt-1">Telemetry & Logs</div>
+            </div>
         </div>
-        <div class="flex items-center gap-3">
-            <span id="sync-badge" class="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/30 flex items-center gap-1.5 shadow-[0_0_10px_rgba(16,185,129,0.15)]">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span> Synced
-            </span>
-            <button onclick="fetchData()" class="w-10 h-10 flex items-center justify-center rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800/80 active:scale-95 transition-all" aria-label="Sync Data" title="Force Sync">
-                <i class="fas fa-sync-alt text-sm"></i>
-            </button>
+        <div class="flex items-center gap-2">
+            <!-- Sync Badge -->
+            <div id="sync-badge" class="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/30 flex items-center gap-1.5 shadow-[0_0_10px_rgba(16,185,129,0.15)]">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+                <span>Synced</span>
+            </div>
+            <!-- Loading Indicator -->
+            <div id="loading" class="hidden text-xs font-mono bg-cyan-500/10 text-cyan-400 px-2.5 py-1 rounded-full border border-cyan-500/30 flex items-center gap-1.5">
+                <i class="fas fa-circle-notch animate-spin text-xs"></i>
+                <span>API</span>
+            </div>
         </div>
     </header>
 
-    <!-- Main Content -->
-    <main class="flex-1 overflow-y-auto p-4 pb-28 relative z-10" id="main-container">
-        
-        <!-- Loading Overlay -->
-        <div id="loading" class="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm flex items-center justify-center z-50 hidden">
-            <div class="text-lg font-black text-cyan-400 flex items-center gap-2.5"><i class="fas fa-spinner fa-spin text-xl"></i> Loading...</div>
-        </div>
+    <!-- Main Container -->
+    <main class="flex-1 max-w-xl w-full mx-auto p-4">
 
-        <!-- TAB: DASHBOARD (Calendar/Tracker) -->
-        <div id="tab-dashboard" class="tab-content hidden">
-            <div class="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl shadow-xl p-5 mb-5">
-                <h2 class="text-lg font-black border-b border-zinc-800 pb-3 mb-4 text-white flex items-center gap-2">
-                    <i class="fas fa-history text-cyan-400"></i> Training History
-                </h2>
-                <div id="dashboard-list" class="space-y-4">
-                    <!-- Populated by JS -->
-                </div>
-            </div>
-        </div>
-
-        <!-- TAB: LOG (Active Workout Session) -->
-        <div id="tab-log" class="tab-content tab-active">
-            <!-- Header Action Pill (Zero-Click Landing View) -->
-            <div class="bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-900/60 border border-zinc-800/90 rounded-2xl p-5 shadow-xl mb-5 flex justify-between items-center relative overflow-hidden">
-                <div class="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-cyan-500 via-blue-500 to-transparent"></div>
-                <div>
-                    <span class="text-[10px] font-black uppercase tracking-widest text-cyan-400 block mb-1">Today's Scheduled Routine</span>
-                    <div class="flex items-center gap-2.5">
-                        <h2 id="active-routine-label" class="text-xl font-black text-white tracking-tight">Free Workout</h2>
-                        <button onclick="openRoutineModal()" class="text-xs bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 rounded-full font-bold border border-zinc-700/80 transition flex items-center gap-1.5 shadow-sm">
-                            <span>Switch</span> <i class="fas fa-chevron-down text-[10px] text-cyan-400"></i>
+        <!-- TAB: WORKOUT (Active Routine Logging) -->
+        <div id="tab-log" class="tab-content">
+            
+            <!-- Routine & Date Header Banner -->
+            <div class="bg-gradient-to-b from-zinc-900 to-zinc-900/80 border border-zinc-800/80 rounded-2xl p-4 mb-5 shadow-xl">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-extrabold uppercase tracking-widest text-zinc-400">Schedule:</span>
+                        <button onclick="openRoutineModal()" id="routine-select-btn" class="bg-zinc-800/90 hover:bg-zinc-700/80 border border-zinc-700/80 hover:border-cyan-500/50 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-2 transition-all shadow-sm">
+                            <i class="fas fa-layer-group text-cyan-400 text-xs"></i>
+                            <span id="active-routine-label">Free Workout</span>
+                            <i class="fas fa-chevron-down text-zinc-400 text-[10px] ml-0.5"></i>
                         </button>
                     </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-extrabold uppercase tracking-widest text-zinc-400">Date:</span>
+                        <input type="date" id="log-date" onchange="onWorkoutDateChange()" class="bg-zinc-950 border border-zinc-800 text-cyan-400 rounded-xl px-2.5 py-1 text-xs font-mono font-bold focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none shadow-inner">
+                    </div>
                 </div>
-                <div class="flex items-center">
-                    <input type="date" id="log-date" onchange="onWorkoutDateChange()" class="bg-zinc-800/80 border border-zinc-700 text-zinc-100 rounded-xl px-3 py-1.5 text-xs font-bold focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500 outline-none">
-                </div>
-            </div>
-
-            <!-- Active Workout Exercises Container -->
-            <div id="active-workout-exercises" class="space-y-4 mb-5">
-                <!-- Dynamically rendered Exercise Cards with Benchmark Banners -->
-            </div>
-
-            <!-- Add Exercise to Workout Selector -->
-            <div class="bg-zinc-900/40 rounded-2xl shadow-lg p-5 mb-6 border border-dashed border-zinc-800">
-                <label class="block text-xs font-black text-zinc-400 uppercase tracking-widest mb-2.5">Add Exercise to Workout</label>
-                <div class="flex gap-2.5">
-                    <select id="add-exercise-select" class="flex-1 bg-zinc-950 border border-zinc-800 text-zinc-200 rounded-xl p-3 text-sm font-bold focus:border-cyan-500 outline-none">
-                        <option value="">-- Choose Exercise --</option>
-                    </select>
-                    <button onclick="addExerciseToActiveWorkout()" class="bg-zinc-800 hover:bg-zinc-700 text-white px-5 py-3 rounded-xl text-sm font-black hover:border-zinc-600 active:scale-95 transition-all border border-zinc-700/80">
-                        + Add
+                <div class="flex items-center justify-between pt-2 border-t border-zinc-800/60 text-xs text-zinc-400">
+                    <div class="flex items-center gap-1.5">
+                        <i class="fas fa-info-circle text-cyan-400"></i>
+                        <span>Zero-Click Smart Rotation Enabled</span>
+                    </div>
+                    <button onclick="finishWorkout()" class="bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 hover:text-emerald-200 font-extrabold px-3 py-1 rounded-lg text-xs transition flex items-center gap-1.5 shadow-[0_0_10px_rgba(16,185,129,0.15)] active:scale-95">
+                        <i class="fas fa-flag-checkered text-emerald-400"></i>
+                        <span>Finish Workout</span>
                     </button>
                 </div>
             </div>
 
-            <!-- Finish Workout Card -->
-            <div id="finish-workout-card" class="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 active:scale-[0.98] text-zinc-950 rounded-2xl shadow-[0_0_25px_rgba(16,185,129,0.25)] p-4 text-center cursor-pointer transition-all font-black text-base mb-8" onclick="finishWorkout()">
-                <i class="fas fa-check-circle mr-2"></i> Finish Workout Session
+            <!-- Exercises Container (Smart Accordions + Ghost Sets) -->
+            <div id="active-workout-exercises" class="space-y-4 mb-6">
+                <!-- Dynamically Rendered by JS -->
             </div>
 
-            <!-- Routine Switcher Modal -->
-            <div id="routine-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-end sm:items-center justify-center p-4">
-                <div class="bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-zinc-800">
-                    <div class="p-4 border-b border-zinc-800 flex justify-between items-center">
-                        <h3 class="font-black text-white text-base">Select Workout Routine</h3>
-                        <button onclick="closeRoutineModal()" class="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center font-bold">✕</button>
-                    </div>
-                    <div id="routine-modal-list" class="p-3.5 space-y-2.5 max-h-80 overflow-y-auto">
-                        <!-- Populated by JS -->
-                    </div>
+            <!-- Add Exercise to Workout Picker -->
+            <div class="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-4 shadow-xl">
+                <div class="text-xs font-extrabold uppercase tracking-widest text-zinc-400 mb-2.5 flex items-center gap-1.5">
+                    <i class="fas fa-plus-circle text-cyan-400"></i> Add Exercise To Today's Session
                 </div>
+                <div class="flex gap-2">
+                    <select id="add-exercise-select" class="flex-1 bg-zinc-950 border border-zinc-800 text-white rounded-xl px-3 py-2 text-xs font-semibold focus:border-cyan-500 outline-none">
+                        <!-- Populated by JS -->
+                    </select>
+                    <button onclick="addExerciseToActiveWorkout()" class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black px-4 py-2 rounded-xl text-xs uppercase tracking-wider shadow-neon-cyan transition-all active:scale-95">
+                        Add
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- TAB: DASHBOARD (History & Volume Metrics) -->
+        <div id="tab-dashboard" class="tab-content hidden">
+            <div class="bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-transparent border border-cyan-500/20 rounded-2xl p-4 mb-5 flex items-center justify-between">
+                <div>
+                    <h2 class="text-base font-black text-white flex items-center gap-2">
+                        <i class="fas fa-chart-line text-cyan-400"></i> Training History & Telemetry
+                    </h2>
+                    <p class="text-xs text-zinc-400 mt-0.5">Accordion day cards with exercise volume breakdown & inline set editing.</p>
+                </div>
+            </div>
+
+            <div id="dashboard-list">
+                <!-- Rendered by JS -->
             </div>
         </div>
 
-        <!-- TAB: EXERCISES -->
+        <!-- TAB: EXERCISES (Library & Custom Builder) -->
         <div id="tab-exercises" class="tab-content hidden">
             <div class="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5 mb-6 shadow-xl text-sm">
                 <h2 class="text-base font-black border-b border-zinc-800 pb-3 mb-4 text-white flex items-center gap-2">
-                    <i class="fas fa-plus-circle text-cyan-400"></i> Add New Exercise
+                    <i class="fas fa-plus-circle text-cyan-400"></i> Create Custom Exercise
                 </h2>
-                <div class="mb-3.5">
-                    <label class="block text-xs font-bold text-zinc-400 mb-1.5 uppercase tracking-wider">Exercise Name</label>
-                    <input type="text" id="new-ex-name" class="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-sm font-semibold focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none" placeholder="e.g. Incline Dumbbell Press">
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-bold text-zinc-400 mb-1.5 uppercase tracking-wider">Exercise Name</label>
+                        <input type="text" id="new-ex-name" class="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-sm font-semibold focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none" placeholder="e.g. Incline Dumbbell Press">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-zinc-400 mb-1.5 uppercase tracking-wider">Target Muscle Category</label>
+                        <select id="new-ex-cat" class="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-sm font-semibold focus:border-cyan-500 outline-none">
+                            <option value="Chest">Chest</option>
+                            <option value="Back">Back</option>
+                            <option value="Legs">Legs</option>
+                            <option value="Shoulders">Shoulders</option>
+                            <option value="Arms">Arms</option>
+                            <option value="Core">Core</option>
+                            <option value="Cardio">Cardio</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <button onclick="addExercise()" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black py-3 rounded-xl shadow-neon-cyan active:scale-95 transition-all mt-1">
+                        Save to Library
+                    </button>
                 </div>
-                <div class="mb-5">
-                    <label class="block text-xs font-bold text-zinc-400 mb-1.5 uppercase tracking-wider">Category</label>
-                    <select id="new-ex-cat" class="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-sm font-semibold focus:border-cyan-500 outline-none">
-                        <option>Chest</option><option>Back</option><option>Legs</option>
-                        <option>Shoulders</option><option>Arms</option><option>Core</option><option>Cardio</option>
-                    </select>
-                </div>
-                <button onclick="addExercise()" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-zinc-950 font-black py-3 rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.25)] active:scale-95 transition-all">Add to Library</button>
             </div>
             
             <h3 class="font-black text-white text-base mb-3 flex items-center gap-2">
@@ -137,9 +200,9 @@
             </div>
         </div>
 
-        <!-- TAB: PLANS -->
+        <!-- TAB: PLANS (Schedules & Routines) -->
         <div id="tab-plans" class="tab-content hidden">
-             <div class="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5 mb-6 shadow-xl text-sm">
+             <div id="routine-builder-form" class="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5 mb-6 shadow-xl text-sm">
                 <h2 class="text-base font-black border-b border-zinc-800 pb-3 mb-4 text-white flex items-center gap-2">
                     <i class="fas fa-calendar-plus text-violet-400"></i> Create Workout Routine
                 </h2>
@@ -147,13 +210,25 @@
                     <label class="block text-xs font-bold text-zinc-400 mb-1.5 uppercase tracking-wider">Routine Name</label>
                     <input type="text" id="new-plan-name" class="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-sm font-semibold focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none" placeholder="e.g. Pull Day A">
                 </div>
-                <div class="mb-5">
-                    <label class="block text-xs font-bold text-zinc-400 mb-1.5 uppercase tracking-wider">Included Exercises (Hold Ctrl/Cmd to select multiple)</label>
-                    <select id="new-plan-exercises" multiple class="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-sm font-semibold h-36 focus:border-violet-500 outline-none">
+                <div class="mb-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider">Select Exercises (Tap to add/remove)</label>
+                        <button type="button" onclick="clearSelectedRoutineExercises()" class="text-xs font-bold text-zinc-400 hover:text-white transition">Clear All</button>
+                    </div>
+                    <div id="routine-pill-picker" class="flex flex-wrap gap-2 max-h-52 overflow-y-auto p-2 bg-zinc-950/80 border border-zinc-800/80 rounded-xl">
                         <!-- Populated by JS -->
-                    </select>
+                    </div>
                 </div>
-                <button onclick="addPlan()" class="w-full bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-400 hover:to-indigo-500 text-white font-black py-3 rounded-xl shadow-[0_0_15px_rgba(139,92,246,0.25)] active:scale-95 transition-all">Save Routine</button>
+                <div class="mb-5">
+                    <label class="block text-xs font-bold text-zinc-400 mb-1.5 uppercase tracking-wider">Selected Sequence</label>
+                    <div id="selected-routine-summary" class="bg-zinc-950/60 border border-zinc-800/60 rounded-xl p-3 text-xs text-zinc-400 min-h-[40px] flex flex-wrap gap-1.5 items-center">
+                        <span class="italic text-zinc-500">No exercises selected yet</span>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <button id="save-routine-btn" onclick="saveRoutineHandler()" class="w-full bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-400 hover:to-indigo-500 text-white font-black py-3 rounded-xl shadow-[0_0_15px_rgba(139,92,246,0.25)] active:scale-95 transition-all">Save Routine</button>
+                    <button id="cancel-edit-routine-btn" onclick="cancelEditRoutine()" class="hidden bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold px-4 py-3 rounded-xl transition-all">Cancel</button>
+                </div>
             </div>
 
             <h3 class="font-black text-white text-base mb-3 flex items-center gap-2">
@@ -181,11 +256,36 @@
             <span class="text-[11px] font-medium">Routines</span>
         </button>
         <button onclick="switchTab('exercises')" id="nav-exercises" class="tab-btn flex-1 min-h-[52px] flex flex-col items-center justify-center text-zinc-500 hover:text-zinc-300 transition-all">
-            <i class="fas fa-list text-lg mb-0.5"></i>
-            <span class="text-[11px] font-medium">Library</span>
+            <i class="fas fa-book-open text-lg mb-0.5"></i>
+            <span class="text-[11px] font-medium">Exercises</span>
         </button>
-    </nav>    <script>
-        const API_URL = "https://script.google.com/macros/s/AKfycbyZbnG3jv37Af1pKFOZIEAamQRHFzIKSQN4IvwdxsWCjWb_NCJV0NGSpOThNN7sqOGwnQ/exec";
+    </nav>
+
+    <!-- Routine Select Modal -->
+    <div id="routine-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl">
+            <div class="flex justify-between items-center pb-3 border-b border-zinc-800 mb-4">
+                <h3 class="font-black text-white text-base flex items-center gap-2">
+                    <i class="fas fa-layer-group text-cyan-400"></i> Choose Schedule
+                </h3>
+                <button onclick="closeRoutineModal()" class="text-zinc-400 hover:text-white p-1">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="routine-modal-options" class="space-y-2 max-h-80 overflow-y-auto mb-4">
+                <!-- Populated by JS -->
+            </div>
+            <div class="pt-3 border-t border-zinc-800 flex justify-end">
+                <button onclick="closeRoutineModal()" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold px-4 py-2 rounded-xl text-xs transition">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        const API_URL = ""; // Empty string for same-origin web app deployment
         
         let appData = {
             exercises: [],
@@ -209,6 +309,24 @@
             const monthStr = months[mIdx] || parts[1];
             const dayStr = parseInt(parts[2], 10);
             return `${monthStr} ${dayStr}`;
+        }
+
+        // --- 0. Date Normalizer Helper (Requirement #1) ---
+        function normalizeDateStr(val) {
+            if (!val) return "";
+            if (typeof val === "string") {
+                const match = val.match(/^(\d{4}-\d{2}-\d{2})/);
+                if (match) return match[1];
+            }
+            if (val instanceof Date && !isNaN(val.getTime())) {
+                const year = val.getFullYear();
+                const month = String(val.getMonth() + 1).padStart(2, '0');
+                const day = String(val.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            }
+            const str = String(val);
+            const match = str.match(/^(\d{4}-\d{2}-\d{2})/);
+            return match ? match[1] : str;
         }
 
         const DEFAULT_EXERCISES = [
@@ -258,7 +376,12 @@
                     if (saved) {
                         const parsed = JSON.parse(saved);
                         if (parsed.exercises && Array.isArray(parsed.exercises)) appData.exercises = parsed.exercises;
-                        if (parsed.logs && Array.isArray(parsed.logs)) appData.logs = parsed.logs;
+                        if (parsed.logs && Array.isArray(parsed.logs)) {
+                            appData.logs = parsed.logs.map(log => ({
+                                ...log,
+                                Date: normalizeDateStr(log.Date)
+                            }));
+                        }
                         if (parsed.templates && Array.isArray(parsed.templates)) appData.templates = parsed.templates;
                     }
                 } catch (e) { console.warn("Failed to load local cache:", e); }
@@ -319,10 +442,13 @@
                 try {
                     const batchItems = q.filter(item => item.action === "BATCH_APPEND").map(i => i.data);
                     const deleteItems = q.filter(item => item.action === "DELETE");
+                    const updateItems = q.filter(item => item.action === "UPDATE");
+                    const updateTplItems = q.filter(item => item.action === "UPDATE_TEMPLATE");
+                    const delTplItems = q.filter(item => item.action === "DELETE_TEMPLATE");
                     
                     if (batchItems.length > 0) {
                         const res = await apiCall('POST', { type: "Logs", action: "BATCH_APPEND", items: batchItems });
-                        if (res.success) {
+                        if (res && res.success) {
                             const syncedIds = new Set(batchItems.map(i => i.Client_ID));
                             const remaining = this.getQueue().filter(item => !syncedIds.has(item.id));
                             this.saveQueue(remaining);
@@ -331,7 +457,43 @@
                     
                     for (const del of deleteItems) {
                         const res = await apiCall('POST', { type: "Logs", action: "DELETE", Log_ID: del.Log_ID });
-                        if (res.success) {
+                        if (res && res.success) {
+                            const remaining = this.getQueue().filter(item => item.id !== del.id);
+                            this.saveQueue(remaining);
+                        }
+                    }
+
+                    for (const upd of updateItems) {
+                        const res = await apiCall('POST', { type: "Logs", action: "UPDATE", Log_ID: upd.Log_ID, Weight: upd.Weight, Reps: upd.Reps });
+                        if (res && res.success) {
+                            const remaining = this.getQueue().filter(item => item.id !== upd.id);
+                            this.saveQueue(remaining);
+                        }
+                    }
+
+                    for (const upd of updateTplItems) {
+                        const res = await apiCall('POST', {
+                            type: "Templates",
+                            action: "UPDATE_TEMPLATE",
+                            Template_ID: upd.Template_ID,
+                            old_Template_Name: upd.old_Template_Name,
+                            new_Template_Name: upd.new_Template_Name,
+                            Exercise_Sequence: upd.Exercise_Sequence
+                        });
+                        if (res && res.success) {
+                            const remaining = this.getQueue().filter(item => item.id !== upd.id);
+                            this.saveQueue(remaining);
+                        }
+                    }
+
+                    for (const del of delTplItems) {
+                        const res = await apiCall('POST', {
+                            type: "Templates",
+                            action: "DELETE_TEMPLATE",
+                            Template_ID: del.Template_ID,
+                            Template_Name: del.Template_Name
+                        });
+                        if (res && res.success) {
                             const remaining = this.getQueue().filter(item => item.id !== del.id);
                             this.saveQueue(remaining);
                         }
@@ -347,16 +509,17 @@
         window.addEventListener('offline', () => Outbox.updateSyncBadge());
 
         // --- 3. Benchmark Engine (PR + Last Session Stats) ---
-        function getExerciseBenchmarks(exerciseId, currentDate) {
+        function getExerciseBenchmarks(exerciseId, currentDateVal) {
+            const currentDate = normalizeDateStr(currentDateVal);
             const history = appData.logs.filter(l => 
                 l.Exercise_ID === exerciseId && 
-                l.Date < currentDate &&
+                normalizeDateStr(l.Date) < currentDate &&
                 l.Weight !== "" && l.Reps !== ""
             );
 
             const allHistory = appData.logs.filter(l => 
                 l.Exercise_ID === exerciseId && 
-                l.Date <= currentDate &&
+                normalizeDateStr(l.Date) <= currentDate &&
                 l.Weight !== "" && l.Reps !== ""
             );
 
@@ -364,12 +527,12 @@
                 return { lastSession: null, pr: null };
             }
 
-            history.sort((a, b) => b.Date.localeCompare(a.Date) || ((a.Set_Index || 0) - (b.Set_Index || 0)));
+            history.sort((a, b) => normalizeDateStr(b.Date).localeCompare(normalizeDateStr(a.Date)) || ((a.Set_Index || 0) - (b.Set_Index || 0)));
 
             let lastSessionObj = null;
             if (history.length > 0) {
-                const lastSessionDate = history[0].Date;
-                const lastSessionSets = history.filter(l => l.Date === lastSessionDate);
+                const lastSessionDate = normalizeDateStr(history[0].Date);
+                const lastSessionSets = history.filter(l => normalizeDateStr(l.Date) === lastSessionDate);
                 const summaryText = lastSessionSets.map(s => `${s.Weight}×${s.Reps}`).join(', ');
                 lastSessionObj = {
                     date: lastSessionDate,
@@ -398,20 +561,18 @@
                 pr: bestSet ? {
                     weight: bestSet.Weight,
                     reps: bestSet.Reps,
-                    date: bestSet.Date
+                    date: normalizeDateStr(bestSet.Date)
                 } : null
             };
         }
 
-        // --- 3.5. Smart Accordion Helpers ---
+        // --- Active Input Preservation During Renders ---
         let drafts = {};
-
         function captureInputDrafts() {
-            if (!activeWorkout.exercises) return;
             activeWorkout.exercises.forEach((exName, exIndex) => {
                 const wEl = document.getElementById(`weight-${exIndex}`);
-                const rEl = document.getElementById(`reps-${exIndex}`);
-                if (wEl && rEl) {
+                const rEl = document.getElementById(`ghost-r-${exIndex}-0`) || document.getElementById(`reps-${exIndex}`);
+                if (wEl && rEl && (wEl.value !== "" || rEl.value !== "")) {
                     drafts[exName] = { weight: wEl.value, reps: rEl.value };
                 }
             });
@@ -421,15 +582,16 @@
             if (activeWorkout.targetSets && activeWorkout.targetSets[exName] !== undefined) {
                 return activeWorkout.targetSets[exName];
             }
-            const setsToday = appData.logs.filter(l => l.Date === dateVal && l.Exercise_ID === exName);
-            const benchmarks = getExerciseBenchmarks(exName, dateVal);
+            const normDate = normalizeDateStr(dateVal);
+            const setsToday = appData.logs.filter(l => normalizeDateStr(l.Date) === normDate && l.Exercise_ID === exName);
+            const benchmarks = getExerciseBenchmarks(exName, normDate);
             const lastSessionCount = (benchmarks.lastSession && benchmarks.lastSession.sets) ? benchmarks.lastSession.sets.length : 3;
             return Math.max(3, lastSessionCount, setsToday.length);
         }
 
         function addTargetSet(exName) {
             const dateInput = document.getElementById('log-date');
-            const dateVal = dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString();
+            const dateVal = normalizeDateStr(dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString());
             const currentTarget = getTargetSetCount(exName, dateVal);
             if (!activeWorkout.targetSets) activeWorkout.targetSets = {};
             activeWorkout.targetSets[exName] = currentTarget + 1;
@@ -438,7 +600,7 @@
 
         function removeTargetSet(exName) {
             const dateInput = document.getElementById('log-date');
-            const dateVal = dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString();
+            const dateVal = normalizeDateStr(dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString());
             const currentTarget = getTargetSetCount(exName, dateVal);
             if (currentTarget > 1) {
                 if (!activeWorkout.targetSets) activeWorkout.targetSets = {};
@@ -453,16 +615,16 @@
             const weightVal = wEl ? wEl.value : "";
             const repsVal = rEl ? rEl.value : "";
             if (!weightVal || !repsVal) {
-                return alert("Please enter Weight and Reps for set " + (rowIdx + 1));
+                return alert(`Please fill in both Weight and Reps to log Set ${rowIdx + 1}`);
             }
             logSetForExerciseDirect(exName, weightVal, repsVal);
         }
 
         function logSetForExerciseDirect(exName, weight, reps) {
             const dateInput = document.getElementById('log-date');
-            const dateVal = dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString();
+            const dateVal = normalizeDateStr(dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString());
 
-            const existingSets = appData.logs.filter(l => l.Date === dateVal && l.Exercise_ID === exName);
+            const existingSets = appData.logs.filter(l => normalizeDateStr(l.Date) === dateVal && l.Exercise_ID === exName);
             const setIdx = existingSets.length + 1;
 
             const newLog = {
@@ -492,15 +654,14 @@
         }
 
         function initDefaultAccordionState() {
+            if (!activeWorkout.expandedExercises) activeWorkout.expandedExercises = new Set();
             activeWorkout.expandedExercises.clear();
-            if (!activeWorkout.exercises || activeWorkout.exercises.length === 0) return;
-
             const dateInput = document.getElementById('log-date');
-            const dateVal = dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString();
+            const dateVal = normalizeDateStr(dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString());
 
             let foundUncompleted = false;
             for (const exName of activeWorkout.exercises) {
-                const setsToday = appData.logs.filter(l => l.Date === dateVal && l.Exercise_ID === exName);
+                const setsToday = appData.logs.filter(l => normalizeDateStr(l.Date) === dateVal && l.Exercise_ID === exName);
                 const targetCount = getTargetSetCount(exName, dateVal);
                 if (setsToday.length < targetCount) {
                     activeWorkout.expandedExercises.add(exName);
@@ -510,55 +671,52 @@
             }
 
             if (!foundUncompleted) {
-                const loggedToday = appData.logs.filter(l => l.Date === dateVal && activeWorkout.exercises.includes(l.Exercise_ID));
+                const loggedToday = appData.logs.filter(l => normalizeDateStr(l.Date) === dateVal && activeWorkout.exercises.includes(l.Exercise_ID));
                 if (loggedToday.length > 0) {
                     const lastLoggedEx = loggedToday[loggedToday.length - 1].Exercise_ID;
                     activeWorkout.expandedExercises.add(lastLoggedEx);
-                } else {
+                } else if (activeWorkout.exercises.length > 0) {
                     activeWorkout.expandedExercises.add(activeWorkout.exercises[0]);
                 }
             }
         }
 
         function toggleAccordion(exName, exIndex) {
-            const bodyEl = document.getElementById(`accordion-body-${exIndex}`);
-            const iconEl = document.getElementById(`accordion-icon-${exIndex}`);
-            const headerEl = document.getElementById(`accordion-header-${exIndex}`);
-            if (!bodyEl) {
-                if (activeWorkout.expandedExercises.has(exName)) {
-                    activeWorkout.expandedExercises.delete(exName);
-                } else {
-                    activeWorkout.expandedExercises.add(exName);
-                }
-                renderActiveWorkout();
-                return;
-            }
+            captureInputDrafts();
+            if (!activeWorkout.expandedExercises) activeWorkout.expandedExercises = new Set();
             if (activeWorkout.expandedExercises.has(exName)) {
                 activeWorkout.expandedExercises.delete(exName);
-                bodyEl.classList.add('hidden');
-                if (iconEl) iconEl.classList.remove('rotate-180');
-                if (headerEl) {
-                    headerEl.setAttribute('aria-expanded', 'false');
-                    headerEl.classList.remove('border-b', 'border-zinc-800/80');
-                }
             } else {
                 activeWorkout.expandedExercises.add(exName);
-                bodyEl.classList.remove('hidden');
-                if (iconEl) iconEl.classList.add('rotate-180');
-                if (headerEl) {
-                    headerEl.setAttribute('aria-expanded', 'true');
-                    headerEl.classList.add('border-b', 'border-zinc-800/80');
+            }
+            const cardEl = document.getElementById(`ex-card-${exIndex}`);
+            if (cardEl) {
+                const bodyEl = cardEl.querySelector('.accordion-body');
+                const chevronEl = cardEl.querySelector('.accordion-chevron');
+                if (bodyEl) {
+                    const isNowExpanded = activeWorkout.expandedExercises.has(exName);
+                    if (isNowExpanded) {
+                        bodyEl.classList.remove('hidden');
+                        if (chevronEl) chevronEl.classList.add('rotate-180', 'text-cyan-400');
+                    } else {
+                        bodyEl.classList.add('hidden');
+                        if (chevronEl) chevronEl.classList.remove('rotate-180', 'text-cyan-400');
+                    }
+                } else {
+                    renderActiveWorkout();
                 }
+            } else {
+                renderActiveWorkout();
             }
         }
 
         function toggleCollapseCompleted() {
             captureInputDrafts();
             const dateInput = document.getElementById('log-date');
-            const dateVal = dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString();
+            const dateVal = normalizeDateStr(dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString());
             
             activeWorkout.exercises.forEach(exName => {
-                const setsToday = appData.logs.filter(l => l.Date === dateVal && l.Exercise_ID === exName);
+                const setsToday = appData.logs.filter(l => normalizeDateStr(l.Date) === dateVal && l.Exercise_ID === exName);
                 const targetCount = getTargetSetCount(exName, dateVal);
                 if (setsToday.length >= targetCount) {
                     activeWorkout.expandedExercises.delete(exName);
@@ -571,10 +729,11 @@
 
         function setAllAccordion(collapse) {
             captureInputDrafts();
+            if (!activeWorkout.expandedExercises) activeWorkout.expandedExercises = new Set();
             if (collapse) {
                 activeWorkout.expandedExercises.clear();
             } else {
-                activeWorkout.exercises.forEach(exName => activeWorkout.expandedExercises.add(exName));
+                activeWorkout.exercises.forEach(ex => activeWorkout.expandedExercises.add(ex));
             }
             renderActiveWorkout();
         }
@@ -582,10 +741,10 @@
         // --- 4. Smart Rotation Auto-Scheduler (Zero-Click Landing View) ---
         function autoSelectNextRoutine() {
             const dateInput = document.getElementById('log-date');
-            const todayStr = dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString();
+            const todayStr = normalizeDateStr(dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString());
             activeWorkout.date = todayStr;
 
-            const setsToday = appData.logs.filter(l => l.Date === todayStr);
+            const setsToday = appData.logs.filter(l => normalizeDateStr(l.Date) === todayStr);
             if (setsToday.length > 0) {
                 const uniqueExercises = Array.from(new Set(setsToday.map(s => s.Exercise_ID).filter(Boolean)));
                 const firstWorkoutId = setsToday[0].Workout_ID;
@@ -609,11 +768,11 @@
                 return;
             }
 
-            const pastDates = Array.from(new Set(appData.logs.filter(l => l.Date < todayStr).map(l => l.Date))).sort((a,b) => b.localeCompare(a));
+            const pastDates = Array.from(new Set(appData.logs.filter(l => normalizeDateStr(l.Date) < todayStr).map(l => normalizeDateStr(l.Date)))).sort((a,b) => b.localeCompare(a));
             if (pastDates.length > 0 && appData.templates.length > 0) {
                 let lastValidRoutine = "";
                 for (const pDate of pastDates) {
-                    const setsOnDate = appData.logs.filter(l => l.Date === pDate && l.Workout_ID && l.Workout_ID !== "W-Manual");
+                    const setsOnDate = appData.logs.filter(l => normalizeDateStr(l.Date) === pDate && l.Workout_ID && l.Workout_ID !== "W-Manual");
                     if (setsOnDate.length > 0) {
                         lastValidRoutine = setsOnDate[0].Workout_ID;
                         break;
@@ -628,55 +787,54 @@
                 if (nextTpl && nextTpl.Exercise_Sequence) {
                     activeWorkout.routineName = nextTpl.Template_Name;
                     activeWorkout.exercises = nextTpl.Exercise_Sequence.split(',').map(s => s.trim()).filter(Boolean);
-                    updateRoutineLabel();
-                    initDefaultAccordionState();
-                    return;
+                } else {
+                    activeWorkout.routineName = "Free Workout";
+                    activeWorkout.exercises = [];
                 }
-            }
-
-            if (appData.templates.length > 0) {
+            } else if (appData.templates.length > 0) {
                 const firstTpl = appData.templates[0];
                 activeWorkout.routineName = firstTpl.Template_Name;
-                activeWorkout.exercises = firstTpl.Exercise_Sequence.split(',').map(s => s.trim()).filter(Boolean);
+                activeWorkout.exercises = (firstTpl.Exercise_Sequence || "").split(',').map(s => s.trim()).filter(Boolean);
             } else {
                 activeWorkout.routineName = "Free Workout";
                 activeWorkout.exercises = [];
             }
+
             updateRoutineLabel();
             initDefaultAccordionState();
         }
 
         function updateRoutineLabel() {
-            const label = document.getElementById('active-routine-label');
-            if (label) label.textContent = activeWorkout.routineName || "Free Workout";
+            const lbl = document.getElementById('active-routine-label');
+            if (lbl) lbl.textContent = activeWorkout.routineName || "Free Workout";
         }
 
-        // --- 5. Modal Routine Switcher ---
         function openRoutineModal() {
             const modal = document.getElementById('routine-modal');
-            const list = document.getElementById('routine-modal-list');
-            if (!modal || !list) return;
+            const optionsContainer = document.getElementById('routine-modal-options');
+            if (!modal || !optionsContainer) return;
 
             let html = `
                 <button onclick="selectRoutineOption('Free Workout')" class="w-full text-left p-3.5 rounded-xl hover:bg-zinc-800 border border-zinc-800/80 flex items-center justify-between font-black text-white transition">
-                    <span>✨ Free / Custom Workout</span>
-                    <span class="text-xs text-zinc-500 font-normal">Empty Slate</span>
+                    <span>Free Workout</span>
+                    ${activeWorkout.routineName === "Free Workout" ? '<i class="fas fa-check text-cyan-400"></i>' : ''}
                 </button>
             `;
 
             appData.templates.forEach(tpl => {
+                const isSelected = (activeWorkout.routineName === tpl.Template_Name);
                 html += `
                     <button onclick="selectRoutineOption('${tpl.Template_Name.replace(/'/g, "\\'")}')" class="w-full text-left p-3.5 rounded-xl hover:bg-zinc-800 border border-zinc-800/80 font-black text-white transition">
-                        <div class="flex justify-between items-center">
-                            <span>📋 ${tpl.Template_Name}</span>
-                            <span class="text-xs text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-0.5 rounded-full font-extrabold">Schedule</span>
+                        <div class="flex items-center justify-between">
+                            <span>${tpl.Template_Name}</span>
+                            ${isSelected ? '<i class="fas fa-check text-cyan-400"></i>' : ''}
                         </div>
-                        <p class="text-xs text-zinc-400 font-medium mt-1 line-clamp-1">${tpl.Exercise_Sequence}</p>
+                        <div class="text-[11px] font-normal text-zinc-400 mt-1 truncate">${tpl.Exercise_Sequence}</div>
                     </button>
                 `;
             });
 
-            list.innerHTML = html;
+            optionsContainer.innerHTML = html;
             modal.classList.remove('hidden');
         }
 
@@ -706,37 +864,38 @@
             renderActiveWorkout();
         }
 
-        // --- 6. Core UI Helpers & Navigation ---
+        // --- 5. UI Helpers & Tab Switching ---
         function showLoading() { const l = document.getElementById('loading'); if(l) l.classList.remove('hidden'); }
         function hideLoading() { const l = document.getElementById('loading'); if(l) l.classList.add('hidden'); }
-        
+
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-            document.getElementById('tab-' + tabId).classList.remove('hidden');
-            
             document.querySelectorAll('.tab-btn').forEach(el => {
-                el.classList.remove('active', 'text-cyan-400', 'font-extrabold');
-                el.classList.add('text-zinc-500');
+                el.classList.remove('text-cyan-400', 'font-extrabold', 'active');
+                el.classList.add('text-zinc-500', 'font-medium');
             });
-            const navBtn = document.getElementById('nav-' + tabId);
-            if (navBtn) {
-                navBtn.classList.add('active', 'text-cyan-400', 'font-extrabold');
-                navBtn.classList.remove('text-zinc-500');
+            const t = document.getElementById(`tab-${tabId}`);
+            const b = document.getElementById(`nav-${tabId}`);
+            if(t) t.classList.remove('hidden');
+            if(b) {
+                b.classList.remove('text-zinc-500', 'font-medium');
+                b.classList.add('text-cyan-400', 'font-extrabold', 'active');
             }
         }
 
+        // --- 6. Backend API Client ---
         async function apiCall(method, payload = null, typeParam = "") {
+            if (!API_URL) return { success: false, error: "Offline / Local Mode" };
+            const url = typeParam ? `${API_URL}?type=${encodeURIComponent(typeParam)}` : API_URL;
+            const options = { method };
+            if (payload) {
+                options.body = JSON.stringify(payload);
+                options.headers = { "Content-Type": "text/plain;charset=utf-8" };
+            }
             try {
-                let url = method === 'GET' ? `${API_URL}?type=${typeParam}` : API_URL;
-                let options = { method: method, redirect: "follow" };
-                if (payload) {
-                    options.headers = { "Content-Type": "text/plain;charset=utf-8" };
-                    options.body = JSON.stringify(payload);
-                }
-                const response = await fetch(url, options);
-                return await response.json();
+                const res = await fetch(url, options);
+                return await res.json();
             } catch (err) {
-                console.warn("API network notice:", err.message);
                 return { success: false, error: err.message };
             }
         }
@@ -756,7 +915,12 @@
             hideLoading();
 
             if (exRes.success && Array.isArray(exRes.data)) appData.exercises = exRes.data;
-            if (logRes.success && Array.isArray(logRes.data)) appData.logs = logRes.data;
+            if (logRes.success && Array.isArray(logRes.data)) {
+                appData.logs = logRes.data.map(l => ({
+                    ...l,
+                    Date: normalizeDateStr(l.Date)
+                }));
+            }
             if (tplRes.success && Array.isArray(tplRes.data)) appData.templates = tplRes.data;
             
             seedDefaults();
@@ -768,21 +932,20 @@
 
         function getLocalDateString() {
             const d = new Date();
-            const pad = n => n < 10 ? '0'+n : n;
-            return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
         }
 
         function initDateInput() {
-            const dateInput = document.getElementById('log-date');
-            if (dateInput && !dateInput.value) {
-                dateInput.value = getLocalDateString();
-            }
+            const d = document.getElementById('log-date');
+            if (d && !d.value) d.value = getLocalDateString();
         }
 
         function onWorkoutDateChange() {
             const dateInput = document.getElementById('log-date');
-            if (dateInput) activeWorkout.date = dateInput.value;
-            drafts = {};
+            activeWorkout.date = normalizeDateStr(dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString());
             initDefaultAccordionState();
             renderActiveWorkout();
         }
@@ -796,15 +959,12 @@
             if (addExSel) {
                 addExSel.innerHTML = '<option value="">-- Choose Exercise --</option>' + selectOptions;
             }
-            const newPlanEx = document.getElementById('new-plan-exercises');
-            if (newPlanEx) {
-                newPlanEx.innerHTML = selectOptions;
-            }
 
             renderDashboard();
             renderActiveWorkout();
             renderExerciseLibrary();
             renderPlansList();
+            renderRoutinePillPicker();
         }
 
         function renderActiveWorkout() {
@@ -814,7 +974,7 @@
             captureInputDrafts();
             
             const dateInput = document.getElementById('log-date');
-            const dateVal = dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString();
+            const dateVal = normalizeDateStr(dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString());
 
             if (!activeWorkout.exercises || activeWorkout.exercises.length === 0) {
                 container.innerHTML = `
@@ -858,7 +1018,7 @@
             `;
 
             const cardsHtml = activeWorkout.exercises.map((exName, exIndex) => {
-                const setsToday = appData.logs.filter(l => l.Date === dateVal && l.Exercise_ID === exName);
+                const setsToday = appData.logs.filter(l => normalizeDateStr(l.Date) === dateVal && l.Exercise_ID === exName);
                 const benchmarks = getExerciseBenchmarks(exName, dateVal);
                 const isExpanded = activeWorkout.expandedExercises.has(exName);
                 const escapedExName = exName.replace(/'/g, "\\'");
@@ -918,127 +1078,104 @@
                     const loggedSet = setsToday[idx];
                     const prevSet = (benchmarks.lastSession && benchmarks.lastSession.sets && benchmarks.lastSession.sets[idx])
                         ? benchmarks.lastSession.sets[idx]
-                        : (benchmarks.lastSession && benchmarks.lastSession.sets && benchmarks.lastSession.sets.length > 0
-                            ? benchmarks.lastSession.sets[benchmarks.lastSession.sets.length - 1]
-                            : null);
+                        : null;
+                    const defaultWeight = prevSet ? prevSet.Weight : "";
+                    const defaultReps = prevSet ? prevSet.Reps : "";
+                    const hintText = prevSet ? `${prevSet.Weight} lbs × ${prevSet.Reps}` : "—";
+
                     if (loggedSet) {
                         return `
-                            <tr class="border-b border-zinc-700/60 last:border-b-0 text-sm bg-emerald-500/[0.04]">
-                                <td class="py-2 px-2 font-bold text-emerald-400">
-                                    <span class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs px-2 py-0.5 rounded font-bold">${idx + 1}</span>
-                                </td>
-                                <td class="py-2 px-2 text-xs font-medium text-zinc-400 truncate max-w-[90px] sm:max-w-none">
-                                    Prev: ${prevSet ? prevSet.Weight + '×' + prevSet.Reps : '-'}
-                                </td>
-                                <td class="py-2 px-2 font-bold tabular-nums font-mono text-base text-white">
-                                    ${loggedSet.Weight} <span class="text-xs font-normal font-sans text-zinc-400">lbs</span>
-                                </td>
-                                <td class="py-2 px-2 font-semibold tabular-nums font-mono text-base text-zinc-200">
-                                    ${loggedSet.Reps} <span class="text-xs font-normal font-sans text-zinc-400">reps</span>
-                                </td>
-                                <td class="py-2 px-2 text-right">
-                                    <div class="flex items-center justify-end gap-1.5">
-                                        <span class="inline-flex items-center text-xs font-black text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-1 rounded-lg">
-                                            <i class="fas fa-check text-[10px] mr-1"></i> Done
-                                        </span>
-                                        <button onclick="deleteLog('${loggedSet.Log_ID}')" class="w-8 h-8 flex items-center justify-center text-zinc-400 hover:text-rose-400 active:bg-rose-500/10 rounded-xl transition-colors" title="Delete set" aria-label="Delete set ${idx + 1}">
-                                            <i class="fas fa-trash-alt text-xs"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
+                            <div class="grid grid-cols-12 gap-1 sm:gap-2 py-2.5 px-2 sm:px-3 rounded-xl items-center bg-zinc-950/60 border border-zinc-800/80 text-xs transition">
+                                <div class="col-span-1 font-mono font-bold text-cyan-400 text-center flex items-center justify-center">
+                                    <span class="w-6 h-6 rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">${idx + 1}</span>
+                                </div>
+                                <div class="col-span-3 sm:col-span-4 text-zinc-500 font-mono text-center truncate px-1 text-[11px] sm:text-xs" title="Previous: ${hintText}">
+                                    ${hintText}
+                                </div>
+                                <div class="col-span-6 sm:col-span-5 font-mono font-bold text-white text-center flex items-center justify-center gap-1">
+                                    <span class="text-sm text-cyan-300 font-extrabold">${loggedSet.Weight}</span>
+                                    <span class="text-[10px] text-zinc-500 uppercase">lbs</span>
+                                    <span class="text-zinc-600 font-normal">×</span>
+                                    <span class="text-sm text-cyan-300 font-extrabold">${loggedSet.Reps}</span>
+                                    <span class="text-[10px] text-zinc-500 uppercase">reps</span>
+                                </div>
+                                <div class="col-span-2 flex justify-end">
+                                    <button onclick="deleteLog('${loggedSet.Log_ID}')" class="w-8 h-8 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center transition active:scale-95" title="Delete Logged Set" aria-label="Delete set ${idx + 1}">
+                                        <i class="fas fa-trash text-xs"></i>
+                                        <span class="hidden sm:inline ml-1 text-xs">Del</span>
+                                    </button>
+                                </div>
+                            </div>
                         `;
                     } else {
-                        const defaultW = prevSet ? prevSet.Weight : (benchmarks.lastSession && benchmarks.lastSession.sets && benchmarks.lastSession.sets.length > 0 ? benchmarks.lastSession.sets[benchmarks.lastSession.sets.length - 1].Weight : "");
-                        const defaultR = prevSet ? prevSet.Reps : "8";
                         return `
-                            <tr class="border-b border-zinc-700/60 last:border-b-0 text-sm">
-                                <td class="py-2 px-2 font-bold text-zinc-400">
-                                    <span class="bg-zinc-800 text-zinc-400 border border-zinc-700/60 text-xs px-2 py-0.5 rounded font-mono font-bold">${idx + 1}</span>
-                                </td>
-                                <td class="py-2 px-2 text-xs font-medium text-zinc-400 truncate max-w-[90px] sm:max-w-none">
-                                    Prev: <strong class="text-zinc-300 font-mono">${prevSet ? prevSet.Weight + '×' + prevSet.Reps : '-'}</strong>
-                                </td>
-                                <td class="py-2 px-1">
-                                    <div class="flex items-center gap-1">
-                                        <input type="number" inputmode="decimal" step="0.5" id="ghost-w-${exIndex}-${idx}" value="${defaultW}" onkeydown="if(event.key==='Enter'){event.preventDefault(); logGhostSet('${escapedExName}', ${exIndex}, ${idx});}" class="w-16 sm:w-20 h-9 bg-zinc-950 border border-zinc-700/80 rounded-lg p-1 text-center text-sm font-bold font-mono text-white focus:border-cyan-400 outline-none" aria-label="Set ${idx + 1} weight">
-                                        <span class="text-xs text-zinc-500">lbs</span>
-                                    </div>
-                                </td>
-                                <td class="py-2 px-1">
-                                    <div class="flex items-center gap-1">
-                                        <input type="number" inputmode="numeric" pattern="[0-9]*" id="ghost-r-${exIndex}-${idx}" value="${defaultR}" onkeydown="if(event.key==='Enter'){event.preventDefault(); logGhostSet('${escapedExName}', ${exIndex}, ${idx});}" class="w-14 sm:w-16 h-9 bg-zinc-950 border border-zinc-700/80 rounded-lg p-1 text-center text-sm font-bold font-mono text-white focus:border-cyan-400 outline-none" aria-label="Set ${idx + 1} reps">
-                                        <span class="text-xs text-zinc-500">reps</span>
-                                    </div>
-                                </td>
-                                <td class="py-2 px-2 text-right">
-                                    <div class="flex items-center justify-end gap-1">
-                                        <button onclick="logGhostSet('${escapedExName}', ${exIndex}, ${idx})" class="h-9 px-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 active:scale-95 text-zinc-950 font-black text-xs rounded-lg shadow-[0_0_12px_rgba(6,182,212,0.25)] flex items-center gap-1 transition-all" title="Log set ${idx + 1}">
-                                            <i class="fas fa-check text-[11px]"></i>
-                                            <span>Log</span>
-                                        </button>
-                                        ${idx >= 3 && idx === targetCount - 1 ? `
-                                        <button onclick="removeTargetSet('${escapedExName}')" class="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-rose-400 rounded-lg" title="Remove target set">
-                                            <i class="fas fa-times text-xs"></i>
-                                        </button>
-                                        ` : ''}
-                                    </div>
-                                </td>
-                            </tr>
+                            <div class="grid grid-cols-12 gap-1 sm:gap-2 py-2 px-2 sm:px-2.5 rounded-xl items-center bg-zinc-900/40 border border-dashed border-zinc-800/80 text-xs hover:border-zinc-700/80 transition group">
+                                <div class="col-span-1 font-mono font-bold text-zinc-500 text-center flex items-center justify-center">
+                                    <span class="w-6 h-6 rounded-full bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-zinc-400">${idx + 1}</span>
+                                </div>
+                                <div class="col-span-3 sm:col-span-4 text-zinc-500 font-mono text-center truncate px-1 text-[11px] sm:text-xs" title="Previous: ${hintText}">
+                                    ${hintText}
+                                </div>
+                                <div class="col-span-6 sm:col-span-5 flex items-center justify-center gap-1">
+                                    <input type="number" id="ghost-w-${exIndex}-${idx}" value="${defaultWeight}" placeholder="lbs" step="any" class="w-14 sm:w-16 bg-zinc-950 border border-zinc-800 focus:border-cyan-500 text-white rounded-lg py-1 px-1 text-center font-mono font-bold text-base outline-none shadow-inner">
+                                    <span class="text-zinc-600 font-bold">×</span>
+                                    <input type="number" id="ghost-r-${exIndex}-${idx}" value="${defaultReps}" placeholder="reps" class="w-12 sm:w-14 bg-zinc-950 border border-zinc-800 focus:border-cyan-500 text-white rounded-lg py-1 px-1 text-center font-mono font-bold text-base outline-none shadow-inner">
+                                </div>
+                                <div class="col-span-2 flex justify-end">
+                                    <button onclick="logGhostSet('${escapedExName}', ${exIndex}, ${idx})" class="w-8 h-8 sm:w-auto sm:h-8 sm:px-2.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 font-bold border border-cyan-500/40 flex items-center justify-center gap-1 transition shadow-[0_0_10px_rgba(6,182,212,0.1)] active:scale-95 shrink-0" title="Log Set">
+                                        <i class="fas fa-check text-[10px]"></i>
+                                        <span class="hidden sm:inline text-xs">Log</span>
+                                    </button>
+                                </div>
+                            </div>
                         `;
                     }
                 }).join('');
 
-                const tableHtml = `
-                    <table class="w-full text-left mb-2.5">
-                        <thead>
-                            <tr class="border-b border-zinc-700/60 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                                <th class="py-1.5 px-2">Set</th>
-                                <th class="py-1.5 px-2">Previous</th>
-                                <th class="py-1.5 px-2">Weight</th>
-                                <th class="py-1.5 px-2">Reps</th>
-                                <th class="py-1.5 px-2 text-right">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${allRowsHtml}
-                        </tbody>
-                    </table>
-                    <div class="flex items-center justify-between pt-1.5 px-1 border-t border-zinc-800/80">
-                        <span class="text-xs text-zinc-400 font-medium">
-                            Progress: <strong class="${setsToday.length >= targetCount ? 'text-emerald-400' : 'text-cyan-400'}">${setsToday.length} / ${targetCount}</strong> sets completed
-                        </span>
-                        <button onclick="addTargetSet('${escapedExName}')" class="text-xs font-bold text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-700/60 px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-2xs active:scale-95">
-                            <i class="fas fa-plus text-[10px] text-cyan-400"></i>
-                            <span>Add Set</span>
-                        </button>
-                    </div>
-                `;
-
                 return `
-                    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-lg transition-all">
-                        <!-- 44px Compact Header Bar -->
-                        <div id="accordion-header-${exIndex}" onclick="toggleAccordion('${escapedExName}', ${exIndex})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); toggleAccordion('${escapedExName}', ${exIndex});}" role="button" tabindex="0" aria-expanded="${isExpanded ? 'true' : 'false'}" aria-controls="accordion-body-${exIndex}" class="min-h-[44px] py-2.5 px-3.5 bg-zinc-900/95 flex items-center justify-between cursor-pointer select-none ${isExpanded ? 'border-b border-zinc-800/80' : ''}">
-                            <div class="flex items-center flex-wrap gap-1.5 min-w-0 mr-2">
-                                <span class="text-xs font-mono text-cyan-400 font-bold">[${exIndex + 1}]</span>
-                                <span class="font-extrabold text-white text-sm sm:text-base tracking-tight truncate mr-1">${exName}</span>
-                                ${lastBadgeHtml}
-                                ${prBadgeHtml}
+                    <div id="ex-card-${exIndex}" class="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-4 shadow-xl text-white transition-all">
+                        <div onclick="toggleAccordion('${escapedExName}', ${exIndex})" class="flex items-center justify-between cursor-pointer select-none pb-1">
+                            <div class="flex items-center gap-3 min-w-0 pr-2">
+                                <span class="w-7 h-7 rounded-xl bg-zinc-800 border border-zinc-700/80 flex items-center justify-center text-xs font-bold text-cyan-400 shrink-0 shadow-sm">
+                                    ${exIndex + 1}
+                                </span>
+                                <span class="font-extrabold text-white text-base tracking-tight truncate block">${exName}</span>
                             </div>
                             <div class="flex items-center gap-2 shrink-0">
                                 ${completionBadgeHtml}
-                                <i id="accordion-icon-${exIndex}" class="fas fa-chevron-down text-xs text-zinc-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}"></i>
-                                <button onclick="event.stopPropagation(); removeExerciseFromActiveWorkout('${escapedExName}')" class="w-8 h-8 flex items-center justify-center text-zinc-400 hover:text-rose-400 rounded-full hover:bg-zinc-800/80 transition-colors ml-1 shrink-0" title="Remove exercise" aria-label="Remove ${exName}">
-                                    <i class="fas fa-times"></i>
+                                <button type="button" class="w-7 h-7 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700/80 flex items-center justify-center text-zinc-400 hover:text-white transition">
+                                    <i class="fas fa-chevron-down text-xs transition-transform duration-200 accordion-chevron ${isExpanded ? 'rotate-180 text-cyan-400' : ''}"></i>
                                 </button>
                             </div>
                         </div>
-                        
-                        <!-- High-Density OLED Exercise Body -->
-                        <div id="accordion-body-${exIndex}" class="p-3.5 bg-zinc-900/60 ${isExpanded ? '' : 'hidden'}">
-                            <!-- Recessed Set Well -->
-                            <div class="bg-zinc-950/60 border border-zinc-800/80 rounded-xl p-2.5">
-                                ${tableHtml}
+
+                        <div class="flex flex-wrap items-center justify-between gap-2 mt-2 pt-2 border-t border-zinc-800/60">
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                ${lastBadgeHtml}
+                                ${prBadgeHtml}
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <button onclick="addTargetSet('${escapedExName}')" class="text-[11px] font-bold text-zinc-400 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700/80 px-2 py-0.5 rounded-lg transition flex items-center gap-1" title="Add Set Row">
+                                    <i class="fas fa-plus text-[9px] text-cyan-400"></i>
+                                    <span>Set</span>
+                                </button>
+                                <button onclick="removeTargetSet('${escapedExName}')" class="text-[11px] font-bold text-zinc-400 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700/80 px-2 py-0.5 rounded-lg transition flex items-center gap-1" title="Remove Set Row">
+                                    <i class="fas fa-minus text-[9px] text-rose-400"></i>
+                                    <span>Set</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="accordion-body mt-3 pt-3 border-t border-zinc-800/80 ${isExpanded ? '' : 'hidden'}">
+                            <div class="grid grid-cols-12 gap-1 sm:gap-2 px-2 sm:px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-zinc-500 select-none">
+                                <div class="col-span-1 text-center">Set</div>
+                                <div class="col-span-3 sm:col-span-4 text-center">Previous</div>
+                                <div class="col-span-6 sm:col-span-5 text-center">Weight × Reps</div>
+                                <div class="col-span-2 text-right">Action</div>
+                            </div>
+
+                            <div class="space-y-2">
+                                ${allRowsHtml}
                             </div>
                         </div>
                     </div>
@@ -1048,41 +1185,199 @@
             container.innerHTML = toolbarHtml + cardsHtml;
         }
 
+        // --- 8. Training History Dashboard Smart Accordions & Inline Set Editing ---
+        const dashboardExpandedDates = new Set();
+        let isDashboardDefaultInitialized = false;
+        const editingLogIds = new Set();
+
+        function toggleDashboardDate(dateStr) {
+            if (dashboardExpandedDates.has(dateStr)) {
+                dashboardExpandedDates.delete(dateStr);
+            } else {
+                dashboardExpandedDates.add(dateStr);
+            }
+            renderDashboard();
+        }
+
+        function startEditLog(logId) {
+            editingLogIds.add(String(logId));
+            renderDashboard();
+        }
+
+        function cancelEditLog(logId) {
+            editingLogIds.delete(String(logId));
+            renderDashboard();
+        }
+
+        function saveEditLog(logId) {
+            const weightEl = document.getElementById(`edit-weight-${logId}`);
+            const repsEl = document.getElementById(`edit-reps-${logId}`);
+            if (!weightEl || !repsEl) return;
+            const newWeight = weightEl.value.trim();
+            const newReps = repsEl.value.trim();
+            if (newWeight === "" || newReps === "") {
+                return alert("Please enter Weight and Reps");
+            }
+            editingLogIds.delete(String(logId));
+            updateLog(logId, newWeight, newReps);
+        }
+
+        function updateLog(logId, newWeight, newReps) {
+            const log = appData.logs.find(l => String(l.Log_ID) === String(logId));
+            if (log) {
+                log.Weight = newWeight;
+                log.Reps = newReps;
+                StateManager.saveCache();
+                renderDashboard();
+                renderActiveWorkout();
+                Outbox.enqueue({
+                    id: "upd-log-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+                    type: "Logs",
+                    action: "UPDATE",
+                    Log_ID: logId,
+                    Weight: newWeight,
+                    Reps: newReps
+                });
+            }
+        }
+
         function renderDashboard() {
             const logsByDate = {};
             appData.logs.forEach(log => {
                 if (!log.Date || !log.Exercise_ID) return;
-                const d = log.Date;
+                const d = normalizeDateStr(log.Date);
                 if(!logsByDate[d]) logsByDate[d] = { sets: 0, volume: 0, exercises: new Set() };
                 logsByDate[d].sets += 1;
-                logsByDate[d].volume += (Number(log.Weight)||0) * (Number(log.Reps)||0);
+                logsByDate[d].volume += (parseFloat(log.Weight)||0) * (parseInt(log.Reps, 10)||0);
                 logsByDate[d].exercises.add(log.Exercise_ID);
             });
             const sortedDates = Object.keys(logsByDate).sort((a,b) => b.localeCompare(a));
-            const dashHtml = sortedDates.map(date => `
+            if (!isDashboardDefaultInitialized && sortedDates.length > 0) {
+                dashboardExpandedDates.add(sortedDates[0]);
+                isDashboardDefaultInitialized = true;
+            }
+            const dashHtml = sortedDates.map(date => {
+                const isExpanded = dashboardExpandedDates.has(date);
+                const dateLogs = appData.logs.filter(l => normalizeDateStr(l.Date) === date);
+                const exNames = Array.from(new Set(dateLogs.map(l => l.Exercise_ID).filter(Boolean)));
+
+                return `
                 <div class="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5 shadow-xl mb-4 text-white">
-                    <div class="flex justify-between items-center border-b border-zinc-800 pb-3 mb-3">
-                        <span class="font-bold text-white text-base flex items-center gap-2">
-                            <i class="far fa-calendar-check text-cyan-400"></i> ${date}
+                    <div onclick="toggleDashboardDate('${date}')" class="flex justify-between items-center border-b border-zinc-800 pb-3 mb-3 cursor-pointer hover:opacity-80 transition">
+                        <span class="font-bold text-white text-base flex items-center gap-2.5">
+                            <i class="fas fa-chevron-right transition-transform duration-300 text-xs ${isExpanded ? 'rotate-90 text-cyan-400' : 'text-zinc-500'}"></i>
+                            <i class="far fa-calendar-check text-cyan-400"></i>
+                            <span>${date}</span>
                         </span>
                         <span class="text-xs bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 px-2.5 py-1 rounded-full font-bold uppercase tracking-wide shadow-[0_0_10px_rgba(6,182,212,0.15)]">
                             ${logsByDate[date].sets} Sets
                         </span>
                     </div>
-                    <div class="mb-3">
-                        <div class="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-0.5">Total Volume</div>
-                        <div class="text-xl font-extrabold font-mono tabular-nums text-white">
-                            ${logsByDate[date].volume.toLocaleString()} <span class="text-sm font-sans font-medium text-zinc-400">lbs</span>
+                    <div class="mb-3 flex items-center justify-between">
+                        <div>
+                            <div class="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-0.5">Total Volume</div>
+                            <div class="text-xl font-extrabold font-mono tabular-nums text-white">
+                                ${logsByDate[date].volume.toLocaleString()} <span class="text-sm font-sans font-medium text-zinc-400">lbs</span>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-0.5">Exercises</div>
+                            <div class="text-sm font-bold text-cyan-300">${logsByDate[date].exercises.size} Trained</div>
                         </div>
                     </div>
-                    <div class="bg-zinc-950/60 rounded-xl p-3 border border-zinc-800/80">
+                    <div class="bg-zinc-950/60 rounded-xl p-3 border border-zinc-800/80 mb-2">
                         <div class="text-[11px] text-zinc-400 font-bold uppercase tracking-wider mb-1.5">Trained Exercises</div>
                         <div class="flex flex-wrap gap-1.5">
                             ${Array.from(logsByDate[date].exercises).map(e => `<span class="bg-zinc-900 border border-zinc-700/80 text-zinc-200 text-xs px-2.5 py-1 rounded-lg font-medium shadow-xs">${e}</span>`).join('')}
                         </div>
                     </div>
+                    ${isExpanded ? `
+                    <div class="mt-4 border-t border-zinc-800/80 pt-3 space-y-3">
+                        ${exNames.map(exName => {
+                            const exLogs = dateLogs.filter(l => l.Exercise_ID === exName);
+                            exLogs.sort((a,b) => (a.Set_Index || 0) - (b.Set_Index || 0));
+                            const exVolume = exLogs.reduce((sum, log) => {
+                                return sum + (parseFloat(log.Weight) || 0) * (parseInt(log.Reps, 10) || 0);
+                            }, 0);
+                            const setSummary = exLogs.map(log => `${log.Weight || 0}×${log.Reps || 0}`).join(', ');
+                            return `
+                            <div class="bg-zinc-950/90 border border-zinc-800 rounded-xl p-3 mb-3 shadow-md">
+                                <div class="flex flex-wrap items-center justify-between border-b border-zinc-800/80 pb-2 mb-2 gap-2">
+                                    <div class="font-extrabold text-white text-sm flex items-center gap-2">
+                                        <i class="fas fa-dumbbell text-cyan-400 text-xs"></i>
+                                        <span>${exName}</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="inline-flex items-center bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs px-2.5 py-0.5 rounded-full font-bold font-mono">
+                                            ${exVolume.toLocaleString()} lbs Vol
+                                        </span>
+                                        <span class="inline-flex items-center bg-zinc-800/80 border border-zinc-700/80 text-zinc-300 text-xs px-2.5 py-0.5 rounded-full font-medium truncate max-w-[200px]" title="Sets: ${setSummary}">
+                                            ${setSummary}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="space-y-1.5">
+                                    ${exLogs.map((log, idx) => {
+                                        const isEditing = editingLogIds.has(String(log.Log_ID));
+                                        if (isEditing) {
+                                            return `
+                                            <div class="flex flex-wrap items-center justify-between py-2 px-2.5 bg-zinc-900 border border-cyan-500/50 rounded-lg mb-1.5 shadow-[0_0_15px_rgba(6,182,212,0.15)] gap-2">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-300 font-extrabold text-xs flex items-center justify-center border border-cyan-500/40 shrink-0">
+                                                        ${log.Set_Index || idx + 1}
+                                                    </span>
+                                                    <div class="flex items-center gap-1.5">
+                                                        <input type="number" id="edit-weight-${log.Log_ID}" value="${log.Weight}" step="any" class="w-20 bg-zinc-950 border border-zinc-700 text-white rounded-lg px-2.5 py-1 text-base font-bold text-center focus:border-cyan-400 outline-none min-h-[44px]" placeholder="lbs">
+                                                        <span class="text-xs text-zinc-400 font-bold">lbs ×</span>
+                                                        <input type="number" id="edit-reps-${log.Log_ID}" value="${log.Reps}" class="w-16 bg-zinc-950 border border-zinc-700 text-white rounded-lg px-2.5 py-1 text-base font-bold text-center focus:border-cyan-400 outline-none min-h-[44px]" placeholder="reps">
+                                                        <span class="text-xs text-zinc-400 font-bold">reps</span>
+                                                    </div>
+                                                </div>
+                                                <div class="flex items-center gap-1.5">
+                                                    <button onclick="saveEditLog('${log.Log_ID}')" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white px-3 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1 shadow-[0_0_10px_rgba(16,185,129,0.3)]">
+                                                        <i class="fas fa-check text-[10px]"></i>
+                                                        <span>Save</span>
+                                                    </button>
+                                                    <button onclick="cancelEditLog('${log.Log_ID}')" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
+                                                        <i class="fas fa-times text-[10px]"></i>
+                                                        <span>Cancel</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            `;
+                                        }
+                                        return `
+                                        <div class="flex items-center justify-between py-2 px-2.5 bg-zinc-900/60 border border-zinc-800/60 rounded-lg mb-1.5 hover:border-zinc-700 transition">
+                                            <div class="flex items-center gap-3">
+                                                <span class="w-6 h-6 rounded-full bg-zinc-800 text-zinc-400 font-extrabold text-xs flex items-center justify-center border border-zinc-700/80 shrink-0">
+                                                    ${log.Set_Index || idx + 1}
+                                                </span>
+                                                <span class="text-sm font-bold font-mono text-white">
+                                                    ${log.Weight} <span class="text-xs text-zinc-400 font-sans">lbs</span> × ${log.Reps} <span class="text-xs text-zinc-400 font-sans">reps</span>
+                                                </span>
+                                            </div>
+                                            <div class="flex items-center gap-1.5">
+                                                <button onclick="startEditLog('${log.Log_ID}')" class="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700/80 text-zinc-300 hover:text-white px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs" title="Edit Set">
+                                                    <i class="fas fa-pencil-alt text-[10px] text-cyan-400"></i>
+                                                    <span>Edit</span>
+                                                </button>
+                                                <button onclick="deleteLog('${log.Log_ID}')" class="bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1" title="Delete Set">
+                                                    <i class="fas fa-trash text-[10px]"></i>
+                                                    <span>Delete</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                            `;
+                        }).join('')}
+                    </div>
+                    ` : ''}
                 </div>
-            `).join('');
+            `;
+            }).join('');
             const dl = document.getElementById('dashboard-list');
             if (dl) {
                 dl.innerHTML = dashHtml || "<p class='text-sm text-zinc-400 italic'>No workout days logged yet. Go log a set!</p>";
@@ -1090,48 +1385,262 @@
         }
 
         function renderExerciseLibrary() {
-            const exListHtml = appData.exercises.map(ex => `
-                <div class="p-3.5 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xs flex justify-between items-center text-white">
-                    <span class="font-bold text-white text-sm">${ex.Name}</span>
-                    <span class="text-[10px] uppercase font-extrabold tracking-wider bg-zinc-950 text-cyan-400 border border-zinc-800 px-2.5 py-1 rounded-full">${ex.Category || 'Generic'}</span>
+            const exHtml = appData.exercises.map(ex => `
+                <div class="flex justify-between items-center p-3.5 bg-zinc-900 border border-zinc-800/80 rounded-xl text-white shadow-sm">
+                    <span class="font-bold text-sm">${ex.Name}</span>
+                    <span class="text-xs bg-zinc-800 border border-zinc-700/60 text-zinc-400 px-2.5 py-1 rounded-lg font-medium">${ex.Category}</span>
                 </div>
             `).join('');
             const el = document.getElementById('exercise-list');
             if (el) {
-                el.innerHTML = exListHtml || '<p class="text-sm text-zinc-400 italic">No exercises added to database yet.</p>';
+                el.innerHTML = exHtml || '<p class="text-sm text-zinc-400 italic">No exercises added to database yet.</p>';
             }
         }
 
+        // --- 9. Routine Builder Pill Picker & Saved Routines Smart Accordions ---
+        const routineExpandedIds = new Set();
+        let selectedRoutineExercises = [];
+        let editingTemplateName = null;
+        let editingTemplateId = null;
+
+        function toggleRoutineAccordion(tplName) {
+            if (routineExpandedIds.has(tplName)) {
+                routineExpandedIds.delete(tplName);
+            } else {
+                routineExpandedIds.add(tplName);
+            }
+            renderPlansList();
+        }
+
+        function toggleRoutineExercise(exName) {
+            const idx = selectedRoutineExercises.indexOf(exName);
+            if (idx !== -1) {
+                selectedRoutineExercises.splice(idx, 1);
+            } else {
+                selectedRoutineExercises.push(exName);
+            }
+            renderRoutinePillPicker();
+        }
+
+        function clearSelectedRoutineExercises() {
+            selectedRoutineExercises = [];
+            renderRoutinePillPicker();
+        }
+
+        function renderRoutinePillPicker() {
+            const container = document.getElementById('routine-pill-picker');
+            const summaryContainer = document.getElementById('selected-routine-summary');
+            if (!container) return;
+
+            if (!appData.exercises || appData.exercises.length === 0) {
+                container.innerHTML = `<p class="text-xs text-zinc-500 italic p-2">No exercises available.</p>`;
+                return;
+            }
+
+            container.innerHTML = appData.exercises.map(ex => {
+                const isSelected = selectedRoutineExercises.includes(ex.Name);
+                const escapedName = ex.Name.replace(/'/g, "\\'");
+                const pillClass = isSelected
+                    ? "bg-cyan-500/15 border-cyan-500/60 text-cyan-300 font-bold shadow-[0_0_10px_rgba(6,182,212,0.2)]"
+                    : "bg-zinc-900/80 border-zinc-800 hover:border-zinc-700 text-zinc-400 font-medium";
+                return `
+                    <button type="button" onclick="toggleRoutineExercise('${escapedName}')" class="px-3.5 py-2.5 rounded-xl border text-xs cursor-pointer transition-all flex items-center gap-1.5 ${pillClass}">
+                        ${isSelected ? '<i class="fas fa-check text-cyan-400"></i>' : ''}
+                        <span>${ex.Name}</span>
+                    </button>
+                `;
+            }).join('');
+
+            if (summaryContainer) {
+                if (selectedRoutineExercises.length === 0) {
+                    summaryContainer.innerHTML = `<span class="italic text-zinc-500">No exercises selected yet</span>`;
+                } else {
+                    summaryContainer.innerHTML = selectedRoutineExercises.map((exName, idx) => `
+                        <span class="inline-flex items-center gap-1 bg-zinc-800/80 border border-zinc-700 text-zinc-300 text-xs px-2.5 py-1 rounded-lg font-medium">
+                            <span class="text-cyan-400 font-bold">${idx + 1}.</span> ${exName}
+                        </span>
+                    `).join('');
+                }
+            }
+        }
+
+        function startEditRoutine(tplName) {
+            const tpl = appData.templates.find(t => t.Template_Name === tplName);
+            if (!tpl) return;
+            editingTemplateName = tpl.Template_Name;
+            editingTemplateId = tpl.Template_ID || null;
+            const nameEl = document.getElementById('new-plan-name');
+            if (nameEl) nameEl.value = tpl.Template_Name;
+            selectedRoutineExercises = (tpl.Exercise_Sequence || "").split(',').map(s => s.trim()).filter(Boolean);
+            renderRoutinePillPicker();
+
+            const saveBtn = document.getElementById('save-routine-btn');
+            const cancelBtn = document.getElementById('cancel-edit-routine-btn');
+            if (saveBtn) {
+                saveBtn.innerHTML = `<i class="fas fa-check mr-1"></i> Update Routine`;
+                saveBtn.className = "w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black py-3 rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.25)] active:scale-95 transition-all";
+            }
+            if (cancelBtn) cancelBtn.classList.remove('hidden');
+
+            const formEl = document.getElementById('routine-builder-form');
+            if (formEl) formEl.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function cancelEditRoutine() {
+            editingTemplateName = null;
+            editingTemplateId = null;
+            const nameEl = document.getElementById('new-plan-name');
+            if (nameEl) nameEl.value = "";
+            selectedRoutineExercises = [];
+            renderRoutinePillPicker();
+
+            const saveBtn = document.getElementById('save-routine-btn');
+            const cancelBtn = document.getElementById('cancel-edit-routine-btn');
+            if (saveBtn) {
+                saveBtn.innerHTML = `Save Routine`;
+                saveBtn.className = "w-full bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-400 hover:to-indigo-500 text-white font-black py-3 rounded-xl shadow-[0_0_15px_rgba(139,92,246,0.25)] active:scale-95 transition-all";
+            }
+            if (cancelBtn) cancelBtn.classList.add('hidden');
+        }
+
+        async function saveRoutineHandler() {
+            const nameEl = document.getElementById("new-plan-name");
+            const name = nameEl ? nameEl.value.trim() : "";
+            const exercises = selectedRoutineExercises.join(", ");
+            if (!name || selectedRoutineExercises.length === 0) {
+                return alert("Provide a schedule name and select at least one exercise.");
+            }
+
+            if (editingTemplateName) {
+                const idx = appData.templates.findIndex(t => t.Template_Name === editingTemplateName);
+                if (idx !== -1) {
+                    appData.templates[idx].Template_Name = name;
+                    appData.templates[idx].Exercise_Sequence = exercises;
+                }
+                StateManager.saveCache();
+
+                Outbox.enqueue({
+                    id: "upd-tpl-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+                    type: "Templates",
+                    action: "UPDATE_TEMPLATE",
+                    Template_ID: editingTemplateId,
+                    old_Template_Name: editingTemplateName,
+                    new_Template_Name: name,
+                    Exercise_Sequence: exercises
+                });
+
+                cancelEditRoutine();
+                renderAll();
+                alert(`Workout plan '${name}' updated!`);
+                return;
+            }
+
+            showLoading();
+            const payload = {
+                type: "Templates",
+                data: { Template_Name: name, Exercise_Sequence: exercises }
+            };
+            const res = await apiCall('POST', payload);
+            hideLoading();
+            
+            if (!res.success) {
+                return alert("Failed to save schedule: " + (res.error || "Unknown error"));
+            }
+            
+            appData.templates.push(payload.data);
+            StateManager.saveCache();
+            cancelEditRoutine();
+            renderAll();
+            alert(`Workout plan '${name}' saved!`);
+        }
+
+        const addPlan = saveRoutineHandler;
+
+        function deleteRoutine(tplName) {
+            if (!confirm(`Are you sure you want to delete routine "${tplName}"?`)) return;
+            appData.templates = appData.templates.filter(t => t.Template_Name !== tplName);
+            StateManager.saveCache();
+            renderPlansList();
+
+            Outbox.enqueue({
+                id: "del-tpl-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+                type: "Templates",
+                action: "DELETE_TEMPLATE",
+                Template_Name: tplName
+            });
+        }
+
         function renderPlansList() {
-            const plansHtml = appData.templates.map(tpl => `
-                <div class="p-4 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-xl text-white">
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="font-extrabold text-white text-base">${tpl.Template_Name}</span>
-                        <button onclick="startWorkout('${tpl.Template_Name.replace(/'/g, "\\'")}')" class="bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-400 hover:to-indigo-500 text-white font-bold px-3.5 py-1.5 rounded-xl text-xs shadow-[0_0_15px_rgba(139,92,246,0.25)] transition-all active:scale-95">Start</button>
+            const plansHtml = appData.templates.map(tpl => {
+                const isExpanded = routineExpandedIds.has(tpl.Template_Name);
+                const escapedName = tpl.Template_Name.replace(/'/g, "\\'");
+                const exList = (tpl.Exercise_Sequence || "").split(',').map(s => s.trim()).filter(Boolean);
+
+                return `
+                    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl shadow-xl text-white overflow-hidden transition-all">
+                        <div onclick="toggleRoutineAccordion('${escapedName}')" class="p-4 flex items-center justify-between cursor-pointer hover:bg-zinc-800/50 transition">
+                            <div class="flex items-center gap-2.5">
+                                <i class="fas fa-chevron-right transition-transform duration-300 text-xs ${isExpanded ? 'rotate-90 text-violet-400' : 'text-zinc-500'}"></i>
+                                <div>
+                                    <span class="font-extrabold text-white text-base block">${tpl.Template_Name}</span>
+                                    <span class="inline-flex items-center text-[11px] bg-zinc-800/80 border border-zinc-700/60 text-zinc-300 px-2 py-0.5 rounded-full font-medium mt-1">
+                                        ${exList.length} Exercises
+                                    </span>
+                                </div>
+                            </div>
+                            <button onclick="event.stopPropagation(); startWorkout('${escapedName}')" class="bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-400 hover:to-indigo-500 text-white font-bold px-3.5 py-1.5 rounded-xl text-xs shadow-[0_0_15px_rgba(139,92,246,0.25)] transition-all active:scale-95 flex items-center gap-1.5">
+                                <i class="fas fa-rocket text-[10px]"></i>
+                                <span>Start</span>
+                            </button>
+                        </div>
+                        ${isExpanded ? `
+                        <div class="px-4 pb-4 border-t border-zinc-800/80 pt-3">
+                            <div class="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-2">Exercise Sequence</div>
+                            <div class="space-y-1.5 mb-3">
+                                ${exList.map((exName, idx) => `
+                                    <div class="flex items-center justify-between py-2 px-3 bg-zinc-950/80 border border-zinc-800/80 rounded-xl">
+                                        <span class="text-xs font-semibold text-zinc-300">
+                                            <span class="text-violet-400 font-bold mr-1.5">${idx + 1}.</span> ${exName}
+                                        </span>
+                                        <span class="text-[11px] text-zinc-500 font-medium">${getTargetSetCount(exName, getLocalDateString())} Sets target</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <div class="flex items-center justify-end gap-2 pt-1">
+                                <button onclick="event.stopPropagation(); startEditRoutine('${escapedName}')" class="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 hover:text-white font-bold px-3 py-1.5 rounded-xl text-xs transition flex items-center gap-1.5">
+                                    <i class="fas fa-pencil-alt text-[10px] text-cyan-400"></i>
+                                    <span>Edit Routine</span>
+                                </button>
+                                <button onclick="event.stopPropagation(); deleteRoutine('${escapedName}')" class="bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 font-bold px-3 py-1.5 rounded-xl text-xs transition flex items-center gap-1.5">
+                                    <i class="fas fa-trash text-[10px]"></i>
+                                    <span>Delete Routine</span>
+                                </button>
+                            </div>
+                        </div>
+                        ` : ''}
                     </div>
-                    <p class="text-xs text-zinc-400 leading-relaxed">${tpl.Exercise_Sequence}</p>
-                </div>
-            `).join('');
+                `;
+            }).join('');
             const pl = document.getElementById('plans-list');
             if (pl) {
                 pl.innerHTML = plansHtml || '<p class="text-sm text-zinc-400 italic">No schedules created yet.</p>';
             }
         }
 
-        // --- 8. Set Mutations & Optimistic CRUD ---
+        // --- 10. Set Mutations & Optimistic CRUD ---
         function logSetForExercise(exName, exIndex) {
             const weightEl = document.getElementById(`weight-${exIndex}`);
             const repsEl = document.getElementById(`reps-${exIndex}`);
             const weight = weightEl ? weightEl.value : "";
             const reps = repsEl ? repsEl.value : "";
             const dateInput = document.getElementById("log-date");
-            const dateVal = dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString();
+            const dateVal = normalizeDateStr(dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString());
 
             if (weight === '' || reps === '') {
                 return alert("Please enter Weight and Reps for " + exName);
             }
 
-            const existingSets = appData.logs.filter(l => l.Date === dateVal && l.Exercise_ID === exName);
+            const existingSets = appData.logs.filter(l => normalizeDateStr(l.Date) === dateVal && l.Exercise_ID === exName);
             const setIdx = existingSets.length + 1;
 
             const newLog = {
@@ -1170,6 +1679,7 @@
 
             Outbox.enqueue({
                 id: 'DEL-' + Date.now(),
+                type: "Logs",
                 action: "DELETE",
                 Log_ID: logId
             });
@@ -1178,26 +1688,25 @@
         function addExerciseToActiveWorkout() {
             const sel = document.getElementById('add-exercise-select');
             const exName = sel ? sel.value : "";
-            if (!exName) return alert("Please choose an exercise to add.");
+            if (!exName) return;
             if (!activeWorkout.exercises.includes(exName)) {
                 activeWorkout.exercises.push(exName);
+                initDefaultAccordionState();
+                renderActiveWorkout();
+            } else {
+                alert(`${exName} is already in today's workout!`);
             }
-            activeWorkout.expandedExercises.add(exName);
-            renderActiveWorkout();
-            sel.value = "";
         }
 
         function removeExerciseFromActiveWorkout(exName) {
             activeWorkout.exercises = activeWorkout.exercises.filter(e => e !== exName);
-            activeWorkout.expandedExercises.delete(exName);
-            delete drafts[exName];
             renderActiveWorkout();
         }
 
         function finishWorkout() {
             const dateInput = document.getElementById("log-date");
-            const dateVal = dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString();
-            const setsToday = appData.logs.filter(l => l.Date === dateVal);
+            const dateVal = normalizeDateStr(dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString());
+            const setsToday = appData.logs.filter(l => normalizeDateStr(l.Date) === dateVal);
             if (setsToday.length === 0) {
                 return alert("No sets logged for today's workout yet!");
             }
@@ -1232,32 +1741,6 @@
             document.getElementById("new-ex-name").value = "";
             renderAll();
             alert(`Added ${name} to your library!`);
-        }
-
-        async function addPlan() {
-            const name = document.getElementById("new-plan-name").value;
-            const selOptions = document.getElementById("new-plan-exercises").selectedOptions;
-            const exercises = Array.from(selOptions).map(opt => opt.value).join(", ");
-            
-            if(!name || exercises.length === 0) return alert("Provide a schedule name and select at least one exercise.");
-
-            showLoading();
-            const payload = {
-                type: "Templates",
-                data: { Template_Name: name, Exercise_Sequence: exercises }
-            };
-            const res = await apiCall('POST', payload);
-            hideLoading();
-            
-            if (!res.success) {
-                return alert("Failed to save schedule: " + (res.error || "Unknown error"));
-            }
-            
-            appData.templates.push(payload.data);
-            StateManager.saveCache();
-            document.getElementById("new-plan-name").value = "";
-            renderAll();
-            alert(`Workout plan '${name}' saved!`);
         }
 
         // Init App On Load
