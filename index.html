@@ -983,6 +983,8 @@
             renderAll();
             Outbox.updateSyncBadge();
 
+            await Outbox.sync();
+
             showLoading();
             const [exRes, logRes, tplRes] = await Promise.all([
                 apiCall('GET', null, 'Exercises'),
@@ -991,12 +993,19 @@
             ]);
             hideLoading();
 
-            if (exRes.success && Array.isArray(exRes.data)) appData.exercises = exRes.data;
+            const q = Outbox.getQueue();
+            const pendingLogs = q.filter(i => i.action === "BATCH_APPEND").map(i => i.data);
+            const pendingEx = q.filter(i => i.action === "ADD_EXERCISE").map(i => i.data);
+
+            if (exRes.success && Array.isArray(exRes.data)) {
+                const remoteExIds = new Set(exRes.data.map(e => e.ID));
+                appData.exercises = [...exRes.data, ...pendingEx.filter(e => !remoteExIds.has(e.ID))];
+            }
             if (logRes.success && Array.isArray(logRes.data)) {
-                appData.logs = logRes.data.map(l => ({
-                    ...l,
-                    Date: normalizeDateStr(l.Date)
-                }));
+                const remoteClientIds = new Set(logRes.data.map(l => l.Client_ID));
+                const remoteLogs = logRes.data.map(l => ({ ...l, Date: normalizeDateStr(l.Date) }));
+                const unmergedPending = pendingLogs.filter(l => !remoteClientIds.has(l.Client_ID));
+                appData.logs = [...remoteLogs, ...unmergedPending];
             }
             if (tplRes.success && Array.isArray(tplRes.data)) appData.templates = tplRes.data;
             
