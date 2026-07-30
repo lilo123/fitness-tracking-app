@@ -312,8 +312,15 @@
         function normalizeDateStr(val) {
             if (!val) return "";
             if (typeof val === "string") {
-                const match = val.match(/^(\d{4}-\d{2}-\d{2})/);
+                const match = val.match(/(\d{4}-\d{2}-\d{2})/);
                 if (match) return match[1];
+                const parsed = new Date(val);
+                if (!isNaN(parsed.getTime())) {
+                    const year = parsed.getFullYear();
+                    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+                    const day = String(parsed.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
+                }
             }
             if (val instanceof Date && !isNaN(val.getTime())) {
                 const year = val.getFullYear();
@@ -322,8 +329,27 @@
                 return `${year}-${month}-${day}`;
             }
             const str = String(val);
-            const match = str.match(/^(\d{4}-\d{2}-\d{2})/);
-            return match ? match[1] : str;
+            const match = str.match(/(\d{4}-\d{2}-\d{2})/);
+            return match ? match[1] : str.slice(0, 10);
+        }
+
+        function formatReadableSessionTitle(dateStr, dateLogs) {
+            let prefix = "";
+            if (dateLogs && dateLogs.length > 0) {
+                const wId = dateLogs[0].Workout_ID;
+                if (wId && wId !== "Free Workout" && wId !== "Custom Workout" && wId !== "W-Manual" && wId !== "1") {
+                    prefix = wId + " — ";
+                }
+            }
+            try {
+                const parts = dateStr.split('-');
+                if (parts.length === 3) {
+                    const dt = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+                    const options = { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' };
+                    return prefix + dt.toLocaleDateString('en-US', options);
+                }
+            } catch(e) {}
+            return prefix + dateStr;
         }
 
         const DEFAULT_EXERCISES = [
@@ -1362,6 +1388,84 @@
             }
         }
 
+        function deleteDashboardWorkoutSession(dateStr) {
+            if (!confirm(`Delete entire workout session on ${dateStr}? All sets logged for this day will be removed.`)) return;
+            const toDelete = appData.logs.filter(l => normalizeDateStr(l.Date) === dateStr);
+            const deleteIds = new Set(toDelete.map(l => String(l.Log_ID)));
+            appData.logs = appData.logs.filter(l => !deleteIds.has(String(l.Log_ID)));
+            StateManager.saveCache();
+            renderDashboard();
+
+            toDelete.forEach(l => {
+                Outbox.enqueue({
+                    id: "del-log-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+                    type: "Logs",
+                    action: "DELETE",
+                    Log_ID: l.Log_ID
+                });
+            });
+        }
+
+        function deleteDashboardExerciseSession(dateStr, exName) {
+            if (!confirm(`Remove "${exName}" and all its sets from session on ${dateStr}?`)) return;
+            const toDelete = appData.logs.filter(l => normalizeDateStr(l.Date) === dateStr && l.Exercise_ID === exName);
+            const deleteIds = new Set(toDelete.map(l => String(l.Log_ID)));
+            appData.logs = appData.logs.filter(l => !deleteIds.has(String(l.Log_ID)));
+            StateManager.saveCache();
+            renderDashboard();
+
+            toDelete.forEach(l => {
+                Outbox.enqueue({
+                    id: "del-log-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+                    type: "Logs",
+                    action: "DELETE",
+                    Log_ID: l.Log_ID
+                });
+            });
+        }
+
+        function addExerciseToDashboardSession(dateStr) {
+            const exList = appData.exercises.map(e => e.Name);
+            if (exList.length === 0) {
+                alert("No exercises available in library.");
+                return;
+            }
+            const promptMsg = "Type the number of the exercise to add to session (" + dateStr + "):\n\n" +
+                              exList.map((n, i) => (i + 1) + ". " + n).join("\n");
+            const choice = prompt(promptMsg);
+            if (!choice) return;
+            const idx = parseInt(choice, 10) - 1;
+            if (isNaN(idx) || idx < 0 || idx >= exList.length) {
+                alert("Invalid exercise number.");
+                return;
+            }
+            const selectedEx = exList[idx];
+            const wInput = prompt(`Weight (lbs) for Set 1 of ${selectedEx}:`, "135");
+            if (wInput === null) return;
+            const rInput = prompt(`Reps for Set 1 of ${selectedEx}:`, "10");
+            if (rInput === null) return;
+
+            const newLog = {
+                Log_ID: Date.now() + Math.floor(Math.random() * 1000),
+                Workout_ID: "Custom Workout",
+                Date: dateStr,
+                Exercise_ID: selectedEx,
+                Set_Index: 1,
+                Weight: parseFloat(wInput) || 0,
+                Reps: parseInt(rInput, 10) || 0,
+                Client_ID: "cli-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+                Timestamp: new Date().toISOString()
+            };
+            appData.logs.push(newLog);
+            StateManager.saveCache();
+            renderDashboard();
+            Outbox.enqueue({
+                id: newLog.Client_ID,
+                action: "BATCH_APPEND",
+                data: newLog
+            });
+        }
+
         function renderDashboard() {
             const logsByDate = {};
             appData.logs.forEach(log => {
@@ -1390,11 +1494,16 @@
                         <span class="font-bold text-white text-base flex items-center gap-2.5">
                             <i class="fas fa-chevron-right transition-transform duration-300 text-xs ${isExpanded ? 'rotate-90 text-cyan-400' : 'text-zinc-500'}"></i>
                             <i class="far fa-calendar-check text-cyan-400"></i>
-                            <span>${date}</span>
+                            <span>${formatReadableSessionTitle(date, dateLogs)}</span>
                         </span>
-                        <span class="text-xs bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 px-2.5 py-1 rounded-full font-bold uppercase tracking-wide">
-                            ${logsByDate[date].sets} Sets
-                        </span>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 px-2.5 py-1 rounded-full font-bold uppercase tracking-wide">
+                                ${logsByDate[date].sets} Sets
+                            </span>
+                            <button onclick="event.stopPropagation(); deleteDashboardWorkoutSession('${date}')" class="text-rose-400 hover:text-rose-300 p-1.5 transition" title="Delete entire workout session">
+                                <i class="fas fa-trash text-xs"></i>
+                            </button>
+                        </div>
                     </div>
 
                     ${isExpanded ? `
@@ -1437,9 +1546,9 @@
                                             <span class="inline-flex items-center bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs px-2.5 py-0.5 rounded-full font-bold font-mono">
                                                 ${exVolume.toLocaleString()} lbs Vol
                                             </span>
-                                            <span class="inline-flex items-center bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs px-2.5 py-0.5 rounded-full font-medium truncate max-w-[160px] sm:max-w-[240px]" title="Sets: ${setSummary}">
-                                                ${setSummary}
-                                            </span>
+                                            <button onclick="event.stopPropagation(); deleteDashboardExerciseSession('${date}', '${exName.replace(/'/g, "\\'")}')" class="text-rose-400 hover:text-rose-300 p-1.5 transition ml-1" title="Remove exercise from this workout session">
+                                                <i class="fas fa-trash text-xs"></i>
+                                            </button>
                                             <i class="fas fa-chevron-down text-xs transition-transform duration-200 ${isExExpanded ? 'rotate-180 text-cyan-400' : 'text-zinc-500'} ml-1"></i>
                                         </div>
                                     </div>
@@ -1500,6 +1609,12 @@
                             </div>
                             `;
                         }).join('')}
+                                <div class="pt-2">
+                                    <button onclick="addExerciseToDashboardSession('${date}')" class="w-full bg-zinc-900 hover:bg-zinc-800 border border-dashed border-zinc-700/80 text-cyan-400 hover:text-cyan-300 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition">
+                                        <i class="fas fa-plus"></i>
+                                        <span>Add Exercise to this Workout Session</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
