@@ -117,10 +117,16 @@
                         <i class="fas fa-calendar-check text-cyan-400"></i>
                         <span>Next workout in rotation ready</span>
                     </div>
-                    <button onclick="finishWorkout()" class="bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 hover:text-emerald-200 font-extrabold px-3 py-1 rounded-lg text-xs transition flex items-center gap-1.5 shadow-[0_0_10px_rgba(16,185,129,0.15)] active:scale-95">
-                        <i class="fas fa-flag-checkered text-emerald-400"></i>
-                        <span>Finish Workout</span>
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <button onclick="clearActiveWorkout()" class="bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 hover:text-rose-200 font-extrabold px-3 py-1 rounded-lg text-xs transition flex items-center gap-1.5 shadow-[0_0_10px_rgba(244,63,94,0.15)] active:scale-95" title="Clear all exercises from today's workout">
+                            <i class="fas fa-undo text-rose-400"></i>
+                            <span>Clear All</span>
+                        </button>
+                        <button onclick="finishWorkout()" class="bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 hover:text-emerald-200 font-extrabold px-3 py-1 rounded-lg text-xs transition flex items-center gap-1.5 shadow-[0_0_10px_rgba(16,185,129,0.15)] active:scale-95">
+                            <i class="fas fa-flag-checkered text-emerald-400"></i>
+                            <span>Finish Workout</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -627,6 +633,18 @@
             const removedEx = activeWorkout.exercises[exIndex];
             if (!confirm(`Remove "${removedEx}" from today's workout?`)) return;
             activeWorkout.exercises.splice(exIndex, 1);
+            renderActiveWorkout();
+        }
+
+        function clearActiveWorkout() {
+            if (!confirm("Are you sure you want to clear all exercises from today's workout?")) return;
+            activeWorkout = {
+                date: getLocalDateString(),
+                routineName: "Custom Workout",
+                exercises: [],
+                targetSets: {}
+            };
+            StateManager.saveCache();
             renderActiveWorkout();
         }
 
@@ -1329,6 +1347,7 @@
                             <div class="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-0.5">Exercises</div>
                             <div class="text-sm font-bold text-cyan-300">${logsByDate[date].exercises.size} Trained</div>
                         </div>
+                    </div>
                     ${isExpanded ? `
                     <div class="mt-4 border-t border-zinc-800/80 pt-3 space-y-3">
                         ${exNames.map(exName => {
