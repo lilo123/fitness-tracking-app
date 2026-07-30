@@ -1268,9 +1268,19 @@
 
         // --- 8. Training History Dashboard Smart Accordions & Inline Set Editing ---
         const dashboardExpandedDates = new Set();
+        const dashboardExpandedVolumeDates = new Set();
         const dashboardExpandedExercises = new Set();
         let isDashboardDefaultInitialized = false;
         const editingLogIds = new Set();
+
+        function toggleDashboardVolume(dateStr) {
+            if (dashboardExpandedVolumeDates.has(dateStr)) {
+                dashboardExpandedVolumeDates.delete(dateStr);
+            } else {
+                dashboardExpandedVolumeDates.add(dateStr);
+            }
+            renderDashboard();
+        }
 
         function toggleDashboardExercise(dateStr, exName) {
             const key = `${dateStr}:::${exName}`;
@@ -1346,10 +1356,12 @@
             const sortedDates = Object.keys(logsByDate).sort((a,b) => b.localeCompare(a));
             if (!isDashboardDefaultInitialized && sortedDates.length > 0) {
                 dashboardExpandedDates.add(sortedDates[0]);
+                dashboardExpandedVolumeDates.add(sortedDates[0]);
                 isDashboardDefaultInitialized = true;
             }
             const dashHtml = sortedDates.map(date => {
                 const isExpanded = dashboardExpandedDates.has(date);
+                const isVolExpanded = dashboardExpandedVolumeDates.has(date);
                 const dateLogs = appData.logs.filter(l => normalizeDateStr(l.Date) === date);
                 const exNames = Array.from(new Set(dateLogs.map(l => l.Exercise_ID).filter(Boolean)));
 
@@ -1367,22 +1379,26 @@
                     </div>
 
                     ${isExpanded ? `
-                    <div class="mt-4 border-t border-zinc-800 pt-4 space-y-4">
-                        <div class="bg-zinc-950/80 border border-zinc-800/80 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                            <div>
-                                <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-0.5">Total Daily Volume</div>
-                                <div class="text-xl font-extrabold font-mono text-white">
-                                    ${logsByDate[date].volume.toLocaleString()} <span class="text-sm font-sans font-medium text-zinc-400">lbs</span>
+                    <div class="mt-4 border-t border-zinc-800 pt-4">
+                        <div class="bg-zinc-950/90 border border-zinc-800/80 rounded-xl p-3.5 shadow-md">
+                            <div onclick="toggleDashboardVolume('${date}')" class="flex items-center justify-between cursor-pointer select-none">
+                                <div>
+                                    <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-0.5">Total Daily Volume</div>
+                                    <div class="text-xl font-extrabold font-mono text-white">
+                                        ${logsByDate[date].volume.toLocaleString()} <span class="text-sm font-sans font-medium text-zinc-400">lbs</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <div class="text-right">
+                                        <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-0.5">Exercises Trained</div>
+                                        <div class="text-sm font-bold text-cyan-300">${logsByDate[date].exercises.size} Exercises</div>
+                                    </div>
+                                    <i class="fas fa-chevron-down text-xs transition-transform duration-200 ${isVolExpanded ? 'rotate-180 text-cyan-400' : 'text-zinc-500'} ml-1"></i>
                                 </div>
                             </div>
-                            <div class="text-left sm:text-right">
-                                <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-0.5">Exercises Trained</div>
-                                <div class="text-sm font-bold text-cyan-300">${logsByDate[date].exercises.size} Exercises</div>
-                            </div>
-                        </div>
 
-                        <div class="space-y-3">
-                            ${exNames.map(exName => {
+                            <div class="mt-3 pt-3 border-t border-zinc-800/80 space-y-3 ${isVolExpanded ? '' : 'hidden'}">
+                                ${exNames.map(exName => {
                                 const exLogs = dateLogs.filter(l => l.Exercise_ID === exName);
                                 exLogs.sort((a,b) => (a.Set_Index || 0) - (b.Set_Index || 0));
                                 const exVolume = exLogs.reduce((sum, log) => {
@@ -1465,6 +1481,8 @@
                             </div>
                             `;
                         }).join('')}
+                            </div>
+                        </div>
                     </div>
                     ` : ''}
                 </div>
