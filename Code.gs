@@ -282,5 +282,5 @@ function setupStandardHeaders() {
   logs.getRange("A1:I1").setValues([["Log_ID", "Workout_ID", "Date", "Exercise_ID", "Set_Index", "Weight", "Reps", "Client_ID", "Timestamp"]]);
   
   var templates = ss.getSheetByName('Templates') || ss.insertSheet('Templates');
-  templates.getRange("A1:B1").setValues([["Template_Name", "Exercise_Sequence"]]);
+  templates.getRange("A1:C1").setValues([["Template_ID", "Template_Name", "Exercise_Sequence"]]);
 }
