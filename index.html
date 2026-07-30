@@ -78,7 +78,7 @@
         </div>
         <div class="flex items-center gap-2">
             <!-- Sync Badge -->
-            <div id="sync-badge" class="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/30 flex items-center gap-1.5 shadow-[0_0_10px_rgba(16,185,129,0.15)]">
+            <div id="sync-badge" onclick="forceRefreshApp()" title="Click to force refresh and sync" class="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/30 flex items-center gap-1.5 shadow-[0_0_10px_rgba(16,185,129,0.15)] cursor-pointer hover:opacity-80 transition select-none">
                 <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
                 <span>Synced</span>
             </div>
@@ -931,6 +931,16 @@
         // --- 5. UI Helpers & Tab Switching ---
         function showLoading() { const l = document.getElementById('loading'); if(l) l.classList.remove('hidden'); }
         function hideLoading() { const l = document.getElementById('loading'); if(l) l.classList.add('hidden'); }
+
+        function forceRefreshApp() {
+            if (Outbox.getQueue().length > 0) {
+                if (!confirm("You have offline items waiting to sync. Force refreshing might reload before they finish sending. Refresh anyway?")) return;
+            }
+            Outbox.sync();
+            setTimeout(() => {
+                window.location.reload(true);
+            }, 300);
+        }
 
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
