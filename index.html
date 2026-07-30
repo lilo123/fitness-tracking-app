@@ -109,13 +109,13 @@
                     </div>
                     <div class="flex items-center gap-2">
                         <span class="text-xs font-extrabold uppercase tracking-widest text-zinc-400">Date:</span>
-                        <input type="date" id="log-date" onchange="onWorkoutDateChange()" class="bg-zinc-950 border border-zinc-800 text-cyan-400 rounded-xl px-2.5 py-1 text-xs font-mono font-bold focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none shadow-inner">
+                        <input type="date" id="log-date" onclick="this.showPicker && this.showPicker()" onchange="onWorkoutDateChange()" class="bg-zinc-950 border border-zinc-800 text-cyan-400 rounded-xl px-2.5 py-1 text-xs font-mono font-bold focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none shadow-inner cursor-pointer">
                     </div>
                 </div>
                 <div class="flex items-center justify-between pt-2 border-t border-zinc-800/60 text-xs text-zinc-400">
                     <div class="flex items-center gap-1.5">
-                        <i class="fas fa-info-circle text-cyan-400"></i>
-                        <span>Zero-Click Smart Rotation Enabled</span>
+                        <i class="fas fa-calendar-check text-cyan-400"></i>
+                        <span>Next workout in rotation ready</span>
                     </div>
                     <button onclick="finishWorkout()" class="bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 hover:text-emerald-200 font-extrabold px-3 py-1 rounded-lg text-xs transition flex items-center gap-1.5 shadow-[0_0_10px_rgba(16,185,129,0.15)] active:scale-95">
                         <i class="fas fa-flag-checkered text-emerald-400"></i>
@@ -151,9 +151,9 @@
             <div class="bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-transparent border border-cyan-500/20 rounded-2xl p-4 mb-5 flex items-center justify-between">
                 <div>
                     <h2 class="text-base font-black text-white flex items-center gap-2">
-                        <i class="fas fa-chart-line text-cyan-400"></i> Training History & Telemetry
+                        <i class="fas fa-chart-line text-cyan-400"></i> Training History
                     </h2>
-                    <p class="text-xs text-zinc-400 mt-0.5">Accordion day cards with exercise volume breakdown & inline set editing.</p>
+                    <p class="text-xs text-zinc-400 mt-0.5">Review your past workouts, track volume progression, and edit logged sets.</p>
                 </div>
             </div>
 
@@ -619,6 +619,14 @@
             const temp = activeWorkout.exercises[exIndex];
             activeWorkout.exercises[exIndex] = activeWorkout.exercises[newIdx];
             activeWorkout.exercises[newIdx] = temp;
+            renderActiveWorkout();
+        }
+
+        function removeActiveWorkoutExercise(exIndex) {
+            if (!activeWorkout.exercises) return;
+            const removedEx = activeWorkout.exercises[exIndex];
+            if (!confirm(`Remove "${removedEx}" from today's workout?`)) return;
+            activeWorkout.exercises.splice(exIndex, 1);
             renderActiveWorkout();
         }
 
@@ -1166,6 +1174,9 @@
                                     <i class="fas fa-arrow-down text-xs"></i>
                                 </button>
                                 ` : ''}
+                                <button type="button" onclick="event.stopPropagation(); removeActiveWorkoutExercise(${exIndex})" class="w-7 h-7 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-400 hover:text-rose-300 transition" title="Remove Exercise from Workout">
+                                    <i class="fas fa-trash text-xs"></i>
+                                </button>
                                 <button type="button" class="w-7 h-7 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700/80 flex items-center justify-center text-zinc-400 hover:text-white transition">
                                     <i class="fas fa-chevron-down text-xs transition-transform duration-200 accordion-chevron ${isExpanded ? 'rotate-180 text-cyan-400' : ''}"></i>
                                 </button>
@@ -1210,8 +1221,19 @@
 
         // --- 8. Training History Dashboard Smart Accordions & Inline Set Editing ---
         const dashboardExpandedDates = new Set();
+        const dashboardExpandedExercises = new Set();
         let isDashboardDefaultInitialized = false;
         const editingLogIds = new Set();
+
+        function toggleDashboardExercise(dateStr, exName) {
+            const key = `${dateStr}:::${exName}`;
+            if (dashboardExpandedExercises.has(key)) {
+                dashboardExpandedExercises.delete(key);
+            } else {
+                dashboardExpandedExercises.add(key);
+            }
+            renderDashboard();
+        }
 
         function toggleDashboardDate(dateStr) {
             if (dashboardExpandedDates.has(dateStr)) {
@@ -1632,10 +1654,15 @@
         }
 
         function renderPlansList() {
+            if (!appData.templates || !Array.isArray(appData.templates)) {
+                appData.templates = [];
+            }
             const plansHtml = appData.templates.map(tpl => {
-                const isExpanded = routineExpandedIds.has(tpl.Template_Name);
-                const escapedName = tpl.Template_Name.replace(/'/g, "\\'");
-                const exList = (tpl.Exercise_Sequence || "").split(',').map(s => s.trim()).filter(Boolean);
+                if (!tpl) return "";
+                const tplName = String(tpl.Template_Name || tpl.Name || "Unnamed Routine");
+                const isExpanded = routineExpandedIds.has(tplName);
+                const escapedName = tplName.replace(/'/g, "\\'");
+                const exList = String(tpl.Exercise_Sequence || tpl.Exercises || "").split(',').map(s => s.trim()).filter(Boolean);
 
                 return `
                     <div class="bg-zinc-900 border border-zinc-800 rounded-2xl shadow-xl text-white overflow-hidden transition-all">
@@ -1643,7 +1670,7 @@
                             <div class="flex items-center gap-2.5">
                                 <i class="fas fa-chevron-right transition-transform duration-300 text-xs ${isExpanded ? 'rotate-90 text-violet-400' : 'text-zinc-500'}"></i>
                                 <div>
-                                    <span class="font-extrabold text-white text-base block">${tpl.Template_Name}</span>
+                                    <span class="font-extrabold text-white text-base block">${tplName}</span>
                                     <span class="inline-flex items-center text-[11px] bg-zinc-800/80 border border-zinc-700/60 text-zinc-300 px-2 py-0.5 rounded-full font-medium mt-1">
                                         ${exList.length} Exercises
                                     </span>
