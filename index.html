@@ -159,8 +159,12 @@
         async function apiCall(method, payload = null, typeParam = "") {
             try {
                 let url = method === 'GET' ? `${API_URL}?type=${typeParam}` : API_URL;
-                let options = { method };
+                let options = { 
+                    method: method,
+                    redirect: "follow"
+                };
                 if (payload) {
+                    options.headers = { "Content-Type": "text/plain;charset=utf-8" };
                     options.body = JSON.stringify(payload);
                 }
                 const response = await fetch(url, options);
