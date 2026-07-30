@@ -29,6 +29,16 @@
             <div class="text-xl text-blue-600"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
         </div>
 
+        <!-- TAB: DASHBOARD (Calendar/Tracker) -->
+        <div id="tab-dashboard" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow p-4 mb-4">
+                <h2 class="text-lg font-bold border-b pb-2 mb-3">Daily Progress</h2>
+                <div id="dashboard-list" class="space-y-4">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+
         <!-- TAB: LOG (Home) -->
         <div id="tab-log" class="tab-content tab-active">
             <div class="bg-white rounded-lg shadow p-4 mb-4">
@@ -116,6 +126,10 @@
 
     <!-- Bottom Navigation -->
     <nav class="bg-white border-t fixed bottom-0 w-full flex justify-around p-2 pb-4 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] z-20">
+        <button onclick="switchTab('dashboard')" id="nav-dashboard" class="tab-btn flex-1 flex flex-col items-center text-gray-400 hover:text-blue-600 transition-colors duration-200">
+            <i class="fas fa-chart-line text-xl mb-1"></i>
+            <span class="text-xs">Dashboard</span>
+        </button>
         <button onclick="switchTab('log')" id="nav-log" class="tab-btn active flex-1 flex flex-col items-center text-gray-400 hover:text-blue-600 transition-colors duration-200">
             <i class="fas fa-dumbbell text-xl mb-1"></i>
             <span class="text-xs">Log</span>
@@ -208,6 +222,36 @@
             if (currentEx) document.getElementById('exercise-select').value = currentEx;
             
             document.getElementById('new-plan-exercises').innerHTML = selectOptions;
+
+            // Render Dashboard (Group logs by Date)
+            const logsByDate = {};
+            appData.logs.forEach(log => {
+                if (!log.Date || !log.Exercise_ID) return;
+                const d = log.Date;
+                if(!logsByDate[d]) logsByDate[d] = { sets: 0, volume: 0, exercises: new Set() };
+                logsByDate[d].sets += 1;
+                logsByDate[d].volume += (Number(log.Weight)||0) * (Number(log.Reps)||0);
+                logsByDate[d].exercises.add(log.Exercise_ID);
+            });
+            const sortedDates = Object.keys(logsByDate).sort((a,b) => b.localeCompare(a));
+            const dashHtml = sortedDates.map(date => `
+                <div class="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
+                    <div class="flex justify-between items-center border-b border-gray-100 pb-2 mb-3">
+                        <span class="font-bold text-gray-800 text-lg"><i class="far fa-calendar-check text-blue-500 mr-2"></i>${date}</span>
+                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-bold uppercase tracking-wide">${logsByDate[date].sets} Sets</span>
+                    </div>
+                    <div class="text-sm text-gray-600 mb-3">
+                        <p class="font-medium">Total Volume: <span class="font-bold text-gray-900">${logsByDate[date].volume.toLocaleString()} lbs</span></p>
+                    </div>
+                    <div class="bg-gray-50 rounded p-2 border border-gray-100">
+                        <p class="text-xs text-gray-500 font-semibold uppercase mb-1">Trained Exercises</p>
+                        <p class="text-sm text-gray-800 font-medium">${Array.from(logsByDate[date].exercises).join(' • ')}</p>
+                    </div>
+                </div>
+            `).join('');
+            if (document.getElementById('dashboard-list')) {
+                document.getElementById('dashboard-list').innerHTML = dashHtml || "<p class='text-sm text-gray-500 italic'>No workout days logged yet. Go log a set!</p>";
+            }
 
             // Render Exercise Library List
             const exListHtml = appData.exercises.map(ex => `
