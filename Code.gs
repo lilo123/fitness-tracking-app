@@ -18,7 +18,31 @@ function doGet(e) {
   }
   
   var data = sheet.getDataRange().getValues();
-  if (data.length <= 1) return createJsonResponse({ success: true, data: [] });
+  if (data.length <= 1) {
+    if (sheetType === "Exercises") {
+      return createJsonResponse({ success: true, data: [
+        { ID: "EX-VT1", Name: "Incline Bench Press", Category: "Chest" },
+        { ID: "EX-VT2", Name: "Cable Lateral Raises", Category: "Shoulders" },
+        { ID: "EX-VT3", Name: "Dips", Category: "Chest / Triceps" },
+        { ID: "EX-VT4", Name: "Leg Extension Machine", Category: "Legs" },
+        { ID: "EX-VT5", Name: "Overhead Tricep Cable Pull", Category: "Arms" },
+        { ID: "EX-VT6", Name: "Leg Raise", Category: "Core" },
+        { ID: "EX-VT7", Name: "Lat Pull Down", Category: "Back" },
+        { ID: "EX-VT8", Name: "Seated Cable Row", Category: "Back" },
+        { ID: "EX-VT9", Name: "Inclined Bicep Curl", Category: "Arms" },
+        { ID: "EX-VT10", Name: "Leg Curl", Category: "Legs" },
+        { ID: "EX-VT11", Name: "Face Pulls", Category: "Shoulders" },
+        { ID: "EX-VT12", Name: "Weighted Sit-Up", Category: "Core" }
+      ] });
+    }
+    if (sheetType === "Templates") {
+      return createJsonResponse({ success: true, data: [
+        { Template_Name: "Workout A (Push, Quads & Core)", Exercise_Sequence: "Incline Bench Press, Cable Lateral Raises, Dips, Leg Extension Machine, Overhead Tricep Cable Pull, Leg Raise" },
+        { Template_Name: "Workout B (Pull, Hamstrings & Core)", Exercise_Sequence: "Lat Pull Down, Seated Cable Row, Inclined Bicep Curl, Leg Curl, Face Pulls, Weighted Sit-Up" }
+      ] });
+    }
+    return createJsonResponse({ success: true, data: [] });
+  }
   
   var headers = data.shift();
   var result = data.map(function(row) {
