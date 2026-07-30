@@ -191,17 +191,22 @@
             
             hideLoading();
 
-            if (exRes.success) appData.exercises = exRes.data || [];
-            if (logRes.success) appData.logs = logRes.data || [];
-            if (tplRes.success) appData.templates = tplRes.data || [];
+            if (exRes.success && Array.isArray(exRes.data)) appData.exercises = exRes.data;
+            if (logRes.success && Array.isArray(logRes.data)) appData.logs = logRes.data;
+            if (tplRes.success && Array.isArray(tplRes.data)) appData.templates = tplRes.data;
             
             renderAll();
         }
 
         function renderAll() {
+            // Save currently selected exercise
+            const currentEx = document.getElementById('exercise-select').value;
+            
             // Populate Exercises dropdowns
             const selectOptions = appData.exercises.map(ex => `<option value="${ex.Name}">${ex.Name}</option>`).join('');
             document.getElementById('exercise-select').innerHTML = '<option value="">-- Select Exercise --</option>' + selectOptions;
+            if (currentEx) document.getElementById('exercise-select').value = currentEx;
+            
             document.getElementById('new-plan-exercises').innerHTML = selectOptions;
 
             // Render Exercise Library List
@@ -218,7 +223,7 @@
                 <div class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
                     <div class="flex justify-between items-center mb-2">
                         <span class="font-bold text-gray-900 text-base">${tpl.Template_Name}</span>
-                        <button onclick="startWorkout('${tpl.Template_Name}')" class="bg-blue-100 text-blue-700 font-semibold px-3 py-1 rounded text-xs hover:bg-blue-200 transition">Start</button>
+                        <button onclick="startWorkout(this.dataset.planName)" data-plan-name="${tpl.Template_Name.replace(/"/g, '&quot;')}" class="bg-blue-100 text-blue-700 font-semibold px-3 py-1 rounded text-xs hover:bg-blue-200 transition">Start</button>
                     </div>
                     <p class="text-xs text-gray-500 leading-relaxed">${tpl.Exercise_Sequence}</p>
                 </div>
@@ -243,13 +248,19 @@
             document.getElementById('recent-logs-list').innerHTML = logsHtml || "<p class='text-gray-500 text-sm italic'>You haven't logged any sets yet.</p>";
         }
 
+        function getLocalDateString() {
+            const d = new Date();
+            const pad = n => n < 10 ? '0'+n : n;
+            return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+        }
+
         async function logSet() {
             const btn = document.getElementById("log-btn");
             const exercise = document.getElementById("exercise-select").value;
             const weight = document.getElementById("weight-input").value;
             const reps = document.getElementById("reps-input").value;
 
-            if (!exercise || !weight || !reps) return alert("Please fill all fields before logging the set.");
+            if (!exercise || weight === '' || reps === '') return alert("Please fill all fields before logging the set.");
 
             btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Saving...';
             
@@ -257,7 +268,7 @@
                 type: "Logs", 
                 data: {
                     Log_ID: Date.now(),
-                    Date: new Date().toISOString().split('T')[0],
+                    Date: getLocalDateString(),
                     Workout_ID: "W-Manual", // For future progression grouping
                     Exercise_ID: exercise,
                     Weight: weight,
@@ -268,12 +279,15 @@
             const res = await apiCall('POST', payload);
             btn.disabled = false; btn.innerHTML = '<i class="fas fa-plus mr-1"></i> Record Set';
             
-            if (res.success) {
-                appData.logs.push(payload.data);
-                renderAll();
-                // Clear the reps, leave weight (since users usually quickly do another set at same weight)
-                document.getElementById("reps-input").value = ""; 
+            if (!res.success) {
+                alert("Failed to save: " + (res.error || "Unknown error occurred on server"));
+                return;
             }
+            
+            appData.logs.push(payload.data);
+            renderAll();
+            // Clear the reps, leave weight
+            document.getElementById("reps-input").value = ""; 
         }
 
         async function addExercise() {
@@ -287,13 +301,16 @@
                 data: { ID: 'EX-'+Date.now(), Name: name, Category: cat }
             };
             const res = await apiCall('POST', payload);
-            if (res.success) {
-                appData.exercises.push(payload.data);
-                document.getElementById("new-ex-name").value = "";
-                renderAll();
-                alert(`Added ${name} to your library!`);
-            }
             hideLoading();
+            
+            if (!res.success) {
+                return alert("Failed to add exercise: " + (res.error || "Unknown error"));
+            }
+            
+            appData.exercises.push(payload.data);
+            document.getElementById("new-ex-name").value = "";
+            renderAll();
+            alert(`Added ${name} to your library!`);
         }
 
         async function addPlan() {
@@ -309,13 +326,16 @@
                 data: { Template_Name: name, Exercise_Sequence: exercises }
             };
             const res = await apiCall('POST', payload);
-            if (res.success) {
-                appData.templates.push(payload.data);
-                document.getElementById("new-plan-name").value = "";
-                renderAll();
-                alert(`Workout plan '${name}' saved!`);
-            }
             hideLoading();
+            
+            if (!res.success) {
+                return alert("Failed to save schedule: " + (res.error || "Unknown error"));
+            }
+            
+            appData.templates.push(payload.data);
+            document.getElementById("new-plan-name").value = "";
+            renderAll();
+            alert(`Workout plan '${name}' saved!`);
         }
 
         function startWorkout(planName) {

@@ -30,6 +30,7 @@ function doPost(e) {
   // Example payload: { "type": "Logs", "data": { "Log_ID": "123", "Weight": 135 } }
   try {
     var body = JSON.parse(e.postData.contents);
+    if (!body || !body.data) throw new Error("Invalid payload: missing data object");
     var sheetType = body.type; 
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetType);
     
@@ -37,14 +38,16 @@ function doPost(e) {
       return createJsonResponse({ error: "Tab not found: " + sheetType });
     }
     
-    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var lastCol = sheet.getLastColumn();
+    if (lastCol === 0) throw new Error("Tab '" + sheetType + "' is empty and has no headers. Add headers to Row 1.");
+    var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
     
     // Map the incoming JSON data to the correct columns dynamically
     var newRow = headers.map(function(header) {
       if (header === 'Date' && !body.data[header]) {
          return new Date().toISOString().split('T')[0];
       }
-      return body.data[header] || "";
+      return body.data[header] != null ? body.data[header] : "";
     });
     
     sheet.appendRow(newRow);
@@ -72,7 +75,7 @@ function setupStandardHeaders() {
   workouts.getRange("A1:C1").setValues([["Workout_ID", "Date", "Name"]]);
   
   var logs = ss.getSheetByName('Logs') || ss.insertSheet('Logs');
-  logs.getRange("A1:E1").setValues([["Log_ID", "Workout_ID", "Exercise_ID", "Weight", "Reps"]]);
+  logs.getRange("A1:F1").setValues([["Log_ID", "Workout_ID", "Date", "Exercise_ID", "Weight", "Reps"]]);
   
   var templates = ss.getSheetByName('Templates') || ss.insertSheet('Templates');
   templates.getRange("A1:B1").setValues([["Template_Name", "Exercise_Sequence"]]);
