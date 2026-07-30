@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Fitness Tracker</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Hide scrollbar for cleaner mobile look */
+        ::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-900 font-sans antialiased p-4">
+
+    <div class="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden md:max-w-2xl mt-10">
+        <div class="p-8">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold">Workout Logger</h1>
+                <button onclick="loadExercises()" class="text-sm text-blue-500 underline">Refresh Data</button>
+            </div>
+
+            <!-- Setup Notice -->
+            <div id="setup-notice" class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6">
+                <p class="font-bold">Setup Required</p>
+                <p class="text-sm">Please paste your Google Apps Script Web App URL below to connect the app.</p>
+                <input type="text" id="api-url" placeholder="https://script.google.com/macros/s/.../exec" 
+                       class="mt-2 w-full p-2 border rounded text-xs">
+                <button onclick="saveApiUrl()" class="mt-2 bg-yellow-500 text-white px-4 py-1 rounded text-sm">Save URL</button>
+            </div>
+
+            <!-- Log a set -->
+            <div id="app-content" class="hidden">
+                <h2 class="text-lg font-semibold mb-4">Log a Set</h2>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Exercise</label>
+                    <select id="exercise-select" class="block appearance-none w-full bg-gray-200 border border-gray-200 text-gray-700 py-3 px-4 pr-8 rounded leading-tight focus:outline-none focus:bg-white focus:border-gray-500">
+                        <option value="">Loading exercises...</option>
+                    </select>
+                </div>
+
+                <div class="flex space-x-4 mb-6">
+                    <div class="w-1/2">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Weight (lbs/kg)</label>
+                        <input type="number" id="weight-input" class="w-full bg-gray-200 text-gray-700 border rounded py-3 px-4 leading-tight focus:outline-none focus:bg-white focus:border-gray-500" placeholder="e.g. 135">
+                    </div>
+                    <div class="w-1/2">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Reps</label>
+                        <input type="number" id="reps-input" class="w-full bg-gray-200 text-gray-700 border rounded py-3 px-4 leading-tight focus:outline-none focus:bg-white focus:border-gray-500" placeholder="e.g. 10">
+                    </div>
+                </div>
+
+                <button onclick="logSet()" id="log-btn" class="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded focus:outline-none focus:shadow-outline transition duration-150">
+                    Log Set
+                </button>
+                <p id="status-msg" class="text-center text-sm mt-3 text-green-600 hidden">Successfully logged!</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Check for saved API URL
+        let API_URL = localStorage.getItem("FITNESS_API_URL");
+        
+        if (API_URL) {
+            document.getElementById("setup-notice").classList.add("hidden");
+            document.getElementById("app-content").classList.remove("hidden");
+            document.getElementById("api-url").value = API_URL;
+            loadExercises();
+        }
+
+        function saveApiUrl() {
+            const url = document.getElementById("api-url").value.trim();
+            if (url) {
+                localStorage.setItem("FITNESS_API_URL", url);
+                API_URL = url;
+                document.getElementById("setup-notice").classList.add("hidden");
+                document.getElementById("app-content").classList.remove("hidden");
+                loadExercises();
+            }
+        }
+
+        async function loadExercises() {
+            if (!API_URL) return;
+            const select = document.getElementById("exercise-select");
+            select.innerHTML = '<option>Loading...</option>';
+            
+            try {
+                const response = await fetch(API_URL + "?type=Exercises");
+                const result = await response.json();
+                
+                if (result.success && result.data.length > 0) {
+                    select.innerHTML = '';
+                    result.data.forEach(ex => {
+                        const opt = document.createElement('option');
+                        opt.value = ex.ID;
+                        opt.textContent = ex.Name;
+                        select.appendChild(opt);
+                    });
+                } else {
+                    select.innerHTML = '<option>No exercises found in Sheet.</option>';
+                }
+            } catch (e) {
+                select.innerHTML = '<option>Error loading. Check URL.</option>';
+            }
+        }
+
+        async function logSet() {
+            const btn = document.getElementById("log-btn");
+            const status = document.getElementById("status-msg");
+            const exercise = document.getElementById("exercise-select").value;
+            const weight = document.getElementById("weight-input").value;
+            const reps = document.getElementById("reps-input").value;
+
+            if (!exercise || !weight || !reps) {
+                alert("Please fill all fields");
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = "Saving...";
+            btn.classList.add("opacity-50");
+
+            const payload = {
+                type: "Logs", // The target tab in Google Sheets
+                data: {
+                    Log_ID: Date.now().toString(),
+                    Workout_ID: "W-" + new Date().toISOString().split('T')[0],
+                    Exercise_ID: exercise,
+                    Weight: weight,
+                    Reps: reps
+                }
+            };
+
+            try {
+                // We use POST with no-cors if needed, but fetch with POST to Apps script requires handling redirects.
+                // In a true production app, you handle the opaque response.
+                await fetch(API_URL, {
+                    method: "POST",
+                    body: JSON.stringify(payload)
+                });
+                
+                // Show success
+                status.classList.remove("hidden");
+                setTimeout(() => status.classList.add("hidden"), 3000);
+            } catch (e) {
+                alert("Error saving: " + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = "Log Set";
+                btn.classList.remove("opacity-50");
+            }
+        }
+    </script>
+</body>
+</html>
