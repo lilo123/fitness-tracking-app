@@ -112,10 +112,9 @@
                         <input type="date" id="log-date" onclick="this.showPicker && this.showPicker()" onchange="onWorkoutDateChange()" class="bg-zinc-950 border border-zinc-800 text-cyan-400 rounded-xl px-2.5 py-1 text-xs font-mono font-bold focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none shadow-inner cursor-pointer">
                     </div>
                 </div>
-                <div class="flex items-center justify-between pt-2 border-t border-zinc-800/60 text-xs text-zinc-400">
-                    <div class="flex items-center gap-1.5">
-                        <i class="fas fa-calendar-check text-cyan-400"></i>
-                        <span>Next workout in rotation ready</span>
+                <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-800/60 text-xs text-zinc-400">
+                    <div id="active-workout-stats" class="flex items-center gap-1.5 font-mono font-medium text-cyan-300">
+                        <!-- Populated by JS -->
                     </div>
                     <div class="flex items-center gap-2">
                         <button onclick="clearActiveWorkout()" class="bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 hover:text-rose-200 font-extrabold px-3 py-1 rounded-lg text-xs transition flex items-center gap-1.5 shadow-[0_0_10px_rgba(244,63,94,0.15)] active:scale-95" title="Clear all exercises from today's workout">
@@ -1235,6 +1234,13 @@
             }).join('');
 
             container.innerHTML = toolbarHtml + cardsHtml;
+
+            const statsEl = document.getElementById('active-workout-stats');
+            if (statsEl) {
+                const totalSetsToday = logsToday.length;
+                const totalVolumeToday = logsToday.reduce((sum, log) => sum + (parseFloat(log.Weight) || 0) * (parseInt(log.Reps, 10) || 0), 0);
+                statsEl.innerHTML = `<i class="fas fa-fire text-amber-400"></i> <span>${activeWorkout.exercises.length} Exercises • ${totalSetsToday} Sets (${totalVolumeToday.toLocaleString()} lbs Today)</span>`;
+            }
         }
 
         // --- 8. Training History Dashboard Smart Accordions & Inline Set Editing ---
