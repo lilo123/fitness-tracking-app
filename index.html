@@ -14,11 +14,21 @@
 <body class="bg-gray-100 text-gray-900 font-sans antialiased h-screen flex flex-col">
 
     <!-- Header -->
-    <header class="bg-blue-600 text-white p-4 shadow-md flex justify-between items-center z-10">
-        <h1 class="text-xl font-bold">Fitness Tracker</h1>
-        <button onclick="fetchData()" class="bg-blue-700 hover:bg-blue-800 px-3 py-1 rounded text-sm shadow">
-            <i class="fas fa-sync-alt mr-1"></i> Sync
-        </button>
+    <header class="bg-white/90 backdrop-blur-md sticky top-0 border-b border-slate-200 px-4 h-14 flex justify-between items-center z-30 shadow-xs">
+        <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-xl bg-slate-900 flex items-center justify-center text-white font-bold text-sm shadow-xs">
+                <i class="fas fa-dumbbell"></i>
+            </div>
+            <h1 class="text-lg font-bold tracking-tight text-slate-900">Workout Log</h1>
+        </div>
+        <div class="flex items-center gap-3">
+            <span id="sync-badge" class="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span> Synced
+            </span>
+            <button onclick="fetchData()" class="w-10 h-10 flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 active:scale-95 transition-all" aria-label="Sync Data" title="Force Sync">
+                <i class="fas fa-sync-alt text-sm"></i>
+            </button>
+        </div>
     </header>
 
     <!-- Main Content -->
@@ -41,47 +51,56 @@
 
         <!-- TAB: LOG (Active Workout Session) -->
         <div id="tab-log" class="tab-content tab-active">
-            <!-- Workout Header & Schedule Selector -->
-            <div class="bg-white rounded-lg shadow p-4 mb-4">
-                <div class="flex justify-between items-center border-b border-gray-100 pb-3 mb-3">
-                    <div>
-                        <h2 class="text-lg font-bold text-gray-900"><i class="fas fa-running text-blue-600 mr-2"></i>Active Workout</h2>
-                        <p class="text-xs text-gray-500">Select a routine & log sets per exercise</p>
-                    </div>
-                    <div>
-                        <input type="date" id="log-date" onchange="renderActiveWorkout()" class="bg-gray-50 border border-gray-300 text-gray-800 rounded px-2 py-1 text-xs font-semibold focus:ring-blue-500 focus:border-blue-500">
+            <!-- Header Action Pill (Zero-Click Landing View) -->
+            <div class="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs mb-4 flex justify-between items-center">
+                <div>
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Today's Scheduled Routine</span>
+                    <div class="flex items-center gap-2">
+                        <h2 id="active-routine-label" class="text-lg font-extrabold text-slate-900">Free Workout</h2>
+                        <button onclick="openRoutineModal()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-full font-semibold border border-slate-300/80 transition flex items-center gap-1">
+                            <span>Switch</span> <i class="fas fa-chevron-down text-[10px]"></i>
+                        </button>
                     </div>
                 </div>
-                
-                <div>
-                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Workout Schedule / Routine</label>
-                    <select id="routine-select" onchange="onRoutineChange(this.value)" class="w-full bg-blue-50 border border-blue-300 text-blue-900 rounded font-semibold p-2 focus:ring-blue-500 focus:border-blue-500 text-sm">
-                        <option value="">-- Free Workout (Custom) --</option>
-                    </select>
+                <div class="flex items-center">
+                    <input type="date" id="log-date" onchange="onWorkoutDateChange()" class="bg-slate-50 border border-slate-200 text-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:ring-blue-500 focus:border-blue-500">
                 </div>
             </div>
 
             <!-- Active Workout Exercises Container -->
             <div id="active-workout-exercises" class="space-y-4 mb-4">
-                <!-- Dynamically rendered Exercise Cards -->
+                <!-- Dynamically rendered Exercise Cards with Benchmark Banners -->
             </div>
 
             <!-- Add Exercise to Workout Selector -->
-            <div class="bg-white rounded-lg shadow p-4 mb-6 border border-dashed border-gray-300">
-                <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Add Another Exercise to this Workout</label>
-                <div class="flex space-x-2">
-                    <select id="add-exercise-select" class="flex-1 bg-gray-50 border border-gray-300 text-gray-900 rounded p-2 text-sm">
+            <div class="bg-white rounded-2xl shadow-xs p-4 mb-6 border border-dashed border-slate-300">
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Add Exercise to Workout</label>
+                <div class="flex gap-2">
+                    <select id="add-exercise-select" class="flex-1 bg-slate-50 border border-slate-200 text-slate-900 rounded-xl p-2.5 text-base font-semibold">
                         <option value="">-- Choose Exercise --</option>
                     </select>
-                    <button onclick="addExerciseToActiveWorkout()" class="bg-gray-800 text-white px-4 py-2 rounded text-sm font-bold hover:bg-gray-900">
+                    <button onclick="addExerciseToActiveWorkout()" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-800 active:scale-95 transition-all">
                         + Add
                     </button>
                 </div>
             </div>
 
             <!-- Finish Workout Card -->
-            <div id="finish-workout-card" class="bg-green-600 text-white rounded-lg shadow p-4 text-center cursor-pointer hover:bg-green-700 transition font-bold text-base mb-6" onclick="finishWorkout()">
+            <div id="finish-workout-card" class="bg-emerald-600 text-white rounded-2xl shadow-sm p-4 text-center cursor-pointer hover:bg-emerald-700 active:scale-[0.98] transition font-bold text-base mb-6" onclick="finishWorkout()">
                 <i class="fas fa-check-circle mr-2"></i> Finish Workout Session
+            </div>
+
+            <!-- Routine Switcher Modal -->
+            <div id="routine-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-end sm:items-center justify-center p-4">
+                <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-100">
+                    <div class="p-4 border-b border-slate-100 flex justify-between items-center">
+                        <h3 class="font-bold text-slate-900 text-base">Select Workout Routine</h3>
+                        <button onclick="closeRoutineModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center font-bold">✕</button>
+                    </div>
+                    <div id="routine-modal-list" class="p-3 space-y-2 max-h-80 overflow-y-auto">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -134,27 +153,25 @@
 
     </main>
 
-    <!-- Bottom Navigation -->
-    <nav class="bg-white border-t fixed bottom-0 w-full flex justify-around p-2 pb-4 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] z-20">
-        <button onclick="switchTab('dashboard')" id="nav-dashboard" class="tab-btn flex-1 flex flex-col items-center text-gray-400 hover:text-blue-600 transition-colors duration-200">
-            <i class="fas fa-chart-line text-xl mb-1"></i>
-            <span class="text-xs">Dashboard</span>
+    <!-- Bottom Navigation Bar (Frosted Glass & Gym Ergonomics) -->
+    <nav class="bg-white/95 backdrop-blur-md border-t border-slate-200/80 fixed bottom-0 w-full flex justify-around px-2 py-1 pb-safe z-30">
+        <button onclick="switchTab('log')" id="nav-log" class="tab-btn active flex-1 min-h-[52px] flex flex-col items-center justify-center text-blue-600 font-bold transition-colors">
+            <i class="fas fa-dumbbell text-lg mb-0.5"></i>
+            <span class="text-[11px]">Workout</span>
         </button>
-        <button onclick="switchTab('log')" id="nav-log" class="tab-btn active flex-1 flex flex-col items-center text-gray-400 hover:text-blue-600 transition-colors duration-200">
-            <i class="fas fa-dumbbell text-xl mb-1"></i>
-            <span class="text-xs">Log</span>
+        <button onclick="switchTab('dashboard')" id="nav-dashboard" class="tab-btn flex-1 min-h-[52px] flex flex-col items-center justify-center text-slate-400 hover:text-blue-600 transition-colors">
+            <i class="fas fa-chart-line text-lg mb-0.5"></i>
+            <span class="text-[11px] font-medium">History</span>
         </button>
-        <button onclick="switchTab('exercises')" id="nav-exercises" class="tab-btn flex-1 flex flex-col items-center text-gray-400 hover:text-blue-600 transition-colors duration-200">
-            <i class="fas fa-list text-xl mb-1"></i>
-            <span class="text-xs">Exercises</span>
+        <button onclick="switchTab('plans')" id="nav-plans" class="tab-btn flex-1 min-h-[52px] flex flex-col items-center justify-center text-slate-400 hover:text-blue-600 transition-colors">
+            <i class="fas fa-clipboard-list text-lg mb-0.5"></i>
+            <span class="text-[11px] font-medium">Routines</span>
         </button>
-        <button onclick="switchTab('plans')" id="nav-plans" class="tab-btn flex-1 flex flex-col items-center text-gray-400 hover:text-blue-600 transition-colors duration-200">
-            <i class="fas fa-clipboard-list text-xl mb-1"></i>
-            <span class="text-xs">Schedules</span>
+        <button onclick="switchTab('exercises')" id="nav-exercises" class="tab-btn flex-1 min-h-[52px] flex flex-col items-center justify-center text-slate-400 hover:text-blue-600 transition-colors">
+            <i class="fas fa-list text-lg mb-0.5"></i>
+            <span class="text-[11px] font-medium">Library</span>
         </button>
-    </nav>
-
-    <script>
+    </nav>    <script>
         const API_URL = "https://script.google.com/macros/s/AKfycbyZbnG3jv37Af1pKFOZIEAamQRHFzIKSQN4IvwdxsWCjWb_NCJV0NGSpOThNN7sqOGwnQ/exec";
         
         let appData = {
@@ -164,33 +181,319 @@
         };
 
         let activeWorkout = {
+            date: "",
+            routineName: "Free Workout",
             exercises: []
         };
 
-        // UI Helpers
-        function showLoading() { document.getElementById('loading').classList.remove('hidden'); }
-        function hideLoading() { document.getElementById('loading').classList.add('hidden'); }
+        function formatShortDate(isoDateStr) {
+            if (!isoDateStr || typeof isoDateStr !== 'string') return '';
+            const parts = isoDateStr.split('-');
+            if (parts.length !== 3) return isoDateStr;
+            const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            const mIdx = parseInt(parts[1], 10) - 1;
+            const monthStr = months[mIdx] || parts[1];
+            const dayStr = parseInt(parts[2], 10);
+            return `${monthStr} ${dayStr}`;
+        }
+
+        // --- 1. StateManager (SWR & localStorage Cache) ---
+        const StateManager = {
+            loadCache() {
+                try {
+                    const saved = localStorage.getItem('fitness_appData_v1');
+                    if (saved) {
+                        const parsed = JSON.parse(saved);
+                        if (parsed.exercises && Array.isArray(parsed.exercises)) appData.exercises = parsed.exercises;
+                        if (parsed.logs && Array.isArray(parsed.logs)) appData.logs = parsed.logs;
+                        if (parsed.templates && Array.isArray(parsed.templates)) appData.templates = parsed.templates;
+                    }
+                } catch (e) { console.warn("Failed to load local cache:", e); }
+            },
+            saveCache() {
+                try {
+                    localStorage.setItem('fitness_appData_v1', JSON.stringify(appData));
+                } catch (e) { console.warn("Failed to save local cache:", e); }
+            }
+        };
+
+        // --- 2. Offline Outbox Queue & Optimistic Sync ---
+        const Outbox = {
+            isSyncing: false,
+            getQueue() {
+                try { return JSON.parse(localStorage.getItem('fitness_outbox_v1') || '[]'); }
+                catch (e) { return []; }
+            },
+            saveQueue(q) {
+                try { localStorage.setItem('fitness_outbox_v1', JSON.stringify(q)); }
+                catch (e) {}
+                this.updateSyncBadge();
+            },
+            enqueue(item) {
+                const q = this.getQueue();
+                q.push(item);
+                this.saveQueue(q);
+                this.sync();
+            },
+            updateSyncBadge() {
+                const badge = document.getElementById('sync-badge');
+                if (!badge) return;
+                const q = this.getQueue();
+                if (!navigator.onLine) {
+                    badge.className = "text-xs font-semibold text-rose-600 bg-rose-50 px-2.5 py-1 rounded-full border border-rose-200 flex items-center gap-1.5";
+                    badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500 inline-block"></span> Offline (${q.length})`;
+                } else if (q.length > 0) {
+                    badge.className = "text-xs font-semibold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200 flex items-center gap-1.5";
+                    badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-500 inline-block animate-spin"></span> Syncing (${q.length})`;
+                } else {
+                    badge.className = "text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1.5";
+                    badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span> Synced`;
+                }
+            },
+            async sync() {
+                if (!navigator.onLine || this.isSyncing) {
+                    this.updateSyncBadge();
+                    return;
+                }
+                const q = this.getQueue();
+                if (q.length === 0) {
+                    this.updateSyncBadge();
+                    return;
+                }
+                
+                this.isSyncing = true;
+                try {
+                    const batchItems = q.filter(item => item.action === "BATCH_APPEND").map(i => i.data);
+                    const deleteItems = q.filter(item => item.action === "DELETE");
+                    
+                    if (batchItems.length > 0) {
+                        const res = await apiCall('POST', { type: "Logs", action: "BATCH_APPEND", items: batchItems });
+                        if (res.success) {
+                            const syncedIds = new Set(batchItems.map(i => i.Client_ID));
+                            const remaining = this.getQueue().filter(item => !syncedIds.has(item.id));
+                            this.saveQueue(remaining);
+                        }
+                    }
+                    
+                    for (const del of deleteItems) {
+                        const res = await apiCall('POST', { type: "Logs", action: "DELETE", Log_ID: del.Log_ID });
+                        if (res.success) {
+                            const remaining = this.getQueue().filter(item => item.id !== del.id);
+                            this.saveQueue(remaining);
+                        }
+                    }
+                } finally {
+                    this.isSyncing = false;
+                    this.updateSyncBadge();
+                }
+            }
+        };
+
+        window.addEventListener('online', () => Outbox.sync());
+        window.addEventListener('offline', () => Outbox.updateSyncBadge());
+
+        // --- 3. Benchmark Engine (PR + Last Session Stats) ---
+        function getExerciseBenchmarks(exerciseId, currentDate) {
+            const history = appData.logs.filter(l => 
+                l.Exercise_ID === exerciseId && 
+                l.Date < currentDate &&
+                l.Weight !== "" && l.Reps !== ""
+            );
+
+            const allHistory = appData.logs.filter(l => 
+                l.Exercise_ID === exerciseId && 
+                l.Date <= currentDate &&
+                l.Weight !== "" && l.Reps !== ""
+            );
+
+            if (history.length === 0 && allHistory.length === 0) {
+                return { lastSession: null, pr: null };
+            }
+
+            history.sort((a, b) => b.Date.localeCompare(a.Date) || ((a.Set_Index || 0) - (b.Set_Index || 0)));
+
+            let lastSessionObj = null;
+            if (history.length > 0) {
+                const lastSessionDate = history[0].Date;
+                const lastSessionSets = history.filter(l => l.Date === lastSessionDate);
+                const summaryText = lastSessionSets.map(s => `${s.Weight}×${s.Reps}`).join(', ');
+                lastSessionObj = {
+                    date: lastSessionDate,
+                    summaryText: summaryText,
+                    sets: lastSessionSets
+                };
+            }
+
+            let bestSet = null;
+            if (allHistory.length > 0) {
+                bestSet = allHistory[0];
+                for (const s of allHistory) {
+                    const weight = parseFloat(s.Weight) || 0;
+                    const bestWeight = parseFloat(bestSet.Weight) || 0;
+                    const reps = parseInt(s.Reps, 10) || 0;
+                    const bestReps = parseInt(bestSet.Reps, 10) || 0;
+
+                    if (weight > bestWeight || (weight === bestWeight && reps > bestReps)) {
+                        bestSet = s;
+                    }
+                }
+            }
+
+            return {
+                lastSession: lastSessionObj,
+                pr: bestSet ? {
+                    weight: bestSet.Weight,
+                    reps: bestSet.Reps,
+                    date: bestSet.Date
+                } : null
+            };
+        }
+
+        // --- 4. Smart Rotation Auto-Scheduler (Zero-Click Landing View) ---
+        function autoSelectNextRoutine() {
+            const dateInput = document.getElementById('log-date');
+            const todayStr = dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString();
+            activeWorkout.date = todayStr;
+
+            const setsToday = appData.logs.filter(l => l.Date === todayStr);
+            if (setsToday.length > 0) {
+                const uniqueExercises = Array.from(new Set(setsToday.map(s => s.Exercise_ID).filter(Boolean)));
+                const firstWorkoutId = setsToday[0].Workout_ID;
+                if (firstWorkoutId && firstWorkoutId !== "W-Manual") {
+                    activeWorkout.routineName = firstWorkoutId;
+                    const tpl = appData.templates.find(t => t.Template_Name === firstWorkoutId);
+                    if (tpl && tpl.Exercise_Sequence) {
+                        const tplEx = tpl.Exercise_Sequence.split(',').map(s => s.trim()).filter(Boolean);
+                        const combined = [...tplEx];
+                        uniqueExercises.forEach(e => { if (!combined.includes(e)) combined.push(e); });
+                        activeWorkout.exercises = combined;
+                    } else {
+                        activeWorkout.exercises = uniqueExercises;
+                    }
+                } else {
+                    activeWorkout.routineName = "Free Workout";
+                    activeWorkout.exercises = uniqueExercises;
+                }
+                updateRoutineLabel();
+                return;
+            }
+
+            const pastDates = Array.from(new Set(appData.logs.filter(l => l.Date < todayStr).map(l => l.Date))).sort((a,b) => b.localeCompare(a));
+            if (pastDates.length > 0 && appData.templates.length > 0) {
+                let lastValidRoutine = "";
+                for (const pDate of pastDates) {
+                    const setsOnDate = appData.logs.filter(l => l.Date === pDate && l.Workout_ID && l.Workout_ID !== "W-Manual");
+                    if (setsOnDate.length > 0) {
+                        lastValidRoutine = setsOnDate[0].Workout_ID;
+                        break;
+                    }
+                }
+                let nextIdx = 0;
+                const idx = appData.templates.findIndex(t => t.Template_Name === lastValidRoutine);
+                if (idx !== -1) {
+                    nextIdx = (idx + 1) % appData.templates.length;
+                }
+                const nextTpl = appData.templates[nextIdx];
+                if (nextTpl && nextTpl.Exercise_Sequence) {
+                    activeWorkout.routineName = nextTpl.Template_Name;
+                    activeWorkout.exercises = nextTpl.Exercise_Sequence.split(',').map(s => s.trim()).filter(Boolean);
+                    updateRoutineLabel();
+                    return;
+                }
+            }
+
+            if (appData.templates.length > 0) {
+                const firstTpl = appData.templates[0];
+                activeWorkout.routineName = firstTpl.Template_Name;
+                activeWorkout.exercises = firstTpl.Exercise_Sequence.split(',').map(s => s.trim()).filter(Boolean);
+            } else {
+                activeWorkout.routineName = "Free Workout";
+                activeWorkout.exercises = [];
+            }
+            updateRoutineLabel();
+        }
+
+        function updateRoutineLabel() {
+            const label = document.getElementById('active-routine-label');
+            if (label) label.textContent = activeWorkout.routineName || "Free Workout";
+        }
+
+        // --- 5. Modal Routine Switcher ---
+        function openRoutineModal() {
+            const modal = document.getElementById('routine-modal');
+            const list = document.getElementById('routine-modal-list');
+            if (!modal || !list) return;
+
+            let html = `
+                <button onclick="selectRoutineOption('Free Workout')" class="w-full text-left p-3 rounded-xl hover:bg-slate-50 border border-slate-100 flex items-center justify-between font-bold text-slate-900">
+                    <span>✨ Free / Custom Workout</span>
+                    <span class="text-xs text-slate-400 font-normal">Empty Slate</span>
+                </button>
+            `;
+
+            appData.templates.forEach(tpl => {
+                html += `
+                    <button onclick="selectRoutineOption('${tpl.Template_Name.replace(/'/g, "\\'")}')" class="w-full text-left p-3 rounded-xl hover:bg-slate-50 border border-slate-100 font-bold text-slate-900">
+                        <div class="flex justify-between items-center">
+                            <span>📋 ${tpl.Template_Name}</span>
+                            <span class="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full font-semibold">Schedule</span>
+                        </div>
+                        <p class="text-xs text-slate-500 font-normal mt-1 line-clamp-1">${tpl.Exercise_Sequence}</p>
+                    </button>
+                `;
+            });
+
+            list.innerHTML = html;
+            modal.classList.remove('hidden');
+        }
+
+        function closeRoutineModal() {
+            const modal = document.getElementById('routine-modal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function selectRoutineOption(name) {
+            closeRoutineModal();
+            activeWorkout.routineName = name;
+            updateRoutineLabel();
+
+            if (name === "Free Workout") {
+                activeWorkout.exercises = [];
+            } else {
+                const tpl = appData.templates.find(t => t.Template_Name === name);
+                if (tpl && tpl.Exercise_Sequence) {
+                    const tplEx = tpl.Exercise_Sequence.split(',').map(s => s.trim()).filter(Boolean);
+                    tplEx.forEach(e => {
+                        if (!activeWorkout.exercises.includes(e)) activeWorkout.exercises.push(e);
+                    });
+                }
+            }
+            renderActiveWorkout();
+        }
+
+        // --- 6. Core UI Helpers & Navigation ---
+        function showLoading() { const l = document.getElementById('loading'); if(l) l.classList.remove('hidden'); }
+        function hideLoading() { const l = document.getElementById('loading'); if(l) l.classList.add('hidden'); }
         
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.getElementById('tab-' + tabId).classList.remove('hidden');
             
             document.querySelectorAll('.tab-btn').forEach(el => {
-                el.classList.remove('active', 'text-blue-600');
-                el.classList.add('text-gray-400');
+                el.classList.remove('active', 'text-blue-600', 'font-bold');
+                el.classList.add('text-slate-400');
             });
             const navBtn = document.getElementById('nav-' + tabId);
-            navBtn.classList.add('active', 'text-blue-600');
-            navBtn.classList.remove('text-gray-400');
+            if (navBtn) {
+                navBtn.classList.add('active', 'text-blue-600', 'font-bold');
+                navBtn.classList.remove('text-slate-400');
+            }
         }
 
         async function apiCall(method, payload = null, typeParam = "") {
             try {
                 let url = method === 'GET' ? `${API_URL}?type=${typeParam}` : API_URL;
-                let options = { 
-                    method: method,
-                    redirect: "follow"
-                };
+                let options = { method: method, redirect: "follow" };
                 if (payload) {
                     options.headers = { "Content-Type": "text/plain;charset=utf-8" };
                     options.body = JSON.stringify(payload);
@@ -198,56 +501,196 @@
                 const response = await fetch(url, options);
                 return await response.json();
             } catch (err) {
-                console.error(err);
-                if (method === 'GET') {
-                    // Ignore errors silently on boot, but show on POST
-                    return { success: false };
-                }
-                alert("Network error: " + err.message);
-                return { success: false };
+                console.warn("API network notice:", err.message);
+                return { success: false, error: err.message };
             }
         }
 
         async function fetchData() {
+            StateManager.loadCache();
+            autoSelectNextRoutine();
+            renderAll();
+            Outbox.updateSyncBadge();
+
             showLoading();
-            // Parallel fetches to speed up sync!
             const [exRes, logRes, tplRes] = await Promise.all([
                 apiCall('GET', null, 'Exercises'),
                 apiCall('GET', null, 'Logs'),
                 apiCall('GET', null, 'Templates')
             ]);
-            
             hideLoading();
 
             if (exRes.success && Array.isArray(exRes.data)) appData.exercises = exRes.data;
             if (logRes.success && Array.isArray(logRes.data)) appData.logs = logRes.data;
             if (tplRes.success && Array.isArray(tplRes.data)) appData.templates = tplRes.data;
             
+            StateManager.saveCache();
+            autoSelectNextRoutine();
             renderAll();
+            Outbox.sync();
         }
 
+        function getLocalDateString() {
+            const d = new Date();
+            const pad = n => n < 10 ? '0'+n : n;
+            return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+        }
+
+        function initDateInput() {
+            const dateInput = document.getElementById('log-date');
+            if (dateInput && !dateInput.value) {
+                dateInput.value = getLocalDateString();
+            }
+        }
+
+        function onWorkoutDateChange() {
+            const dateInput = document.getElementById('log-date');
+            if (dateInput) activeWorkout.date = dateInput.value;
+            renderActiveWorkout();
+        }
+
+        // --- 7. Rendering Engines ---
         function renderAll() {
             initDateInput();
 
-            // Populate Exercise Dropdowns across tabs
             const selectOptions = appData.exercises.map(ex => `<option value="${ex.Name}">${ex.Name}</option>`).join('');
-            if (document.getElementById('add-exercise-select')) {
-                document.getElementById('add-exercise-select').innerHTML = '<option value="">-- Choose Exercise --</option>' + selectOptions;
+            const addExSel = document.getElementById('add-exercise-select');
+            if (addExSel) {
+                addExSel.innerHTML = '<option value="">-- Choose Exercise --</option>' + selectOptions;
             }
-            if (document.getElementById('new-plan-exercises')) {
-                document.getElementById('new-plan-exercises').innerHTML = selectOptions;
-            }
-            if (document.getElementById('routine-select')) {
-                const currentRoutine = document.getElementById('routine-select').value;
-                const routineOptions = appData.templates.map(t => `<option value="${t.Template_Name}">${t.Template_Name}</option>`).join('');
-                document.getElementById('routine-select').innerHTML = '<option value="">-- Free Workout (Custom) --</option>' + routineOptions;
-                if (currentRoutine) document.getElementById('routine-select').value = currentRoutine;
+            const newPlanEx = document.getElementById('new-plan-exercises');
+            if (newPlanEx) {
+                newPlanEx.innerHTML = selectOptions;
             }
 
             renderDashboard();
             renderActiveWorkout();
             renderExerciseLibrary();
             renderPlansList();
+        }
+
+        function renderActiveWorkout() {
+            const container = document.getElementById('active-workout-exercises');
+            if (!container) return;
+            
+            const dateInput = document.getElementById('log-date');
+            const dateVal = dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString();
+
+            if (activeWorkout.exercises.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-white rounded-2xl shadow-xs p-8 text-center border border-dashed border-slate-300">
+                        <i class="fas fa-dumbbell text-slate-400 text-4xl mb-2"></i>
+                        <p class="text-slate-700 font-bold mb-1">No exercises in today's workout yet</p>
+                        <p class="text-xs text-slate-400">Select a Routine above or pick an exercise below to start logging!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const cardsHtml = activeWorkout.exercises.map((exName, exIndex) => {
+                const setsToday = appData.logs.filter(l => l.Date === dateVal && l.Exercise_ID === exName);
+                const benchmarks = getExerciseBenchmarks(exName, dateVal);
+
+                let lastSummary = "No previous session recorded";
+                if (benchmarks.lastSession) {
+                    const shortDate = formatShortDate(benchmarks.lastSession.date);
+                    lastSummary = `<strong class="text-slate-900">Last (${shortDate}):</strong> ${benchmarks.lastSession.summaryText}`;
+                }
+                let prBadge = "";
+                if (benchmarks.pr) {
+                    prBadge = `
+                        <div class="flex items-center bg-amber-50 border border-amber-200 text-amber-800 px-2 py-0.5 rounded font-semibold shrink-0">
+                            <i class="fas fa-trophy text-amber-500 mr-1"></i>
+                            <span>PR: ${benchmarks.pr.weight}×${benchmarks.pr.reps}</span>
+                        </div>
+                    `;
+                }
+
+                const benchmarkBanner = `
+                    <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 mb-3 text-xs">
+                        <div class="flex items-center text-slate-700 font-medium truncate mr-2">
+                            <i class="fas fa-history text-slate-400 mr-1.5"></i>
+                            <span>${lastSummary}</span>
+                        </div>
+                        ${prBadge}
+                    </div>
+                `;
+
+                const currentSetIdx = setsToday.length;
+                let defaultWeight = "";
+                if (setsToday.length > 0) {
+                    defaultWeight = setsToday[setsToday.length - 1].Weight;
+                } else if (benchmarks.lastSession && benchmarks.lastSession.sets[currentSetIdx]) {
+                    defaultWeight = benchmarks.lastSession.sets[currentSetIdx].Weight;
+                } else if (benchmarks.lastSession && benchmarks.lastSession.sets.length > 0) {
+                    defaultWeight = benchmarks.lastSession.sets[benchmarks.lastSession.sets.length - 1].Weight;
+                }
+
+                let tableHtml = `<p class="text-xs text-slate-400 italic py-2">No sets logged for this exercise today.</p>`;
+                if (setsToday.length > 0) {
+                    const rowsHtml = setsToday.map((s, idx) => `
+                        <tr class="border-b border-slate-100 last:border-b-0 text-sm">
+                            <td class="py-2 font-bold text-slate-500">
+                                <span class="bg-slate-100 text-slate-700 text-xs px-2 py-0.5 rounded font-bold">${idx + 1}</span>
+                            </td>
+                            <td class="py-2 font-bold tabular-nums font-mono text-base text-slate-900">${s.Weight} <span class="text-xs font-normal font-sans text-slate-400">lbs</span></td>
+                            <td class="py-2 font-semibold tabular-nums font-mono text-base text-slate-700">${s.Reps} <span class="text-xs font-normal font-sans text-slate-400">reps</span></td>
+                            <td class="py-2 text-right">
+                                <button onclick="deleteLog('${s.Log_ID}')" class="w-10 h-10 flex items-center justify-center text-slate-300 hover:text-rose-500 active:bg-rose-50 rounded-xl transition-colors ml-auto" title="Delete set">
+                                    <i class="fas fa-trash-alt text-sm"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('');
+                    
+                    tableHtml = `
+                        <table class="w-full text-left mb-3">
+                            <thead>
+                                <tr class="border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                    <th class="py-1">Set</th>
+                                    <th class="py-1">Weight</th>
+                                    <th class="py-1">Reps</th>
+                                    <th class="py-1"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rowsHtml}
+                            </tbody>
+                        </table>
+                    `;
+                }
+
+                return `
+                    <div class="bg-white rounded-2xl shadow-xs border border-slate-200/80 p-4">
+                        <div class="flex justify-between items-center border-b border-slate-100 pb-2 mb-2">
+                            <span class="font-extrabold text-slate-900 text-base">${exName}</span>
+                            <button onclick="removeExerciseFromActiveWorkout('${exName.replace(/'/g, "\\'")}')" class="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-rose-500 rounded-full active:bg-slate-100" title="Remove exercise from screen">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        
+                        ${benchmarkBanner}
+                        ${tableHtml}
+                        
+                        <div class="flex items-center gap-2 pt-2 border-t border-slate-100">
+                            <div class="w-1/3">
+                                <input type="number" inputmode="decimal" step="0.5" id="weight-${exIndex}" value="${defaultWeight}" class="w-full h-11 bg-slate-50 border border-slate-200 rounded-xl p-2 text-center text-base font-bold tabular-nums text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none" placeholder="lbs">
+                            </div>
+                            <div class="w-1/3">
+                                <input type="number" inputmode="numeric" pattern="[0-9]*" id="reps-${exIndex}" class="w-full h-11 bg-slate-50 border border-slate-200 rounded-xl p-2 text-center text-base font-bold tabular-nums text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none" placeholder="Reps">
+                            </div>
+                            <div class="w-1/3">
+                                <button onclick="logSetForExercise('${exName.replace(/'/g, "\\'")}', ${exIndex})" class="w-full h-11 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-all">
+                                    <i class="fas fa-check"></i>
+                                    <span>Log Set</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = cardsHtml;
         }
 
         function renderDashboard() {
@@ -262,192 +705,117 @@
             });
             const sortedDates = Object.keys(logsByDate).sort((a,b) => b.localeCompare(a));
             const dashHtml = sortedDates.map(date => `
-                <div class="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
-                    <div class="flex justify-between items-center border-b border-gray-100 pb-2 mb-3">
-                        <span class="font-bold text-gray-800 text-lg"><i class="far fa-calendar-check text-blue-500 mr-2"></i>${date}</span>
-                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-bold uppercase tracking-wide">${logsByDate[date].sets} Sets</span>
+                <div class="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs mb-4">
+                    <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-3">
+                        <span class="font-bold text-slate-900 text-base flex items-center gap-2">
+                            <i class="far fa-calendar-check text-blue-600"></i> ${date}
+                        </span>
+                        <span class="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-bold uppercase tracking-wide">
+                            ${logsByDate[date].sets} Sets
+                        </span>
                     </div>
-                    <div class="text-sm text-gray-600 mb-3">
-                        <p class="font-medium">Total Volume: <span class="font-bold text-gray-900">${logsByDate[date].volume.toLocaleString()} lbs</span></p>
+                    <div class="mb-3">
+                        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Total Volume</div>
+                        <div class="text-xl font-extrabold font-mono tabular-nums text-slate-900">
+                            ${logsByDate[date].volume.toLocaleString()} <span class="text-sm font-sans font-medium text-slate-500">lbs</span>
+                        </div>
                     </div>
-                    <div class="bg-gray-50 rounded p-2 border border-gray-100">
-                        <p class="text-xs text-gray-500 font-semibold uppercase mb-1">Trained Exercises</p>
-                        <p class="text-sm text-gray-800 font-medium">${Array.from(logsByDate[date].exercises).join(' • ')}</p>
+                    <div class="bg-slate-50/70 rounded-xl p-3 border border-slate-100">
+                        <div class="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-1.5">Trained Exercises</div>
+                        <div class="flex flex-wrap gap-1.5">
+                            ${Array.from(logsByDate[date].exercises).map(e => `<span class="bg-white border border-slate-200 text-slate-700 text-xs px-2.5 py-1 rounded-lg font-medium shadow-2xs">${e}</span>`).join('')}
+                        </div>
                     </div>
                 </div>
             `).join('');
-            if (document.getElementById('dashboard-list')) {
-                document.getElementById('dashboard-list').innerHTML = dashHtml || "<p class='text-sm text-gray-500 italic'>No workout days logged yet. Go log a set!</p>";
+            const dl = document.getElementById('dashboard-list');
+            if (dl) {
+                dl.innerHTML = dashHtml || "<p class='text-sm text-slate-500 italic'>No workout days logged yet. Go log a set!</p>";
             }
         }
 
         function renderExerciseLibrary() {
             const exListHtml = appData.exercises.map(ex => `
-                <div class="p-3 bg-white border border-gray-100 rounded shadow-sm flex justify-between items-center transition hover:bg-gray-50">
-                    <span class="font-semibold text-gray-800">${ex.Name}</span>
-                    <span class="text-[10px] uppercase font-bold tracking-wider bg-gray-200 text-gray-700 px-2 py-1 rounded-full">${ex.Category || 'Generic'}</span>
+                <div class="p-3.5 bg-white border border-slate-100 rounded-xl shadow-2xs flex justify-between items-center">
+                    <span class="font-bold text-slate-900 text-sm">${ex.Name}</span>
+                    <span class="text-[10px] uppercase font-extrabold tracking-wider bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full">${ex.Category || 'Generic'}</span>
                 </div>
             `).join('');
-            if (document.getElementById('exercise-list')) {
-                document.getElementById('exercise-list').innerHTML = exListHtml || '<p class="text-sm text-gray-500 italic">No exercises added to database yet.</p>';
+            const el = document.getElementById('exercise-list');
+            if (el) {
+                el.innerHTML = exListHtml || '<p class="text-sm text-slate-500 italic">No exercises added to database yet.</p>';
             }
         }
 
         function renderPlansList() {
             const plansHtml = appData.templates.map(tpl => `
-                <div class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+                <div class="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-xs">
                     <div class="flex justify-between items-center mb-2">
-                        <span class="font-bold text-gray-900 text-base">${tpl.Template_Name}</span>
-                        <button onclick="startWorkout(this.dataset.planName)" data-plan-name="${tpl.Template_Name.replace(/"/g, '&quot;')}" class="bg-blue-100 text-blue-700 font-semibold px-3 py-1 rounded text-xs hover:bg-blue-200 transition">Start</button>
+                        <span class="font-extrabold text-slate-900 text-base">${tpl.Template_Name}</span>
+                        <button onclick="startWorkout('${tpl.Template_Name.replace(/'/g, "\\'")}')" class="bg-blue-50 text-blue-700 font-bold px-3.5 py-1.5 rounded-xl text-xs hover:bg-blue-100 transition">Start</button>
                     </div>
-                    <p class="text-xs text-gray-500 leading-relaxed">${tpl.Exercise_Sequence}</p>
+                    <p class="text-xs text-slate-500 leading-relaxed">${tpl.Exercise_Sequence}</p>
                 </div>
             `).join('');
-            if (document.getElementById('plans-list')) {
-                document.getElementById('plans-list').innerHTML = plansHtml || '<p class="text-sm text-gray-500 italic">No schedules created yet.</p>';
+            const pl = document.getElementById('plans-list');
+            if (pl) {
+                pl.innerHTML = plansHtml || '<p class="text-sm text-slate-500 italic">No schedules created yet.</p>';
             }
         }
 
-        function renderActiveWorkout() {
-            const container = document.getElementById('active-workout-exercises');
-            if (!container) return;
-            
-            const dateInput = document.getElementById('log-date');
-            const dateVal = dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString();
-
-            // Include any exercise that already has logged sets on this Date
-            appData.logs.filter(l => l.Date === dateVal && l.Exercise_ID).forEach(l => {
-                if (!activeWorkout.exercises.includes(l.Exercise_ID)) {
-                    activeWorkout.exercises.push(l.Exercise_ID);
-                }
-            });
-
-            if (activeWorkout.exercises.length === 0) {
-                container.innerHTML = `
-                    <div class="bg-white rounded-lg shadow p-8 text-center border border-dashed border-gray-300">
-                        <i class="fas fa-dumbbell text-gray-400 text-4xl mb-2"></i>
-                        <p class="text-gray-600 font-semibold mb-1">No exercises in today's workout yet</p>
-                        <p class="text-xs text-gray-400">Select a Routine above or pick an exercise below to start logging!</p>
-                    </div>
-                `;
-                return;
-            }
-
-            const cardsHtml = activeWorkout.exercises.map((exName, exIndex) => {
-                const setsToday = appData.logs.filter(l => l.Date === dateVal && l.Exercise_ID === exName);
-                
-                // Pre-fill weight with last logged set weight for this exercise
-                const allSetsForEx = appData.logs.filter(l => l.Exercise_ID === exName);
-                const lastWeight = allSetsForEx.length > 0 ? allSetsForEx[allSetsForEx.length - 1].Weight : "";
-
-                let tableHtml = `<p class="text-xs text-gray-400 italic py-2">No sets logged for this exercise today.</p>`;
-                
-                if (setsToday.length > 0) {
-                    const rowsHtml = setsToday.map((s, idx) => `
-                        <tr class="border-b border-gray-100 last:border-b-0 text-sm">
-                            <td class="py-1.5 font-bold text-gray-500">${idx + 1}</td>
-                            <td class="py-1.5 font-bold text-blue-600">${s.Weight} <span class="text-xs font-normal text-gray-400">lbs</span></td>
-                            <td class="py-1.5 font-semibold text-gray-800">${s.Reps} <span class="text-xs font-normal text-gray-400">reps</span></td>
-                        </tr>
-                    `).join('');
-                    
-                    tableHtml = `
-                        <table class="w-full text-left mt-2 mb-3">
-                            <thead>
-                                <tr class="border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase">
-                                    <th class="py-1">Set</th>
-                                    <th class="py-1">Weight</th>
-                                    <th class="py-1">Reps</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${rowsHtml}
-                            </tbody>
-                        </table>
-                    `;
-                }
-
-                return `
-                    <div class="bg-white rounded-lg shadow border border-gray-200 p-4">
-                        <div class="flex justify-between items-center border-b border-gray-100 pb-2 mb-2">
-                            <div>
-                                <span class="font-bold text-gray-900 text-base">${exName}</span>
-                            </div>
-                            <button onclick="removeExerciseFromActiveWorkout('${exName}')" class="text-gray-400 hover:text-red-500 text-xs">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                        
-                        ${tableHtml}
-                        
-                        <!-- Inline Add Set Bar -->
-                        <div class="flex space-x-2 pt-2 border-t border-gray-100 items-center">
-                            <div class="w-1/3">
-                                <input type="number" id="weight-${exIndex}" value="${lastWeight}" class="w-full bg-gray-50 border border-gray-300 rounded p-1.5 text-xs font-semibold" placeholder="Weight">
-                            </div>
-                            <div class="w-1/3">
-                                <input type="number" id="reps-${exIndex}" class="w-full bg-gray-50 border border-gray-300 rounded p-1.5 text-xs font-semibold" placeholder="Reps">
-                            </div>
-                            <div class="w-1/3">
-                                <button onclick="logSetForExercise('${exName}', ${exIndex})" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 rounded text-xs shadow flex items-center justify-center">
-                                    <i class="fas fa-plus mr-1"></i> Log Set
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
-            container.innerHTML = cardsHtml;
-        }
-
-        async function logSetForExercise(exName, exIndex) {
+        // --- 8. Set Mutations & Optimistic CRUD ---
+        function logSetForExercise(exName, exIndex) {
             const weightEl = document.getElementById(`weight-${exIndex}`);
             const repsEl = document.getElementById(`reps-${exIndex}`);
             const weight = weightEl ? weightEl.value : "";
             const reps = repsEl ? repsEl.value : "";
-            const dateVal = document.getElementById("log-date").value || getLocalDateString();
+            const dateInput = document.getElementById("log-date");
+            const dateVal = dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString();
 
             if (weight === '' || reps === '') {
                 return alert("Please enter Weight and Reps for " + exName);
             }
 
-            const payload = {
-                type: "Logs", 
-                data: {
-                    Log_ID: Date.now(),
-                    Date: dateVal,
-                    Workout_ID: "W-Manual",
-                    Exercise_ID: exName,
-                    Weight: weight,
-                    Reps: reps
-                }
+            const existingSets = appData.logs.filter(l => l.Date === dateVal && l.Exercise_ID === exName);
+            const setIdx = existingSets.length + 1;
+
+            const newLog = {
+                Log_ID: Date.now(),
+                Workout_ID: activeWorkout.routineName || "W-Manual",
+                Date: dateVal,
+                Exercise_ID: exName,
+                Set_Index: setIdx,
+                Weight: weight,
+                Reps: reps,
+                Client_ID: 'C-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6),
+                Timestamp: new Date().toISOString()
             };
 
-            const res = await apiCall('POST', payload);
-            if (!res.success) {
-                alert("Failed to save set: " + (res.error || "Server error"));
-                return;
-            }
+            appData.logs.push(newLog);
+            StateManager.saveCache();
 
-            appData.logs.push(payload.data);
-            if (repsEl) repsEl.value = ""; // Clear reps
+            if (repsEl) repsEl.value = "";
             renderActiveWorkout();
             renderDashboard();
+
+            Outbox.enqueue({
+                id: newLog.Client_ID,
+                action: "BATCH_APPEND",
+                data: newLog
+            });
         }
 
-        function onRoutineChange(templateName) {
-            if (!templateName) return;
-            const tpl = appData.templates.find(t => t.Template_Name === templateName);
-            if (tpl && tpl.Exercise_Sequence) {
-                const exercisesList = tpl.Exercise_Sequence.split(',').map(s => s.trim()).filter(Boolean);
-                exercisesList.forEach(ex => {
-                    if (!activeWorkout.exercises.includes(ex)) {
-                        activeWorkout.exercises.push(ex);
-                    }
-                });
-                renderActiveWorkout();
-            }
+        function deleteLog(logId) {
+            appData.logs = appData.logs.filter(l => String(l.Log_ID) !== String(logId));
+            StateManager.saveCache();
+            renderActiveWorkout();
+            renderDashboard();
+
+            Outbox.enqueue({
+                id: 'DEL-' + Date.now(),
+                action: "DELETE",
+                Log_ID: logId
+            });
         }
 
         function addExerciseToActiveWorkout() {
@@ -467,32 +835,19 @@
         }
 
         function finishWorkout() {
-            const dateVal = document.getElementById("log-date").value || getLocalDateString();
+            const dateInput = document.getElementById("log-date");
+            const dateVal = dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString();
             const setsToday = appData.logs.filter(l => l.Date === dateVal);
             if (setsToday.length === 0) {
                 return alert("No sets logged for today's workout yet!");
             }
-            alert(`Workout Session Saved!\n\nYou logged ${setsToday.length} total sets on ${dateVal}.\nCheck your Daily Progress in the Dashboard!`);
+            alert(`Workout Session Saved!\n\nYou logged ${setsToday.length} total sets on ${dateVal}.\nCheck your History in the Dashboard!`);
             switchTab('dashboard');
         }
 
         function startWorkout(planName) {
-            document.getElementById('routine-select').value = planName;
-            onRoutineChange(planName);
+            selectRoutineOption(planName);
             switchTab('log');
-        }
-
-        function getLocalDateString() {
-            const d = new Date();
-            const pad = n => n < 10 ? '0'+n : n;
-            return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
-        }
-
-        function initDateInput() {
-            const dateInput = document.getElementById('log-date');
-            if (dateInput && !dateInput.value) {
-                dateInput.value = getLocalDateString();
-            }
         }
 
         async function addExercise() {
@@ -513,6 +868,7 @@
             }
             
             appData.exercises.push(payload.data);
+            StateManager.saveCache();
             document.getElementById("new-ex-name").value = "";
             renderAll();
             alert(`Added ${name} to your library!`);
@@ -527,7 +883,7 @@
 
             showLoading();
             const payload = {
-                type: "Templates", // This maps directly to the Google Sheet tab Name
+                type: "Templates",
                 data: { Template_Name: name, Exercise_Sequence: exercises }
             };
             const res = await apiCall('POST', payload);
@@ -538,24 +894,14 @@
             }
             
             appData.templates.push(payload.data);
+            StateManager.saveCache();
             document.getElementById("new-plan-name").value = "";
             renderAll();
             alert(`Workout plan '${name}' saved!`);
         }
 
-        function startWorkout(planName) {
-            const tpl = appData.templates.find(t => t.Template_Name === planName);
-            if(tpl) {
-                // In a V2, this could populate a specific "Active Workout Dashboard" 
-                // For MVP, we switch to log screen so they know what to do next
-                alert(`Starting ${planName}!\n\nYour routine today:\n${tpl.Exercise_Sequence}`);
-                switchTab('log');
-            }
-        }
-
         // Init App On Load
         fetchData();
-        
     </script>
 </body>
 </html>
