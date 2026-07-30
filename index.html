@@ -45,6 +45,11 @@
                 <h2 class="text-lg font-bold border-b pb-2 mb-4">Log a Set</h2>
                 
                 <div class="mb-3">
+                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Date</label>
+                    <input type="date" id="log-date" class="w-full bg-gray-50 border border-gray-300 text-gray-900 rounded p-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+
+                <div class="mb-3">
                     <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Exercise</label>
                     <select id="exercise-select" class="w-full bg-gray-50 border border-gray-300 text-gray-900 rounded p-2 focus:ring-blue-500 focus:border-blue-500">
                         <option value="">-- Select Exercise --</option>
@@ -290,6 +295,7 @@
                 </div>`
             }).join('');
             document.getElementById('recent-logs-list').innerHTML = logsHtml || "<p class='text-gray-500 text-sm italic'>You haven't logged any sets yet.</p>";
+            initDateInput();
         }
 
         function getLocalDateString() {
@@ -298,11 +304,19 @@
             return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
         }
 
+        function initDateInput() {
+            const dateInput = document.getElementById('log-date');
+            if (dateInput && !dateInput.value) {
+                dateInput.value = getLocalDateString();
+            }
+        }
+
         async function logSet() {
             const btn = document.getElementById("log-btn");
             const exercise = document.getElementById("exercise-select").value;
             const weight = document.getElementById("weight-input").value;
             const reps = document.getElementById("reps-input").value;
+            const dateVal = document.getElementById("log-date").value || getLocalDateString();
 
             if (!exercise || weight === '' || reps === '') return alert("Please fill all fields before logging the set.");
 
@@ -312,7 +326,7 @@
                 type: "Logs", 
                 data: {
                     Log_ID: Date.now(),
-                    Date: getLocalDateString(),
+                    Date: dateVal,
                     Workout_ID: "W-Manual", // For future progression grouping
                     Exercise_ID: exercise,
                     Weight: weight,
