@@ -60,26 +60,15 @@
     </div>
 
     <script>
-        // Check for saved API URL
-        let API_URL = localStorage.getItem("FITNESS_API_URL");
+        // Hardcoded API URL
+        let API_URL = "https://script.google.com/macros/s/AKfycbyZbnG3jv37Af1pKFOZIEAamQRHFzIKSQN4IvwdxsWCjWb_NCJV0NGSpOThNN7sqOGwnQ/exec";
         
-        if (API_URL) {
-            document.getElementById("setup-notice").classList.add("hidden");
-            document.getElementById("app-content").classList.remove("hidden");
-            document.getElementById("api-url").value = API_URL;
-            loadExercises();
-        }
-
-        function saveApiUrl() {
-            const url = document.getElementById("api-url").value.trim();
-            if (url) {
-                localStorage.setItem("FITNESS_API_URL", url);
-                API_URL = url;
-                document.getElementById("setup-notice").classList.add("hidden");
-                document.getElementById("app-content").classList.remove("hidden");
-                loadExercises();
-            }
-        }
+        document.getElementById("setup-notice").classList.add("hidden");
+        document.getElementById("app-content").classList.remove("hidden");
+        loadExercises();
+        
+        // Keep function stub in case they manually re-show setup
+        function saveApiUrl() {}
 
         async function loadExercises() {
             if (!API_URL) return;
