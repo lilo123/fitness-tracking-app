@@ -417,6 +417,80 @@
             });
         }
 
+        function getTargetSetCount(exName, dateVal) {
+            if (activeWorkout.targetSets && activeWorkout.targetSets[exName] !== undefined) {
+                return activeWorkout.targetSets[exName];
+            }
+            const setsToday = appData.logs.filter(l => l.Date === dateVal && l.Exercise_ID === exName);
+            const benchmarks = getExerciseBenchmarks(exName, dateVal);
+            const lastSessionCount = (benchmarks.lastSession && benchmarks.lastSession.sets) ? benchmarks.lastSession.sets.length : 3;
+            return Math.max(3, lastSessionCount, setsToday.length);
+        }
+
+        function addTargetSet(exName) {
+            const dateInput = document.getElementById('log-date');
+            const dateVal = dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString();
+            const currentTarget = getTargetSetCount(exName, dateVal);
+            if (!activeWorkout.targetSets) activeWorkout.targetSets = {};
+            activeWorkout.targetSets[exName] = currentTarget + 1;
+            renderActiveWorkout();
+        }
+
+        function removeTargetSet(exName) {
+            const dateInput = document.getElementById('log-date');
+            const dateVal = dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString();
+            const currentTarget = getTargetSetCount(exName, dateVal);
+            if (currentTarget > 1) {
+                if (!activeWorkout.targetSets) activeWorkout.targetSets = {};
+                activeWorkout.targetSets[exName] = currentTarget - 1;
+                renderActiveWorkout();
+            }
+        }
+
+        function logGhostSet(exName, exIndex, rowIdx) {
+            const wEl = document.getElementById(`ghost-w-${exIndex}-${rowIdx}`);
+            const rEl = document.getElementById(`ghost-r-${exIndex}-${rowIdx}`);
+            const weightVal = wEl ? wEl.value : "";
+            const repsVal = rEl ? rEl.value : "";
+            if (!weightVal || !repsVal) {
+                return alert("Please enter Weight and Reps for set " + (rowIdx + 1));
+            }
+            logSetForExerciseDirect(exName, weightVal, repsVal);
+        }
+
+        function logSetForExerciseDirect(exName, weight, reps) {
+            const dateInput = document.getElementById('log-date');
+            const dateVal = dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString();
+
+            const existingSets = appData.logs.filter(l => l.Date === dateVal && l.Exercise_ID === exName);
+            const setIdx = existingSets.length + 1;
+
+            const newLog = {
+                Log_ID: Date.now(),
+                Workout_ID: activeWorkout.routineName || "W-Manual",
+                Date: dateVal,
+                Exercise_ID: exName,
+                Set_Index: setIdx,
+                Weight: weight,
+                Reps: reps,
+                Client_ID: 'C-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6),
+                Timestamp: new Date().toISOString()
+            };
+
+            appData.logs.push(newLog);
+            StateManager.saveCache();
+
+            delete drafts[exName];
+            renderActiveWorkout();
+            renderDashboard();
+
+            Outbox.enqueue({
+                id: newLog.Client_ID,
+                action: "BATCH_APPEND",
+                data: newLog
+            });
+        }
+
         function initDefaultAccordionState() {
             activeWorkout.expandedExercises.clear();
             if (!activeWorkout.exercises || activeWorkout.exercises.length === 0) return;
@@ -427,7 +501,8 @@
             let foundUncompleted = false;
             for (const exName of activeWorkout.exercises) {
                 const setsToday = appData.logs.filter(l => l.Date === dateVal && l.Exercise_ID === exName);
-                if (setsToday.length === 0) {
+                const targetCount = getTargetSetCount(exName, dateVal);
+                if (setsToday.length < targetCount) {
                     activeWorkout.expandedExercises.add(exName);
                     foundUncompleted = true;
                     break;
@@ -484,7 +559,8 @@
             
             activeWorkout.exercises.forEach(exName => {
                 const setsToday = appData.logs.filter(l => l.Date === dateVal && l.Exercise_ID === exName);
-                if (setsToday.length > 0) {
+                const targetCount = getTargetSetCount(exName, dateVal);
+                if (setsToday.length >= targetCount) {
                     activeWorkout.expandedExercises.delete(exName);
                 } else {
                     activeWorkout.expandedExercises.add(exName);
@@ -816,79 +892,126 @@
                     `;
                 }
 
-                const completionBadgeHtml = setsToday.length > 0 ? `
-                    <span class="inline-flex items-center text-xs font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 px-2.5 py-1 rounded-full shrink-0 shadow-[0_0_10px_rgba(16,185,129,0.15)]">
-                        <i class="fas fa-check mr-1 text-[10px]"></i>
-                        <span>✓ ${setsToday.length} ${setsToday.length === 1 ? 'Set' : 'Sets'}</span>
-                    </span>
-                ` : `
+                const targetCount = getTargetSetCount(exName, dateVal);
+                let completionBadgeHtml = `
                     <span class="inline-flex items-center text-xs font-bold bg-zinc-800 border border-zinc-700/80 text-zinc-400 px-2.5 py-1 rounded-full shrink-0">
-                        <span>0 Sets</span>
+                        <span>0 / ${targetCount} Sets</span>
                     </span>
                 `;
-
-                const currentSetIdx = setsToday.length;
-                let defaultWeight = "";
-                if (setsToday.length > 0) {
-                    defaultWeight = setsToday[setsToday.length - 1].Weight;
-                } else if (benchmarks.lastSession && benchmarks.lastSession.sets[currentSetIdx]) {
-                    defaultWeight = benchmarks.lastSession.sets[currentSetIdx].Weight;
-                } else if (benchmarks.lastSession && benchmarks.lastSession.sets.length > 0) {
-                    defaultWeight = benchmarks.lastSession.sets[benchmarks.lastSession.sets.length - 1].Weight;
-                }
-
-                const draft = drafts[exName] || {};
-                const inputWeight = (draft.weight !== undefined && draft.weight !== "") ? draft.weight : defaultWeight;
-                const inputReps = (draft.reps !== undefined) ? draft.reps : "";
-
-                let tableHtml = `<p class="text-xs text-zinc-400 italic py-2 text-center">No sets logged for this exercise today.</p>`;
-                if (setsToday.length > 0) {
-                    const rowsHtml = setsToday.map((s, idx) => `
-                        <tr class="border-b border-zinc-700/60 last:border-b-0 text-sm">
-                            <td class="py-2 px-2 font-bold text-zinc-400">
-                                <span class="bg-zinc-800 text-zinc-300 border border-zinc-700/60 text-xs px-2 py-0.5 rounded font-bold">${idx + 1}</span>
-                            </td>
-                            <td class="py-2 px-2 font-bold tabular-nums font-mono text-base text-white">${s.Weight} <span class="text-xs font-normal font-sans text-zinc-400">lbs</span></td>
-                            <td class="py-2 px-2 font-semibold tabular-nums font-mono text-base text-zinc-300">${s.Reps} <span class="text-xs font-normal font-sans text-zinc-400">reps</span></td>
-                            <td class="py-2 px-2 text-right">
-                                <button onclick="deleteLog('${s.Log_ID}')" class="w-9 h-9 flex items-center justify-center text-zinc-400 hover:text-rose-400 active:bg-rose-500/10 rounded-xl transition-colors ml-auto" title="Delete set" aria-label="Delete set ${idx + 1}">
-                                    <i class="fas fa-trash-alt text-sm"></i>
-                                </button>
-                            </td>
-                        </tr>
-                    `).join('');
-
-                    tableHtml = `
-                        <table class="w-full text-left">
-                            <thead>
-                                <tr class="border-b border-zinc-700/60 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                                    <th class="py-1.5 px-2">Set</th>
-                                    <th class="py-1.5 px-2">Weight</th>
-                                    <th class="py-1.5 px-2">Reps</th>
-                                    <th class="py-1.5 px-2 text-right"></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${rowsHtml}
-                            </tbody>
-                        </table>
+                if (setsToday.length >= targetCount) {
+                    completionBadgeHtml = `
+                        <span class="inline-flex items-center text-xs font-black bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 px-2.5 py-1 rounded-full shrink-0 shadow-[0_0_10px_rgba(16,185,129,0.15)]">
+                            <i class="fas fa-check mr-1 text-[10px]"></i>
+                            <span>✓ ${setsToday.length} / ${targetCount} Sets</span>
+                        </span>
+                    `;
+                } else if (setsToday.length > 0) {
+                    completionBadgeHtml = `
+                        <span class="inline-flex items-center text-xs font-bold bg-amber-500/10 border border-amber-500/30 text-amber-400 px-2.5 py-1 rounded-full shrink-0">
+                            <span>${setsToday.length} / ${targetCount} Sets</span>
+                        </span>
                     `;
                 }
 
-                const quickLogBarHtml = `
-                    <div class="flex items-center gap-2">
-                        <div class="w-1/3 min-w-[48px]">
-                            <input type="number" inputmode="decimal" step="0.5" id="weight-${exIndex}" value="${inputWeight}" onkeydown="if(event.key==='Enter'){event.preventDefault(); logSetForExercise('${escapedExName}', ${exIndex});}" class="w-full h-11 bg-zinc-950 border border-zinc-700 rounded-xl p-2 text-center text-base font-bold tabular-nums text-white placeholder:text-zinc-400 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none" placeholder="lbs" aria-label="Weight in lbs for ${exName}">
-                        </div>
-                        <div class="w-1/3 min-w-[48px]">
-                            <input type="number" inputmode="numeric" pattern="[0-9]*" id="reps-${exIndex}" value="${inputReps}" onkeydown="if(event.key==='Enter'){event.preventDefault(); logSetForExercise('${escapedExName}', ${exIndex});}" class="w-full h-11 bg-zinc-950 border border-zinc-700 rounded-xl p-2 text-center text-base font-bold tabular-nums text-white placeholder:text-zinc-400 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none" placeholder="Reps" aria-label="Reps for ${exName}">
-                        </div>
-                        <div class="w-1/3 min-w-[48px]">
-                            <button onclick="logSetForExercise('${escapedExName}', ${exIndex})" class="w-full h-11 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 active:scale-95 text-zinc-950 font-black text-xs sm:text-sm rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.25)] flex items-center justify-center gap-1.5 transition-all border border-cyan-400/30">
-                                <i class="fas fa-check"></i>
-                                <span>Log Set</span>
-                            </button>
-                        </div>
+                const totalRows = Math.max(targetCount, setsToday.length);
+                const allRowsHtml = Array.from({ length: totalRows }, (_, idx) => {
+                    const loggedSet = setsToday[idx];
+                    const prevSet = (benchmarks.lastSession && benchmarks.lastSession.sets && benchmarks.lastSession.sets[idx])
+                        ? benchmarks.lastSession.sets[idx]
+                        : (benchmarks.lastSession && benchmarks.lastSession.sets && benchmarks.lastSession.sets.length > 0
+                            ? benchmarks.lastSession.sets[benchmarks.lastSession.sets.length - 1]
+                            : null);
+                    if (loggedSet) {
+                        return `
+                            <tr class="border-b border-zinc-700/60 last:border-b-0 text-sm bg-emerald-500/[0.04]">
+                                <td class="py-2 px-2 font-bold text-emerald-400">
+                                    <span class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs px-2 py-0.5 rounded font-bold">${idx + 1}</span>
+                                </td>
+                                <td class="py-2 px-2 text-xs font-medium text-zinc-400 truncate max-w-[90px] sm:max-w-none">
+                                    Prev: ${prevSet ? prevSet.Weight + '×' + prevSet.Reps : '-'}
+                                </td>
+                                <td class="py-2 px-2 font-bold tabular-nums font-mono text-base text-white">
+                                    ${loggedSet.Weight} <span class="text-xs font-normal font-sans text-zinc-400">lbs</span>
+                                </td>
+                                <td class="py-2 px-2 font-semibold tabular-nums font-mono text-base text-zinc-200">
+                                    ${loggedSet.Reps} <span class="text-xs font-normal font-sans text-zinc-400">reps</span>
+                                </td>
+                                <td class="py-2 px-2 text-right">
+                                    <div class="flex items-center justify-end gap-1.5">
+                                        <span class="inline-flex items-center text-xs font-black text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-1 rounded-lg">
+                                            <i class="fas fa-check text-[10px] mr-1"></i> Done
+                                        </span>
+                                        <button onclick="deleteLog('${loggedSet.Log_ID}')" class="w-8 h-8 flex items-center justify-center text-zinc-400 hover:text-rose-400 active:bg-rose-500/10 rounded-xl transition-colors" title="Delete set" aria-label="Delete set ${idx + 1}">
+                                            <i class="fas fa-trash-alt text-xs"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    } else {
+                        const defaultW = prevSet ? prevSet.Weight : (benchmarks.lastSession && benchmarks.lastSession.sets && benchmarks.lastSession.sets.length > 0 ? benchmarks.lastSession.sets[benchmarks.lastSession.sets.length - 1].Weight : "");
+                        const defaultR = prevSet ? prevSet.Reps : "8";
+                        return `
+                            <tr class="border-b border-zinc-700/60 last:border-b-0 text-sm">
+                                <td class="py-2 px-2 font-bold text-zinc-400">
+                                    <span class="bg-zinc-800 text-zinc-400 border border-zinc-700/60 text-xs px-2 py-0.5 rounded font-mono font-bold">${idx + 1}</span>
+                                </td>
+                                <td class="py-2 px-2 text-xs font-medium text-zinc-400 truncate max-w-[90px] sm:max-w-none">
+                                    Prev: <strong class="text-zinc-300 font-mono">${prevSet ? prevSet.Weight + '×' + prevSet.Reps : '-'}</strong>
+                                </td>
+                                <td class="py-2 px-1">
+                                    <div class="flex items-center gap-1">
+                                        <input type="number" inputmode="decimal" step="0.5" id="ghost-w-${exIndex}-${idx}" value="${defaultW}" onkeydown="if(event.key==='Enter'){event.preventDefault(); logGhostSet('${escapedExName}', ${exIndex}, ${idx});}" class="w-16 sm:w-20 h-9 bg-zinc-950 border border-zinc-700/80 rounded-lg p-1 text-center text-sm font-bold font-mono text-white focus:border-cyan-400 outline-none" aria-label="Set ${idx + 1} weight">
+                                        <span class="text-xs text-zinc-500">lbs</span>
+                                    </div>
+                                </td>
+                                <td class="py-2 px-1">
+                                    <div class="flex items-center gap-1">
+                                        <input type="number" inputmode="numeric" pattern="[0-9]*" id="ghost-r-${exIndex}-${idx}" value="${defaultR}" onkeydown="if(event.key==='Enter'){event.preventDefault(); logGhostSet('${escapedExName}', ${exIndex}, ${idx});}" class="w-14 sm:w-16 h-9 bg-zinc-950 border border-zinc-700/80 rounded-lg p-1 text-center text-sm font-bold font-mono text-white focus:border-cyan-400 outline-none" aria-label="Set ${idx + 1} reps">
+                                        <span class="text-xs text-zinc-500">reps</span>
+                                    </div>
+                                </td>
+                                <td class="py-2 px-2 text-right">
+                                    <div class="flex items-center justify-end gap-1">
+                                        <button onclick="logGhostSet('${escapedExName}', ${exIndex}, ${idx})" class="h-9 px-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 active:scale-95 text-zinc-950 font-black text-xs rounded-lg shadow-[0_0_12px_rgba(6,182,212,0.25)] flex items-center gap-1 transition-all" title="Log set ${idx + 1}">
+                                            <i class="fas fa-check text-[11px]"></i>
+                                            <span>Log</span>
+                                        </button>
+                                        ${idx >= 3 && idx === targetCount - 1 ? `
+                                        <button onclick="removeTargetSet('${escapedExName}')" class="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-rose-400 rounded-lg" title="Remove target set">
+                                            <i class="fas fa-times text-xs"></i>
+                                        </button>
+                                        ` : ''}
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    }
+                }).join('');
+
+                const tableHtml = `
+                    <table class="w-full text-left mb-2.5">
+                        <thead>
+                            <tr class="border-b border-zinc-700/60 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                                <th class="py-1.5 px-2">Set</th>
+                                <th class="py-1.5 px-2">Previous</th>
+                                <th class="py-1.5 px-2">Weight</th>
+                                <th class="py-1.5 px-2">Reps</th>
+                                <th class="py-1.5 px-2 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${allRowsHtml}
+                        </tbody>
+                    </table>
+                    <div class="flex items-center justify-between pt-1.5 px-1 border-t border-zinc-800/80">
+                        <span class="text-xs text-zinc-400 font-medium">
+                            Progress: <strong class="${setsToday.length >= targetCount ? 'text-emerald-400' : 'text-cyan-400'}">${setsToday.length} / ${targetCount}</strong> sets completed
+                        </span>
+                        <button onclick="addTargetSet('${escapedExName}')" class="text-xs font-bold text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-700/60 px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-2xs active:scale-95">
+                            <i class="fas fa-plus text-[10px] text-cyan-400"></i>
+                            <span>Add Set</span>
+                        </button>
                     </div>
                 `;
 
@@ -914,11 +1037,9 @@
                         <!-- High-Density OLED Exercise Body -->
                         <div id="accordion-body-${exIndex}" class="p-3.5 bg-zinc-900/60 ${isExpanded ? '' : 'hidden'}">
                             <!-- Recessed Set Well -->
-                            <div class="bg-zinc-950/60 border border-zinc-800/80 rounded-xl p-2.5 mb-3">
+                            <div class="bg-zinc-950/60 border border-zinc-800/80 rounded-xl p-2.5">
                                 ${tableHtml}
                             </div>
-                            <!-- Single-Row Inline Quick-Log Bar -->
-                            ${quickLogBarHtml}
                         </div>
                     </div>
                 `;
