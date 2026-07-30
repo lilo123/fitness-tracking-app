@@ -3,144 +3,330 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Personal Fitness Tracker</title>
-    <!-- Tailwind CSS for styling -->
+    <title>Fitness Tracker</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* Hide scrollbar for cleaner mobile look */
         ::-webkit-scrollbar { display: none; }
+        .tab-btn.active { color: #2563eb; font-weight: bold; }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-900 font-sans antialiased p-4">
+<body class="bg-gray-100 text-gray-900 font-sans antialiased h-screen flex flex-col">
 
-    <div class="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden md:max-w-2xl mt-10">
-        <div class="p-8">
-            <div class="flex justify-between items-center mb-6">
-                <h1 class="text-2xl font-bold">Workout Logger</h1>
-                <button onclick="loadExercises()" class="text-sm text-blue-500 underline">Refresh Data</button>
-            </div>
+    <!-- Header -->
+    <header class="bg-blue-600 text-white p-4 shadow-md flex justify-between items-center z-10">
+        <h1 class="text-xl font-bold">Fitness Tracker</h1>
+        <button onclick="fetchData()" class="bg-blue-700 hover:bg-blue-800 px-3 py-1 rounded text-sm shadow">
+            <i class="fas fa-sync-alt mr-1"></i> Sync
+        </button>
+    </header>
 
-            <!-- Setup Notice -->
-            <div id="setup-notice" class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6">
-                <p class="font-bold">Setup Required</p>
-                <p class="text-sm">Please paste your Google Apps Script Web App URL below to connect the app.</p>
-                <input type="text" id="api-url" placeholder="https://script.google.com/macros/s/.../exec" 
-                       class="mt-2 w-full p-2 border rounded text-xs">
-                <button onclick="saveApiUrl()" class="mt-2 bg-yellow-500 text-white px-4 py-1 rounded text-sm">Save URL</button>
-            </div>
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto p-4 pb-24 relative" id="main-container">
+        
+        <!-- Loading Overlay -->
+        <div id="loading" class="absolute inset-0 bg-gray-100 bg-opacity-75 flex items-center justify-center z-50 hidden">
+            <div class="text-xl text-blue-600"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+        </div>
 
-            <!-- Log a set -->
-            <div id="app-content" class="hidden">
-                <h2 class="text-lg font-semibold mb-4">Log a Set</h2>
+        <!-- TAB: LOG (Home) -->
+        <div id="tab-log" class="tab-content tab-active">
+            <div class="bg-white rounded-lg shadow p-4 mb-4">
+                <h2 class="text-lg font-bold border-b pb-2 mb-4">Log a Set</h2>
                 
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2">Exercise</label>
-                    <select id="exercise-select" class="block appearance-none w-full bg-gray-200 border border-gray-200 text-gray-700 py-3 px-4 pr-8 rounded leading-tight focus:outline-none focus:bg-white focus:border-gray-500">
-                        <option value="">Loading exercises...</option>
+                <div class="mb-3">
+                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Exercise</label>
+                    <select id="exercise-select" class="w-full bg-gray-50 border border-gray-300 text-gray-900 rounded p-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">-- Select Exercise --</option>
                     </select>
                 </div>
-
-                <div class="flex space-x-4 mb-6">
+                
+                <div class="flex space-x-3 mb-4">
                     <div class="w-1/2">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Weight (lbs/kg)</label>
-                        <input type="number" id="weight-input" class="w-full bg-gray-200 text-gray-700 border rounded py-3 px-4 leading-tight focus:outline-none focus:bg-white focus:border-gray-500" placeholder="e.g. 135">
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Weight</label>
+                        <input type="number" id="weight-input" class="w-full bg-gray-50 border border-gray-300 rounded p-2" placeholder="lbs/kg">
                     </div>
                     <div class="w-1/2">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Reps</label>
-                        <input type="number" id="reps-input" class="w-full bg-gray-200 text-gray-700 border rounded py-3 px-4 leading-tight focus:outline-none focus:bg-white focus:border-gray-500" placeholder="e.g. 10">
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Reps</label>
+                        <input type="number" id="reps-input" class="w-full bg-gray-50 border border-gray-300 rounded p-2" placeholder="Count">
                     </div>
                 </div>
-
-                <button onclick="logSet()" id="log-btn" class="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded focus:outline-none focus:shadow-outline transition duration-150">
-                    Log Set
+                
+                <button onclick="logSet()" id="log-btn" class="w-full bg-blue-600 text-white font-bold py-3 rounded shadow hover:bg-blue-700">
+                    <i class="fas fa-plus"></i> Record Set
                 </button>
-                <p id="status-msg" class="text-center text-sm mt-3 text-green-600 hidden">Successfully logged!</p>
+            </div>
+
+            <div class="bg-white rounded-lg shadow p-4">
+                <h2 class="text-lg font-bold border-b pb-2 mb-3">Recent Sets</h2>
+                <div id="recent-logs-list" class="space-y-2 text-sm">
+                    <p class="text-gray-500 italic">No sets logged yet.</p>
+                </div>
             </div>
         </div>
-    </div>
+
+        <!-- TAB: EXERCISES -->
+        <div id="tab-exercises" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow p-4 mb-4 text-sm">
+                <h2 class="text-lg font-bold border-b pb-2 mb-4">Add New Exercise</h2>
+                <div class="mb-3">
+                    <label class="block text-xs text-gray-600">Name</label>
+                    <input type="text" id="new-ex-name" class="w-full border p-2 rounded" placeholder="e.g. Incline Dumbbell Press">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-xs text-gray-600 uppercase mb-1">Category</label>
+                    <select id="new-ex-cat" class="w-full border p-2 rounded">
+                        <option>Chest</option><option>Back</option><option>Legs</option>
+                        <option>Shoulders</option><option>Arms</option><option>Core</option><option>Cardio</option>
+                    </select>
+                </div>
+                <button onclick="addExercise()" class="w-full bg-green-600 text-white font-bold py-2 rounded shadow hover:bg-green-700">Add Exercise</button>
+            </div>
+            
+            <h3 class="font-bold text-gray-700 mb-2">My Exercise Library</h3>
+            <div id="exercise-list" class="space-y-2">
+                <!-- rendering exercises here -->
+            </div>
+        </div>
+
+        <!-- TAB: PLANS -->
+        <div id="tab-plans" class="tab-content hidden">
+             <div class="bg-white rounded-lg shadow p-4 mb-4 text-sm">
+                <h2 class="text-lg font-bold border-b pb-2 mb-4">Create Workout Schedule</h2>
+                <div class="mb-3">
+                    <label class="block text-xs text-gray-600">Plan Name</label>
+                    <input type="text" id="new-plan-name" class="w-full border p-2 rounded" placeholder="e.g. Pull Day A">
+                </div>
+                <div class="mb-3">
+                    <label class="block text-xs text-gray-600">Included Exercises (Hold Ctrl/Cmd to select multiple)</label>
+                    <select id="new-plan-exercises" multiple class="w-full border p-2 rounded h-32">
+                        <!-- Populated by JS -->
+                    </select>
+                </div>
+                <button onclick="addPlan()" class="w-full bg-purple-600 text-white font-bold py-2 rounded shadow hover:bg-purple-700">Save Schedule</button>
+            </div>
+
+            <h3 class="font-bold text-gray-700 mb-2">My Schedules</h3>
+            <div id="plans-list" class="space-y-3">
+                <!-- rendering plans -->
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="bg-white border-t fixed bottom-0 w-full flex justify-around p-2 pb-4 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] z-20">
+        <button onclick="switchTab('log')" id="nav-log" class="tab-btn active flex-1 flex flex-col items-center text-gray-400 hover:text-blue-600 transition-colors duration-200">
+            <i class="fas fa-dumbbell text-xl mb-1"></i>
+            <span class="text-xs">Log</span>
+        </button>
+        <button onclick="switchTab('exercises')" id="nav-exercises" class="tab-btn flex-1 flex flex-col items-center text-gray-400 hover:text-blue-600 transition-colors duration-200">
+            <i class="fas fa-list text-xl mb-1"></i>
+            <span class="text-xs">Exercises</span>
+        </button>
+        <button onclick="switchTab('plans')" id="nav-plans" class="tab-btn flex-1 flex flex-col items-center text-gray-400 hover:text-blue-600 transition-colors duration-200">
+            <i class="fas fa-clipboard-list text-xl mb-1"></i>
+            <span class="text-xs">Schedules</span>
+        </button>
+    </nav>
 
     <script>
-        // Hardcoded API URL
-        let API_URL = "https://script.google.com/macros/s/AKfycbyZbnG3jv37Af1pKFOZIEAamQRHFzIKSQN4IvwdxsWCjWb_NCJV0NGSpOThNN7sqOGwnQ/exec";
+        const API_URL = "https://script.google.com/macros/s/AKfycbyZbnG3jv37Af1pKFOZIEAamQRHFzIKSQN4IvwdxsWCjWb_NCJV0NGSpOThNN7sqOGwnQ/exec";
         
-        document.getElementById("setup-notice").classList.add("hidden");
-        document.getElementById("app-content").classList.remove("hidden");
-        loadExercises();
-        
-        // Keep function stub in case they manually re-show setup
-        function saveApiUrl() {}
+        let appData = {
+            exercises: [],
+            logs: [],
+            templates: []
+        };
 
-        async function loadExercises() {
-            if (!API_URL) return;
-            const select = document.getElementById("exercise-select");
-            select.innerHTML = '<option>Loading...</option>';
+        // UI Helpers
+        function showLoading() { document.getElementById('loading').classList.remove('hidden'); }
+        function hideLoading() { document.getElementById('loading').classList.add('hidden'); }
+        
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
             
+            document.querySelectorAll('.tab-btn').forEach(el => {
+                el.classList.remove('active', 'text-blue-600');
+                el.classList.add('text-gray-400');
+            });
+            const navBtn = document.getElementById('nav-' + tabId);
+            navBtn.classList.add('active', 'text-blue-600');
+            navBtn.classList.remove('text-gray-400');
+        }
+
+        async function apiCall(method, payload = null, typeParam = "") {
             try {
-                const response = await fetch(API_URL + "?type=Exercises");
-                const result = await response.json();
-                
-                if (result.success && result.data.length > 0) {
-                    select.innerHTML = '';
-                    result.data.forEach(ex => {
-                        const opt = document.createElement('option');
-                        opt.value = ex.ID;
-                        opt.textContent = ex.Name;
-                        select.appendChild(opt);
-                    });
-                } else {
-                    select.innerHTML = '<option>No exercises found in Sheet.</option>';
+                let url = method === 'GET' ? `${API_URL}?type=${typeParam}` : API_URL;
+                let options = { method };
+                if (payload) {
+                    options.body = JSON.stringify(payload);
                 }
-            } catch (e) {
-                select.innerHTML = '<option>Error loading. Check URL.</option>';
+                const response = await fetch(url, options);
+                return await response.json();
+            } catch (err) {
+                console.error(err);
+                if (method === 'GET') {
+                    // Ignore errors silently on boot, but show on POST
+                    return { success: false };
+                }
+                alert("Network error: " + err.message);
+                return { success: false };
             }
+        }
+
+        async function fetchData() {
+            showLoading();
+            // Parallel fetches to speed up sync!
+            const [exRes, logRes, tplRes] = await Promise.all([
+                apiCall('GET', null, 'Exercises'),
+                apiCall('GET', null, 'Logs'),
+                apiCall('GET', null, 'Templates')
+            ]);
+            
+            hideLoading();
+
+            if (exRes.success) appData.exercises = exRes.data || [];
+            if (logRes.success) appData.logs = logRes.data || [];
+            if (tplRes.success) appData.templates = tplRes.data || [];
+            
+            renderAll();
+        }
+
+        function renderAll() {
+            // Populate Exercises dropdowns
+            const selectOptions = appData.exercises.map(ex => `<option value="${ex.Name}">${ex.Name}</option>`).join('');
+            document.getElementById('exercise-select').innerHTML = '<option value="">-- Select Exercise --</option>' + selectOptions;
+            document.getElementById('new-plan-exercises').innerHTML = selectOptions;
+
+            // Render Exercise Library List
+            const exListHtml = appData.exercises.map(ex => `
+                <div class="p-3 bg-white border border-gray-100 rounded shadow-sm flex justify-between items-center transition hover:bg-gray-50">
+                    <span class="font-semibold text-gray-800">${ex.Name}</span>
+                    <span class="text-[10px] uppercase font-bold tracking-wider bg-gray-200 text-gray-700 px-2 py-1 rounded-full">${ex.Category || 'Generic'}</span>
+                </div>
+            `).join('');
+            document.getElementById('exercise-list').innerHTML = exListHtml || '<p class="text-sm text-gray-500 italic">No exercises added to database yet.</p>';
+
+            // Render Plans List
+            const plansHtml = appData.templates.map(tpl => `
+                <div class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-bold text-gray-900 text-base">${tpl.Template_Name}</span>
+                        <button onclick="startWorkout('${tpl.Template_Name}')" class="bg-blue-100 text-blue-700 font-semibold px-3 py-1 rounded text-xs hover:bg-blue-200 transition">Start</button>
+                    </div>
+                    <p class="text-xs text-gray-500 leading-relaxed">${tpl.Exercise_Sequence}</p>
+                </div>
+            `).join('');
+            document.getElementById('plans-list').innerHTML = plansHtml || '<p class="text-sm text-gray-500 italic">No schedules created yet.</p>';
+
+            // Render Recent Logs (Reverse order to show newest first)
+            const recentLogs = [...appData.logs].reverse().filter(l => l.Exercise_ID).slice(0, 50); // Show last 50
+            const logsHtml = recentLogs.map(log => {
+                return `
+                <div class="flex justify-between border-b border-gray-100 py-3 last:border-b-0">
+                    <div>
+                        <p class="font-semibold text-gray-800">${log.Exercise_ID}</p>
+                        <p class="text-xs text-gray-400 mt-1"><i class="far fa-calendar-alt mr-1"></i>${log.Date || 'Today'}</p>
+                    </div>
+                    <div class="text-right flex flex-col justify-center">
+                        <p class="font-bold text-blue-600 text-lg">${log.Weight} <span class="text-xs font-normal text-gray-500">lbs</span></p>
+                        <p class="text-xs font-medium text-gray-600 tracking-wide">${log.Reps} Reps</p>
+                    </div>
+                </div>`
+            }).join('');
+            document.getElementById('recent-logs-list').innerHTML = logsHtml || '<p class="text-gray-500 text-sm italic">You haven\\'t logged any sets yet.</p>';
         }
 
         async function logSet() {
             const btn = document.getElementById("log-btn");
-            const status = document.getElementById("status-msg");
             const exercise = document.getElementById("exercise-select").value;
             const weight = document.getElementById("weight-input").value;
             const reps = document.getElementById("reps-input").value;
 
-            if (!exercise || !weight || !reps) {
-                alert("Please fill all fields");
-                return;
-            }
+            if (!exercise || !weight || !reps) return alert("Please fill all fields before logging the set.");
 
-            btn.disabled = true;
-            btn.innerHTML = "Saving...";
-            btn.classList.add("opacity-50");
-
+            btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Saving...';
+            
             const payload = {
-                type: "Logs", // The target tab in Google Sheets
+                type: "Logs", 
                 data: {
-                    Log_ID: Date.now().toString(),
-                    Workout_ID: "W-" + new Date().toISOString().split('T')[0],
+                    Log_ID: Date.now(),
+                    Date: new Date().toISOString().split('T')[0],
+                    Workout_ID: "W-Manual", // For future progression grouping
                     Exercise_ID: exercise,
                     Weight: weight,
                     Reps: reps
                 }
             };
 
-            try {
-                // We use POST with no-cors if needed, but fetch with POST to Apps script requires handling redirects.
-                // In a true production app, you handle the opaque response.
-                await fetch(API_URL, {
-                    method: "POST",
-                    body: JSON.stringify(payload)
-                });
-                
-                // Show success
-                status.classList.remove("hidden");
-                setTimeout(() => status.classList.add("hidden"), 3000);
-            } catch (e) {
-                alert("Error saving: " + e.message);
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = "Log Set";
-                btn.classList.remove("opacity-50");
+            const res = await apiCall('POST', payload);
+            btn.disabled = false; btn.innerHTML = '<i class="fas fa-plus mr-1"></i> Record Set';
+            
+            if (res.success) {
+                appData.logs.push(payload.data);
+                renderAll();
+                // Clear the reps, leave weight (since users usually quickly do another set at same weight)
+                document.getElementById("reps-input").value = ""; 
             }
         }
+
+        async function addExercise() {
+            const name = document.getElementById("new-ex-name").value;
+            const cat = document.getElementById("new-ex-cat").value;
+            if(!name) return alert("Please provide an exercise name.");
+
+            showLoading();
+            const payload = {
+                type: "Exercises",
+                data: { ID: 'EX-'+Date.now(), Name: name, Category: cat }
+            };
+            const res = await apiCall('POST', payload);
+            if (res.success) {
+                appData.exercises.push(payload.data);
+                document.getElementById("new-ex-name").value = "";
+                renderAll();
+                alert(`Added ${name} to your library!`);
+            }
+            hideLoading();
+        }
+
+        async function addPlan() {
+            const name = document.getElementById("new-plan-name").value;
+            const selOptions = document.getElementById("new-plan-exercises").selectedOptions;
+            const exercises = Array.from(selOptions).map(opt => opt.value).join(", ");
+            
+            if(!name || exercises.length === 0) return alert("Provide a schedule name and select at least one exercise.");
+
+            showLoading();
+            const payload = {
+                type: "Templates", // This maps directly to the Google Sheet tab Name
+                data: { Template_Name: name, Exercise_Sequence: exercises }
+            };
+            const res = await apiCall('POST', payload);
+            if (res.success) {
+                appData.templates.push(payload.data);
+                document.getElementById("new-plan-name").value = "";
+                renderAll();
+                alert(`Workout plan '${name}' saved!`);
+            }
+            hideLoading();
+        }
+
+        function startWorkout(planName) {
+            const tpl = appData.templates.find(t => t.Template_Name === planName);
+            if(tpl) {
+                // In a V2, this could populate a specific "Active Workout Dashboard" 
+                // For MVP, we switch to log screen so they know what to do next
+                alert(`Starting ${planName}!\n\nYour routine today:\n${tpl.Exercise_Sequence}`);
+                switchTab('log');
+            }
+        }
+
+        // Init App On Load
+        fetchData();
+        
     </script>
 </body>
 </html>
