@@ -103,6 +103,9 @@
                 <select id="coach-athlete-select" onchange="switchActiveAthlete(this.value)" class="bg-transparent text-white text-xs font-extrabold outline-none cursor-pointer">
                     <!-- Populated dynamically -->
                 </select>
+                <button id="btn-delete-athlete" onclick="deleteActiveAthlete()" class="hidden text-zinc-500 hover:text-rose-400 p-1 transition rounded-lg hover:bg-rose-500/10 ml-0.5" title="Delete this athlete and all their workout history">
+                    <i class="fas fa-trash-alt text-[10px]"></i>
+                </button>
             </div>
             <div class="flex items-center gap-2">
                 <button onclick="promptAddAthlete()" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold px-2.5 py-1 rounded-xl transition flex items-center gap-1.5 border border-zinc-700" title="Add a new athlete or friend">
@@ -377,6 +380,15 @@
                 `).join('') + `<option value="__NEW__" class="bg-zinc-950 text-cyan-400 font-bold" style="background-color: #09090b; color: #22d3ee;">+ Add New Athlete...</option>`;
             }
 
+            const delBtn = document.getElementById('btn-delete-athlete');
+            if (delBtn) {
+                if (AppContext.activeAthlete === "duy") {
+                    delBtn.classList.add('hidden');
+                } else {
+                    delBtn.classList.remove('hidden');
+                }
+            }
+
             if (copyBtn) {
                 if (AppContext.activeAthlete === "duy") {
                     copyBtn.classList.add('hidden');
@@ -384,6 +396,35 @@
                     copyBtn.classList.remove('hidden');
                 }
             }
+        }
+
+        async function deleteActiveAthlete() {
+            if (AppContext.activeAthlete === "duy") {
+                alert("Cannot delete the primary coach profile.");
+                return;
+            }
+            const name = getAthleteDisplayName(AppContext.activeAthlete);
+            const confirmed = confirm(`Are you sure you want to delete athlete "${name}" and all of their workout logs?\n\nThis will remove their data from Google Sheets.`);
+            if (!confirmed) return;
+
+            const targetSlug = AppContext.activeAthlete;
+            
+            // Remove from local list
+            coachAthletes = coachAthletes.filter(a => a.Athlete_ID !== targetSlug);
+            saveCoachAthletes();
+
+            // Clear local cached data for this athlete
+            localStorage.removeItem(`fitness_appData_v2_${targetSlug}`);
+            localStorage.removeItem(`fitness_outbox_v2_${targetSlug}`);
+
+            // Call backend to delete tabs in Google Sheets
+            showLoading();
+            await apiCall('POST', { action: "DELETE_ATHLETE", Athlete_ID: targetSlug }, "Athletes");
+            hideLoading();
+
+            // Switch back to coach profile
+            await switchActiveAthlete("duy");
+            alert(`Athlete "${name}" and all data have been deleted.`);
         }
 
         async function switchActiveAthlete(newAthleteSlug) {

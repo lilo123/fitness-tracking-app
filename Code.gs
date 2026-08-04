@@ -238,6 +238,31 @@ function doPost(e) {
       return createJsonResponse({ success: true, message: "Athlete registered successfully!", Athlete_ID: newSlug, Display_Name: newDisplayName });
     }
 
+    // Handle DELETE_ATHLETE action
+    if (body.action === "DELETE_ATHLETE") {
+      var targetSlug = (body.Athlete_ID || body.athlete || "").trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
+      if (!targetSlug || targetSlug === "duy") {
+        return createJsonResponse({ success: false, error: "Cannot delete primary coach profile" });
+      }
+      
+      var logSheet = ss.getSheetByName("Logs_" + targetSlug);
+      if (logSheet) ss.deleteSheet(logSheet);
+      
+      var tplSheet = ss.getSheetByName("Templates_" + targetSlug);
+      if (tplSheet) ss.deleteSheet(tplSheet);
+      
+      var athSheet = ss.getSheetByName("Athletes");
+      if (athSheet) {
+        var data = athSheet.getDataRange().getValues();
+        for (var r = data.length - 1; r >= 1; r--) {
+          if (String(data[r][0]).toLowerCase() === targetSlug) {
+            athSheet.deleteRow(r + 1);
+          }
+        }
+      }
+      return createJsonResponse({ success: true, message: "Athlete and data deleted successfully!" });
+    }
+
     // Handle CLONE_TEMPLATE action (copies routine from Coach to Athlete)
     if (body.action === "CLONE_TEMPLATE") {
       var targetAthlete = (body.targetAthlete || "").trim().toLowerCase();
