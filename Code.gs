@@ -47,13 +47,12 @@ function resolveSheetName(ss, requestedType, athleteId) {
     var tplSheet = ss.getSheetByName(tplName);
     if (!tplSheet) {
       tplSheet = ss.insertSheet(tplName);
-      tplSheet.getRange(1, 1, 1, 3).setValues([["Template_ID", "Template_Name", "Exercise_Sequence"]]);
-      // Copy starter templates if creating new athlete
+      tplSheet.getRange(1, 1, 1, 2).setValues([["Template_Name", "Exercise_Sequence"]]);
       var defaultTemplates = [
-        ["TPL-1", "Workout A (Push, Quads & Core)", "Incline Bench Press, Cable Lateral Raises, Dips, Leg Extension Machine, Overhead Tricep Cable Pull, Leg Raise"],
-        ["TPL-2", "Workout B (Pull, Hamstrings & Core)", "Lat Pull Down, Seated Cable Row, Inclined Bicep Curl, Leg Curl, Face Pulls, Weighted Sit-Up"]
+        ["Workout A (Push, Quads & Core)", "Incline Bench Press, Cable Lateral Raises, Dips, Leg Extension Machine, Overhead Tricep Cable Pull, Leg Raise"],
+        ["Workout B (Pull, Hamstrings & Core)", "Lat Pull Down, Seated Cable Row, Inclined Bicep Curl, Leg Curl, Face Pulls, Weighted Sit-Up"]
       ];
-      tplSheet.getRange(2, 1, defaultTemplates.length, 3).setValues(defaultTemplates);
+      tplSheet.getRange(2, 1, defaultTemplates.length, 2).setValues(defaultTemplates);
     }
     return tplSheet;
   }
@@ -69,8 +68,8 @@ function ensureSchema(sheet, sheetType) {
       return ["Log_ID", "Workout_ID", "Date", "Exercise_ID", "Set_Index", "Weight", "Reps", "Client_ID", "Timestamp"];
     }
     if (sheetType.indexOf("Templates") !== -1) {
-      sheet.getRange(1, 1, 1, 3).setValues([["Template_ID", "Template_Name", "Exercise_Sequence"]]);
-      return ["Template_ID", "Template_Name", "Exercise_Sequence"];
+      sheet.getRange(1, 1, 1, 2).setValues([["Template_Name", "Exercise_Sequence"]]);
+      return ["Template_Name", "Exercise_Sequence"];
     }
     if (sheetType === "Exercises") {
       sheet.getRange(1, 1, 1, 3).setValues([["ID", "Name", "Category"]]);
@@ -87,16 +86,6 @@ function ensureSchema(sheet, sheetType) {
   if (sheetType.indexOf("Logs") !== -1) {
     var requiredCols = ["Log_ID", "Workout_ID", "Date", "Exercise_ID", "Set_Index", "Weight", "Reps", "Client_ID", "Timestamp"];
     requiredCols.forEach(function(col) {
-      if (headers.indexOf(col) === -1) {
-        lastCol++;
-        sheet.getRange(1, lastCol).setValue(col);
-        headers.push(col);
-      }
-    });
-  }
-  if (sheetType.indexOf("Templates") !== -1) {
-    var requiredColsTpl = ["Template_ID", "Template_Name", "Exercise_Sequence"];
-    requiredColsTpl.forEach(function(col) {
       if (headers.indexOf(col) === -1) {
         lastCol++;
         sheet.getRange(1, lastCol).setValue(col);
@@ -152,34 +141,36 @@ function seedMasterExercises(ss) {
 
 function seedMasterTemplates(ss, tabName) {
   var sheet = ss.getSheetByName(tabName) || ss.insertSheet(tabName);
-  var headers = ensureSchema(sheet, tabName);
   var data = sheet.getDataRange().getValues();
-  var nameCol = headers.indexOf("Template_Name");
   
-  var existing = {};
-  for (var r = 1; r < data.length; r++) {
-    var val = nameCol !== -1 ? data[r][nameCol] : data[r][0];
-    if (val) existing[String(val).trim().toLowerCase()] = true;
+  if (data.length <= 1) {
+    sheet.clear();
+    sheet.getRange(1, 1, 1, 2).setValues([["Template_Name", "Exercise_Sequence"]]);
+    var defaults = [
+      ["Workout A (Push, Quads & Core)", "Incline Bench Press, Cable Lateral Raises, Dips, Leg Extension Machine, Overhead Tricep Cable Pull, Leg Raise"],
+      ["Workout B (Pull, Hamstrings & Core)", "Lat Pull Down, Seated Cable Row, Inclined Bicep Curl, Leg Curl, Face Pulls, Weighted Sit-Up"]
+    ];
+    sheet.getRange(2, 1, defaults.length, 2).setValues(defaults);
+    return;
   }
   
-  var defaults = [
-    { Template_ID: "TPL-1", Template_Name: "Workout A (Push, Quads & Core)", Exercise_Sequence: "Incline Bench Press, Cable Lateral Raises, Dips, Leg Extension Machine, Overhead Tricep Cable Pull, Leg Raise" },
-    { Template_ID: "TPL-2", Template_Name: "Workout B (Pull, Hamstrings & Core)", Exercise_Sequence: "Lat Pull Down, Seated Cable Row, Inclined Bicep Curl, Leg Curl, Face Pulls, Weighted Sit-Up" }
-  ];
-  
-  var toAdd = [];
-  defaults.forEach(function(d) {
-    if (!existing[d.Template_Name.toLowerCase()]) {
-      var row = headers.map(function(h) {
-        return d[h] || "";
-      });
-      toAdd.push(row);
-      existing[d.Template_Name.toLowerCase()] = true;
+  // Check if columns shifted (e.g. Row 1 has Template_ID or Column A has TPL-)
+  var isShifted = false;
+  for (var r = 0; r < data.length; r++) {
+    if (String(data[r][0]).indexOf("TPL-") === 0 || String(data[r][0]) === "Template_ID") {
+      isShifted = true;
+      break;
     }
-  });
+  }
   
-  if (toAdd.length > 0) {
-    sheet.getRange(sheet.getLastRow() + 1, 1, toAdd.length, headers.length).setValues(toAdd);
+  if (isShifted) {
+    sheet.clear();
+    sheet.getRange(1, 1, 1, 2).setValues([["Template_Name", "Exercise_Sequence"]]);
+    var cleanRows = [
+      ["Workout A (Push, Quads & Core)", "Incline Bench Press, Cable Lateral Raises, Dips, Leg Extension Machine, Overhead Tricep Cable Pull, Leg Raise"],
+      ["Workout B (Pull, Hamstrings & Core)", "Lat Pull Down, Seated Cable Row, Inclined Bicep Curl, Leg Curl, Face Pulls, Weighted Sit-Up"]
+    ];
+    sheet.getRange(2, 1, cleanRows.length, 2).setValues(cleanRows);
   }
 }
 
