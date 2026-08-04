@@ -571,16 +571,12 @@
         ];
 
         function seedDefaults() {
-            DEFAULT_EXERCISES.forEach(defEx => {
-                if (!appData.exercises.some(e => e.Name.toLowerCase() === defEx.Name.toLowerCase())) {
-                    appData.exercises.push(defEx);
-                }
-            });
-            DEFAULT_TEMPLATES.forEach(defTpl => {
-                if (!appData.templates.some(t => t.Template_Name.toLowerCase() === defTpl.Template_Name.toLowerCase())) {
-                    appData.templates.push(defTpl);
-                }
-            });
+            if (!appData.exercises || appData.exercises.length === 0) {
+                appData.exercises = [...DEFAULT_EXERCISES];
+            }
+            if (!appData.templates || appData.templates.length === 0) {
+                appData.templates = [...DEFAULT_TEMPLATES];
+            }
         }
 
         // --- 1. StateManager (SWR & localStorage Cache) ---
