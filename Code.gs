@@ -109,65 +109,77 @@ function ensureSchema(sheet, sheetType) {
 
 function seedMasterExercises(ss) {
   var sheet = ss.getSheetByName("Exercises") || ss.insertSheet("Exercises");
-  ensureSchema(sheet, "Exercises");
+  var headers = ensureSchema(sheet, "Exercises");
   var data = sheet.getDataRange().getValues();
+  var nameCol = headers.indexOf("Name");
+  
   var existing = {};
   for (var r = 1; r < data.length; r++) {
-    if (data[r][1]) existing[String(data[r][1]).trim().toLowerCase()] = true;
+    var val = nameCol !== -1 ? data[r][nameCol] : data[r][1];
+    if (val) existing[String(val).trim().toLowerCase()] = true;
   }
   
   var defaults = [
-    ["EX-VT1", "Incline Bench Press", "Chest"],
-    ["EX-VT2", "Cable Lateral Raises", "Shoulders"],
-    ["EX-VT3", "Dips", "Chest / Triceps"],
-    ["EX-VT4", "Leg Extension Machine", "Legs"],
-    ["EX-VT5", "Overhead Tricep Cable Pull", "Arms"],
-    ["EX-VT6", "Leg Raise", "Core"],
-    ["EX-VT7", "Lat Pull Down", "Back"],
-    ["EX-VT8", "Seated Cable Row", "Back"],
-    ["EX-VT9", "Inclined Bicep Curl", "Arms"],
-    ["EX-VT10", "Leg Curl", "Legs"],
-    ["EX-VT11", "Face Pulls", "Shoulders"],
-    ["EX-VT12", "Weighted Sit-Up", "Core"]
+    { ID: "EX-VT1", Name: "Incline Bench Press", Category: "Chest" },
+    { ID: "EX-VT2", Name: "Cable Lateral Raises", Category: "Shoulders" },
+    { ID: "EX-VT3", Name: "Dips", Category: "Chest / Triceps" },
+    { ID: "EX-VT4", Name: "Leg Extension Machine", Category: "Legs" },
+    { ID: "EX-VT5", Name: "Overhead Tricep Cable Pull", Category: "Arms" },
+    { ID: "EX-VT6", Name: "Leg Raise", Category: "Core" },
+    { ID: "EX-VT7", Name: "Lat Pull Down", Category: "Back" },
+    { ID: "EX-VT8", Name: "Seated Cable Row", Category: "Back" },
+    { ID: "EX-VT9", Name: "Inclined Bicep Curl", Category: "Arms" },
+    { ID: "EX-VT10", Name: "Leg Curl", Category: "Legs" },
+    { ID: "EX-VT11", Name: "Face Pulls", Category: "Shoulders" },
+    { ID: "EX-VT12", Name: "Weighted Sit-Up", Category: "Core" }
   ];
   
   var toAdd = [];
   defaults.forEach(function(d) {
-    if (!existing[d[1].toLowerCase()]) {
-      toAdd.push(d);
-      existing[d[1].toLowerCase()] = true;
+    if (!existing[d.Name.toLowerCase()]) {
+      var row = headers.map(function(h) {
+        return d[h] || "";
+      });
+      toAdd.push(row);
+      existing[d.Name.toLowerCase()] = true;
     }
   });
   
   if (toAdd.length > 0) {
-    sheet.getRange(sheet.getLastRow() + 1, 1, toAdd.length, 3).setValues(toAdd);
+    sheet.getRange(sheet.getLastRow() + 1, 1, toAdd.length, headers.length).setValues(toAdd);
   }
 }
 
 function seedMasterTemplates(ss, tabName) {
   var sheet = ss.getSheetByName(tabName) || ss.insertSheet(tabName);
-  ensureSchema(sheet, tabName);
+  var headers = ensureSchema(sheet, tabName);
   var data = sheet.getDataRange().getValues();
+  var nameCol = headers.indexOf("Template_Name");
+  
   var existing = {};
   for (var r = 1; r < data.length; r++) {
-    if (data[r][1]) existing[String(data[r][1]).trim().toLowerCase()] = true;
+    var val = nameCol !== -1 ? data[r][nameCol] : data[r][0];
+    if (val) existing[String(val).trim().toLowerCase()] = true;
   }
   
   var defaults = [
-    ["TPL-1", "Workout A (Push, Quads & Core)", "Incline Bench Press, Cable Lateral Raises, Dips, Leg Extension Machine, Overhead Tricep Cable Pull, Leg Raise"],
-    ["TPL-2", "Workout B (Pull, Hamstrings & Core)", "Lat Pull Down, Seated Cable Row, Inclined Bicep Curl, Leg Curl, Face Pulls, Weighted Sit-Up"]
+    { Template_ID: "TPL-1", Template_Name: "Workout A (Push, Quads & Core)", Exercise_Sequence: "Incline Bench Press, Cable Lateral Raises, Dips, Leg Extension Machine, Overhead Tricep Cable Pull, Leg Raise" },
+    { Template_ID: "TPL-2", Template_Name: "Workout B (Pull, Hamstrings & Core)", Exercise_Sequence: "Lat Pull Down, Seated Cable Row, Inclined Bicep Curl, Leg Curl, Face Pulls, Weighted Sit-Up" }
   ];
   
   var toAdd = [];
   defaults.forEach(function(d) {
-    if (!existing[d[1].toLowerCase()]) {
-      toAdd.push(d);
-      existing[d[1].toLowerCase()] = true;
+    if (!existing[d.Template_Name.toLowerCase()]) {
+      var row = headers.map(function(h) {
+        return d[h] || "";
+      });
+      toAdd.push(row);
+      existing[d.Template_Name.toLowerCase()] = true;
     }
   });
   
   if (toAdd.length > 0) {
-    sheet.getRange(sheet.getLastRow() + 1, 1, toAdd.length, 3).setValues(toAdd);
+    sheet.getRange(sheet.getLastRow() + 1, 1, toAdd.length, headers.length).setValues(toAdd);
   }
 }
 
