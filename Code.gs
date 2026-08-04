@@ -1,7 +1,7 @@
 // Code.gs
-// This acts as the backend API for your fitness tracker.
+// Multi-Athlete Coaching Engine Backend API for Cyber-Gym.
 
-function formatDateLocal(dateObj) {
+function formatDateLocal(dateObj, tz) {
   if (!dateObj) return "";
   if (typeof dateObj === "string") {
     var match = dateObj.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
@@ -11,15 +11,36 @@ function formatDateLocal(dateObj) {
     dateObj = new Date(dateObj);
   }
   if (dateObj instanceof Date && !isNaN(dateObj.getTime())) {
-    return Utilities.formatDate(dateObj, SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(), "yyyy-MM-dd");
+    return Utilities.formatDate(dateObj, tz || "UTC", "yyyy-MM-dd");
   }
   return String(dateObj);
 }
 
 function resolveSheetName(ss, requestedType, athleteId) {
   var cleanAthlete = (athleteId || "duy").trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
+  
   if (requestedType === "Exercises") {
-    return ss.getSheetByName("Exercises") || ss.insertSheet("Exercises");
+    var exSheet = ss.getSheetByName("Exercises");
+    if (!exSheet) {
+      exSheet = ss.insertSheet("Exercises");
+      exSheet.getRange(1, 1, 1, 3).setValues([["ID", "Name", "Category"]]);
+      var defaultExercises = [
+        ["EX-VT1", "Incline Bench Press", "Chest"],
+        ["EX-VT2", "Cable Lateral Raises", "Shoulders"],
+        ["EX-VT3", "Dips", "Chest / Triceps"],
+        ["EX-VT4", "Leg Extension Machine", "Legs"],
+        ["EX-VT5", "Overhead Tricep Cable Pull", "Arms"],
+        ["EX-VT6", "Leg Raise", "Core"],
+        ["EX-VT7", "Lat Pull Down", "Back"],
+        ["EX-VT8", "Seated Cable Row", "Back"],
+        ["EX-VT9", "Inclined Bicep Curl", "Arms"],
+        ["EX-VT10", "Leg Curl", "Legs"],
+        ["EX-VT11", "Face Pulls", "Shoulders"],
+        ["EX-VT12", "Weighted Sit-Up", "Core"]
+      ];
+      exSheet.getRange(2, 1, defaultExercises.length, 3).setValues(defaultExercises);
+    }
+    return exSheet;
   }
   
   if (requestedType === "Athletes") {
@@ -96,162 +117,81 @@ function ensureSchema(sheet, sheetType) {
   return headers;
 }
 
-function seedMasterExercises(ss) {
-  var sheet = ss.getSheetByName("Exercises") || ss.insertSheet("Exercises");
-  var headers = ensureSchema(sheet, "Exercises");
-  var data = sheet.getDataRange().getValues();
-  var nameCol = headers.indexOf("Name");
-  
-  var existing = {};
-  for (var r = 1; r < data.length; r++) {
-    var val = nameCol !== -1 ? data[r][nameCol] : data[r][1];
-    if (val) existing[String(val).trim().toLowerCase()] = true;
-  }
-  
-  var defaults = [
-    { ID: "EX-VT1", Name: "Incline Bench Press", Category: "Chest" },
-    { ID: "EX-VT2", Name: "Cable Lateral Raises", Category: "Shoulders" },
-    { ID: "EX-VT3", Name: "Dips", Category: "Chest / Triceps" },
-    { ID: "EX-VT4", Name: "Leg Extension Machine", Category: "Legs" },
-    { ID: "EX-VT5", Name: "Overhead Tricep Cable Pull", Category: "Arms" },
-    { ID: "EX-VT6", Name: "Leg Raise", Category: "Core" },
-    { ID: "EX-VT7", Name: "Lat Pull Down", Category: "Back" },
-    { ID: "EX-VT8", Name: "Seated Cable Row", Category: "Back" },
-    { ID: "EX-VT9", Name: "Inclined Bicep Curl", Category: "Arms" },
-    { ID: "EX-VT10", Name: "Leg Curl", Category: "Legs" },
-    { ID: "EX-VT11", Name: "Face Pulls", Category: "Shoulders" },
-    { ID: "EX-VT12", Name: "Weighted Sit-Up", Category: "Core" }
-  ];
-  
-  var toAdd = [];
-  defaults.forEach(function(d) {
-    if (!existing[d.Name.toLowerCase()]) {
-      var row = headers.map(function(h) {
-        return d[h] || "";
-      });
-      toAdd.push(row);
-      existing[d.Name.toLowerCase()] = true;
-    }
-  });
-  
-  if (toAdd.length > 0) {
-    sheet.getRange(sheet.getLastRow() + 1, 1, toAdd.length, headers.length).setValues(toAdd);
-  }
-}
-
-function seedMasterTemplates(ss, tabName) {
-  var sheet = ss.getSheetByName(tabName) || ss.insertSheet(tabName);
-  var data = sheet.getDataRange().getValues();
-  
-  if (data.length <= 1) {
-    sheet.clear();
-    sheet.getRange(1, 1, 1, 2).setValues([["Template_Name", "Exercise_Sequence"]]);
-    var defaults = [
-      ["Workout A (Push, Quads & Core)", "Incline Bench Press, Cable Lateral Raises, Dips, Leg Extension Machine, Overhead Tricep Cable Pull, Leg Raise"],
-      ["Workout B (Pull, Hamstrings & Core)", "Lat Pull Down, Seated Cable Row, Inclined Bicep Curl, Leg Curl, Face Pulls, Weighted Sit-Up"]
-    ];
-    sheet.getRange(2, 1, defaults.length, 2).setValues(defaults);
-    return;
-  }
-  
-  // Check if columns shifted (e.g. Row 1 has Template_ID or Column A has TPL-)
-  var isShifted = false;
-  for (var r = 0; r < data.length; r++) {
-    if (String(data[r][0]).indexOf("TPL-") === 0 || String(data[r][0]) === "Template_ID") {
-      isShifted = true;
-      break;
-    }
-  }
-  
-  if (isShifted) {
-    sheet.clear();
-    sheet.getRange(1, 1, 1, 2).setValues([["Template_Name", "Exercise_Sequence"]]);
-    var cleanRows = [
-      ["Workout A (Push, Quads & Core)", "Incline Bench Press, Cable Lateral Raises, Dips, Leg Extension Machine, Overhead Tricep Cable Pull, Leg Raise"],
-      ["Workout B (Pull, Hamstrings & Core)", "Lat Pull Down, Seated Cable Row, Inclined Bicep Curl, Leg Curl, Face Pulls, Weighted Sit-Up"]
-    ];
-    sheet.getRange(2, 1, cleanRows.length, 2).setValues(cleanRows);
-  }
-}
-
 function doGet(e) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheetType = (e && e.parameter && e.parameter.type) || "Exercises";
-  var athlete = (e && e.parameter && e.parameter.athlete) || "duy";
-  
-  var sheet = resolveSheetName(ss, sheetType, athlete);
-  if (!sheet) {
-    return createJsonResponse({ error: "Tab not found: " + sheetType });
-  }
-  
-  // If querying Athletes, also scan tabs to discover any newly added athlete tabs
-  if (sheetType === "Athletes") {
-    var allSheets = ss.getSheets();
-    var registered = {};
-    var athData = sheet.getDataRange().getValues();
-    var athHeaders = athData.shift() || ["Athlete_ID", "Display_Name", "Status", "Last_Active"];
-    var idCol = athHeaders.indexOf("Athlete_ID");
-    var nameCol = athHeaders.indexOf("Display_Name");
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var tz = ss.getSpreadsheetTimeZone();
+    var sheetType = (e && e.parameter && e.parameter.type) || "Exercises";
+    var athlete = (e && e.parameter && e.parameter.athlete) || "duy";
     
-    var athleteList = [];
-    athData.forEach(function(row) {
-      if (row[idCol]) {
-        var aId = String(row[idCol]).toLowerCase();
-        registered[aId] = true;
-        athleteList.push({
-          Athlete_ID: aId,
-          Display_Name: row[nameCol] || aId,
-          Status: row[2] || "Active",
-          Last_Active: row[3] || ""
-        });
-      }
-    });
+    var sheet = resolveSheetName(ss, sheetType, athlete);
+    if (!sheet) {
+      return createJsonResponse({ success: false, error: "Tab not found: " + sheetType });
+    }
     
-    // Auto-discover Logs_* tabs
-    var newAthletesToAppend = [];
-    allSheets.forEach(function(s) {
-      var sName = s.getName();
-      if (sName.indexOf("Logs_") === 0) {
-        var slug = sName.replace("Logs_", "").toLowerCase();
-        if (!registered[slug] && slug !== "duy") {
-          registered[slug] = true;
-          var displayName = slug.charAt(0).toUpperCase() + slug.slice(1);
-          newAthletesToAppend.push([slug, displayName, "Active", new Date().toISOString()]);
-          athleteList.push({ Athlete_ID: slug, Display_Name: displayName, Status: "Active", Last_Active: new Date().toISOString() });
+    if (sheetType === "Athletes") {
+      var allSheets = ss.getSheets();
+      var registered = {};
+      var athData = sheet.getDataRange().getValues();
+      var athHeaders = athData.shift() || ["Athlete_ID", "Display_Name", "Status", "Last_Active"];
+      var idCol = athHeaders.indexOf("Athlete_ID");
+      var nameCol = athHeaders.indexOf("Display_Name");
+      
+      var athleteList = [];
+      athData.forEach(function(row) {
+        if (row[idCol]) {
+          var aId = String(row[idCol]).toLowerCase();
+          registered[aId] = true;
+          athleteList.push({
+            Athlete_ID: aId,
+            Display_Name: row[nameCol] || aId,
+            Status: row[2] || "Active",
+            Last_Active: row[3] || ""
+          });
         }
+      });
+      
+      // Auto-discover Logs_* tabs
+      var newAthletesToAppend = [];
+      allSheets.forEach(function(s) {
+        var sName = s.getName();
+        if (sName.indexOf("Logs_") === 0) {
+          var slug = sName.replace("Logs_", "").toLowerCase();
+          if (!registered[slug] && slug !== "duy") {
+            registered[slug] = true;
+            var displayName = slug.charAt(0).toUpperCase() + slug.slice(1);
+            newAthletesToAppend.push([slug, displayName, "Active", new Date().toISOString()]);
+            athleteList.push({ Athlete_ID: slug, Display_Name: displayName, Status: "Active", Last_Active: new Date().toISOString() });
+          }
+        }
+      });
+      if (newAthletesToAppend.length > 0) {
+        sheet.getRange(sheet.getLastRow() + 1, 1, newAthletesToAppend.length, 4).setValues(newAthletesToAppend);
       }
-    });
-    if (newAthletesToAppend.length > 0) {
-      sheet.getRange(sheet.getLastRow() + 1, 1, newAthletesToAppend.length, 4).setValues(newAthletesToAppend);
+      if (athleteList.length === 0) {
+        athleteList.push({ Athlete_ID: "duy", Display_Name: "Duy (Coach)", Status: "Active", Last_Active: new Date().toISOString() });
+      }
+      return createJsonResponse({ success: true, data: athleteList });
     }
-    if (athleteList.length === 0) {
-      athleteList.push({ Athlete_ID: "duy", Display_Name: "Duy (Coach)", Status: "Active", Last_Active: new Date().toISOString() });
+    
+    var data = sheet.getDataRange().getValues();
+    if (data.length <= 1) {
+      return createJsonResponse({ success: true, data: [] });
     }
-    return createJsonResponse({ success: true, data: athleteList });
-  }
-  
-  // Automatically write defaults into the physical Google Sheet rows if missing
-  if (sheetType === "Exercises") {
-    seedMasterExercises(ss);
-  } else if (sheetType === "Templates" || sheetType.indexOf("Templates_") === 0) {
-    seedMasterTemplates(ss, sheet.getName());
-  }
-  
-  var data = sheet.getDataRange().getValues();
-  if (data.length <= 1) {
-    return createJsonResponse({ success: true, data: [] });
-  }
-  
-  var headers = data.shift();
-  var result = data.map(function(row) {
-    var obj = {};
-    headers.forEach(function(header, i) {
-      obj[header] = (header === 'Date' && row[i]) ? formatDateLocal(row[i]) : row[i];
+    
+    var headers = data.shift();
+    var result = data.map(function(row) {
+      var obj = {};
+      headers.forEach(function(header, i) {
+        obj[header] = (header === 'Date' && row[i]) ? formatDateLocal(row[i], tz) : row[i];
+      });
+      return obj;
     });
-    return obj;
-  });
-  
-  return createJsonResponse({ success: true, data: result });
+    
+    return createJsonResponse({ success: true, data: result });
+  } catch (err) {
+    return createJsonResponse({ success: false, error: err.toString() });
+  }
 }
 
 function doPost(e) {
@@ -265,12 +205,13 @@ function doPost(e) {
     if (!body) throw new Error("Invalid payload: missing body");
     
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var tz = ss.getSpreadsheetTimeZone();
     var athlete = body.athlete || "duy";
     var sheetType = body.type || (body.action && body.action.indexOf("EXERCISE") !== -1 ? "Exercises" : (body.action && body.action.indexOf("TEMPLATE") !== -1 ? "Templates" : "Logs"));
     var sheet = resolveSheetName(ss, sheetType, athlete);
     
     if (!sheet) {
-      return createJsonResponse({ error: "Tab not found for type: " + sheetType });
+      return createJsonResponse({ success: false, error: "Tab not found for type: " + sheetType });
     }
     
     var headers = ensureSchema(sheet, sheetType);
@@ -282,11 +223,21 @@ function doPost(e) {
       var newDisplayName = body.Display_Name || body.Name || newSlug;
       if (!newSlug) return createJsonResponse({ success: false, error: "Athlete name is required" });
       
-      // Auto-provision their logs & templates
       resolveSheetName(ss, "Logs", newSlug);
       resolveSheetName(ss, "Templates", newSlug);
       
-      athSheet.appendRow([newSlug, newDisplayName, "Active", new Date().toISOString()]);
+      // Check existing before appending
+      var athData = athSheet.getDataRange().getValues();
+      var alreadyExists = false;
+      for (var r = 1; r < athData.length; r++) {
+        if (String(athData[r][0]).trim().toLowerCase() === newSlug) {
+          alreadyExists = true;
+          break;
+        }
+      }
+      if (!alreadyExists) {
+        athSheet.appendRow([newSlug, newDisplayName, "Active", new Date().toISOString()]);
+      }
       return createJsonResponse({ success: true, message: "Athlete registered successfully!", Athlete_ID: newSlug, Display_Name: newDisplayName });
     }
 
@@ -307,9 +258,12 @@ function doPost(e) {
       
       var athSheet = ss.getSheetByName("Athletes");
       if (athSheet) {
+        var aHeaders = athSheet.getRange(1, 1, 1, athSheet.getLastColumn()).getValues()[0];
+        var idIndex = aHeaders.indexOf("Athlete_ID");
+        if (idIndex === -1) idIndex = 0;
         var data = athSheet.getDataRange().getValues();
         for (var r = data.length - 1; r >= 1; r--) {
-          if (String(data[r][0]).trim().toLowerCase() === targetSlug) {
+          if (String(data[r][idIndex]).trim().toLowerCase() === targetSlug) {
             athSheet.deleteRow(r + 1);
           }
         }
@@ -317,7 +271,7 @@ function doPost(e) {
       return createJsonResponse({ success: true, message: "Athlete and all associated sheets deleted successfully!" });
     }
 
-    // Handle CLONE_TEMPLATE action (copies routine from Coach to Athlete)
+    // Handle CLONE_TEMPLATE action
     if (body.action === "CLONE_TEMPLATE") {
       var targetAthlete = (body.targetAthlete || "").trim().toLowerCase();
       var sourceTpl = body.template;
@@ -326,7 +280,6 @@ function doPost(e) {
       var targetSheet = resolveSheetName(ss, "Templates", targetAthlete);
       var targetHeaders = ensureSchema(targetSheet, "Templates_" + targetAthlete);
       var row = targetHeaders.map(function(h) {
-        if (h === "Template_ID") return "TPL-" + Date.now();
         if (h === "Template_Name") return sourceTpl.Template_Name || "";
         if (h === "Exercise_Sequence") return sourceTpl.Exercise_Sequence || "";
         return "";
@@ -344,8 +297,10 @@ function doPost(e) {
       var idIndex = headers.indexOf("ID");
 
       for (var r = data.length - 1; r >= 1; r--) {
-        if ((targetName && nameIndex !== -1 && String(data[r][nameIndex]) === String(targetName)) ||
-            (targetId && idIndex !== -1 && String(data[r][idIndex]) === String(targetId))) {
+        var rowName = nameIndex !== -1 ? String(data[r][nameIndex]).trim().toLowerCase() : "";
+        var rowId = idIndex !== -1 ? String(data[r][idIndex]).trim() : "";
+        if ((targetName && rowName === String(targetName).trim().toLowerCase()) ||
+            (targetId && rowId === String(targetId).trim())) {
           sheet.deleteRow(r + 1);
           return createJsonResponse({ success: true, message: "Exercise deleted successfully!" });
         }
@@ -355,26 +310,39 @@ function doPost(e) {
     
     // Handle DELETE action
     if (body.action === "DELETE") {
-      var targetId = String(body.Log_ID || (body.data && body.data.Log_ID));
+      var rawId = body.Log_ID != null ? body.Log_ID : (body.data && body.data.Log_ID != null ? body.data.Log_ID : null);
+      if (rawId == null || rawId === "" || rawId === "undefined") {
+        return createJsonResponse({ success: false, error: "Valid Log_ID required for delete" });
+      }
+      var targetId = String(rawId).trim();
       var data = sheet.getDataRange().getValues();
       var idIndex = headers.indexOf("Log_ID");
       if (idIndex === -1) throw new Error("Log_ID column not found");
       
       for (var r = data.length - 1; r >= 1; r--) {
         var cellVal = data[r][idIndex];
-        if (String(cellVal) === targetId || (!isNaN(cellVal) && Number(cellVal) === Number(targetId))) {
-          sheet.deleteRow(r + 1);
-          return createJsonResponse({ success: true, message: "Row deleted successfully!" });
+        if (cellVal != null && cellVal !== "") {
+          if (String(cellVal).trim() === targetId || (!isNaN(cellVal) && Number(cellVal) === Number(targetId))) {
+            sheet.deleteRow(r + 1);
+            return createJsonResponse({ success: true, message: "Row deleted successfully!" });
+          }
         }
       }
       return createJsonResponse({ success: true, message: "Log_ID already deleted or not found" });
     }
     
-    // Handle UPDATE action
+    // Handle UPDATE action (Preserves unsupplied fields)
     if (body.action === "UPDATE") {
-      var targetId = String(body.Log_ID || (body.data && body.data.Log_ID));
-      var newWeight = body.Weight != null ? body.Weight : (body.data && body.data.Weight != null ? body.data.Weight : "");
-      var newReps = body.Reps != null ? body.Reps : (body.data && body.data.Reps != null ? body.data.Reps : "");
+      var rawId = body.Log_ID != null ? body.Log_ID : (body.data && body.data.Log_ID != null ? body.data.Log_ID : null);
+      if (rawId == null || rawId === "" || rawId === "undefined") {
+        return createJsonResponse({ success: false, error: "Valid Log_ID required for update" });
+      }
+      var targetId = String(rawId).trim();
+      var hasWeight = body.Weight != null || (body.data && body.data.Weight != null);
+      var hasReps = body.Reps != null || (body.data && body.data.Reps != null);
+      var newWeight = hasWeight ? (body.Weight != null ? body.Weight : body.data.Weight) : null;
+      var newReps = hasReps ? (body.Reps != null ? body.Reps : body.data.Reps) : null;
+      
       var data = sheet.getDataRange().getValues();
       var idIndex = headers.indexOf("Log_ID");
       var weightIndex = headers.indexOf("Weight");
@@ -383,12 +351,14 @@ function doPost(e) {
       
       for (var r = 1; r < data.length; r++) {
         var cellVal = data[r][idIndex];
-        if (String(cellVal) === targetId || (!isNaN(cellVal) && Number(cellVal) === Number(targetId))) {
-          var updatedRow = data[r].slice();
-          if (weightIndex !== -1) updatedRow[weightIndex] = newWeight;
-          if (repsIndex !== -1) updatedRow[repsIndex] = newReps;
-          sheet.getRange(r + 1, 1, 1, headers.length).setValues([updatedRow]);
-          return createJsonResponse({ success: true, message: "Log updated successfully!" });
+        if (cellVal != null && cellVal !== "") {
+          if (String(cellVal).trim() === targetId || (!isNaN(cellVal) && Number(cellVal) === Number(targetId))) {
+            var updatedRow = data[r].slice(0, headers.length);
+            if (hasWeight && weightIndex !== -1) updatedRow[weightIndex] = newWeight;
+            if (hasReps && repsIndex !== -1) updatedRow[repsIndex] = newReps;
+            sheet.getRange(r + 1, 1, 1, headers.length).setValues([updatedRow]);
+            return createJsonResponse({ success: true, message: "Log updated successfully!" });
+          }
         }
       }
       return createJsonResponse({ success: false, error: "Log_ID not found: " + targetId });
@@ -396,25 +366,20 @@ function doPost(e) {
 
     // Handle UPDATE_TEMPLATE action
     if (body.action === "UPDATE_TEMPLATE") {
-      var targetId = body.Template_ID || (body.data && body.data.Template_ID);
-      var oldName = body.old_Template_Name || body.Template_Name || (body.data && (body.data.old_Template_Name || body.data.Template_Name));
+      var oldName = (body.old_Template_Name || body.Template_Name || (body.data && (body.data.old_Template_Name || body.data.Template_Name)) || "").trim().toLowerCase();
       var newName = body.new_Template_Name || body.Template_Name || (body.data && (body.data.new_Template_Name || body.data.Template_Name));
       var newSeq = body.Exercise_Sequence || (body.data && body.data.Exercise_Sequence) || "";
       
       var data = sheet.getDataRange().getValues();
-      var idIndex = headers.indexOf("Template_ID");
       var nameIndex = headers.indexOf("Template_Name");
       var seqIndex = headers.indexOf("Exercise_Sequence");
+      if (nameIndex === -1) nameIndex = 0;
+      if (seqIndex === -1) seqIndex = 1;
       
       for (var r = 1; r < data.length; r++) {
-        var match = false;
-        if (targetId && idIndex !== -1 && String(data[r][idIndex]) === String(targetId)) {
-          match = true;
-        } else if (oldName && nameIndex !== -1 && String(data[r][nameIndex]) === String(oldName)) {
-          match = true;
-        }
-        if (match) {
-          var updatedRow = data[r].slice();
+        var rowName = String(data[r][nameIndex]).trim().toLowerCase();
+        if (oldName && rowName === oldName) {
+          var updatedRow = data[r].slice(0, headers.length);
           if (nameIndex !== -1 && newName) updatedRow[nameIndex] = newName;
           if (seqIndex !== -1 && newSeq) updatedRow[seqIndex] = newSeq;
           sheet.getRange(r + 1, 1, 1, headers.length).setValues([updatedRow]);
@@ -426,21 +391,14 @@ function doPost(e) {
 
     // Handle DELETE_TEMPLATE action
     if (body.action === "DELETE_TEMPLATE") {
-      var targetId = body.Template_ID || (body.data && body.data.Template_ID);
-      var targetName = body.Template_Name || (body.data && body.data.Template_Name);
-      
+      var targetName = (body.Template_Name || (body.data && body.data.Template_Name) || "").trim().toLowerCase();
       var data = sheet.getDataRange().getValues();
-      var idIndex = headers.indexOf("Template_ID");
       var nameIndex = headers.indexOf("Template_Name");
+      if (nameIndex === -1) nameIndex = 0;
       
       for (var r = data.length - 1; r >= 1; r--) {
-        var match = false;
-        if (targetId && idIndex !== -1 && String(data[r][idIndex]) === String(targetId)) {
-          match = true;
-        } else if (targetName && nameIndex !== -1 && String(data[r][nameIndex]) === String(targetName)) {
-          match = true;
-        }
-        if (match) {
+        var rowName = String(data[r][nameIndex]).trim().toLowerCase();
+        if (targetName && rowName === targetName) {
           sheet.deleteRow(r + 1);
           return createJsonResponse({ success: true, message: "Template deleted successfully!" });
         }
@@ -455,20 +413,21 @@ function doPost(e) {
       if (clientIndex !== -1 && sheet.getLastRow() > 1) {
         var clientCol = sheet.getRange(2, clientIndex + 1, sheet.getLastRow() - 1, 1).getValues();
         for (var c = 0; c < clientCol.length; c++) {
-          if (clientCol[c][0]) existingClients[String(clientCol[c][0])] = true;
+          if (clientCol[c][0]) existingClients[String(clientCol[c][0]).trim()] = true;
         }
       }
       
       var rowsToAppend = [];
       body.items.forEach(function(item) {
-        if (clientIndex !== -1 && item.Client_ID && existingClients[String(item.Client_ID)]) {
+        var cId = item.Client_ID ? String(item.Client_ID).trim() : "";
+        if (clientIndex !== -1 && cId && existingClients[cId]) {
           return; // Skip duplicate
         }
-        if (clientIndex !== -1 && item.Client_ID) {
-          existingClients[String(item.Client_ID)] = true;
+        if (clientIndex !== -1 && cId) {
+          existingClients[cId] = true;
         }
         var row = headers.map(function(h) {
-          if (h === 'Date' && !item[h]) return formatDateLocal(new Date());
+          if (h === 'Date' && !item[h]) return formatDateLocal(new Date(), tz);
           if (h === 'Timestamp' && !item[h]) return new Date().toISOString();
           return item[h] != null ? item[h] : "";
         });
@@ -485,7 +444,7 @@ function doPost(e) {
     if (!body.data) throw new Error("Invalid payload: missing data object");
     var newRow = headers.map(function(header) {
       if (header === 'Date' && !body.data[header]) {
-         return formatDateLocal(new Date());
+         return formatDateLocal(new Date(), tz);
       }
       if (header === 'Timestamp' && !body.data[header]) {
          return new Date().toISOString();
@@ -502,7 +461,6 @@ function doPost(e) {
   }
 }
 
-// Helper to handle CORS properly
 function createJsonResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);

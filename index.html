@@ -432,6 +432,7 @@
                 promptAddAthlete();
                 return;
             }
+            drafts = {};
             AppContext.activeAthlete = newAthleteSlug;
             localStorage.setItem('fitness_active_athlete_v2', newAthleteSlug);
             appData = { exercises: appData.exercises || [], logs: [], templates: [] };
@@ -682,6 +683,7 @@
                     const batchItems = q.filter(item => item.action === "BATCH_APPEND").map(i => i.data);
                     const deleteItems = q.filter(item => item.action === "DELETE");
                     const updateItems = q.filter(item => item.action === "UPDATE");
+                    const createTplItems = q.filter(item => item.action === "CREATE_TEMPLATE");
                     const updateTplItems = q.filter(item => item.action === "UPDATE_TEMPLATE");
                     const delTplItems = q.filter(item => item.action === "DELETE_TEMPLATE");
                     const addExItems = q.filter(item => item.action === "ADD_EXERCISE");
@@ -712,11 +714,22 @@
                         }
                     }
 
+                    for (const createTpl of createTplItems) {
+                        const res = await apiCall('POST', {
+                            type: "Templates",
+                            data: createTpl.data,
+                            athlete: AppContext.activeAthlete
+                        });
+                        if (res && res.success) {
+                            const remaining = this.getQueue().filter(item => item.id !== createTpl.id);
+                            this.saveQueue(remaining);
+                        }
+                    }
+
                     for (const upd of updateTplItems) {
                         const res = await apiCall('POST', {
                             type: "Templates",
                             action: "UPDATE_TEMPLATE",
-                            Template_ID: upd.Template_ID,
                             old_Template_Name: upd.old_Template_Name,
                             new_Template_Name: upd.new_Template_Name,
                             Exercise_Sequence: upd.Exercise_Sequence,
@@ -732,7 +745,6 @@
                         const res = await apiCall('POST', {
                             type: "Templates",
                             action: "DELETE_TEMPLATE",
-                            Template_ID: del.Template_ID,
                             Template_Name: del.Template_Name,
                             athlete: AppContext.activeAthlete
                         });
@@ -888,6 +900,7 @@
             if (!activeWorkout.exercises) return;
             const newIdx = exIndex + direction;
             if (newIdx < 0 || newIdx >= activeWorkout.exercises.length) return;
+            drafts = {};
             const temp = activeWorkout.exercises[exIndex];
             activeWorkout.exercises[exIndex] = activeWorkout.exercises[newIdx];
             activeWorkout.exercises[newIdx] = temp;
@@ -898,12 +911,14 @@
             if (!activeWorkout.exercises) return;
             const removedEx = activeWorkout.exercises[exIndex];
             if (!confirm(`Remove "${removedEx}" from today's workout?`)) return;
+            drafts = {};
             activeWorkout.exercises.splice(exIndex, 1);
             renderActiveWorkout();
         }
 
         function clearActiveWorkout() {
             if (!confirm("Are you sure you want to clear all exercises from today's workout?")) return;
+            drafts = {};
             activeWorkout = {
                 date: getLocalDateString(),
                 routineName: "Custom Workout",
@@ -1279,11 +1294,31 @@
             }
             if (logRes && logRes.success && Array.isArray(logRes.data)) {
                 const remoteClientIds = new Set(logRes.data.map(l => l.Client_ID));
-                const remoteLogs = logRes.data.map(l => ({ ...l, Date: normalizeDateStr(l.Date) }));
+                const pendingDeleteIds = new Set(q.filter(i => i.action === "DELETE").map(i => String(i.Log_ID)));
+                const pendingUpdates = new Map();
+                q.filter(i => i.action === "UPDATE").forEach(u => {
+                    pendingUpdates.set(String(u.Log_ID), u);
+                });
+
+                const remoteLogs = logRes.data
+                    .filter(l => !pendingDeleteIds.has(String(l.Log_ID)))
+                    .map(l => {
+                        const upd = pendingUpdates.get(String(l.Log_ID));
+                        return {
+                            ...l,
+                            Weight: (upd && upd.Weight != null) ? upd.Weight : l.Weight,
+                            Reps: (upd && upd.Reps != null) ? upd.Reps : l.Reps,
+                            Date: normalizeDateStr(l.Date)
+                        };
+                    });
                 const unmergedPending = pendingLogs.filter(l => !remoteClientIds.has(l.Client_ID));
                 appData.logs = [...remoteLogs, ...unmergedPending];
             }
-            if (tplRes && tplRes.success && Array.isArray(tplRes.data)) appData.templates = tplRes.data;
+            if (tplRes && tplRes.success && Array.isArray(tplRes.data)) {
+                const pendingTplCreates = q.filter(i => i.action === "CREATE_TEMPLATE").map(i => i.data);
+                const remoteNames = new Set(tplRes.data.map(t => t.Template_Name));
+                appData.templates = [...tplRes.data, ...pendingTplCreates.filter(t => !remoteNames.has(t.Template_Name))];
+            }
             
             seedDefaults();
             StateManager.saveCache();
@@ -1306,6 +1341,7 @@
         }
 
         function onWorkoutDateChange() {
+            drafts = {};
             const dateInput = document.getElementById('log-date');
             activeWorkout.date = normalizeDateStr(dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString());
             initDefaultAccordionState();
@@ -1695,12 +1731,15 @@
             const rInput = prompt(`Reps for Set 1 of ${selectedEx}:`, "10");
             if (rInput === null) return;
 
+            const existingSetsForEx = appData.logs.filter(l => normalizeDateStr(l.Date) === dateStr && l.Exercise_ID === selectedEx);
+            const nextSetIdx = existingSetsForEx.length + 1;
+
             const newLog = {
                 Log_ID: Date.now() + Math.floor(Math.random() * 1000),
                 Workout_ID: "Custom Workout",
                 Date: dateStr,
                 Exercise_ID: selectedEx,
-                Set_Index: 1,
+                Set_Index: nextSetIdx,
                 Weight: parseFloat(wInput) || 0,
                 Reps: parseInt(rInput, 10) || 0,
                 Client_ID: "cli-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
@@ -2073,26 +2112,22 @@
                 return;
             }
 
-            showLoading();
-            const payload = {
-                type: "Templates",
-                data: { Template_Name: name, Exercise_Sequence: exercises }
-            };
-            const res = await apiCall('POST', payload);
-            hideLoading();
-            
-            if (!res.success) {
-                return alert("Failed to save schedule: " + (res.error || "Unknown error"));
-            }
-            
-            appData.templates.push(payload.data);
+            // Creating new routine (optimistic + offline outbox)
+            const newTpl = { Template_Name: name, Exercise_Sequence: exercises };
+            appData.templates.push(newTpl);
             StateManager.saveCache();
+
+            Outbox.enqueue({
+                id: "add-tpl-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+                type: "Templates",
+                action: "CREATE_TEMPLATE",
+                data: newTpl
+            });
+
             cancelEditRoutine();
             renderAll();
             alert(`Workout plan '${name}' saved!`);
         }
-
-        const addPlan = saveRoutineHandler;
 
         function deleteRoutine(tplName) {
             if (!confirm(`Are you sure you want to delete routine "${tplName}"?`)) return;
@@ -2171,48 +2206,6 @@
         }
 
         // --- 10. Set Mutations & Optimistic CRUD ---
-        function logSetForExercise(exName, exIndex) {
-            const weightEl = document.getElementById(`weight-${exIndex}`);
-            const repsEl = document.getElementById(`reps-${exIndex}`);
-            const weight = weightEl ? weightEl.value : "";
-            const reps = repsEl ? repsEl.value : "";
-            const dateInput = document.getElementById("log-date");
-            const dateVal = normalizeDateStr(dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString());
-
-            if (weight === '' || reps === '') {
-                return alert("Please enter Weight and Reps for " + exName);
-            }
-
-            const existingSets = appData.logs.filter(l => normalizeDateStr(l.Date) === dateVal && l.Exercise_ID === exName);
-            const setIdx = existingSets.length + 1;
-
-            const newLog = {
-                Log_ID: Date.now(),
-                Workout_ID: activeWorkout.routineName || "W-Manual",
-                Date: dateVal,
-                Exercise_ID: exName,
-                Set_Index: setIdx,
-                Weight: weight,
-                Reps: reps,
-                Client_ID: 'C-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6),
-                Timestamp: new Date().toISOString()
-            };
-
-            appData.logs.push(newLog);
-            StateManager.saveCache();
-
-            if (repsEl) repsEl.value = "";
-            if (weightEl) weightEl.value = "";
-            renderActiveWorkout();
-            renderDashboard();
-
-            Outbox.enqueue({
-                id: newLog.Client_ID,
-                action: "BATCH_APPEND",
-                data: newLog
-            });
-        }
-
         function deleteLog(logId) {
             appData.logs = appData.logs.filter(l => String(l.Log_ID) !== String(logId));
             StateManager.saveCache();
@@ -2238,22 +2231,6 @@
             } else {
                 alert(`${exName} is already in today's workout!`);
             }
-        }
-
-        function removeExerciseFromActiveWorkout(exName) {
-            activeWorkout.exercises = activeWorkout.exercises.filter(e => e !== exName);
-            renderActiveWorkout();
-        }
-
-        function finishWorkout() {
-            const dateInput = document.getElementById("log-date");
-            const dateVal = normalizeDateStr(dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString());
-            const setsToday = appData.logs.filter(l => normalizeDateStr(l.Date) === dateVal);
-            if (setsToday.length === 0) {
-                return alert("No sets logged for today's workout yet!");
-            }
-            alert(`Workout Session Saved!\n\nYou logged ${setsToday.length} total sets on ${dateVal}.\nCheck your History in the Dashboard!`);
-            switchTab('dashboard');
         }
 
         function startWorkout(planName) {
