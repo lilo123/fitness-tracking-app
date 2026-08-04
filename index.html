@@ -66,26 +66,49 @@
 <body class="min-h-screen flex flex-col bg-zinc-950 text-zinc-100 pb-24 selection:bg-cyan-500/20 selection:text-cyan-300">
 
     <!-- Top Navbar (OLED Obsidian Cyber-Gym style) -->
-    <header class="bg-zinc-900/90 backdrop-blur-xl border-b border-zinc-800/80 sticky top-0 z-30 px-4 py-3 flex items-center justify-between shadow-lg">
-        <div class="flex items-center gap-2.5">
-            <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-neon-cyan">
-                <i class="fas fa-bolt text-zinc-950 font-black text-sm"></i>
+    <header class="bg-zinc-900/90 backdrop-blur-xl border-b border-zinc-800/80 sticky top-0 z-30 px-4 py-3 shadow-lg">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2.5 min-w-0">
+                <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-neon-cyan shrink-0">
+                    <i class="fas fa-bolt text-zinc-950 font-black text-sm"></i>
+                </div>
+                <div class="min-w-0">
+                    <h1 id="app-title-header" class="font-black tracking-wider text-base uppercase bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent truncate">Cyber-Gym</h1>
+                    <div id="app-subtitle-header" class="text-[10px] font-mono tracking-widest uppercase text-cyan-400 font-semibold -mt-1 truncate">Telemetry & Logs</div>
+                </div>
             </div>
-            <div>
-                <h1 class="font-black tracking-wider text-base uppercase bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">Cyber-Gym</h1>
-                <div class="text-[10px] font-mono tracking-widest uppercase text-cyan-400 font-semibold -mt-1">Telemetry & Logs</div>
+            <div class="flex items-center gap-2 shrink-0">
+                <!-- Sync Badge -->
+                <div id="sync-badge" onclick="forceRefreshApp()" title="Click to force refresh and sync" class="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/30 flex items-center gap-1.5 shadow-[0_0_10px_rgba(16,185,129,0.15)] cursor-pointer hover:opacity-80 transition select-none">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+                    <span>Synced</span>
+                </div>
+                <!-- Loading Indicator -->
+                <div id="loading" class="hidden text-xs font-mono bg-cyan-500/10 text-cyan-400 px-2.5 py-1 rounded-full border border-cyan-500/30 flex items-center gap-1.5">
+                    <i class="fas fa-circle-notch animate-spin text-xs"></i>
+                    <span>API</span>
+                </div>
             </div>
         </div>
-        <div class="flex items-center gap-2">
-            <!-- Sync Badge -->
-            <div id="sync-badge" onclick="forceRefreshApp()" title="Click to force refresh and sync" class="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/30 flex items-center gap-1.5 shadow-[0_0_10px_rgba(16,185,129,0.15)] cursor-pointer hover:opacity-80 transition select-none">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
-                <span>Synced</span>
+
+        <!-- Coach Cockpit Bar (Shown only in Coach Mode) -->
+        <div id="coach-cockpit-bar" class="hidden mt-2.5 pt-2.5 border-t border-zinc-800/80 flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-1.5 bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-1 shadow-inner">
+                <i class="fas fa-user-circle text-cyan-400 text-xs"></i>
+                <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Athlete:</span>
+                <select id="coach-athlete-select" onchange="switchActiveAthlete(this.value)" class="bg-transparent text-white text-xs font-extrabold outline-none cursor-pointer">
+                    <!-- Populated dynamically -->
+                </select>
             </div>
-            <!-- Loading Indicator -->
-            <div id="loading" class="hidden text-xs font-mono bg-cyan-500/10 text-cyan-400 px-2.5 py-1 rounded-full border border-cyan-500/30 flex items-center gap-1.5">
-                <i class="fas fa-circle-notch animate-spin text-xs"></i>
-                <span>API</span>
+            <div class="flex items-center gap-2">
+                <button onclick="promptAddAthlete()" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold px-2.5 py-1 rounded-xl transition flex items-center gap-1.5 border border-zinc-700" title="Add a new athlete or friend">
+                    <i class="fas fa-user-plus text-cyan-400 text-[10px]"></i>
+                    <span>+ Athlete</span>
+                </button>
+                <button id="btn-copy-athlete-link" onclick="copyAthleteLink()" class="bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 text-xs font-bold px-2.5 py-1 rounded-xl transition flex items-center gap-1.5 shadow-[0_0_10px_rgba(6,182,212,0.15)]" title="Copy shareable link for current athlete">
+                    <i class="fas fa-link text-cyan-400 text-[10px]"></i>
+                    <span>Copy Link</span>
+                </button>
             </div>
         </div>
     </header>
@@ -284,6 +307,130 @@
     <script>
         const API_URL = "https://script.google.com/macros/s/AKfycbyZbnG3jv37Af1pKFOZIEAamQRHFzIKSQN4IvwdxsWCjWb_NCJV0NGSpOThNN7sqOGwnQ/exec";
         
+        // --- Multi-Athlete Routing & Context ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const athleteSlugParam = urlParams.get('athlete')?.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+
+        const AppContext = {
+            role: athleteSlugParam ? 'athlete' : 'coach',
+            activeAthlete: athleteSlugParam || localStorage.getItem('fitness_active_athlete_v2') || 'duy',
+            isCoach() { return this.role === 'coach'; },
+            isLockedAthlete() { return this.role === 'athlete'; }
+        };
+
+        let coachAthletes = [
+            { Athlete_ID: "duy", Display_Name: "Duy (Coach)" }
+        ];
+
+        function getAthleteDisplayName(slug) {
+            if (!slug || slug === "duy") return "Duy";
+            const found = coachAthletes.find(a => a.Athlete_ID === slug);
+            if (found) return found.Display_Name;
+            return slug.charAt(0).toUpperCase() + slug.slice(1);
+        }
+
+        function loadCoachAthletes() {
+            try {
+                const saved = localStorage.getItem('fitness_coach_athletes_v2');
+                if (saved) {
+                    const list = JSON.parse(saved);
+                    if (Array.isArray(list) && list.length > 0) coachAthletes = list;
+                }
+            } catch(e) {}
+            if (!coachAthletes.some(a => a.Athlete_ID === "duy")) {
+                coachAthletes.unshift({ Athlete_ID: "duy", Display_Name: "Duy (Coach)" });
+            }
+        }
+
+        function saveCoachAthletes() {
+            try {
+                localStorage.setItem('fitness_coach_athletes_v2', JSON.stringify(coachAthletes));
+            } catch(e) {}
+        }
+        loadCoachAthletes();
+
+        function renderCoachHeader() {
+            const cockpit = document.getElementById('coach-cockpit-bar');
+            const appSubtitle = document.getElementById('app-subtitle-header');
+            const selectEl = document.getElementById('coach-athlete-select');
+            const copyBtn = document.getElementById('btn-copy-athlete-link');
+            
+            if (AppContext.isLockedAthlete()) {
+                if (cockpit) cockpit.classList.add('hidden');
+                if (appSubtitle) appSubtitle.textContent = `${getAthleteDisplayName(AppContext.activeAthlete)}'s Training`;
+                return;
+            }
+
+            // Coach Mode
+            if (cockpit) cockpit.classList.remove('hidden');
+            if (appSubtitle) appSubtitle.textContent = `Coach HQ • ${getAthleteDisplayName(AppContext.activeAthlete)}`;
+            
+            if (selectEl) {
+                selectEl.innerHTML = coachAthletes.map(a => `
+                    <option value="${a.Athlete_ID}" ${a.Athlete_ID === AppContext.activeAthlete ? 'selected' : ''}>
+                        ${a.Display_Name}
+                    </option>
+                `).join('') + `<option value="__NEW__">+ Add New Athlete...</option>`;
+            }
+
+            if (copyBtn) {
+                if (AppContext.activeAthlete === "duy") {
+                    copyBtn.classList.add('hidden');
+                } else {
+                    copyBtn.classList.remove('hidden');
+                }
+            }
+        }
+
+        async function switchActiveAthlete(newAthleteSlug) {
+            if (newAthleteSlug === "__NEW__") {
+                promptAddAthlete();
+                return;
+            }
+            AppContext.activeAthlete = newAthleteSlug;
+            localStorage.setItem('fitness_active_athlete_v2', newAthleteSlug);
+            appData = { exercises: appData.exercises || [], logs: [], templates: [] };
+            activeWorkout.exercises = [];
+            activeWorkout.expandedExercises.clear();
+            renderCoachHeader();
+            await fetchData();
+        }
+
+        function promptAddAthlete() {
+            const name = prompt("Enter athlete / friend name (e.g. Sarah, Alex, Mike):");
+            if (!name || !name.trim()) {
+                renderCoachHeader();
+                return;
+            }
+            const cleanName = name.trim();
+            const slug = cleanName.toLowerCase().replace(/[^a-z0-9_]/g, '');
+            if (!slug) {
+                alert("Invalid athlete name. Please use alphanumeric characters.");
+                renderCoachHeader();
+                return;
+            }
+            if (!coachAthletes.some(a => a.Athlete_ID === slug)) {
+                coachAthletes.push({ Athlete_ID: slug, Display_Name: cleanName });
+                saveCoachAthletes();
+                apiCall('POST', { action: "REGISTER_ATHLETE", Athlete_ID: slug, Display_Name: cleanName }, "Athletes");
+            }
+            switchActiveAthlete(slug);
+        }
+
+        function copyAthleteLink() {
+            const baseUrl = window.location.origin + window.location.pathname;
+            const clientUrl = `${baseUrl}?athlete=${encodeURIComponent(AppContext.activeAthlete)}`;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(clientUrl).then(() => {
+                    alert(`Copied link for ${getAthleteDisplayName(AppContext.activeAthlete)}:\n\n${clientUrl}\n\nSend this link to your friend!`);
+                }).catch(() => {
+                    prompt("Copy this link to share with your friend:", clientUrl);
+                });
+            } else {
+                prompt("Copy this link to share with your friend:", clientUrl);
+            }
+        }
+
         let appData = {
             exercises: [],
             logs: [],
@@ -308,7 +455,7 @@
             return `${monthStr} ${dayStr}`;
         }
 
-        // --- 0. Date Normalizer Helper (Requirement #1) ---
+        // --- 0. Date Normalizer Helper ---
         function normalizeDateStr(val) {
             if (!val) return "";
             if (typeof val === "string") {
@@ -393,9 +540,17 @@
 
         // --- 1. StateManager (SWR & localStorage Cache) ---
         const StateManager = {
+            getCacheKey(key) {
+                return `fitness_${key}_v2_${AppContext.activeAthlete}`;
+            },
             loadCache() {
                 try {
-                    const saved = localStorage.getItem('fitness_appData_v1');
+                    // Check for legacy v1 migration for duy
+                    if (AppContext.activeAthlete === "duy" && !localStorage.getItem(this.getCacheKey('appData'))) {
+                        const legacy = localStorage.getItem('fitness_appData_v1');
+                        if (legacy) localStorage.setItem(this.getCacheKey('appData'), legacy);
+                    }
+                    const saved = localStorage.getItem(this.getCacheKey('appData'));
                     if (saved) {
                         const parsed = JSON.parse(saved);
                         if (parsed.exercises && Array.isArray(parsed.exercises)) appData.exercises = parsed.exercises;
@@ -412,7 +567,7 @@
             },
             saveCache() {
                 try {
-                    localStorage.setItem('fitness_appData_v1', JSON.stringify(appData));
+                    localStorage.setItem(this.getCacheKey('appData'), JSON.stringify(appData));
                 } catch (e) { console.warn("Failed to save local cache:", e); }
             }
         };
@@ -420,17 +575,26 @@
         // --- 2. Offline Outbox Queue & Optimistic Sync ---
         const Outbox = {
             isSyncing: false,
+            getQueueKey() {
+                return `fitness_outbox_v2_${AppContext.activeAthlete}`;
+            },
             getQueue() {
-                try { return JSON.parse(localStorage.getItem('fitness_outbox_v1') || '[]'); }
-                catch (e) { return []; }
+                try {
+                    if (AppContext.activeAthlete === "duy" && !localStorage.getItem(this.getQueueKey())) {
+                        const legacy = localStorage.getItem('fitness_outbox_v1');
+                        if (legacy) localStorage.setItem(this.getQueueKey(), legacy);
+                    }
+                    return JSON.parse(localStorage.getItem(this.getQueueKey()) || '[]');
+                } catch (e) { return []; }
             },
             saveQueue(q) {
-                try { localStorage.setItem('fitness_outbox_v1', JSON.stringify(q)); }
+                try { localStorage.setItem(this.getQueueKey(), JSON.stringify(q)); }
                 catch (e) {}
                 this.updateSyncBadge();
             },
             enqueue(item) {
                 const q = this.getQueue();
+                item.athlete = AppContext.activeAthlete;
                 q.push(item);
                 this.saveQueue(q);
                 this.sync();
@@ -476,7 +640,7 @@
                     const delExItems = q.filter(item => item.action === "DELETE_EXERCISE");
                     
                     if (batchItems.length > 0) {
-                        const res = await apiCall('POST', { type: "Logs", action: "BATCH_APPEND", items: batchItems });
+                        const res = await apiCall('POST', { type: "Logs", action: "BATCH_APPEND", items: batchItems, athlete: AppContext.activeAthlete });
                         if (res && res.success) {
                             const syncedIds = new Set(batchItems.map(i => i.Client_ID));
                             const remaining = this.getQueue().filter(item => !syncedIds.has(item.id));
@@ -485,7 +649,7 @@
                     }
                     
                     for (const del of deleteItems) {
-                        const res = await apiCall('POST', { type: "Logs", action: "DELETE", Log_ID: del.Log_ID });
+                        const res = await apiCall('POST', { type: "Logs", action: "DELETE", Log_ID: del.Log_ID, athlete: AppContext.activeAthlete });
                         if (res && res.success) {
                             const remaining = this.getQueue().filter(item => item.id !== del.id);
                             this.saveQueue(remaining);
@@ -493,7 +657,7 @@
                     }
 
                     for (const upd of updateItems) {
-                        const res = await apiCall('POST', { type: "Logs", action: "UPDATE", Log_ID: upd.Log_ID, Weight: upd.Weight, Reps: upd.Reps });
+                        const res = await apiCall('POST', { type: "Logs", action: "UPDATE", Log_ID: upd.Log_ID, Weight: upd.Weight, Reps: upd.Reps, athlete: AppContext.activeAthlete });
                         if (res && res.success) {
                             const remaining = this.getQueue().filter(item => item.id !== upd.id);
                             this.saveQueue(remaining);
@@ -507,7 +671,8 @@
                             Template_ID: upd.Template_ID,
                             old_Template_Name: upd.old_Template_Name,
                             new_Template_Name: upd.new_Template_Name,
-                            Exercise_Sequence: upd.Exercise_Sequence
+                            Exercise_Sequence: upd.Exercise_Sequence,
+                            athlete: AppContext.activeAthlete
                         });
                         if (res && res.success) {
                             const remaining = this.getQueue().filter(item => item.id !== upd.id);
@@ -520,7 +685,8 @@
                             type: "Templates",
                             action: "DELETE_TEMPLATE",
                             Template_ID: del.Template_ID,
-                            Template_Name: del.Template_Name
+                            Template_Name: del.Template_Name,
+                            athlete: AppContext.activeAthlete
                         });
                         if (res && res.success) {
                             const remaining = this.getQueue().filter(item => item.id !== del.id);
@@ -984,15 +1150,25 @@
         }
 
         // --- 6. Backend API Client ---
-        async function apiCall(method, payload = null, typeParam = "") {
+        async function apiCall(method, payload = null, typeParam = "", athleteOverride = null) {
             if (!API_URL) return { success: false, error: "Offline / Local Mode" };
-            const url = typeParam ? `${API_URL}?type=${encodeURIComponent(typeParam)}` : API_URL;
+            const targetAthlete = athleteOverride || (payload && payload.athlete) || AppContext.activeAthlete;
+            let url = API_URL;
+            const params = [];
+            if (typeParam) params.push(`type=${encodeURIComponent(typeParam)}`);
+            if (targetAthlete) params.push(`athlete=${encodeURIComponent(targetAthlete)}`);
+            if (params.length > 0) url += `?${params.join("&")}`;
+
             const options = {
                 method,
                 redirect: 'follow'
             };
             if (payload) {
-                options.body = JSON.stringify(payload);
+                const payloadWithAthlete = {
+                    ...payload,
+                    athlete: payload.athlete || targetAthlete
+                };
+                options.body = JSON.stringify(payloadWithAthlete);
                 options.headers = { "Content-Type": "text/plain" };
             }
             try {
@@ -1005,6 +1181,7 @@
 
         async function fetchData() {
             StateManager.loadCache();
+            renderCoachHeader();
             autoSelectNextRoutine();
             renderAll();
             Outbox.updateSyncBadge();
@@ -1012,28 +1189,48 @@
             await Outbox.sync();
 
             showLoading();
-            const [exRes, logRes, tplRes] = await Promise.all([
+            const fetches = [
                 apiCall('GET', null, 'Exercises'),
-                apiCall('GET', null, 'Logs'),
-                apiCall('GET', null, 'Templates')
-            ]);
+                apiCall('GET', null, 'Logs', AppContext.activeAthlete),
+                apiCall('GET', null, 'Templates', AppContext.activeAthlete)
+            ];
+            if (AppContext.isCoach()) {
+                fetches.push(apiCall('GET', null, 'Athletes'));
+            }
+
+            const results = await Promise.all(fetches);
             hideLoading();
+
+            const exRes = results[0];
+            const logRes = results[1];
+            const tplRes = results[2];
+            const athRes = results[3];
+
+            if (athRes && athRes.success && Array.isArray(athRes.data)) {
+                athRes.data.forEach(a => {
+                    if (a.Athlete_ID && !coachAthletes.some(ca => ca.Athlete_ID === a.Athlete_ID)) {
+                        coachAthletes.push({ Athlete_ID: a.Athlete_ID, Display_Name: a.Display_Name || a.Athlete_ID });
+                    }
+                });
+                saveCoachAthletes();
+                renderCoachHeader();
+            }
 
             const q = Outbox.getQueue();
             const pendingLogs = q.filter(i => i.action === "BATCH_APPEND").map(i => i.data);
             const pendingEx = q.filter(i => i.action === "ADD_EXERCISE").map(i => i.data);
 
-            if (exRes.success && Array.isArray(exRes.data)) {
+            if (exRes && exRes.success && Array.isArray(exRes.data)) {
                 const remoteExIds = new Set(exRes.data.map(e => e.ID));
                 appData.exercises = [...exRes.data, ...pendingEx.filter(e => !remoteExIds.has(e.ID))];
             }
-            if (logRes.success && Array.isArray(logRes.data)) {
+            if (logRes && logRes.success && Array.isArray(logRes.data)) {
                 const remoteClientIds = new Set(logRes.data.map(l => l.Client_ID));
                 const remoteLogs = logRes.data.map(l => ({ ...l, Date: normalizeDateStr(l.Date) }));
                 const unmergedPending = pendingLogs.filter(l => !remoteClientIds.has(l.Client_ID));
                 appData.logs = [...remoteLogs, ...unmergedPending];
             }
-            if (tplRes.success && Array.isArray(tplRes.data)) appData.templates = tplRes.data;
+            if (tplRes && tplRes.success && Array.isArray(tplRes.data)) appData.templates = tplRes.data;
             
             seedDefaults();
             StateManager.saveCache();
