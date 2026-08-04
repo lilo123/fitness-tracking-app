@@ -172,12 +172,41 @@
 
         <!-- TAB: DASHBOARD (History & Volume Metrics) -->
         <div id="tab-dashboard" class="tab-content hidden">
-            <div class="bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-transparent border border-cyan-500/20 rounded-2xl p-4 mb-5 flex items-center justify-between">
-                <div>
-                    <h2 class="text-base font-black text-white flex items-center gap-2">
-                        <i class="fas fa-chart-line text-cyan-400"></i> Training History
-                    </h2>
-                    <p class="text-xs text-zinc-400 mt-0.5">Review your past workouts, track volume progression, and edit logged sets.</p>
+            <!-- Header with Title & View Mode Switcher -->
+            <div class="bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-transparent border border-cyan-500/20 rounded-2xl p-4 mb-4">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                    <div>
+                        <h2 class="text-base font-black text-white flex items-center gap-2">
+                            <i class="fas fa-chart-line text-cyan-400"></i> Training History
+                        </h2>
+                        <p class="text-xs text-zinc-400 mt-0.5">Track progressive overload, milestone PRs, and exercise telemetry.</p>
+                    </div>
+                </div>
+
+                <!-- View Switcher Segmented Control (Min 44px Touch Targets) -->
+                <div class="bg-zinc-950/90 p-1 rounded-2xl border border-zinc-800/80 flex gap-1 shadow-inner">
+                    <button id="btn-hist-mode-date" onclick="setHistoryViewMode('date')" class="flex-1 min-h-[44px] py-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all">
+                        <i class="far fa-calendar-alt text-sm"></i>
+                        <span>By Session</span>
+                    </button>
+                    <button id="btn-hist-mode-exercise" onclick="setHistoryViewMode('exercise')" class="flex-1 min-h-[44px] py-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all">
+                        <i class="fas fa-dumbbell text-sm"></i>
+                        <span>By Exercise</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Static Exercise Filter Bar (Preserves focus while typing) -->
+            <div id="history-exercise-filters" class="mb-4 hidden space-y-2.5">
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 text-xs"></i>
+                    <input type="text" id="history-exercise-search" oninput="onHistorySearchInput(this.value)" placeholder="Search exercises in history..." class="w-full bg-zinc-900 border border-zinc-800 text-white rounded-xl pl-9 pr-8 py-2.5 text-xs font-semibold focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition min-h-[44px]">
+                    <button id="history-clear-search-btn" onclick="clearHistorySearch()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white text-xs p-1.5">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="history-category-rail" class="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar select-none">
+                    <!-- Populated dynamically -->
                 </div>
             </div>
 
@@ -433,6 +462,7 @@
                 return;
             }
             drafts = {};
+            if (typeof HistoryView !== 'undefined') HistoryView.reset();
             AppContext.activeAthlete = newAthleteSlug;
             localStorage.setItem('fitness_active_athlete_v2', newAthleteSlug);
             appData = { exercises: appData.exercises || [], logs: [], templates: [] };
@@ -1597,12 +1627,206 @@
             restoreInputDrafts();
         }
 
-        // --- 8. Training History Dashboard Smart Accordions & Inline Set Editing ---
+        // --- 8. Training History Dashboard State & Handlers ---
         const dashboardExpandedDates = new Set();
         const dashboardExpandedVolumeDates = new Set();
         const dashboardExpandedExercises = new Set();
         let isDashboardDefaultInitialized = false;
         const editingLogIds = new Set();
+
+        const HistoryView = {
+            mode: localStorage.getItem('fitness_history_view_mode') || 'date', // 'date' | 'exercise'
+            categoryFilter: 'All',
+            searchQuery: '',
+            expandedExercises: new Set(),
+            
+            setMode(newMode) {
+                this.mode = newMode;
+                localStorage.setItem('fitness_history_view_mode', newMode);
+                editingLogIds.clear();
+                updateHistoryViewControls();
+                renderDashboard();
+            },
+            
+            setCategory(cat) {
+                this.categoryFilter = cat;
+                updateHistoryViewControls();
+                renderDashboard();
+            },
+            
+            setSearch(query) {
+                this.searchQuery = (query || "").trim();
+                const clearBtn = document.getElementById('history-clear-search-btn');
+                if (clearBtn) {
+                    if (this.searchQuery) clearBtn.classList.remove('hidden');
+                    else clearBtn.classList.add('hidden');
+                }
+                renderDashboard();
+            },
+            
+            toggleExercise(exName) {
+                if (this.expandedExercises.has(exName)) {
+                    this.expandedExercises.delete(exName);
+                } else {
+                    this.expandedExercises.add(exName);
+                }
+                renderDashboard();
+            },
+            
+            reset() {
+                this.expandedExercises.clear();
+                this.searchQuery = '';
+                this.categoryFilter = 'All';
+                const sInput = document.getElementById('history-exercise-search');
+                if (sInput) sInput.value = '';
+                const clearBtn = document.getElementById('history-clear-search-btn');
+                if (clearBtn) clearBtn.classList.add('hidden');
+            }
+        };
+
+        function setHistoryViewMode(mode) {
+            HistoryView.setMode(mode);
+        }
+
+        function onHistorySearchInput(val) {
+            HistoryView.setSearch(val);
+        }
+
+        function clearHistorySearch() {
+            const sInput = document.getElementById('history-exercise-search');
+            if (sInput) sInput.value = '';
+            HistoryView.setSearch('');
+        }
+
+        function resetExerciseHistoryFilters() {
+            HistoryView.reset();
+            updateHistoryViewControls();
+            renderDashboard();
+        }
+
+        function updateHistoryViewControls() {
+            const btnDate = document.getElementById('btn-hist-mode-date');
+            const btnEx = document.getElementById('btn-hist-mode-exercise');
+            const filterBar = document.getElementById('history-exercise-filters');
+            
+            if (btnDate && btnEx) {
+                if (HistoryView.mode === 'exercise') {
+                    btnEx.className = "flex-1 min-h-[44px] py-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-neon-cyan";
+                    btnDate.className = "flex-1 min-h-[44px] py-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all text-zinc-400 hover:text-zinc-200";
+                    if (filterBar) filterBar.classList.remove('hidden');
+                } else {
+                    btnDate.className = "flex-1 min-h-[44px] py-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-neon-cyan";
+                    btnEx.className = "flex-1 min-h-[44px] py-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all text-zinc-400 hover:text-zinc-200";
+                    if (filterBar) filterBar.classList.add('hidden');
+                }
+            }
+            renderHistoryCategoryRail();
+        }
+
+        function renderHistoryCategoryRail() {
+            const rail = document.getElementById('history-category-rail');
+            if (!rail) return;
+            const categories = ["All", "Chest", "Back", "Legs", "Shoulders", "Arms", "Core", "Cardio", "Other"];
+            rail.innerHTML = categories.map(cat => {
+                const isActive = HistoryView.categoryFilter === cat;
+                return `
+                <button onclick="HistoryView.setCategory('${cat}')" class="px-3.5 py-1.5 rounded-full text-xs font-extrabold whitespace-nowrap transition-all flex items-center gap-1 min-h-[36px] ${isActive ? 'bg-cyan-500 text-zinc-950 shadow-[0_0_12px_rgba(6,182,212,0.4)]' : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'}">
+                    <span>${cat}</span>
+                </button>
+                `;
+            }).join('');
+        }
+
+        function computeExerciseSummaries() {
+            const exerciseMap = new Map();
+
+            // 1. Seed library exercises with muscle categories
+            appData.exercises.forEach(ex => {
+                if (ex && ex.Name) {
+                    exerciseMap.set(ex.Name, {
+                        name: ex.Name,
+                        category: ex.Category || 'Other',
+                        totalSets: 0,
+                        totalVolume: 0,
+                        maxWeight: 0,
+                        best1RM: 0,
+                        best1RMSet: null,
+                        maxRepsOnBodyweight: 0,
+                        lastDate: '',
+                        sessionsMap: new Map()
+                    });
+                }
+            });
+
+            // 2. Single-pass over all logs
+            for (let i = 0; i < appData.logs.length; i++) {
+                const log = appData.logs[i];
+                const exName = log.Exercise_ID;
+                if (!exName || !log.Date) continue;
+
+                let entry = exerciseMap.get(exName);
+                if (!entry) {
+                    entry = {
+                        name: exName,
+                        category: 'Other',
+                        totalSets: 0,
+                        totalVolume: 0,
+                        maxWeight: 0,
+                        best1RM: 0,
+                        best1RMSet: null,
+                        maxRepsOnBodyweight: 0,
+                        lastDate: '',
+                        sessionsMap: new Map()
+                    };
+                    exerciseMap.set(exName, entry);
+                }
+
+                const date = normalizeDateStr(log.Date);
+                const weight = parseFloat(log.Weight) || 0;
+                const reps = parseInt(log.Reps, 10) || 0;
+                const vol = weight * reps;
+                const est1RM = reps === 1 ? weight : (reps > 0 && reps <= 20 ? Math.round(weight * (1 + reps / 30)) : weight);
+
+                entry.totalSets += 1;
+                entry.totalVolume += vol;
+                if (weight > entry.maxWeight) entry.maxWeight = weight;
+                if (est1RM > entry.best1RM) {
+                    entry.best1RM = est1RM;
+                    entry.best1RMSet = { weight, reps, date };
+                }
+                if (weight === 0 && reps > entry.maxRepsOnBodyweight) entry.maxRepsOnBodyweight = reps;
+                if (!entry.lastDate || date > entry.lastDate) entry.lastDate = date;
+
+                let session = entry.sessionsMap.get(date);
+                if (!session) {
+                    session = { date, workoutId: log.Workout_ID || '', volume: 0, maxWeight: 0, sets: [] };
+                    entry.sessionsMap.set(date, session);
+                }
+                session.volume += vol;
+                if (weight > session.maxWeight) session.maxWeight = weight;
+                session.sets.push(log);
+            }
+
+            const list = Array.from(exerciseMap.values()).filter(e => e.totalSets > 0);
+            
+            // Format sessions as sorted array with overload volume delta
+            list.forEach(entry => {
+                const sessions = Array.from(entry.sessionsMap.values()).sort((a, b) => a.date.localeCompare(b.date)); // Oldest first to compute deltas
+                for (let s = 0; s < sessions.length; s++) {
+                    sessions[s].sets.sort((a, b) => (a.Set_Index || 0) - (b.Set_Index || 0));
+                    if (s > 0) {
+                        const prevVol = sessions[s - 1].volume;
+                        if (prevVol > 0) {
+                            sessions[s].volDeltaPercent = Math.round(((sessions[s].volume - prevVol) / prevVol) * 100);
+                        }
+                    }
+                }
+                // Reverse to display newest session first
+                entry.sessions = sessions.reverse();
+            });
+
+            return list;
+        }
 
         function toggleDashboardVolume(dateStr) {
             if (dashboardExpandedVolumeDates.has(dateStr)) {
@@ -1756,6 +1980,15 @@
         }
 
         function renderDashboard() {
+            updateHistoryViewControls();
+            if (HistoryView.mode === 'exercise') {
+                renderDashboardByExercise();
+            } else {
+                renderDashboardByDate();
+            }
+        }
+
+        function renderDashboardByDate() {
             const logsByDate = {};
             appData.logs.forEach(log => {
                 if (!log.Date || !log.Exercise_ID) return;
@@ -1771,6 +2004,26 @@
                 dashboardExpandedVolumeDates.add(sortedDates[0]);
                 isDashboardDefaultInitialized = true;
             }
+
+            const dl = document.getElementById('dashboard-list');
+            if (!dl) return;
+
+            if (sortedDates.length === 0) {
+                dl.innerHTML = `
+                <div class="bg-zinc-900/60 border border-dashed border-zinc-800 rounded-3xl p-8 text-center my-6">
+                    <div class="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mx-auto mb-4 text-cyan-400 text-2xl shadow-neon-cyan">
+                        <i class="fas fa-dumbbell"></i>
+                    </div>
+                    <h3 class="text-base font-black text-white uppercase tracking-wider mb-1">No Workouts Recorded</h3>
+                    <p class="text-xs text-zinc-400 max-w-xs mx-auto mb-5">Start your first training session to unlock exercise progression, PR tracking, and volume analytics.</p>
+                    <button onclick="switchTab('log')" class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black px-5 py-3 rounded-xl text-xs uppercase tracking-wider shadow-neon-cyan active:scale-95 transition">
+                        <i class="fas fa-plus mr-1.5"></i> Start Workout
+                    </button>
+                </div>
+                `;
+                return;
+            }
+
             const dashHtml = sortedDates.map(date => {
                 const isExpanded = dashboardExpandedDates.has(date);
                 const isVolExpanded = dashboardExpandedVolumeDates.has(date);
@@ -1856,11 +2109,11 @@
                                                     </div>
                                                 </div>
                                                 <div class="flex items-center gap-1.5">
-                                                    <button onclick="saveEditLog('${log.Log_ID}')" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white px-3 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1 shadow-[0_0_10px_rgba(16,185,129,0.3)]">
+                                                    <button onclick="saveEditLog('${log.Log_ID}')" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white px-3 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1 shadow-[0_0_10px_rgba(16,185,129,0.3)] min-h-[36px]">
                                                         <i class="fas fa-check text-[10px]"></i>
                                                         <span>Save</span>
                                                     </button>
-                                                    <button onclick="cancelEditLog('${log.Log_ID}')" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
+                                                    <button onclick="cancelEditLog('${log.Log_ID}')" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 min-h-[36px]">
                                                         <i class="fas fa-times text-[10px]"></i>
                                                         <span>Cancel</span>
                                                     </button>
@@ -1879,13 +2132,11 @@
                                                 </span>
                                             </div>
                                             <div class="flex items-center gap-1.5">
-                                                <button onclick="startEditLog('${log.Log_ID}')" class="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700/80 text-zinc-300 hover:text-white px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs" title="Edit Set">
+                                                <button onclick="startEditLog('${log.Log_ID}')" class="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700/80 text-zinc-300 hover:text-white flex items-center justify-center transition" title="Edit Set">
                                                     <i class="fas fa-pencil-alt text-[10px] text-cyan-400"></i>
-                                                    <span>Edit</span>
                                                 </button>
-                                                <button onclick="deleteLog('${log.Log_ID}')" class="bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1" title="Delete Set">
+                                                <button onclick="deleteLog('${log.Log_ID}')" class="w-8 h-8 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 flex items-center justify-center transition" title="Delete Set">
                                                     <i class="fas fa-trash text-[10px]"></i>
-                                                    <span>Delete</span>
                                                 </button>
                                             </div>
                                         </div>
@@ -1908,10 +2159,219 @@
                 </div>
             `;
             }).join('');
+
+            dl.innerHTML = dashHtml;
+        }
+
+        function renderDashboardByExercise() {
+            const allSummaries = computeExerciseSummaries();
+            const filterQuery = (HistoryView.searchQuery || "").toLowerCase();
+            const catFilter = HistoryView.categoryFilter;
+
+            const filtered = allSummaries.filter(item => {
+                const matchesCat = catFilter === "All" || item.category === catFilter;
+                const matchesSearch = !filterQuery || item.name.toLowerCase().includes(filterQuery);
+                return matchesCat && matchesSearch;
+            });
+
+            // Sort: Most recently trained first
+            filtered.sort((a, b) => (b.lastDate || "").localeCompare(a.lastDate || ""));
+
             const dl = document.getElementById('dashboard-list');
-            if (dl) {
-                dl.innerHTML = dashHtml || "<p class='text-sm text-zinc-400 italic'>No workout days logged yet. Go log a set!</p>";
+            if (!dl) return;
+
+            if (allSummaries.length === 0) {
+                dl.innerHTML = `
+                <div class="bg-zinc-900/60 border border-dashed border-zinc-800 rounded-3xl p-8 text-center my-6">
+                    <div class="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mx-auto mb-4 text-cyan-400 text-2xl shadow-neon-cyan">
+                        <i class="fas fa-dumbbell"></i>
+                    </div>
+                    <h3 class="text-base font-black text-white uppercase tracking-wider mb-1">No Exercise Telemetry Yet</h3>
+                    <p class="text-xs text-zinc-400 max-w-xs mx-auto mb-5">Log your workout sets to unlock comprehensive per-exercise PR tracking and overload history.</p>
+                    <button onclick="switchTab('log')" class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black px-5 py-3 rounded-xl text-xs uppercase tracking-wider shadow-neon-cyan active:scale-95 transition">
+                        <i class="fas fa-plus mr-1.5"></i> Start Workout
+                    </button>
+                </div>
+                `;
+                return;
             }
+
+            if (filtered.length === 0) {
+                dl.innerHTML = `
+                <div class="bg-zinc-900/60 border border-zinc-800/80 rounded-2xl p-6 text-center my-4">
+                    <i class="fas fa-filter text-zinc-500 text-xl mb-2"></i>
+                    <p class="text-sm font-bold text-zinc-300">No exercises matching "${HistoryView.searchQuery || catFilter}"</p>
+                    <p class="text-xs text-zinc-500 mt-1 mb-3">Try adjusting your search query or muscle category filter.</p>
+                    <button onclick="resetExerciseHistoryFilters()" class="text-xs font-bold text-cyan-400 hover:text-cyan-300 bg-cyan-500/10 border border-cyan-500/30 px-3 py-1.5 rounded-lg transition">
+                        Clear Filters
+                    </button>
+                </div>
+                `;
+                return;
+            }
+
+            const cardsHtml = filtered.map(item => {
+                const isExpanded = HistoryView.expandedExercises.has(item.name);
+                const escapedName = item.name.replace(/'/g, "\\'");
+
+                return `
+                <div class="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-4 sm:p-5 shadow-xl mb-4 text-white transition-all">
+                    <!-- Exercise Summary Card Header (Accordion Toggle) -->
+                    <div onclick="HistoryView.toggleExercise('${escapedName}')" class="cursor-pointer select-none">
+                        <div class="flex items-center justify-between gap-2 mb-2">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <i class="fas fa-chevron-right transition-transform duration-300 text-xs shrink-0 ${isExpanded ? 'rotate-90 text-cyan-400' : 'text-zinc-500'}"></i>
+                                <span class="font-black text-white text-base truncate">${item.name}</span>
+                            </div>
+                            <span class="shrink-0 text-[11px] bg-zinc-800/90 border border-zinc-700/70 text-cyan-300 font-bold px-2.5 py-0.5 rounded-full">
+                                ${item.category}
+                            </span>
+                        </div>
+
+                        <!-- Milestone Monospace Strip -->
+                        <div class="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-zinc-800/70 text-center">
+                            <div class="bg-zinc-950/80 border border-zinc-800/80 rounded-xl py-2 px-1">
+                                <div class="text-[9px] font-extrabold uppercase tracking-wider text-amber-400 flex items-center justify-center gap-1">
+                                    <i class="fas fa-crown text-[9px]"></i> Max Load
+                                </div>
+                                <div class="text-sm font-extrabold font-mono text-amber-300 mt-0.5">
+                                    ${item.maxWeight > 0 ? `${item.maxWeight} <span class="text-[10px] font-sans text-zinc-400 font-normal">lbs</span>` : (item.maxRepsOnBodyweight > 0 ? `${item.maxRepsOnBodyweight} reps` : '0 lbs')}
+                                </div>
+                            </div>
+                            <div class="bg-zinc-950/80 border border-zinc-800/80 rounded-xl py-2 px-1">
+                                <div class="text-[9px] font-extrabold uppercase tracking-wider text-violet-400 flex items-center justify-center gap-1">
+                                    <i class="fas fa-bolt text-[9px]"></i> Est. 1RM
+                                </div>
+                                <div class="text-sm font-extrabold font-mono text-violet-300 mt-0.5">
+                                    ${item.best1RM > 0 ? `${item.best1RM} <span class="text-[10px] font-sans text-zinc-400 font-normal">lbs</span>` : '-'}
+                                </div>
+                            </div>
+                            <div class="bg-zinc-950/80 border border-zinc-800/80 rounded-xl py-2 px-1">
+                                <div class="text-[9px] font-extrabold uppercase tracking-wider text-cyan-400 flex items-center justify-center gap-1">
+                                    <i class="fas fa-chart-bar text-[9px]"></i> Volume
+                                </div>
+                                <div class="text-sm font-extrabold font-mono text-cyan-300 mt-0.5">
+                                    ${item.totalVolume >= 1000 ? `${(item.totalVolume / 1000).toFixed(1)}k` : item.totalVolume} <span class="text-[10px] font-sans text-zinc-400 font-normal">lbs</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between text-[11px] text-zinc-400 font-medium mt-2.5 px-1">
+                            <span><i class="far fa-clock text-zinc-500 mr-1"></i> Last: ${item.lastDate ? item.lastDate : 'N/A'}</span>
+                            <span><i class="fas fa-layer-group text-zinc-500 mr-1"></i> ${item.totalSets} Sets (${item.sessions.length} Sessions)</span>
+                        </div>
+                    </div>
+
+                    <!-- Progression Timeline Accordion Body -->
+                    ${isExpanded ? `
+                    <div class="mt-4 pt-4 border-t border-zinc-800/90 space-y-3.5">
+                        <div class="text-xs font-black uppercase tracking-widest text-zinc-400 flex items-center gap-1.5 mb-2">
+                            <i class="fas fa-history text-cyan-400"></i> Progression Timeline
+                        </div>
+
+                        ${item.sessions.map((session, sIdx) => {
+                            const isVolUp = session.volDeltaPercent !== undefined && session.volDeltaPercent > 0;
+                            const isVolDown = session.volDeltaPercent !== undefined && session.volDeltaPercent < 0;
+                            return `
+                            <div class="bg-zinc-950/90 border border-zinc-800 rounded-xl p-3.5 shadow-md">
+                                <div class="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-zinc-800/60">
+                                    <div>
+                                        <div class="font-extrabold text-white text-xs flex items-center gap-1.5">
+                                            <i class="far fa-calendar-alt text-cyan-400"></i>
+                                            <span>${session.date}</span>
+                                        </div>
+                                        ${session.workoutId ? `<div class="text-[10px] text-zinc-400 font-semibold mt-0.5 truncate">${session.workoutId}</div>` : ''}
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-mono text-xs font-bold text-zinc-300">
+                                            ${session.volume.toLocaleString()} <span class="text-[10px] text-zinc-400 font-sans">lbs Vol</span>
+                                        </span>
+                                        ${isVolUp ? `
+                                        <span class="text-[10px] font-black font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+                                            <i class="fas fa-arrow-up text-[8px]"></i> +${session.volDeltaPercent}%
+                                        </span>
+                                        ` : ''}
+                                    </div>
+                                </div>
+
+                                <div class="space-y-1.5">
+                                    ${session.sets.map((log, setIdx) => {
+                                        const isEditing = editingLogIds.has(String(log.Log_ID));
+                                        const wNum = parseFloat(log.Weight) || 0;
+                                        const rNum = parseInt(log.Reps, 10) || 0;
+                                        const set1RM = rNum === 1 ? wNum : (rNum > 0 && rNum <= 20 ? Math.round(wNum * (1 + rNum / 30)) : wNum);
+                                        const isMaxWeightPR = item.maxWeight > 0 && wNum === item.maxWeight;
+                                        const is1RMPR = item.best1RM > 0 && set1RM === item.best1RM;
+
+                                        if (isEditing) {
+                                            return `
+                                            <div class="flex flex-wrap items-center justify-between py-2 px-2.5 bg-zinc-900 border border-cyan-500/50 rounded-lg mb-1.5 shadow-[0_0_15px_rgba(6,182,212,0.15)] gap-2">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-300 font-extrabold text-xs flex items-center justify-center border border-cyan-500/40 shrink-0">
+                                                        ${log.Set_Index || setIdx + 1}
+                                                    </span>
+                                                    <div class="flex items-center gap-1.5">
+                                                        <input type="number" id="edit-weight-${log.Log_ID}" value="${log.Weight}" step="any" class="w-20 bg-zinc-950 border border-zinc-700 text-white rounded-lg px-2.5 py-1 text-base font-bold text-center focus:border-cyan-400 outline-none min-h-[44px]" placeholder="lbs">
+                                                        <span class="text-xs text-zinc-400 font-bold">lbs ×</span>
+                                                        <input type="number" id="edit-reps-${log.Log_ID}" value="${log.Reps}" class="w-16 bg-zinc-950 border border-zinc-700 text-white rounded-lg px-2.5 py-1 text-base font-bold text-center focus:border-cyan-400 outline-none min-h-[44px]" placeholder="reps">
+                                                        <span class="text-xs text-zinc-400 font-bold">reps</span>
+                                                    </div>
+                                                </div>
+                                                <div class="flex items-center gap-1.5">
+                                                    <button onclick="saveEditLog('${log.Log_ID}')" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white px-3 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1 shadow-[0_0_10px_rgba(16,185,129,0.3)] min-h-[36px]">
+                                                        <i class="fas fa-check text-[10px]"></i>
+                                                        <span>Save</span>
+                                                    </button>
+                                                    <button onclick="cancelEditLog('${log.Log_ID}')" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 min-h-[36px]">
+                                                        <i class="fas fa-times text-[10px]"></i>
+                                                        <span>Cancel</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            `;
+                                        }
+
+                                        return `
+                                        <div class="flex items-center justify-between py-1.5 px-2 bg-zinc-900/60 border border-zinc-800/60 rounded-lg hover:border-zinc-700 transition">
+                                            <div class="flex items-center gap-2 min-w-0">
+                                                <span class="w-5 h-5 rounded-full bg-zinc-800 text-zinc-400 font-bold text-[10px] flex items-center justify-center shrink-0">
+                                                    ${log.Set_Index || setIdx + 1}
+                                                </span>
+                                                <span class="text-xs font-bold font-mono text-white">
+                                                    ${log.Weight} <span class="text-[10px] text-zinc-400 font-sans">lbs</span> × ${log.Reps} <span class="text-[10px] text-zinc-400 font-sans">reps</span>
+                                                </span>
+                                                ${isMaxWeightPR ? `
+                                                <span class="text-[9px] font-black bg-amber-500/15 border border-amber-500/40 text-amber-300 px-1.5 py-0.5 rounded-md flex items-center gap-0.5 shadow-[0_0_8px_rgba(245,158,11,0.2)]">
+                                                    <i class="fas fa-crown text-[8px]"></i> Max PR
+                                                </span>
+                                                ` : (is1RMPR ? `
+                                                <span class="text-[9px] font-black bg-violet-500/15 border border-violet-500/40 text-violet-300 px-1.5 py-0.5 rounded-md flex items-center gap-0.5 shadow-[0_0_8px_rgba(139,92,246,0.2)]">
+                                                    <i class="fas fa-bolt text-[8px]"></i> 1RM PR
+                                                </span>
+                                                ` : '')}
+                                            </div>
+                                            <div class="flex items-center gap-1.5 shrink-0">
+                                                <button onclick="startEditLog('${log.Log_ID}')" class="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700/80 text-zinc-300 hover:text-white flex items-center justify-center transition" title="Edit Set">
+                                                    <i class="fas fa-pencil-alt text-[10px] text-cyan-400"></i>
+                                                </button>
+                                                <button onclick="deleteLog('${log.Log_ID}')" class="w-8 h-8 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 flex items-center justify-center transition" title="Delete Set">
+                                                    <i class="fas fa-trash text-[10px]"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                            `;
+                        }).join('')}
+                    </div>
+                    ` : ''}
+                </div>
+                `;
+            }).join('');
+
+            dl.innerHTML = cardsHtml;
         }
 
         function renderExerciseLibrary() {
