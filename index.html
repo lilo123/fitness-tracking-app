@@ -601,7 +601,14 @@
                                 Date: normalizeDateStr(log.Date)
                             }));
                         }
-                        if (parsed.templates && Array.isArray(parsed.templates)) appData.templates = parsed.templates;
+                        if (parsed.templates && Array.isArray(parsed.templates)) {
+                            const cleanTpls = parsed.templates.filter(t => !String(t.Template_Name || "").startsWith("TPL-"));
+                            if (cleanTpls.length > 0) {
+                                appData.templates = cleanTpls;
+                            } else {
+                                appData.templates = [];
+                            }
+                        }
                     }
                 } catch (e) { console.warn("Failed to load local cache:", e); }
                 seedDefaults();
@@ -1045,7 +1052,7 @@
             if (setsToday.length > 0) {
                 const uniqueExercises = Array.from(new Set(setsToday.map(s => s.Exercise_ID).filter(Boolean)));
                 const firstWorkoutId = setsToday[0].Workout_ID;
-                if (firstWorkoutId && firstWorkoutId !== "W-Manual") {
+                if (firstWorkoutId && firstWorkoutId !== "W-Manual" && !firstWorkoutId.startsWith("TPL-")) {
                     activeWorkout.routineName = firstWorkoutId;
                     const tpl = appData.templates.find(t => t.Template_Name === firstWorkoutId);
                     if (tpl && tpl.Exercise_Sequence) {
@@ -1057,8 +1064,13 @@
                         activeWorkout.exercises = uniqueExercises;
                     }
                 } else {
-                    activeWorkout.routineName = "Free Workout";
-                    activeWorkout.exercises = uniqueExercises;
+                    activeWorkout.routineName = (appData.templates[0] && appData.templates[0].Template_Name) || "Free Workout";
+                    const tpl = appData.templates.find(t => t.Template_Name === activeWorkout.routineName);
+                    if (tpl && tpl.Exercise_Sequence) {
+                        activeWorkout.exercises = tpl.Exercise_Sequence.split(',').map(s => s.trim()).filter(Boolean);
+                    } else {
+                        activeWorkout.exercises = uniqueExercises;
+                    }
                 }
                 updateRoutineLabel();
                 initDefaultAccordionState();
@@ -1069,7 +1081,7 @@
             if (pastDates.length > 0 && appData.templates.length > 0) {
                 let lastValidRoutine = "";
                 for (const pDate of pastDates) {
-                    const setsOnDate = appData.logs.filter(l => normalizeDateStr(l.Date) === pDate && l.Workout_ID && l.Workout_ID !== "W-Manual");
+                    const setsOnDate = appData.logs.filter(l => normalizeDateStr(l.Date) === pDate && l.Workout_ID && l.Workout_ID !== "W-Manual" && !l.Workout_ID.startsWith("TPL-"));
                     if (setsOnDate.length > 0) {
                         lastValidRoutine = setsOnDate[0].Workout_ID;
                         break;
@@ -1997,7 +2009,6 @@
             const tpl = appData.templates.find(t => t.Template_Name === tplName);
             if (!tpl) return;
             editingTemplateName = tpl.Template_Name;
-            editingTemplateId = tpl.Template_ID || null;
             const nameEl = document.getElementById('new-plan-name');
             if (nameEl) nameEl.value = tpl.Template_Name;
             selectedRoutineExercises = (tpl.Exercise_Sequence || "").split(',').map(s => s.trim()).filter(Boolean);
@@ -2017,7 +2028,6 @@
 
         function cancelEditRoutine() {
             editingTemplateName = null;
-            editingTemplateId = null;
             const nameEl = document.getElementById('new-plan-name');
             if (nameEl) nameEl.value = "";
             selectedRoutineExercises = [];
@@ -2052,7 +2062,6 @@
                     id: "upd-tpl-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
                     type: "Templates",
                     action: "UPDATE_TEMPLATE",
-                    Template_ID: editingTemplateId,
                     old_Template_Name: editingTemplateName,
                     new_Template_Name: name,
                     Exercise_Sequence: exercises
