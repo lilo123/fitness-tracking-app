@@ -217,48 +217,32 @@
 
         <!-- TAB: EXERCISES (Library & Custom Builder) -->
         <div id="tab-exercises" class="tab-content hidden">
-            <div class="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5 mb-6 shadow-xl text-sm">
-                <h2 class="text-base font-black border-b border-zinc-800 pb-3 mb-4 text-white flex items-center gap-2">
+            <div id="exercise-form-card" class="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5 mb-6 shadow-xl text-sm">
+                <h2 id="exercise-form-title" class="text-base font-black border-b border-zinc-800 pb-3 mb-4 text-white flex items-center gap-2">
                     <i class="fas fa-plus-circle text-cyan-400"></i> Create Custom Exercise
                 </h2>
-                <div class="space-y-3">
+                <div class="space-y-4">
                     <div>
                         <label class="block text-xs font-bold text-zinc-400 mb-1.5 uppercase tracking-wider">Exercise Name</label>
                         <input type="text" id="new-ex-name" class="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-sm font-semibold focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none" placeholder="e.g. Incline Dumbbell Press">
                     </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-bold text-zinc-400 mb-1.5 uppercase tracking-wider">Primary Muscle</label>
-                            <select id="new-ex-cat" class="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-sm font-semibold focus:border-cyan-500 outline-none">
-                                <option value="Chest">Chest</option>
-                                <option value="Back">Back</option>
-                                <option value="Legs">Legs</option>
-                                <option value="Shoulders">Shoulders</option>
-                                <option value="Arms">Arms</option>
-                                <option value="Core">Core</option>
-                                <option value="Cardio">Cardio</option>
-                                <option value="Other">Other</option>
-                            </select>
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider">Target Muscle Groups <span class="text-zinc-500 font-normal">(Tap multiple)</span></label>
+                            <button type="button" onclick="clearExerciseCategoryTags()" class="text-xs font-bold text-zinc-500 hover:text-zinc-300 transition">Clear</button>
                         </div>
-                        <div>
-                            <label class="block text-xs font-bold text-zinc-400 mb-1.5 uppercase tracking-wider">Secondary Muscle <span class="text-zinc-500 font-normal">(Optional)</span></label>
-                            <select id="new-ex-secondary-cat" class="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-sm font-semibold focus:border-cyan-500 outline-none">
-                                <option value="">-- None --</option>
-                                <option value="Chest">Chest</option>
-                                <option value="Back">Back</option>
-                                <option value="Legs">Legs</option>
-                                <option value="Shoulders">Shoulders</option>
-                                <option value="Arms">Arms</option>
-                                <option value="Triceps">Triceps</option>
-                                <option value="Biceps">Biceps</option>
-                                <option value="Core">Core</option>
-                                <option value="Cardio">Cardio</option>
-                            </select>
+                        <div id="exercise-category-pills" class="flex flex-wrap gap-1.5 p-2 bg-zinc-950/80 border border-zinc-800/80 rounded-xl">
+                            <!-- Populated by JS -->
                         </div>
                     </div>
-                    <button onclick="addExercise()" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black py-3 rounded-xl shadow-neon-cyan active:scale-95 transition-all mt-1">
-                        Save to Library
-                    </button>
+                    <div class="flex gap-2">
+                        <button id="save-exercise-btn" onclick="saveExerciseHandler()" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black py-3 rounded-xl shadow-neon-cyan active:scale-95 transition-all">
+                            Save to Library
+                        </button>
+                        <button id="cancel-edit-exercise-btn" onclick="cancelEditExercise()" class="hidden bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold px-4 py-3 rounded-xl transition-all">
+                            Cancel
+                        </button>
+                    </div>
                 </div>
             </div>
             
@@ -808,6 +792,7 @@
                     const updateTplItems = q.filter(item => item.action === "UPDATE_TEMPLATE");
                     const delTplItems = q.filter(item => item.action === "DELETE_TEMPLATE");
                     const addExItems = q.filter(item => item.action === "ADD_EXERCISE");
+                    const updateExItems = q.filter(item => item.action === "UPDATE_EXERCISE");
                     const delExItems = q.filter(item => item.action === "DELETE_EXERCISE");
                     
                     if (batchItems.length > 0) {
@@ -881,6 +866,21 @@
                         const res = await apiCall('POST', { type: "Exercises", data: addEx.data });
                         if (res && res.success) {
                             const remaining = this.getQueue().filter(i => i.id !== addEx.id);
+                            this.saveQueue(remaining);
+                        }
+                    }
+
+                    for (const updEx of updateExItems) {
+                        const res = await apiCall('POST', {
+                            type: "Exercises",
+                            action: "UPDATE_EXERCISE",
+                            ID: updEx.ID,
+                            old_Name: updEx.old_Name,
+                            new_Name: updEx.new_Name,
+                            Category: updEx.Category
+                        });
+                        if (res && res.success) {
+                            const remaining = this.getQueue().filter(i => i.id !== updEx.id);
                             this.saveQueue(remaining);
                         }
                     }
@@ -2526,8 +2526,10 @@
         }
 
         function renderExerciseLibrary() {
+            renderExerciseCategoryPills();
             const exHtml = appData.exercises.map(ex => {
                 const escapedName = ex.Name.replace(/'/g, "\\'");
+                const escapedId = String(ex.ID || "").replace(/'/g, "\\'");
                 return `
                 <div class="flex justify-between items-center p-3.5 bg-zinc-900 border border-zinc-800/80 rounded-xl text-white shadow-sm">
                     <span class="font-bold text-sm">${ex.Name}</span>
@@ -2535,7 +2537,10 @@
                         <div class="flex flex-wrap items-center gap-1">
                             ${renderCategoryBadges(ex.Category)}
                         </div>
-                        <button onclick="deleteExercise('${escapedName}')" class="text-zinc-500 hover:text-rose-400 p-1.5 transition rounded-lg hover:bg-rose-500/10" title="Delete Exercise">
+                        <button onclick="startEditExercise('${escapedId || escapedName}')" class="text-zinc-400 hover:text-cyan-400 p-2 transition rounded-lg hover:bg-cyan-500/10 min-h-[36px] min-w-[36px] flex items-center justify-center" title="Edit Exercise">
+                            <i class="fas fa-pencil-alt text-xs"></i>
+                        </button>
+                        <button onclick="deleteExercise('${escapedName}')" class="text-zinc-500 hover:text-rose-400 p-2 transition rounded-lg hover:bg-rose-500/10 min-h-[36px] min-w-[36px] flex items-center justify-center" title="Delete Exercise">
                             <i class="fas fa-trash-alt text-xs"></i>
                         </button>
                     </div>
@@ -2953,33 +2958,164 @@
             switchTab('log');
         }
 
-        function addExercise() {
-            const nameEl = document.getElementById("new-ex-name");
-            const catEl = document.getElementById("new-ex-cat");
-            const secCatEl = document.getElementById("new-ex-secondary-cat");
-            const name = nameEl ? nameEl.value.trim() : "";
-            const primaryCat = catEl ? catEl.value : "Chest";
-            const secondaryCat = secCatEl ? secCatEl.value.trim() : "";
+        let selectedExerciseTags = new Set(["Chest"]);
+        let editingExerciseId = null;
+        let editingExerciseOldName = null;
 
-            let combinedCat = primaryCat;
-            if (secondaryCat && secondaryCat.toLowerCase() !== primaryCat.toLowerCase()) {
-                combinedCat = `${primaryCat} / ${secondaryCat}`;
+        function toggleExerciseCategoryTag(tag) {
+            if (selectedExerciseTags.has(tag)) {
+                if (selectedExerciseTags.size > 1) {
+                    selectedExerciseTags.delete(tag);
+                }
+            } else {
+                selectedExerciseTags.add(tag);
+            }
+            renderExerciseCategoryPills();
+        }
+
+        function clearExerciseCategoryTags() {
+            selectedExerciseTags.clear();
+            selectedExerciseTags.add("Other");
+            renderExerciseCategoryPills();
+        }
+
+        function renderExerciseCategoryPills() {
+            const container = document.getElementById('exercise-category-pills');
+            if (!container) return;
+            const tags = ["Chest", "Back", "Legs", "Shoulders", "Arms", "Triceps", "Biceps", "Core", "Cardio", "Glutes", "Forearms", "Other"];
+            container.innerHTML = tags.map(tag => {
+                const isSelected = selectedExerciseTags.has(tag);
+                const pillClass = isSelected
+                    ? "bg-cyan-500/20 border-cyan-500 text-cyan-300 font-extrabold shadow-[0_0_10px_rgba(6,182,212,0.25)]"
+                    : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700";
+                return `
+                    <button type="button" onclick="toggleExerciseCategoryTag('${tag}')" class="px-3 py-1.5 rounded-xl border text-xs cursor-pointer transition-all flex items-center gap-1.5 active:scale-95 ${pillClass}">
+                        ${isSelected ? '<i class="fas fa-check text-cyan-400 text-[10px]"></i>' : ''}
+                        <span>${tag}</span>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        function startEditExercise(idOrName) {
+            const ex = appData.exercises.find(e => String(e.ID) === String(idOrName) || e.Name === idOrName);
+            if (!ex) return;
+            editingExerciseId = ex.ID;
+            editingExerciseOldName = ex.Name;
+
+            const nameEl = document.getElementById("new-ex-name");
+            if (nameEl) nameEl.value = ex.Name;
+
+            selectedExerciseTags.clear();
+            const existingTags = tokenizeCategories(ex.Category);
+            existingTags.forEach(t => selectedExerciseTags.add(t));
+            if (selectedExerciseTags.size === 0) selectedExerciseTags.add("Other");
+            renderExerciseCategoryPills();
+
+            const titleEl = document.getElementById("exercise-form-title");
+            if (titleEl) titleEl.innerHTML = `<i class="fas fa-pencil-alt text-cyan-400"></i> Edit Exercise`;
+
+            const saveBtn = document.getElementById("save-exercise-btn");
+            if (saveBtn) {
+                saveBtn.innerHTML = `<i class="fas fa-check mr-1.5"></i> Update Exercise`;
+                saveBtn.className = "w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black py-3 rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.25)] active:scale-95 transition-all";
             }
 
+            const cancelBtn = document.getElementById("cancel-edit-exercise-btn");
+            if (cancelBtn) cancelBtn.classList.remove("hidden");
+
+            const formCard = document.getElementById("exercise-form-card");
+            if (formCard) formCard.scrollIntoView({ behavior: "smooth" });
+        }
+
+        function cancelEditExercise() {
+            editingExerciseId = null;
+            editingExerciseOldName = null;
+
+            const nameEl = document.getElementById("new-ex-name");
+            if (nameEl) nameEl.value = "";
+
+            selectedExerciseTags.clear();
+            selectedExerciseTags.add("Chest");
+            renderExerciseCategoryPills();
+
+            const titleEl = document.getElementById("exercise-form-title");
+            if (titleEl) titleEl.innerHTML = `<i class="fas fa-plus-circle text-cyan-400"></i> Create Custom Exercise`;
+
+            const saveBtn = document.getElementById("save-exercise-btn");
+            if (saveBtn) {
+                saveBtn.innerHTML = `Save to Library`;
+                saveBtn.className = "w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black py-3 rounded-xl shadow-neon-cyan active:scale-95 transition-all";
+            }
+
+            const cancelBtn = document.getElementById("cancel-edit-exercise-btn");
+            if (cancelBtn) cancelBtn.classList.add("hidden");
+        }
+
+        function saveExerciseHandler() {
+            const nameEl = document.getElementById("new-ex-name");
+            const name = nameEl ? nameEl.value.trim() : "";
             if (!name) return alert("Please provide an exercise name.");
 
+            const tagList = Array.from(selectedExerciseTags);
+            const categoryStr = tagList.length > 0 ? tagList.join(" / ") : "Other";
+
+            if (editingExerciseId) {
+                const ex = appData.exercises.find(e => String(e.ID) === String(editingExerciseId));
+                const oldName = editingExerciseOldName || (ex ? ex.Name : name);
+                if (ex) {
+                    ex.Name = name;
+                    ex.Category = categoryStr;
+                }
+
+                // Referential cascading updates across templates and logs
+                if (oldName !== name) {
+                    appData.templates.forEach(tpl => {
+                        if (tpl.Exercise_Sequence) {
+                            const seq = tpl.Exercise_Sequence.split(',').map(s => s.trim());
+                            const updatedSeq = seq.map(s => s === oldName ? name : s);
+                            tpl.Exercise_Sequence = updatedSeq.join(', ');
+                        }
+                    });
+                    appData.logs.forEach(l => {
+                        if (l.Exercise_ID === oldName) {
+                            l.Exercise_ID = name;
+                        }
+                    });
+                    if (activeWorkout.exercises) {
+                        activeWorkout.exercises = activeWorkout.exercises.map(e => e === oldName ? name : e);
+                    }
+                }
+
+                StateManager.saveCache();
+                cancelEditExercise();
+                renderAll();
+                alert(`Updated "${name}" (${categoryStr})!`);
+
+                Outbox.enqueue({
+                    id: "upd-ex-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+                    type: "Exercises",
+                    action: "UPDATE_EXERCISE",
+                    ID: editingExerciseId,
+                    old_Name: oldName,
+                    new_Name: name,
+                    Category: categoryStr
+                });
+                return;
+            }
+
+            // Create New Exercise
             const newEx = {
                 ID: 'EX-' + Date.now(),
                 Name: name,
-                Category: combinedCat
+                Category: categoryStr
             };
 
             appData.exercises.push(newEx);
             StateManager.saveCache();
-            if (nameEl) nameEl.value = "";
-            if (secCatEl) secCatEl.value = "";
+            cancelEditExercise();
             renderAll();
-            alert(`Added "${name}" (${combinedCat}) to your library!`);
+            alert(`Added "${name}" (${categoryStr}) to your library!`);
 
             Outbox.enqueue({
                 id: newEx.ID,

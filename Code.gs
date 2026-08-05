@@ -301,6 +301,35 @@ function doPost(e) {
       return createJsonResponse({ success: true, message: "Template assigned to " + targetAthlete });
     }
 
+    // Handle UPDATE_EXERCISE action
+    if (body.action === "UPDATE_EXERCISE") {
+      var targetId = body.ID || (body.data && body.data.ID);
+      var oldName = (body.old_Name || body.Name || (body.data && (body.data.old_Name || body.data.Name)) || "").trim().toLowerCase();
+      var newName = body.new_Name || body.Name || (body.data && (body.data.new_Name || body.data.Name));
+      var newCategory = body.Category || (body.data && body.data.Category) || "Other";
+      
+      var data = sheet.getDataRange().getValues();
+      var idIndex = headers.indexOf("ID");
+      var nameIndex = headers.indexOf("Name");
+      var catIndex = headers.indexOf("Category");
+      if (idIndex === -1) idIndex = 0;
+      if (nameIndex === -1) nameIndex = 1;
+      if (catIndex === -1) catIndex = 2;
+      
+      for (var r = 1; r < data.length; r++) {
+        var rowId = idIndex !== -1 ? String(data[r][idIndex]).trim() : "";
+        var rowName = nameIndex !== -1 ? String(data[r][nameIndex]).trim().toLowerCase() : "";
+        if ((targetId && rowId === String(targetId).trim()) || (oldName && rowName === oldName)) {
+          var updatedRow = data[r].slice(0, headers.length);
+          if (nameIndex !== -1 && newName) updatedRow[nameIndex] = newName;
+          if (catIndex !== -1 && newCategory) updatedRow[catIndex] = newCategory;
+          sheet.getRange(r + 1, 1, 1, headers.length).setValues([updatedRow]);
+          return createJsonResponse({ success: true, message: "Exercise updated successfully!" });
+        }
+      }
+      return createJsonResponse({ success: false, error: "Exercise not found" });
+    }
+
     // Handle DELETE_EXERCISE action
     if (body.action === "DELETE_EXERCISE") {
       var targetName = body.Name || (body.data && body.data.Name);
