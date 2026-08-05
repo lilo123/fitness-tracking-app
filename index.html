@@ -226,18 +226,35 @@
                         <label class="block text-xs font-bold text-zinc-400 mb-1.5 uppercase tracking-wider">Exercise Name</label>
                         <input type="text" id="new-ex-name" class="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-sm font-semibold focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none" placeholder="e.g. Incline Dumbbell Press">
                     </div>
-                    <div>
-                        <label class="block text-xs font-bold text-zinc-400 mb-1.5 uppercase tracking-wider">Target Muscle Category</label>
-                        <select id="new-ex-cat" class="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-sm font-semibold focus:border-cyan-500 outline-none">
-                            <option value="Chest">Chest</option>
-                            <option value="Back">Back</option>
-                            <option value="Legs">Legs</option>
-                            <option value="Shoulders">Shoulders</option>
-                            <option value="Arms">Arms</option>
-                            <option value="Core">Core</option>
-                            <option value="Cardio">Cardio</option>
-                            <option value="Other">Other</option>
-                        </select>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-zinc-400 mb-1.5 uppercase tracking-wider">Primary Muscle</label>
+                            <select id="new-ex-cat" class="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-sm font-semibold focus:border-cyan-500 outline-none">
+                                <option value="Chest">Chest</option>
+                                <option value="Back">Back</option>
+                                <option value="Legs">Legs</option>
+                                <option value="Shoulders">Shoulders</option>
+                                <option value="Arms">Arms</option>
+                                <option value="Core">Core</option>
+                                <option value="Cardio">Cardio</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-zinc-400 mb-1.5 uppercase tracking-wider">Secondary Muscle <span class="text-zinc-500 font-normal">(Optional)</span></label>
+                            <select id="new-ex-secondary-cat" class="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-sm font-semibold focus:border-cyan-500 outline-none">
+                                <option value="">-- None --</option>
+                                <option value="Chest">Chest</option>
+                                <option value="Back">Back</option>
+                                <option value="Legs">Legs</option>
+                                <option value="Shoulders">Shoulders</option>
+                                <option value="Arms">Arms</option>
+                                <option value="Triceps">Triceps</option>
+                                <option value="Biceps">Biceps</option>
+                                <option value="Core">Core</option>
+                                <option value="Cardio">Cardio</option>
+                            </select>
+                        </div>
                     </div>
                     <button onclick="addExercise()" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black py-3 rounded-xl shadow-neon-cyan active:scale-95 transition-all mt-1">
                         Save to Library
@@ -262,6 +279,32 @@
                 <div class="mb-3.5">
                     <label class="block text-xs font-bold text-zinc-400 mb-1.5 uppercase tracking-wider">Routine Name</label>
                     <input type="text" id="new-plan-name" class="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-sm font-semibold focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none" placeholder="e.g. Pull Day A">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-zinc-400 mb-1.5 uppercase tracking-wider">Assign Schedule to Days <span class="text-zinc-500 font-normal">(Auto-loads on these days)</span></label>
+                    <div id="routine-day-pills" class="grid grid-cols-7 gap-1 sm:gap-1.5 select-none">
+                        <button type="button" onclick="toggleRoutineDayOfWeek('Mon')" id="btn-day-Mon" class="min-h-[40px] py-2 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center bg-zinc-950 border border-zinc-800 text-zinc-400 hover:text-white">
+                            <span>Mon</span>
+                        </button>
+                        <button type="button" onclick="toggleRoutineDayOfWeek('Tue')" id="btn-day-Tue" class="min-h-[40px] py-2 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center bg-zinc-950 border border-zinc-800 text-zinc-400 hover:text-white">
+                            <span>Tue</span>
+                        </button>
+                        <button type="button" onclick="toggleRoutineDayOfWeek('Wed')" id="btn-day-Wed" class="min-h-[40px] py-2 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center bg-zinc-950 border border-zinc-800 text-zinc-400 hover:text-white">
+                            <span>Wed</span>
+                        </button>
+                        <button type="button" onclick="toggleRoutineDayOfWeek('Thu')" id="btn-day-Thu" class="min-h-[40px] py-2 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center bg-zinc-950 border border-zinc-800 text-zinc-400 hover:text-white">
+                            <span>Thu</span>
+                        </button>
+                        <button type="button" onclick="toggleRoutineDayOfWeek('Fri')" id="btn-day-Fri" class="min-h-[40px] py-2 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center bg-zinc-950 border border-zinc-800 text-zinc-400 hover:text-white">
+                            <span>Fri</span>
+                        </button>
+                        <button type="button" onclick="toggleRoutineDayOfWeek('Sat')" id="btn-day-Sat" class="min-h-[40px] py-2 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center bg-zinc-950 border border-zinc-800 text-zinc-400 hover:text-white">
+                            <span>Sat</span>
+                        </button>
+                        <button type="button" onclick="toggleRoutineDayOfWeek('Sun')" id="btn-day-Sun" class="min-h-[40px] py-2 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center bg-zinc-950 border border-zinc-800 text-zinc-400 hover:text-white">
+                            <span>Sun</span>
+                        </button>
+                    </div>
                 </div>
                 <div class="mb-4">
                     <div class="flex items-center justify-between mb-2">
@@ -575,6 +618,50 @@
             return prefix + dateStr;
         }
 
+        const MUSCLE_TAXONOMY = {
+            "Chest": ["chest", "pecs", "pectoral", "upper chest", "lower chest"],
+            "Back": ["back", "lats", "latissimus", "traps", "rhomboids", "lower back", "erectors", "upper back"],
+            "Arms": ["arms", "biceps", "triceps", "forearms", "bicep", "tricep", "forearm", "brachialis"],
+            "Shoulders": ["shoulders", "delts", "deltoids", "front delt", "side delt", "rear delt", "rotator cuff"],
+            "Legs": ["legs", "quads", "quadriceps", "hamstrings", "glutes", "calves", "adductors", "abductors", "hamstring", "calf"],
+            "Core": ["core", "abs", "abdominals", "obliques", "serratus"],
+            "Cardio": ["cardio", "hiit", "aerobic", "running", "rowing", "cycling"]
+        };
+
+        function tokenizeCategories(categoryStr) {
+            if (!categoryStr) return ["Other"];
+            const rawTokens = String(categoryStr).split(/[\/\\,&+;|]|\band\b/i);
+            const tokens = rawTokens.map(t => t.trim()).filter(Boolean);
+            return tokens.length > 0 ? tokens : ["Other"];
+        }
+
+        function exerciseMatchesCategory(exerciseCategory, filterCategory) {
+            if (!filterCategory || filterCategory === "All") return true;
+            const filterNorm = filterCategory.trim().toLowerCase();
+            const tokens = tokenizeCategories(exerciseCategory).map(t => t.toLowerCase());
+
+            if (tokens.includes(filterNorm)) return true;
+
+            const subGroups = MUSCLE_TAXONOMY[filterCategory] || [];
+            if (tokens.some(token => subGroups.includes(token))) return true;
+
+            for (const [parentGroup, aliases] of Object.entries(MUSCLE_TAXONOMY)) {
+                if (tokens.includes(parentGroup.toLowerCase()) && aliases.includes(filterNorm)) {
+                    return true;
+                }
+            }
+            return tokens.some(t => t.includes(filterNorm) || filterNorm.includes(t));
+        }
+
+        function renderCategoryBadges(categoryStr) {
+            const tokens = tokenizeCategories(categoryStr);
+            return tokens.map(tag => `
+                <span class="text-[11px] bg-zinc-800/90 border border-zinc-700/70 text-cyan-300 font-bold px-2.5 py-0.5 rounded-full">
+                    ${tag}
+                </span>
+            `).join(' ');
+        }
+
         const DEFAULT_EXERCISES = [
             { ID: "EX-VT1", Name: "Incline Bench Press", Category: "Chest" },
             { ID: "EX-VT2", Name: "Cable Lateral Raises", Category: "Shoulders" },
@@ -593,11 +680,15 @@
         const DEFAULT_TEMPLATES = [
             {
                 Template_Name: "Workout A (Push, Quads & Core)",
-                Exercise_Sequence: "Incline Bench Press, Cable Lateral Raises, Dips, Leg Extension Machine, Overhead Tricep Cable Pull, Leg Raise"
+                Exercise_Sequence: "Incline Bench Press, Cable Lateral Raises, Dips, Leg Extension Machine, Overhead Tricep Cable Pull, Leg Raise",
+                Target_Sets: "4, 3, 3, 3, 3, 3",
+                Day_Of_Week: "Monday, Thursday"
             },
             {
                 Template_Name: "Workout B (Pull, Hamstrings & Core)",
-                Exercise_Sequence: "Lat Pull Down, Seated Cable Row, Inclined Bicep Curl, Leg Curl, Face Pulls, Weighted Sit-Up"
+                Exercise_Sequence: "Lat Pull Down, Seated Cable Row, Inclined Bicep Curl, Leg Curl, Face Pulls, Weighted Sit-Up",
+                Target_Sets: "4, 3, 3, 3, 3, 3",
+                Day_Of_Week: "Tuesday, Friday"
             }
         ];
 
@@ -763,6 +854,8 @@
                             old_Template_Name: upd.old_Template_Name,
                             new_Template_Name: upd.new_Template_Name,
                             Exercise_Sequence: upd.Exercise_Sequence,
+                            Target_Sets: upd.Target_Sets,
+                            Day_Of_Week: upd.Day_Of_Week,
                             athlete: AppContext.activeAthlete
                         });
                         if (res && res.success) {
@@ -895,6 +988,32 @@
             });
         }
 
+        function parseTemplateTargetSets(tpl) {
+            if (!tpl || !tpl.Exercise_Sequence) return {};
+            const exercises = String(tpl.Exercise_Sequence).split(',').map(s => s.trim()).filter(Boolean);
+            const setTokens = tpl.Target_Sets ? String(tpl.Target_Sets).split(',').map(s => s.trim()) : [];
+            const map = {};
+            exercises.forEach((exName, idx) => {
+                const parsed = parseInt(setTokens[idx], 10);
+                map[exName] = (!isNaN(parsed) && parsed >= 1 && parsed <= 10) ? parsed : 3;
+            });
+            return map;
+        }
+
+        function parseTemplateDays(tpl) {
+            if (!tpl || !tpl.Day_Of_Week) return [];
+            return String(tpl.Day_Of_Week).split(',').map(s => s.trim()).filter(Boolean);
+        }
+
+        function getDayOfWeek(dateStr) {
+            if (!dateStr) return "";
+            const parts = normalizeDateStr(dateStr).split('-').map(Number);
+            if (parts.length !== 3) return "";
+            const dt = new Date(parts[0], parts[1] - 1, parts[2]); // Explicit local component Date
+            const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+            return weekdays[dt.getDay()];
+        }
+
         function getTargetSetCount(exName, dateVal) {
             if (activeWorkout.targetSets && activeWorkout.targetSets[exName] !== undefined) {
                 return activeWorkout.targetSets[exName];
@@ -974,12 +1093,17 @@
             const dateInput = document.getElementById('log-date');
             const dateVal = normalizeDateStr(dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString());
 
+            if (activeWorkout.routineName === "Rest Day") {
+                activeWorkout.routineName = "Custom Workout";
+                updateRoutineLabel();
+            }
+
             const existingSets = appData.logs.filter(l => normalizeDateStr(l.Date) === dateVal && l.Exercise_ID === exName);
             const setIdx = existingSets.length + 1;
 
             const newLog = {
                 Log_ID: Date.now(),
-                Workout_ID: activeWorkout.routineName || "W-Manual",
+                Workout_ID: activeWorkout.routineName || "Custom Workout",
                 Date: dateVal,
                 Exercise_ID: exName,
                 Set_Index: setIdx,
@@ -1087,7 +1211,7 @@
             renderActiveWorkout();
         }
 
-        // --- 4. Smart Rotation Auto-Scheduler (Zero-Click Landing View) ---
+        // --- 4. Smart Rotation & Weekly Day-of-Week Scheduler ---
         function autoSelectNextRoutine() {
             const dateInput = document.getElementById('log-date');
             const todayStr = normalizeDateStr(dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString());
@@ -1097,7 +1221,7 @@
             if (setsToday.length > 0) {
                 const uniqueExercises = Array.from(new Set(setsToday.map(s => s.Exercise_ID).filter(Boolean)));
                 const firstWorkoutId = setsToday[0].Workout_ID;
-                if (firstWorkoutId && firstWorkoutId !== "W-Manual" && !firstWorkoutId.startsWith("TPL-")) {
+                if (firstWorkoutId && firstWorkoutId !== "W-Manual" && !firstWorkoutId.startsWith("TPL-") && firstWorkoutId !== "Rest Day") {
                     activeWorkout.routineName = firstWorkoutId;
                     const tpl = appData.templates.find(t => t.Template_Name === firstWorkoutId);
                     if (tpl && tpl.Exercise_Sequence) {
@@ -1105,53 +1229,51 @@
                         const combined = [...tplEx];
                         uniqueExercises.forEach(e => { if (!combined.includes(e)) combined.push(e); });
                         activeWorkout.exercises = combined;
+                        activeWorkout.targetSets = parseTemplateTargetSets(tpl);
                     } else {
                         activeWorkout.exercises = uniqueExercises;
                     }
                 } else {
-                    activeWorkout.routineName = (appData.templates[0] && appData.templates[0].Template_Name) || "Free Workout";
-                    const tpl = appData.templates.find(t => t.Template_Name === activeWorkout.routineName);
-                    if (tpl && tpl.Exercise_Sequence) {
-                        activeWorkout.exercises = tpl.Exercise_Sequence.split(',').map(s => s.trim()).filter(Boolean);
-                    } else {
-                        activeWorkout.exercises = uniqueExercises;
-                    }
+                    activeWorkout.routineName = "Custom Workout";
+                    activeWorkout.exercises = uniqueExercises;
                 }
                 updateRoutineLabel();
                 initDefaultAccordionState();
                 return;
             }
 
-            const pastDates = Array.from(new Set(appData.logs.filter(l => normalizeDateStr(l.Date) < todayStr).map(l => normalizeDateStr(l.Date)))).sort((a,b) => b.localeCompare(a));
-            if (pastDates.length > 0 && appData.templates.length > 0) {
-                let lastValidRoutine = "";
-                for (const pDate of pastDates) {
-                    const setsOnDate = appData.logs.filter(l => normalizeDateStr(l.Date) === pDate && l.Workout_ID && l.Workout_ID !== "W-Manual" && !l.Workout_ID.startsWith("TPL-"));
-                    if (setsOnDate.length > 0) {
-                        lastValidRoutine = setsOnDate[0].Workout_ID;
-                        break;
-                    }
-                }
-                let nextIdx = 0;
-                const idx = appData.templates.findIndex(t => t.Template_Name === lastValidRoutine);
-                if (idx !== -1) {
-                    nextIdx = (idx + 1) % appData.templates.length;
-                }
-                const nextTpl = appData.templates[nextIdx];
-                if (nextTpl && nextTpl.Exercise_Sequence) {
-                    activeWorkout.routineName = nextTpl.Template_Name;
-                    activeWorkout.exercises = nextTpl.Exercise_Sequence.split(',').map(s => s.trim()).filter(Boolean);
+            // Check if any template is scheduled for this day of the week
+            const dayName = getDayOfWeek(todayStr); // e.g. "Tuesday"
+            const shortDay = dayName.slice(0, 3);   // e.g. "Tue"
+            
+            const scheduledTpl = appData.templates.find(t => {
+                if (!t.Day_Of_Week) return false;
+                const days = parseTemplateDays(t);
+                return days.some(d => d.toLowerCase().startsWith(shortDay.toLowerCase()) || d.toLowerCase() === dayName.toLowerCase());
+            });
+
+            if (scheduledTpl) {
+                activeWorkout.routineName = scheduledTpl.Template_Name;
+                activeWorkout.exercises = (scheduledTpl.Exercise_Sequence || "").split(',').map(s => s.trim()).filter(Boolean);
+                activeWorkout.targetSets = parseTemplateTargetSets(scheduledTpl);
+            } else {
+                // Check if any templates have schedules configured
+                const hasAnySchedules = appData.templates.some(t => t.Day_Of_Week && parseTemplateDays(t).length > 0);
+                if (hasAnySchedules) {
+                    activeWorkout.routineName = "Rest Day";
+                    activeWorkout.exercises = [];
+                    activeWorkout.targetSets = {};
+                } else if (appData.templates.length > 0) {
+                    // Fallback to first template if user hasn't set up weekly schedule yet
+                    const firstTpl = appData.templates[0];
+                    activeWorkout.routineName = firstTpl.Template_Name;
+                    activeWorkout.exercises = (firstTpl.Exercise_Sequence || "").split(',').map(s => s.trim()).filter(Boolean);
+                    activeWorkout.targetSets = parseTemplateTargetSets(firstTpl);
                 } else {
                     activeWorkout.routineName = "Free Workout";
                     activeWorkout.exercises = [];
+                    activeWorkout.targetSets = {};
                 }
-            } else if (appData.templates.length > 0) {
-                const firstTpl = appData.templates[0];
-                activeWorkout.routineName = firstTpl.Template_Name;
-                activeWorkout.exercises = (firstTpl.Exercise_Sequence || "").split(',').map(s => s.trim()).filter(Boolean);
-            } else {
-                activeWorkout.routineName = "Free Workout";
-                activeWorkout.exercises = [];
             }
 
             updateRoutineLabel();
@@ -1160,7 +1282,13 @@
 
         function updateRoutineLabel() {
             const lbl = document.getElementById('active-routine-label');
-            if (lbl) lbl.textContent = activeWorkout.routineName || "Free Workout";
+            if (lbl) {
+                if (activeWorkout.routineName === "Rest Day") {
+                    lbl.innerHTML = `<i class="fas fa-bed text-indigo-400 mr-1"></i> Rest Day`;
+                } else {
+                    lbl.textContent = activeWorkout.routineName || "Free Workout";
+                }
+            }
         }
 
         function openRoutineModal() {
@@ -1177,12 +1305,15 @@
 
             appData.templates.forEach(tpl => {
                 const isSelected = (activeWorkout.routineName === tpl.Template_Name);
+                const days = parseTemplateDays(tpl);
+                const dayBadges = days.map(d => `<span class="bg-violet-500/20 text-violet-300 font-bold px-1.5 py-0.5 rounded text-[10px] mr-1">${d}</span>`).join('');
                 html += `
                     <button onclick="selectRoutineOption('${tpl.Template_Name.replace(/'/g, "\\'")}')" class="w-full text-left p-3.5 rounded-xl hover:bg-zinc-800 border border-zinc-800/80 font-black text-white transition">
                         <div class="flex items-center justify-between">
                             <span>${tpl.Template_Name}</span>
                             ${isSelected ? '<i class="fas fa-check text-cyan-400"></i>' : ''}
                         </div>
+                        ${dayBadges ? `<div class="mt-1">${dayBadges}</div>` : ''}
                         <div class="text-[11px] font-normal text-zinc-400 mt-1 truncate">${tpl.Exercise_Sequence}</div>
                     </button>
                 `;
@@ -1202,15 +1333,14 @@
             activeWorkout.routineName = name;
             updateRoutineLabel();
 
-            if (name === "Free Workout") {
+            if (name === "Free Workout" || name === "Rest Day") {
                 activeWorkout.exercises = [];
+                activeWorkout.targetSets = {};
             } else {
                 const tpl = appData.templates.find(t => t.Template_Name === name);
                 if (tpl && tpl.Exercise_Sequence) {
-                    const tplEx = tpl.Exercise_Sequence.split(',').map(s => s.trim()).filter(Boolean);
-                    tplEx.forEach(e => {
-                        if (!activeWorkout.exercises.includes(e)) activeWorkout.exercises.push(e);
-                    });
+                    activeWorkout.exercises = tpl.Exercise_Sequence.split(',').map(s => s.trim()).filter(Boolean);
+                    activeWorkout.targetSets = parseTemplateTargetSets(tpl);
                 }
             }
             drafts = {};
@@ -1374,7 +1504,7 @@
             drafts = {};
             const dateInput = document.getElementById('log-date');
             activeWorkout.date = normalizeDateStr(dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString());
-            initDefaultAccordionState();
+            autoSelectNextRoutine();
             renderActiveWorkout();
         }
 
@@ -1405,13 +1535,34 @@
             const dateVal = normalizeDateStr(dateInput ? (dateInput.value || getLocalDateString()) : getLocalDateString());
 
             if (!activeWorkout.exercises || activeWorkout.exercises.length === 0) {
-                container.innerHTML = `
-                    <div class="bg-zinc-900/90 rounded-2xl shadow-xl p-8 text-center border border-dashed border-zinc-800 text-white">
-                        <i class="fas fa-dumbbell text-zinc-600 text-4xl mb-3"></i>
-                        <p class="text-white font-bold text-base mb-1">No exercises in today's workout yet</p>
-                        <p class="text-xs text-zinc-400">Select a Routine above or pick an exercise below to start logging!</p>
-                    </div>
-                `;
+                if (activeWorkout.routineName === "Rest Day") {
+                    container.innerHTML = `
+                        <div class="bg-gradient-to-br from-indigo-950/40 via-zinc-900/90 to-zinc-950 border border-indigo-500/30 rounded-3xl p-8 text-center text-white shadow-2xl my-2">
+                            <div class="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center mx-auto mb-4 text-indigo-400 text-2xl shadow-[0_0_20px_rgba(99,102,241,0.25)]">
+                                <i class="fas fa-bed"></i>
+                            </div>
+                            <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-bold uppercase tracking-wider mb-2.5">
+                                <i class="far fa-calendar-check text-[10px]"></i> Scheduled Rest Day
+                            </div>
+                            <h3 class="text-lg font-black text-white mb-1.5">Time to Rest & Recover</h3>
+                            <p class="text-xs text-zinc-400 max-w-sm mx-auto mb-6 leading-relaxed">Rest days are essential for muscle hypertrophy and central nervous system recovery. Take a walk, stretch, or select a routine if you'd like to train today.</p>
+                            <div class="flex flex-col sm:flex-row items-center justify-center gap-2.5 max-w-xs mx-auto">
+                                <button onclick="openRoutineModal()" class="w-full bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-400 hover:to-indigo-500 text-white font-black py-3 px-4 rounded-xl text-xs uppercase tracking-wider shadow-[0_0_15px_rgba(139,92,246,0.25)] active:scale-95 transition flex items-center justify-center gap-1.5 min-h-[44px]">
+                                    <i class="fas fa-dumbbell"></i>
+                                    <span>Choose Routine</span>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = `
+                        <div class="bg-zinc-900/90 rounded-2xl shadow-xl p-8 text-center border border-dashed border-zinc-800 text-white">
+                            <i class="fas fa-dumbbell text-zinc-600 text-4xl mb-3"></i>
+                            <p class="text-white font-bold text-base mb-1">No exercises in today's workout yet</p>
+                            <p class="text-xs text-zinc-400">Select a Routine above or pick an exercise below to start logging!</p>
+                        </div>
+                    `;
+                }
                 return;
             }
 
@@ -2169,7 +2320,7 @@
             const catFilter = HistoryView.categoryFilter;
 
             const filtered = allSummaries.filter(item => {
-                const matchesCat = catFilter === "All" || item.category === catFilter;
+                const matchesCat = exerciseMatchesCategory(item.category, catFilter);
                 const matchesSearch = !filterQuery || item.name.toLowerCase().includes(filterQuery);
                 return matchesCat && matchesSearch;
             });
@@ -2223,9 +2374,9 @@
                                 <i class="fas fa-chevron-right transition-transform duration-300 text-xs shrink-0 ${isExpanded ? 'rotate-90 text-cyan-400' : 'text-zinc-500'}"></i>
                                 <span class="font-black text-white text-base truncate">${item.name}</span>
                             </div>
-                            <span class="shrink-0 text-[11px] bg-zinc-800/90 border border-zinc-700/70 text-cyan-300 font-bold px-2.5 py-0.5 rounded-full">
-                                ${item.category}
-                            </span>
+                            <div class="shrink-0 flex flex-wrap items-center gap-1">
+                                ${renderCategoryBadges(item.category)}
+                            </div>
                         </div>
 
                         <!-- Milestone Monospace Strip -->
@@ -2381,7 +2532,9 @@
                 <div class="flex justify-between items-center p-3.5 bg-zinc-900 border border-zinc-800/80 rounded-xl text-white shadow-sm">
                     <span class="font-bold text-sm">${ex.Name}</span>
                     <div class="flex items-center gap-2">
-                        <span class="text-xs bg-zinc-800 border border-zinc-700/60 text-zinc-400 px-2.5 py-1 rounded-lg font-medium">${ex.Category}</span>
+                        <div class="flex flex-wrap items-center gap-1">
+                            ${renderCategoryBadges(ex.Category)}
+                        </div>
                         <button onclick="deleteExercise('${escapedName}')" class="text-zinc-500 hover:text-rose-400 p-1.5 transition rounded-lg hover:bg-rose-500/10" title="Delete Exercise">
                             <i class="fas fa-trash-alt text-xs"></i>
                         </button>
@@ -2397,9 +2550,33 @@
 
         // --- 9. Routine Builder Pill Picker & Saved Routines Smart Accordions ---
         const routineExpandedIds = new Set();
-        let selectedRoutineExercises = [];
+        let selectedRoutineExercises = []; // Array of { name: string, targetSets: number }
+        let selectedRoutineDays = new Set(); // Set of "Mon", "Tue", etc.
         let editingTemplateName = null;
         let editingTemplateId = null;
+
+        function toggleRoutineDayOfWeek(day) {
+            if (selectedRoutineDays.has(day)) {
+                selectedRoutineDays.delete(day);
+            } else {
+                selectedRoutineDays.add(day);
+            }
+            renderRoutineDayPills();
+        }
+
+        function renderRoutineDayPills() {
+            const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+            days.forEach(day => {
+                const btn = document.getElementById(`btn-day-${day}`);
+                if (!btn) return;
+                const isSelected = selectedRoutineDays.has(day);
+                if (isSelected) {
+                    btn.className = "min-h-[40px] py-2 rounded-xl text-xs font-black transition-all flex flex-col items-center justify-center bg-violet-600 border border-violet-400 text-white shadow-[0_0_12px_rgba(139,92,246,0.5)] active:scale-95";
+                } else {
+                    btn.className = "min-h-[40px] py-2 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center bg-zinc-950 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 active:scale-95";
+                }
+            });
+        }
 
         function toggleRoutineAccordion(tplName) {
             if (routineExpandedIds.has(tplName)) {
@@ -2411,12 +2588,20 @@
         }
 
         function toggleRoutineExercise(exName) {
-            const idx = selectedRoutineExercises.indexOf(exName);
+            const idx = selectedRoutineExercises.findIndex(item => item.name === exName);
             if (idx !== -1) {
                 selectedRoutineExercises.splice(idx, 1);
             } else {
-                selectedRoutineExercises.push(exName);
+                selectedRoutineExercises.push({ name: exName, targetSets: 3 });
             }
+            renderRoutinePillPicker();
+        }
+
+        function changeRoutineExerciseTargetSets(idx, delta) {
+            if (idx < 0 || idx >= selectedRoutineExercises.length) return;
+            const current = selectedRoutineExercises[idx].targetSets || 3;
+            const next = Math.max(1, Math.min(10, current + delta));
+            selectedRoutineExercises[idx].targetSets = next;
             renderRoutinePillPicker();
         }
 
@@ -2452,7 +2637,7 @@
             }
 
             if (filterContainer) {
-                const categories = ["All", ...Array.from(new Set(appData.exercises.map(e => e.Category || "Other")))];
+                const categories = ["All", "Chest", "Back", "Legs", "Shoulders", "Arms", "Core", "Cardio", "Other"];
                 filterContainer.innerHTML = categories.map(cat => {
                     const isCurrent = routineFilterCategory === cat;
                     const btnClass = isCurrent
@@ -2466,10 +2651,10 @@
                 }).join('');
             }
 
-            const filteredExercises = appData.exercises.filter(ex => routineFilterCategory === "All" || (ex.Category || "Other") === routineFilterCategory);
+            const filteredExercises = appData.exercises.filter(ex => exerciseMatchesCategory(ex.Category || "Other", routineFilterCategory));
 
             container.innerHTML = filteredExercises.map(ex => {
-                const isSelected = selectedRoutineExercises.includes(ex.Name);
+                const isSelected = selectedRoutineExercises.some(item => item.name === ex.Name);
                 const escapedName = ex.Name.replace(/'/g, "\\'");
                 const pillClass = isSelected
                     ? "bg-cyan-500/15 border-cyan-500/60 text-cyan-300 font-bold shadow-[0_0_10px_rgba(6,182,212,0.2)]"
@@ -2486,20 +2671,44 @@
                 if (selectedRoutineExercises.length === 0) {
                     summaryContainer.innerHTML = `<span class="italic text-zinc-500">No exercises selected yet</span>`;
                 } else {
-                    summaryContainer.innerHTML = selectedRoutineExercises.map((exName, idx) => {
-                        const escapedName = exName.replace(/'/g, "\\'");
-                        return `
-                        <span class="inline-flex items-center gap-1.5 bg-zinc-900 border border-cyan-500/30 text-white text-xs px-2.5 py-1.5 rounded-lg font-semibold shadow-xs">
-                            <span class="text-cyan-400 font-bold">${idx + 1}.</span> 
-                            <span>${exName}</span>
-                            <span class="flex items-center gap-1 ml-1 border-l border-zinc-700/80 pl-1.5">
-                                ${idx > 0 ? `<button type="button" onclick="event.stopPropagation(); moveRoutineExercise(${idx}, -1)" class="w-5 h-5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-cyan-400 flex items-center justify-center transition" title="Move Up"><i class="fas fa-arrow-up text-[9px]"></i></button>` : ''}
-                                ${idx < selectedRoutineExercises.length - 1 ? `<button type="button" onclick="event.stopPropagation(); moveRoutineExercise(${idx}, 1)" class="w-5 h-5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-cyan-400 flex items-center justify-center transition" title="Move Down"><i class="fas fa-arrow-down text-[9px]"></i></button>` : ''}
-                                <button type="button" onclick="event.stopPropagation(); toggleRoutineExercise('${escapedName}')" class="w-5 h-5 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 flex items-center justify-center transition" title="Remove"><i class="fas fa-times text-[9px]"></i></button>
-                            </span>
-                        </span>
-                        `;
-                    }).join('');
+                    summaryContainer.innerHTML = `
+                    <div class="w-full space-y-2">
+                        ${selectedRoutineExercises.map((item, idx) => {
+                            const exName = item.name;
+                            const sets = item.targetSets || 3;
+                            const escapedName = exName.replace(/'/g, "\\'");
+                            return `
+                            <div class="w-full flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 p-2.5 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xs">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <span class="w-6 h-6 rounded-full bg-violet-500/20 text-violet-300 font-extrabold text-xs flex items-center justify-center border border-violet-500/40 shrink-0">
+                                        ${idx + 1}
+                                    </span>
+                                    <span class="font-bold text-xs text-white truncate">${exName}</span>
+                                </div>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <!-- Stepper Target Sets -->
+                                    <div class="flex items-center bg-zinc-950 border border-zinc-800 rounded-lg p-0.5">
+                                        <button type="button" onclick="event.stopPropagation(); changeRoutineExerciseTargetSets(${idx}, -1)" class="w-8 h-8 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center justify-center font-black transition active:scale-95 text-xs" title="Decrease Sets">
+                                            <i class="fas fa-minus text-[10px]"></i>
+                                        </button>
+                                        <span class="px-2.5 text-xs font-mono font-extrabold text-violet-300 min-w-[54px] text-center">
+                                            ${sets} <span class="text-[10px] font-sans text-zinc-400 font-normal">Sets</span>
+                                        </span>
+                                        <button type="button" onclick="event.stopPropagation(); changeRoutineExerciseTargetSets(${idx}, 1)" class="w-8 h-8 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center justify-center font-black transition active:scale-95 text-xs" title="Increase Sets">
+                                            <i class="fas fa-plus text-[10px]"></i>
+                                        </button>
+                                    </div>
+                                    <div class="flex items-center gap-1 border-l border-zinc-800 pl-1.5">
+                                        ${idx > 0 ? `<button type="button" onclick="event.stopPropagation(); moveRoutineExercise(${idx}, -1)" class="w-7 h-7 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center transition" title="Move Up"><i class="fas fa-arrow-up text-[9px]"></i></button>` : ''}
+                                        ${idx < selectedRoutineExercises.length - 1 ? `<button type="button" onclick="event.stopPropagation(); moveRoutineExercise(${idx}, 1)" class="w-7 h-7 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center transition" title="Move Down"><i class="fas fa-arrow-down text-[9px]"></i></button>` : ''}
+                                        <button type="button" onclick="event.stopPropagation(); toggleRoutineExercise('${escapedName}')" class="w-7 h-7 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 flex items-center justify-center transition" title="Remove"><i class="fas fa-times text-[10px]"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                            `;
+                        }).join('')}
+                    </div>
+                    `;
                 }
             }
         }
@@ -2510,7 +2719,23 @@
             editingTemplateName = tpl.Template_Name;
             const nameEl = document.getElementById('new-plan-name');
             if (nameEl) nameEl.value = tpl.Template_Name;
-            selectedRoutineExercises = (tpl.Exercise_Sequence || "").split(',').map(s => s.trim()).filter(Boolean);
+
+            const exNames = (tpl.Exercise_Sequence || "").split(',').map(s => s.trim()).filter(Boolean);
+            const targetSetsMap = parseTemplateTargetSets(tpl);
+            selectedRoutineExercises = exNames.map(name => ({
+                name,
+                targetSets: targetSetsMap[name] || 3
+            }));
+
+            selectedRoutineDays.clear();
+            const days = parseTemplateDays(tpl);
+            days.forEach(d => {
+                const short = d.slice(0, 3);
+                const dayCode = short.charAt(0).toUpperCase() + short.slice(1).toLowerCase();
+                selectedRoutineDays.add(dayCode);
+            });
+
+            renderRoutineDayPills();
             renderRoutinePillPicker();
 
             const saveBtn = document.getElementById('save-routine-btn');
@@ -2530,6 +2755,8 @@
             const nameEl = document.getElementById('new-plan-name');
             if (nameEl) nameEl.value = "";
             selectedRoutineExercises = [];
+            selectedRoutineDays.clear();
+            renderRoutineDayPills();
             renderRoutinePillPicker();
 
             const saveBtn = document.getElementById('save-routine-btn');
@@ -2544,9 +2771,12 @@
         async function saveRoutineHandler() {
             const nameEl = document.getElementById("new-plan-name");
             const name = nameEl ? nameEl.value.trim() : "";
-            const exercises = selectedRoutineExercises.join(", ");
+            const exercises = selectedRoutineExercises.map(item => item.name).join(", ");
+            const targetSetsCsv = selectedRoutineExercises.map(item => item.targetSets || 3).join(", ");
+            const dayOfWeekCsv = Array.from(selectedRoutineDays).join(", ");
+
             if (!name || selectedRoutineExercises.length === 0) {
-                return alert("Provide a schedule name and select at least one exercise.");
+                return alert("Provide a routine name and select at least one exercise.");
             }
 
             if (editingTemplateName) {
@@ -2554,6 +2784,8 @@
                 if (idx !== -1) {
                     appData.templates[idx].Template_Name = name;
                     appData.templates[idx].Exercise_Sequence = exercises;
+                    appData.templates[idx].Target_Sets = targetSetsCsv;
+                    appData.templates[idx].Day_Of_Week = dayOfWeekCsv;
                 }
                 StateManager.saveCache();
 
@@ -2563,17 +2795,24 @@
                     action: "UPDATE_TEMPLATE",
                     old_Template_Name: editingTemplateName,
                     new_Template_Name: name,
-                    Exercise_Sequence: exercises
+                    Exercise_Sequence: exercises,
+                    Target_Sets: targetSetsCsv,
+                    Day_Of_Week: dayOfWeekCsv
                 });
 
                 cancelEditRoutine();
                 renderAll();
-                alert(`Workout plan '${name}' updated!`);
+                alert(`Workout routine '${name}' updated!`);
                 return;
             }
 
             // Creating new routine (optimistic + offline outbox)
-            const newTpl = { Template_Name: name, Exercise_Sequence: exercises };
+            const newTpl = {
+                Template_Name: name,
+                Exercise_Sequence: exercises,
+                Target_Sets: targetSetsCsv,
+                Day_Of_Week: dayOfWeekCsv
+            };
             appData.templates.push(newTpl);
             StateManager.saveCache();
 
@@ -2586,7 +2825,7 @@
 
             cancelEditRoutine();
             renderAll();
-            alert(`Workout plan '${name}' saved!`);
+            alert(`Workout routine '${name}' saved!`);
         }
 
         function deleteRoutine(tplName) {
@@ -2613,6 +2852,8 @@
                 const isExpanded = routineExpandedIds.has(tplName);
                 const escapedName = tplName.replace(/'/g, "\\'");
                 const exList = String(tpl.Exercise_Sequence || tpl.Exercises || "").split(',').map(s => s.trim()).filter(Boolean);
+                const targetSetsMap = parseTemplateTargetSets(tpl);
+                const days = parseTemplateDays(tpl);
 
                 return `
                     <div class="bg-zinc-900 border border-zinc-800 rounded-2xl shadow-xl text-white overflow-hidden transition-all">
@@ -2621,9 +2862,16 @@
                                 <i class="fas fa-chevron-right transition-transform duration-300 text-xs ${isExpanded ? 'rotate-90 text-violet-400' : 'text-zinc-500'}"></i>
                                 <div>
                                     <span class="font-extrabold text-white text-base block">${tplName}</span>
-                                    <span class="inline-flex items-center text-[11px] bg-zinc-800/80 border border-zinc-700/60 text-zinc-300 px-2 py-0.5 rounded-full font-medium mt-1">
-                                        ${exList.length} Exercises
-                                    </span>
+                                    <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                                        <span class="inline-flex items-center text-[11px] bg-zinc-800/80 border border-zinc-700/60 text-zinc-300 px-2 py-0.5 rounded-full font-medium">
+                                            ${exList.length} Exercises
+                                        </span>
+                                        ${days.map(d => `
+                                            <span class="inline-flex items-center text-[10px] bg-violet-500/15 border border-violet-500/30 text-violet-300 px-2 py-0.5 rounded-full font-bold">
+                                                <i class="far fa-calendar-alt text-[9px] mr-1"></i> ${d}
+                                            </span>
+                                        `).join('')}
+                                    </div>
                                 </div>
                             </div>
                             <button onclick="event.stopPropagation(); startWorkout('${escapedName}')" class="bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-400 hover:to-indigo-500 text-white font-bold px-3.5 py-1.5 rounded-xl text-xs shadow-[0_0_15px_rgba(139,92,246,0.25)] transition-all active:scale-95 flex items-center gap-1.5">
@@ -2633,16 +2881,19 @@
                         </div>
                         ${isExpanded ? `
                         <div class="px-4 pb-4 border-t border-zinc-800/80 pt-3">
-                            <div class="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-2">Exercise Sequence</div>
+                            <div class="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-2">Exercise Sequence & Target Sets</div>
                             <div class="space-y-1.5 mb-3">
-                                ${exList.map((exName, idx) => `
+                                ${exList.map((exName, idx) => {
+                                    const targetCount = targetSetsMap[exName] || 3;
+                                    return `
                                     <div class="flex items-center justify-between py-2 px-3 bg-zinc-950/80 border border-zinc-800/80 rounded-xl">
                                         <span class="text-xs font-semibold text-zinc-300">
                                             <span class="text-violet-400 font-bold mr-1.5">${idx + 1}.</span> ${exName}
                                         </span>
-                                        <span class="text-[11px] text-zinc-500 font-medium">${getTargetSetCount(exName, getLocalDateString())} Sets target</span>
+                                        <span class="text-[11px] text-violet-300 font-mono font-bold bg-violet-500/10 border border-violet-500/20 px-2 py-0.5 rounded-lg">${targetCount} Sets Target</span>
                                     </div>
-                                `).join('')}
+                                    `;
+                                }).join('')}
                             </div>
                             <div class="flex items-center justify-end gap-2 pt-1">
                                 <button onclick="event.stopPropagation(); startEditRoutine('${escapedName}')" class="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 hover:text-white font-bold px-3 py-1.5 rounded-xl text-xs transition flex items-center gap-1.5">
@@ -2684,6 +2935,10 @@
             const sel = document.getElementById('add-exercise-select');
             const exName = sel ? sel.value : "";
             if (!exName) return;
+            if (activeWorkout.routineName === "Rest Day") {
+                activeWorkout.routineName = "Custom Workout";
+                updateRoutineLabel();
+            }
             if (!activeWorkout.exercises.includes(exName)) {
                 activeWorkout.exercises.push(exName);
                 initDefaultAccordionState();
@@ -2701,21 +2956,30 @@
         function addExercise() {
             const nameEl = document.getElementById("new-ex-name");
             const catEl = document.getElementById("new-ex-cat");
+            const secCatEl = document.getElementById("new-ex-secondary-cat");
             const name = nameEl ? nameEl.value.trim() : "";
-            const cat = catEl ? catEl.value : "Chest";
+            const primaryCat = catEl ? catEl.value : "Chest";
+            const secondaryCat = secCatEl ? secCatEl.value.trim() : "";
+
+            let combinedCat = primaryCat;
+            if (secondaryCat && secondaryCat.toLowerCase() !== primaryCat.toLowerCase()) {
+                combinedCat = `${primaryCat} / ${secondaryCat}`;
+            }
+
             if (!name) return alert("Please provide an exercise name.");
 
             const newEx = {
                 ID: 'EX-' + Date.now(),
                 Name: name,
-                Category: cat
+                Category: combinedCat
             };
 
             appData.exercises.push(newEx);
             StateManager.saveCache();
             if (nameEl) nameEl.value = "";
+            if (secCatEl) secCatEl.value = "";
             renderAll();
-            alert(`Added "${name}" to your library!`);
+            alert(`Added "${name}" (${combinedCat}) to your library!`);
 
             Outbox.enqueue({
                 id: newEx.ID,

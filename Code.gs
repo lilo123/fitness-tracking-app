@@ -68,12 +68,12 @@ function resolveSheetName(ss, requestedType, athleteId) {
     var tplSheet = ss.getSheetByName(tplName);
     if (!tplSheet) {
       tplSheet = ss.insertSheet(tplName);
-      tplSheet.getRange(1, 1, 1, 2).setValues([["Template_Name", "Exercise_Sequence"]]);
+      tplSheet.getRange(1, 1, 1, 4).setValues([["Template_Name", "Exercise_Sequence", "Target_Sets", "Day_Of_Week"]]);
       var defaultTemplates = [
-        ["Workout A (Push, Quads & Core)", "Incline Bench Press, Cable Lateral Raises, Dips, Leg Extension Machine, Overhead Tricep Cable Pull, Leg Raise"],
-        ["Workout B (Pull, Hamstrings & Core)", "Lat Pull Down, Seated Cable Row, Inclined Bicep Curl, Leg Curl, Face Pulls, Weighted Sit-Up"]
+        ["Workout A (Push, Quads & Core)", "Incline Bench Press, Cable Lateral Raises, Dips, Leg Extension Machine, Overhead Tricep Cable Pull, Leg Raise", "4, 3, 3, 3, 3, 3", "Monday, Thursday"],
+        ["Workout B (Pull, Hamstrings & Core)", "Lat Pull Down, Seated Cable Row, Inclined Bicep Curl, Leg Curl, Face Pulls, Weighted Sit-Up", "4, 3, 3, 3, 3, 3", "Tuesday, Friday"]
       ];
-      tplSheet.getRange(2, 1, defaultTemplates.length, 2).setValues(defaultTemplates);
+      tplSheet.getRange(2, 1, defaultTemplates.length, 4).setValues(defaultTemplates);
     }
     return tplSheet;
   }
@@ -89,8 +89,8 @@ function ensureSchema(sheet, sheetType) {
       return ["Log_ID", "Workout_ID", "Date", "Exercise_ID", "Set_Index", "Weight", "Reps", "Client_ID", "Timestamp"];
     }
     if (sheetType.indexOf("Templates") !== -1) {
-      sheet.getRange(1, 1, 1, 2).setValues([["Template_Name", "Exercise_Sequence"]]);
-      return ["Template_Name", "Exercise_Sequence"];
+      sheet.getRange(1, 1, 1, 4).setValues([["Template_Name", "Exercise_Sequence", "Target_Sets", "Day_Of_Week"]]);
+      return ["Template_Name", "Exercise_Sequence", "Target_Sets", "Day_Of_Week"];
     }
     if (sheetType === "Exercises") {
       sheet.getRange(1, 1, 1, 3).setValues([["ID", "Name", "Category"]]);
@@ -107,6 +107,17 @@ function ensureSchema(sheet, sheetType) {
   if (sheetType.indexOf("Logs") !== -1) {
     var requiredCols = ["Log_ID", "Workout_ID", "Date", "Exercise_ID", "Set_Index", "Weight", "Reps", "Client_ID", "Timestamp"];
     requiredCols.forEach(function(col) {
+      if (headers.indexOf(col) === -1) {
+        lastCol++;
+        sheet.getRange(1, lastCol).setValue(col);
+        headers.push(col);
+      }
+    });
+  }
+
+  if (sheetType.indexOf("Templates") !== -1) {
+    var requiredTplCols = ["Template_Name", "Exercise_Sequence", "Target_Sets", "Day_Of_Week"];
+    requiredTplCols.forEach(function(col) {
       if (headers.indexOf(col) === -1) {
         lastCol++;
         sheet.getRange(1, lastCol).setValue(col);
@@ -282,6 +293,8 @@ function doPost(e) {
       var row = targetHeaders.map(function(h) {
         if (h === "Template_Name") return sourceTpl.Template_Name || "";
         if (h === "Exercise_Sequence") return sourceTpl.Exercise_Sequence || "";
+        if (h === "Target_Sets") return sourceTpl.Target_Sets || "";
+        if (h === "Day_Of_Week") return sourceTpl.Day_Of_Week || "";
         return "";
       });
       targetSheet.appendRow(row);
@@ -369,10 +382,16 @@ function doPost(e) {
       var oldName = (body.old_Template_Name || body.Template_Name || (body.data && (body.data.old_Template_Name || body.data.Template_Name)) || "").trim().toLowerCase();
       var newName = body.new_Template_Name || body.Template_Name || (body.data && (body.data.new_Template_Name || body.data.Template_Name));
       var newSeq = body.Exercise_Sequence || (body.data && body.data.Exercise_Sequence) || "";
+      var hasTargetSets = body.Target_Sets != null || (body.data && body.data.Target_Sets != null);
+      var newTargetSets = hasTargetSets ? (body.Target_Sets != null ? body.Target_Sets : body.data.Target_Sets) : "";
+      var hasDayOfWeek = body.Day_Of_Week != null || (body.data && body.data.Day_Of_Week != null);
+      var newDayOfWeek = hasDayOfWeek ? (body.Day_Of_Week != null ? body.Day_Of_Week : body.data.Day_Of_Week) : "";
       
       var data = sheet.getDataRange().getValues();
       var nameIndex = headers.indexOf("Template_Name");
       var seqIndex = headers.indexOf("Exercise_Sequence");
+      var setsIndex = headers.indexOf("Target_Sets");
+      var dayIndex = headers.indexOf("Day_Of_Week");
       if (nameIndex === -1) nameIndex = 0;
       if (seqIndex === -1) seqIndex = 1;
       
@@ -382,6 +401,8 @@ function doPost(e) {
           var updatedRow = data[r].slice(0, headers.length);
           if (nameIndex !== -1 && newName) updatedRow[nameIndex] = newName;
           if (seqIndex !== -1 && newSeq) updatedRow[seqIndex] = newSeq;
+          if (setsIndex !== -1 && hasTargetSets) updatedRow[setsIndex] = newTargetSets;
+          if (dayIndex !== -1 && hasDayOfWeek) updatedRow[dayIndex] = newDayOfWeek;
           sheet.getRange(r + 1, 1, 1, headers.length).setValues([updatedRow]);
           return createJsonResponse({ success: true, message: "Template updated successfully!" });
         }
