@@ -198,6 +198,25 @@ function doGet(e) {
       });
       return obj;
     });
+
+    if (sheetType === "Exercises") {
+      var seenIds = {};
+      var seenNames = {};
+      var deduped = [];
+      result.forEach(function(item) {
+        if (!item) return;
+        var name = item.Name ? String(item.Name).trim() : "";
+        if (!name) return;
+        var lowerName = name.toLowerCase();
+        var id = item.ID != null ? String(item.ID).trim() : "";
+        if (id && seenIds[id]) return;
+        if (seenNames[lowerName]) return;
+        if (id) seenIds[id] = true;
+        seenNames[lowerName] = true;
+        deduped.push(item);
+      });
+      result = deduped;
+    }
     
     return createJsonResponse({ success: true, data: result });
   } catch (err) {
@@ -301,12 +320,22 @@ function doPost(e) {
       return createJsonResponse({ success: true, message: "Template assigned to " + targetAthlete });
     }
 
-    // Handle UPDATE_EXERCISE action
+    // Handle UPDATE_EXERCISE action (updates first match and purges any duplicates)
     if (body.action === "UPDATE_EXERCISE") {
       var targetId = body.ID || (body.data && body.data.ID);
-      var oldName = (body.old_Name || body.Name || (body.data && (body.data.old_Name || body.data.Name)) || "").trim().toLowerCase();
+      var normTargetId = targetId ? String(targetId).trim() : "";
+      if (normTargetId === "undefined" || normTargetId === "null") normTargetId = "";
+
+      var rawOldName = body.old_Name || body.Name || (body.data && (body.data.old_Name || body.data.Name)) || "";
+      var oldName = String(rawOldName).trim().toLowerCase();
+      if (oldName === "undefined" || oldName === "null") oldName = "";
+
       var newName = body.new_Name || body.Name || (body.data && (body.data.new_Name || body.data.Name));
       var newCategory = body.Category || (body.data && body.data.Category) || "Other";
+
+      if (!normTargetId && !oldName) {
+        return createJsonResponse({ success: false, error: "Valid Name or ID required to update exercise" });
+      }
       
       var data = sheet.getDataRange().getValues();
       var idIndex = headers.indexOf("ID");
@@ -316,38 +345,73 @@ function doPost(e) {
       if (nameIndex === -1) nameIndex = 1;
       if (catIndex === -1) catIndex = 2;
       
+      var matchingRows = [];
       for (var r = 1; r < data.length; r++) {
-        var rowId = idIndex !== -1 ? String(data[r][idIndex]).trim() : "";
-        var rowName = nameIndex !== -1 ? String(data[r][nameIndex]).trim().toLowerCase() : "";
-        if ((targetId && rowId === String(targetId).trim()) || (oldName && rowName === oldName)) {
-          var updatedRow = data[r].slice(0, headers.length);
-          if (nameIndex !== -1 && newName) updatedRow[nameIndex] = newName;
-          if (catIndex !== -1 && newCategory) updatedRow[catIndex] = newCategory;
-          sheet.getRange(r + 1, 1, 1, headers.length).setValues([updatedRow]);
-          return createJsonResponse({ success: true, message: "Exercise updated successfully!" });
+        var rowId = (idIndex !== -1 && data[r][idIndex] != null) ? String(data[r][idIndex]).trim() : "";
+        var rowName = (nameIndex !== -1 && data[r][nameIndex] != null) ? String(data[r][nameIndex]).trim().toLowerCase() : "";
+        if ((normTargetId && rowId === normTargetId) || (oldName && rowName === oldName)) {
+          matchingRows.push(r + 1);
         }
       }
-      return createJsonResponse({ success: false, error: "Exercise not found" });
+
+      if (matchingRows.length === 0) {
+        return createJsonResponse({ success: false, error: "Exercise not found" });
+      }
+
+      // Update first matching row
+      var primaryRow = matchingRows[0];
+      var rowIndex0 = primaryRow - 1;
+      var updatedRow = data[rowIndex0].slice(0, headers.length);
+      if (idIndex !== -1 && normTargetId) updatedRow[idIndex] = normTargetId;
+      if (nameIndex !== -1 && newName) updatedRow[nameIndex] = newName;
+      if (catIndex !== -1 && newCategory) updatedRow[catIndex] = newCategory;
+      sheet.getRange(primaryRow, 1, 1, headers.length).setValues([updatedRow]);
+
+      // Delete any duplicate matching rows in reverse order
+      for (var d = matchingRows.length - 1; d >= 1; d--) {
+        sheet.deleteRow(matchingRows[d]);
+      }
+
+      return createJsonResponse({
+        success: true,
+        message: "Exercise updated successfully!",
+        dedupedCount: matchingRows.length - 1
+      });
     }
 
-    // Handle DELETE_EXERCISE action
+    // Handle DELETE_EXERCISE action (deletes all matching rows to remove duplicates)
     if (body.action === "DELETE_EXERCISE") {
       var targetName = body.Name || (body.data && body.data.Name);
       var targetId = body.ID || (body.data && body.data.ID);
+      var normTargetName = targetName ? String(targetName).trim().toLowerCase() : "";
+      var normTargetId = targetId ? String(targetId).trim() : "";
+      if (normTargetName === "undefined" || normTargetName === "null") normTargetName = "";
+      if (normTargetId === "undefined" || normTargetId === "null") normTargetId = "";
+
+      if (!normTargetName && !normTargetId) {
+        return createJsonResponse({ success: false, error: "Valid Name or ID required to delete exercise" });
+      }
+
       var data = sheet.getDataRange().getValues();
       var nameIndex = headers.indexOf("Name");
       var idIndex = headers.indexOf("ID");
+      if (nameIndex === -1) nameIndex = 1;
+      if (idIndex === -1) idIndex = 0;
 
+      var deletedCount = 0;
       for (var r = data.length - 1; r >= 1; r--) {
-        var rowName = nameIndex !== -1 ? String(data[r][nameIndex]).trim().toLowerCase() : "";
-        var rowId = idIndex !== -1 ? String(data[r][idIndex]).trim() : "";
-        if ((targetName && rowName === String(targetName).trim().toLowerCase()) ||
-            (targetId && rowId === String(targetId).trim())) {
+        var rowName = (nameIndex !== -1 && data[r][nameIndex] != null) ? String(data[r][nameIndex]).trim().toLowerCase() : "";
+        var rowId = (idIndex !== -1 && data[r][idIndex] != null) ? String(data[r][idIndex]).trim() : "";
+        if ((normTargetName && rowName === normTargetName) ||
+            (normTargetId && rowId === normTargetId)) {
           sheet.deleteRow(r + 1);
-          return createJsonResponse({ success: true, message: "Exercise deleted successfully!" });
+          deletedCount++;
         }
       }
-      return createJsonResponse({ success: true, message: "Exercise already deleted or not found" });
+      if (deletedCount > 0) {
+        return createJsonResponse({ success: true, message: "Exercise deleted successfully!", deletedCount: deletedCount });
+      }
+      return createJsonResponse({ success: true, message: "Exercise already deleted or not found", deletedCount: 0 });
     }
     
     // Handle DELETE action
@@ -489,17 +553,48 @@ function doPost(e) {
       }
       return createJsonResponse({ success: true, message: "Batch append complete", count: rowsToAppend.length });
     }
+
+    // Idempotency / deduplication check for Exercises
+    if (sheetType === "Exercises" || body.action === "ADD_EXERCISE") {
+      var incomingId = (body.data && body.data.ID) || body.ID;
+      var incomingName = (body.data && body.data.Name) || body.Name;
+      var normId = incomingId ? String(incomingId).trim() : "";
+      var normName = incomingName ? String(incomingName).trim().toLowerCase() : "";
+      if (normId === "undefined" || normId === "null") normId = "";
+      if (normName === "undefined" || normName === "null") normName = "";
+
+      if (!normName && !normId) {
+        return createJsonResponse({ success: false, error: "Exercise Name or ID is required" });
+      }
+
+      var exData = sheet.getDataRange().getValues();
+      var exIdIndex = headers.indexOf("ID");
+      var exNameIndex = headers.indexOf("Name");
+      if (exIdIndex === -1) exIdIndex = 0;
+      if (exNameIndex === -1) exNameIndex = 1;
+
+      for (var er = 1; er < exData.length; er++) {
+        var rowId = (exIdIndex !== -1 && exData[er][exIdIndex] != null) ? String(exData[er][exIdIndex]).trim() : "";
+        var rowName = (exNameIndex !== -1 && exData[er][exNameIndex] != null) ? String(exData[er][exNameIndex]).trim().toLowerCase() : "";
+        if ((normId && rowId === normId) || (normName && rowName === normName)) {
+          return createJsonResponse({ success: true, message: "Exercise already exists (idempotent skip)", duplicate: true });
+        }
+      }
+    }
     
     // Default single append
-    if (!body.data) throw new Error("Invalid payload: missing data object");
+    var rowData = body.data || body;
+    if (!rowData || (!body.data && !body.ID && !body.Name && !body.Log_ID && !body.Workout_ID)) {
+      throw new Error("Invalid payload: missing data object");
+    }
     var newRow = headers.map(function(header) {
-      if (header === 'Date' && !body.data[header]) {
+      if (header === 'Date' && !rowData[header]) {
          return formatDateLocal(new Date(), tz);
       }
-      if (header === 'Timestamp' && !body.data[header]) {
+      if (header === 'Timestamp' && !rowData[header]) {
          return new Date().toISOString();
       }
-      return body.data[header] != null ? body.data[header] : "";
+      return rowData[header] != null ? rowData[header] : "";
     });
     
     sheet.appendRow(newRow);

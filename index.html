@@ -676,9 +676,33 @@
             }
         ];
 
+        function deduplicateExercises(list) {
+            if (!Array.isArray(list)) return [];
+            const seenIds = new Set();
+            const seenNames = new Set();
+            const result = [];
+            for (const ex of list) {
+                if (!ex || !ex.Name) continue;
+                const id = ex.ID != null ? String(ex.ID).trim() : "";
+                const name = String(ex.Name).trim();
+                if (!name) continue;
+                const lowerName = name.toLowerCase();
+                if (id && seenIds.has(id)) continue;
+                if (seenNames.has(lowerName)) continue;
+                if (id) seenIds.add(id);
+                seenNames.add(lowerName);
+                result.push({
+                    ...ex,
+                    ID: id || ('EX-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5)),
+                    Name: name
+                });
+            }
+            return result;
+        }
+
         function seedDefaults() {
             if (!appData.exercises || appData.exercises.length === 0) {
-                appData.exercises = [...DEFAULT_EXERCISES];
+                appData.exercises = deduplicateExercises([...DEFAULT_EXERCISES]);
             }
             if (!appData.templates || appData.templates.length === 0) {
                 appData.templates = [...DEFAULT_TEMPLATES];
@@ -700,7 +724,9 @@
                     const saved = localStorage.getItem(this.getCacheKey('appData'));
                     if (saved) {
                         const parsed = JSON.parse(saved);
-                        if (parsed.exercises && Array.isArray(parsed.exercises)) appData.exercises = parsed.exercises;
+                        if (parsed.exercises && Array.isArray(parsed.exercises)) {
+                            appData.exercises = deduplicateExercises(parsed.exercises);
+                        }
                         if (parsed.logs && Array.isArray(parsed.logs)) {
                             appData.logs = parsed.logs.map(log => ({
                                 ...log,
@@ -863,7 +889,7 @@
                     }
 
                     for (const addEx of addExItems) {
-                        const res = await apiCall('POST', { type: "Exercises", data: addEx.data });
+                        const res = await apiCall('POST', { type: "Exercises", action: "ADD_EXERCISE", data: addEx.data });
                         if (res && res.success) {
                             const remaining = this.getQueue().filter(i => i.id !== addEx.id);
                             this.saveQueue(remaining);
@@ -889,7 +915,8 @@
                         const res = await apiCall('POST', {
                             type: "Exercises",
                             action: "DELETE_EXERCISE",
-                            Name: delEx.Name
+                            Name: delEx.Name,
+                            ID: delEx.ID
                         });
                         if (res && res.success) {
                             const remaining = this.getQueue().filter(i => i.id !== delEx.id);
@@ -1449,8 +1476,53 @@
             const pendingEx = q.filter(i => i.action === "ADD_EXERCISE").map(i => i.data);
 
             if (exRes && exRes.success && Array.isArray(exRes.data)) {
-                const remoteExIds = new Set(exRes.data.map(e => e.ID));
-                appData.exercises = [...exRes.data, ...pendingEx.filter(e => !remoteExIds.has(e.ID))];
+                const pendingDeleteExNames = new Set(
+                    q.filter(i => i.action === "DELETE_EXERCISE" && i.Name)
+                     .map(i => String(i.Name).trim().toLowerCase())
+                );
+                const pendingDeleteExIds = new Set(
+                    q.filter(i => i.action === "DELETE_EXERCISE" && i.ID)
+                     .map(i => String(i.ID).trim())
+                );
+                const pendingExUpdates = new Map();
+                q.filter(i => i.action === "UPDATE_EXERCISE").forEach(u => {
+                    if (u.ID) pendingExUpdates.set(String(u.ID).trim(), u);
+                    if (u.old_Name) pendingExUpdates.set(String(u.old_Name).trim().toLowerCase(), u);
+                });
+
+                const remoteExercises = exRes.data
+                    .filter(e => {
+                        if (!e) return false;
+                        const id = e.ID != null ? String(e.ID).trim() : "";
+                        const name = e.Name ? String(e.Name).trim().toLowerCase() : "";
+                        if (id && pendingDeleteExIds.has(id)) return false;
+                        if (name && pendingDeleteExNames.has(name)) return false;
+                        return true;
+                    })
+                    .map(e => {
+                        const id = e.ID != null ? String(e.ID).trim() : "";
+                        const name = e.Name ? String(e.Name).trim().toLowerCase() : "";
+                        const upd = (id && pendingExUpdates.get(id)) || (name && pendingExUpdates.get(name));
+                        if (upd) {
+                            return {
+                                ...e,
+                                Name: upd.new_Name || e.Name,
+                                Category: upd.Category || e.Category
+                            };
+                        }
+                        return e;
+                    });
+
+                const cleanPendingEx = pendingEx.filter(e => {
+                    if (!e) return false;
+                    const id = e.ID != null ? String(e.ID).trim() : "";
+                    const name = e.Name ? String(e.Name).trim().toLowerCase() : "";
+                    if (id && pendingDeleteExIds.has(id)) return false;
+                    if (name && pendingDeleteExNames.has(name)) return false;
+                    return true;
+                });
+
+                appData.exercises = deduplicateExercises([...remoteExercises, ...cleanPendingEx]);
             }
             if (logRes && logRes.success && Array.isArray(logRes.data)) {
                 const remoteClientIds = new Set(logRes.data.map(l => l.Client_ID));
@@ -2537,10 +2609,10 @@
                         <div class="flex flex-wrap items-center gap-1">
                             ${renderCategoryBadges(ex.Category)}
                         </div>
-                        <button onclick="startEditExercise('${escapedId || escapedName}')" class="text-zinc-400 hover:text-cyan-400 p-2 transition rounded-lg hover:bg-cyan-500/10 min-h-[36px] min-w-[36px] flex items-center justify-center" title="Edit Exercise">
+                        <button onclick="startEditExercise('${escapedId}', '${escapedName}')" class="text-zinc-400 hover:text-cyan-400 p-2 transition rounded-lg hover:bg-cyan-500/10 min-h-[36px] min-w-[36px] flex items-center justify-center" title="Edit Exercise">
                             <i class="fas fa-pencil-alt text-xs"></i>
                         </button>
-                        <button onclick="deleteExercise('${escapedName}')" class="text-zinc-500 hover:text-rose-400 p-2 transition rounded-lg hover:bg-rose-500/10 min-h-[36px] min-w-[36px] flex items-center justify-center" title="Delete Exercise">
+                        <button onclick="deleteExercise('${escapedName}', '${escapedId}')" class="text-zinc-500 hover:text-rose-400 p-2 transition rounded-lg hover:bg-rose-500/10 min-h-[36px] min-w-[36px] flex items-center justify-center" title="Delete Exercise">
                             <i class="fas fa-trash-alt text-xs"></i>
                         </button>
                     </div>
@@ -2997,9 +3069,18 @@
             }).join('');
         }
 
-        function startEditExercise(idOrName) {
-            const ex = appData.exercises.find(e => String(e.ID) === String(idOrName) || e.Name === idOrName);
+        function startEditExercise(id, name) {
+            const needleId = String(id || "").trim();
+            const needleName = String(name || "").trim().toLowerCase();
+            const ex = appData.exercises.find(e => 
+                (needleId && e.ID && String(e.ID).trim() === needleId) ||
+                (needleName && e.Name && e.Name.trim().toLowerCase() === needleName) ||
+                (needleId && e.Name && e.Name.trim().toLowerCase() === needleId.toLowerCase())
+            );
             if (!ex) return;
+            if (!ex.ID) {
+                ex.ID = 'EX-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
+            }
             editingExerciseId = ex.ID;
             editingExerciseOldName = ex.Name;
 
@@ -3057,13 +3138,37 @@
             const name = nameEl ? nameEl.value.trim() : "";
             if (!name) return alert("Please provide an exercise name.");
 
+            const isEditing = Boolean(editingExerciseId || editingExerciseOldName);
+            const lowerName = name.toLowerCase();
+
+            // Duplicate validation: check case-insensitive name against existing exercises
+            const isDuplicate = appData.exercises.some(e => {
+                if (!e || !e.Name) return false;
+                const isSelf = isEditing && (
+                    (editingExerciseId && e.ID && String(e.ID).trim() === String(editingExerciseId).trim()) ||
+                    (editingExerciseOldName && e.Name.trim().toLowerCase() === editingExerciseOldName.trim().toLowerCase())
+                );
+                if (isSelf) return false;
+                return e.Name.trim().toLowerCase() === lowerName;
+            });
+
+            if (isDuplicate) {
+                return alert(`An exercise named "${name}" already exists in your library.`);
+            }
+
             const tagList = Array.from(selectedExerciseTags);
             const categoryStr = tagList.length > 0 ? tagList.join(" / ") : "Other";
 
-            if (editingExerciseId) {
-                const ex = appData.exercises.find(e => String(e.ID) === String(editingExerciseId));
+            if (isEditing) {
+                const ex = appData.exercises.find(e => 
+                    (editingExerciseId && e.ID && String(e.ID).trim() === String(editingExerciseId).trim()) ||
+                    (editingExerciseOldName && e.Name && e.Name.trim().toLowerCase() === editingExerciseOldName.trim().toLowerCase())
+                );
                 const oldName = editingExerciseOldName || (ex ? ex.Name : name);
+                const currentId = (ex && ex.ID) || editingExerciseId || ('EX-' + Date.now());
+
                 if (ex) {
+                    ex.ID = currentId;
                     ex.Name = name;
                     ex.Category = categoryStr;
                 }
@@ -3096,7 +3201,7 @@
                     id: "upd-ex-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
                     type: "Exercises",
                     action: "UPDATE_EXERCISE",
-                    ID: editingExerciseId,
+                    ID: currentId,
                     old_Name: oldName,
                     new_Name: name,
                     Category: categoryStr
@@ -3125,18 +3230,53 @@
             });
         }
 
-        function deleteExercise(exName) {
-            if (!confirm(`Are you sure you want to delete "${exName}" from your library?`)) return;
+        function deleteExercise(exName, exId) {
+            let name = (exName || "").trim();
+            let id = (exId || "").trim();
 
-            appData.exercises = appData.exercises.filter(ex => ex.Name !== exName);
+            const matchedEx = appData.exercises.find(e => 
+                (id && String(e.ID).trim() === id) || 
+                (name && (String(e.ID).trim() === name || (e.Name && e.Name.trim().toLowerCase() === name.toLowerCase())))
+            );
+            if (matchedEx) {
+                name = matchedEx.Name;
+                if (!id && matchedEx.ID) id = String(matchedEx.ID).trim();
+            }
+
+            const displayName = name || id;
+            if (!displayName) return;
+            if (!confirm(`Are you sure you want to delete "${displayName}" from your library?`)) return;
+
+            const normName = name.toLowerCase();
+
+            // Purge from local appData.exercises
+            appData.exercises = appData.exercises.filter(ex => {
+                if (id && ex.ID && String(ex.ID).trim() === id) return false;
+                if (normName && ex.Name && ex.Name.trim().toLowerCase() === normName) return false;
+                return true;
+            });
             StateManager.saveCache();
             renderAll();
+
+            // Purge any pending additions or updates for this exercise from Outbox queue
+            const currentQueue = Outbox.getQueue();
+            const filteredQueue = currentQueue.filter(item => {
+                if (item.action === "ADD_EXERCISE" || item.action === "UPDATE_EXERCISE") {
+                    const itemExId = item.ID || (item.data && item.data.ID);
+                    const itemExName = item.new_Name || item.old_Name || item.Name || (item.data && item.data.Name);
+                    if (id && itemExId && String(itemExId).trim() === id) return false;
+                    if (normName && itemExName && String(itemExName).trim().toLowerCase() === normName) return false;
+                }
+                return true;
+            });
+            Outbox.saveQueue(filteredQueue);
 
             Outbox.enqueue({
                 id: 'del-ex-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
                 type: "Exercises",
                 action: "DELETE_EXERCISE",
-                Name: exName
+                Name: name,
+                ID: id
             });
         }
 
