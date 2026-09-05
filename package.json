@@ -1,0 +1,51 @@
+{
+  "name": "cybergym",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:db": "npx supabase test db",
+    "test:deno": "PATH=\"$HOME/.deno/bin:$PATH\" deno test --config supabase/functions/parse-nutrition/deno.json --allow-net --allow-env supabase/functions/parse-nutrition/index.test.ts && PATH=\"$HOME/.deno/bin:$PATH\" deno test --config supabase/functions/create-athlete/deno.json --allow-net --allow-env supabase/functions/create-athlete/index.test.ts",
+    "test:e2e": "playwright test",
+    "test:all": "npm run test && npm run test:db && npm run test:deno && npm run test:e2e"
+  },
+  "dependencies": {
+    "@capacitor/core": "^7.6.8",
+    "@kiwi-health/capacitor-health-connect": "^0.0.42",
+    "@supabase/supabase-js": "^2.109.0",
+    "@tanstack/react-query": "^5.102.8",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.38.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-hook-form": "^7.87.0",
+    "react-router-dom": "^7.18.3",
+    "tailwind-merge": "^3.6.0",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^7.6.8",
+    "@capacitor/cli": "^7.6.8",
+    "@playwright/test": "^1.62.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.6",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "jsdom": "^29.1.1",
+    "oxlint": "^1.79.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
+  }
+}

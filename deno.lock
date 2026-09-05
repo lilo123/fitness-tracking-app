@@ -1,0 +1,46 @@
+{
+  "version": "5",
+  "specifiers": {
+    "jsr:@deno/installer-shell-setup@*": "0.3.4"
+  },
+  "jsr": {
+    "@deno/installer-shell-setup@0.3.4": {
+      "integrity": "48665d1a737d487cce6874bc97bba70a5aeffa7053aca3f60df93c6fab8963b4"
+    }
+  },
+  "workspace": {
+    "packageJson": {
+      "dependencies": [
+        "npm:@capacitor/android@^7.6.8",
+        "npm:@capacitor/cli@^7.6.8",
+        "npm:@capacitor/core@^7.6.8",
+        "npm:@kiwi-health/capacitor-health-connect@^0.0.42",
+        "npm:@playwright/test@^1.62.1",
+        "npm:@supabase/supabase-js@^2.109.0",
+        "npm:@tailwindcss/vite@^4.3.3",
+        "npm:@tanstack/react-query@^5.102.8",
+        "npm:@testing-library/jest-dom@^6.9.1",
+        "npm:@testing-library/react@^16.3.3",
+        "npm:@testing-library/user-event@^14.6.6",
+        "npm:@types/node@^24.13.3",
+        "npm:@types/react-dom@^19.2.4",
+        "npm:@types/react@^19.2.18",
+        "npm:@vitejs/plugin-react@^6.1.0",
+        "npm:clsx@^2.1.1",
+        "npm:jsdom@^29.1.1",
+        "npm:lucide-react@^1.38.0",
+        "npm:oxlint@^1.79.0",
+        "npm:react-dom@^19.2.8",
+        "npm:react-hook-form@^7.87.0",
+        "npm:react-router-dom@^7.18.3",
+        "npm:react@^19.2.8",
+        "npm:tailwind-merge@^3.6.0",
+        "npm:tailwindcss@^4.3.3",
+        "npm:typescript@~6.0.2",
+        "npm:vite@^8.2.2",
+        "npm:vitest@^4.1.11",
+        "npm:ws@^8.21.3"
+      ]
+    }
+  }
+}
