@@ -34,7 +34,7 @@ export const CoachProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
 
   const selectedAthleteId = isCoach
-    ? (coachSelectedAthleteId || athletes[0]?.id || '')
+    ? (coachSelectedAthleteId || athletes[0]?.id || user?.id || '')
     : (user?.id || '');
 
   const refreshAthletes = useCallback(async () => {
@@ -45,23 +45,30 @@ export const CoachProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         .eq('role', 'athlete')
         .order('created_at', { ascending: false });
 
-      if (data && !error && Array.isArray(data) && data.length > 0) {
-        const fetchedAthletes: AthleteInfo[] = data.map((u: any) => ({
-          id: u.id,
-          name: u.username || u.email?.split('@')[0] || 'Athlete',
-          email: u.email || '',
-          status: 'Active',
-          last_active: u.created_at,
-        }));
-        setAthletes(fetchedAthletes);
-        localStorage.setItem('cybergym_athletes', JSON.stringify(fetchedAthletes));
+      if (data && !error && Array.isArray(data)) {
+        if (data.length > 0) {
+          const fetchedAthletes: AthleteInfo[] = data.map((u: any) => ({
+            id: u.id,
+            name: u.username || u.email?.split('@')[0] || 'Athlete',
+            email: u.email || '',
+            status: 'Active',
+            last_active: u.created_at,
+          }));
+          setAthletes(fetchedAthletes);
+          localStorage.setItem('cybergym_athletes', JSON.stringify(fetchedAthletes));
 
-        setCoachSelectedAthleteId((prev) => {
-          if (prev && fetchedAthletes.some((a) => a.id === prev)) return prev;
-          const firstId = fetchedAthletes[0]?.id || '';
-          if (firstId) localStorage.setItem('cybergym_selected_athlete', firstId);
-          return firstId;
-        });
+          setCoachSelectedAthleteId((prev) => {
+            if (prev && fetchedAthletes.some((a) => a.id === prev)) return prev;
+            const firstId = fetchedAthletes[0]?.id || '';
+            if (firstId) localStorage.setItem('cybergym_selected_athlete', firstId);
+            return firstId;
+          });
+        } else {
+          setAthletes([]);
+          setCoachSelectedAthleteId('');
+          localStorage.removeItem('cybergym_athletes');
+          localStorage.removeItem('cybergym_selected_athlete');
+        }
       }
     } catch {
       // Keep local list
@@ -79,23 +86,30 @@ export const CoachProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             .eq('role', 'athlete')
             .order('created_at', { ascending: false });
 
-          if (active && res && res.data && !res.error && Array.isArray(res.data) && res.data.length > 0) {
-            const fetchedAthletes: AthleteInfo[] = res.data.map((u: any) => ({
-              id: u.id,
-              name: u.username || u.email?.split('@')[0] || 'Athlete',
-              email: u.email || '',
-              status: 'Active',
-              last_active: u.created_at,
-            }));
-            setAthletes(fetchedAthletes);
-            localStorage.setItem('cybergym_athletes', JSON.stringify(fetchedAthletes));
+          if (active && res && res.data && !res.error && Array.isArray(res.data)) {
+            if (res.data.length > 0) {
+              const fetchedAthletes: AthleteInfo[] = res.data.map((u: any) => ({
+                id: u.id,
+                name: u.username || u.email?.split('@')[0] || 'Athlete',
+                email: u.email || '',
+                status: 'Active',
+                last_active: u.created_at,
+              }));
+              setAthletes(fetchedAthletes);
+              localStorage.setItem('cybergym_athletes', JSON.stringify(fetchedAthletes));
 
-            setCoachSelectedAthleteId((prev) => {
-              if (prev && fetchedAthletes.some((a) => a.id === prev)) return prev;
-              const firstId = fetchedAthletes[0]?.id || '';
-              if (firstId) localStorage.setItem('cybergym_selected_athlete', firstId);
-              return firstId;
-            });
+              setCoachSelectedAthleteId((prev) => {
+                if (prev && fetchedAthletes.some((a) => a.id === prev)) return prev;
+                const firstId = fetchedAthletes[0]?.id || '';
+                if (firstId) localStorage.setItem('cybergym_selected_athlete', firstId);
+                return firstId;
+              });
+            } else {
+              setAthletes([]);
+              setCoachSelectedAthleteId('');
+              localStorage.removeItem('cybergym_athletes');
+              localStorage.removeItem('cybergym_selected_athlete');
+            }
           }
         } catch {
           // Keep default list

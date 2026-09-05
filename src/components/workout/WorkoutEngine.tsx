@@ -38,11 +38,11 @@ import {
 } from 'lucide-react';
 
 export const WorkoutEngine: React.FC = () => {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { selectedAthleteId } = useCoach();
   const queryClient = useQueryClient();
 
-  const targetUserId = selectedAthleteId || user?.id || '';
+  const targetUserId = (role === 'coach' && selectedAthleteId ? selectedAthleteId : user?.id) || user?.id || '';
 
   const [workoutDate, setWorkoutDate] = useState<string>(() => {
     return normalizeDateStr(new Date().toISOString());

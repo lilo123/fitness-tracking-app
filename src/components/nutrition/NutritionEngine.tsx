@@ -712,11 +712,11 @@ function parseLocalNutrition(input: string, customDishes: CustomDish[]): StagedM
 }
 
 export const NutritionEngine: React.FC = () => {
-  const { user, profile } = useAuth();
+  const { user, profile, role } = useAuth();
   const { selectedAthleteId } = useCoach();
   const queryClient = useQueryClient();
 
-  const targetUserId = selectedAthleteId || user?.id || '';
+  const targetUserId = (role === 'coach' && selectedAthleteId ? selectedAthleteId : user?.id) || user?.id || '';
 
   // Input & Staged State
   const [nlInput, setNlInput] = useState('');

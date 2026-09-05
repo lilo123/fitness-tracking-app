@@ -138,11 +138,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) {
         return { success: false, error: error.message };
       }
-      if (data?.user) {
+      if (data?.session && data?.user) {
         setUser(data.user);
         await fetchProfile(data.user.id, data.user.email);
+        return { success: true };
       }
-      return { success: true };
+      return {
+        success: false,
+        error: 'Account created! Please check your email to confirm your account before signing in, or disable email confirmation in Supabase Auth settings.',
+      };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
