@@ -118,4 +118,48 @@ describe('SettingsView', () => {
       expect(localStorage.getItem('cybergym_view_mode')).toBe('athlete');
     });
   });
+
+  it('renders Workout Preferences section with auto-start rest timer toggle switch', async () => {
+    renderComponent();
+    await screen.findByDisplayValue('Coach Duy');
+
+    expect(screen.getByText('Workout Preferences')).toBeDefined();
+    expect(screen.getByText('Auto-start Rest Timer on Set Log')).toBeDefined();
+    const toggleBtn = screen.getByTestId('toggle-auto-timer');
+    expect(toggleBtn).toBeDefined();
+    expect(toggleBtn.getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('allows toggling auto-start rest timer preference and persists to localStorage and profile', async () => {
+    renderComponent();
+    await screen.findByDisplayValue('Coach Duy');
+
+    const toggleBtn = screen.getByTestId('toggle-auto-timer');
+    expect(toggleBtn.getAttribute('aria-checked')).toBe('true');
+
+    // Toggle off
+    fireEvent.click(toggleBtn);
+
+    await waitFor(() => {
+      expect(toggleBtn.getAttribute('aria-checked')).toBe('false');
+      expect(localStorage.getItem('cybergym_auto_rest_timer')).toBe('false');
+      expect(mockUpsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          auto_rest_timer: false,
+        })
+      );
+    });
+
+    // Toggle back on
+    fireEvent.click(toggleBtn);
+    await waitFor(() => {
+      expect(toggleBtn.getAttribute('aria-checked')).toBe('true');
+      expect(localStorage.getItem('cybergym_auto_rest_timer')).toBe('true');
+      expect(mockUpsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          auto_rest_timer: true,
+        })
+      );
+    });
+  });
 });

@@ -496,7 +496,7 @@ describe('WorkoutEngine', () => {
     fireEvent.click(routineBtn);
 
     // Should render custom template option with name
-    const customTplOption = await screen.findByText('Custom Bulgarian Split Routine (Custom)');
+    const customTplOption = await screen.findByText('Custom Bulgarian Split Routine');
     expect(customTplOption).toBeDefined();
 
     fireEvent.click(customTplOption);
@@ -741,7 +741,7 @@ describe('WorkoutEngine', () => {
     const routineBtn = screen.getByTestId('routine-select-btn');
     fireEvent.click(routineBtn);
 
-    const customTplOption = await screen.findByText('Custom Broken Routine (Custom)');
+    const customTplOption = await screen.findByText('Custom Broken Routine');
     fireEvent.click(customTplOption);
 
     // Type into draft for this exercise
@@ -989,6 +989,226 @@ describe('WorkoutEngine', () => {
       expect(screen.getByText('Ad-hoc Arm Blast')).toBeDefined();
       expect(screen.getByText('Incline Bench Press')).toBeDefined();
       expect(screen.getByText('3/3 Sets')).toBeDefined();
+    });
+  });
+
+  it('deduplicates custom and default templates in routine modal and prioritizes custom DB template without (Custom) suffix', async () => {
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'routine_templates') {
+        return {
+          select: vi.fn().mockReturnValue({
+            or: vi.fn().mockResolvedValue({
+              data: [
+                {
+                  id: 'tpl-custom-push',
+                  name: 'Push, Quads, & Core - Reduced',
+                  days_of_week: ['Mon', 'Thu'],
+                  exercises: [
+                    {
+                      exercise_id: 'ex-bench',
+                      order_index: 0,
+                      target_sets: 4,
+                      target_reps: 8,
+                      exercise: { name: 'Incline Bench Press' },
+                    },
+                    {
+                      exercise_id: 'ex-custom-ext',
+                      order_index: 1,
+                      target_sets: 3,
+                      target_reps: 12,
+                      exercise: { name: 'Custom Quad Destroyer' },
+                    },
+                  ],
+                },
+              ],
+              error: null,
+            }),
+          }),
+        };
+      }
+      if (table === 'exercises') {
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({
+              data: [
+                { id: 'ex-bench', name: 'Incline Bench Press', body_part: 'Chest' },
+                { id: 'ex-custom-ext', name: 'Custom Quad Destroyer', body_part: 'Legs' },
+              ],
+              error: null,
+            }),
+          }),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          or: vi.fn().mockResolvedValue({ data: [], error: null }),
+          in: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+
+    const routineBtn = screen.getByTestId('routine-select-btn');
+    fireEvent.click(routineBtn);
+
+    // Wait for custom template to load and render exercise subtitle
+    await screen.findByText(/Custom Quad Destroyer/);
+
+    // Verify template appears exactly once in modal list (deduplicated with default)
+    const matchingRoutines = screen.getAllByText('Push, Quads, & Core - Reduced');
+    expect(matchingRoutines.length).toBe(1);
+
+    // Verify "(Custom)" suffix is NOT rendered
+    expect(screen.queryByText(/Push, Quads, & Core - Reduced \(Custom\)/)).toBeNull();
+
+    // Click template to load
+    fireEvent.click(matchingRoutines[0]);
+
+    // Verify custom DB exercises loaded (Database precedence)
+    await waitFor(() => {
+      expect(screen.getByText('Custom Quad Destroyer')).toBeDefined();
+    });
+  });
+
+  it('respects auto_rest_timer=false preference: does not auto-start rest timer on set commit, but manual timer works', async () => {
+    localStorage.setItem('cybergym_auto_rest_timer', 'false');
+
+    const mockInsert = vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({
+          data: {
+            id: 'logged-set-notimer',
+            set_index: 1,
+            weight: 225,
+            reps: 8,
+          },
+          error: null,
+        }),
+      }),
+    });
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'sets') {
+        return {
+          insert: mockInsert,
+          select: vi.fn().mockReturnValue({
+            in: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
+        };
+      }
+      if (table === 'workouts') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [{ id: 'workout-1' }], error: null }),
+            }),
+          }),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          or: vi.fn().mockResolvedValue({ data: [], error: null }),
+          in: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+    await selectWorkoutA();
+
+    // Verify floating rest timer is initially NOT visible
+    expect(screen.queryByTestId('rest-timer-pill')).toBeNull();
+
+    // Find and commit a set with weight and reps
+    const weightInput = await screen.findByTestId('ghost-weight-0-0');
+    const repsInput = screen.getByTestId('ghost-reps-0-0');
+    const commitBtn = screen.getByTestId('commit-set-btn-0-0');
+
+    await userEvent.type(weightInput, '185');
+    await userEvent.type(repsInput, '8');
+    fireEvent.click(commitBtn);
+
+    // Set was logged
+    await waitFor(() => {
+      expect(mockInsert).toHaveBeenCalled();
+    });
+
+    // Auto rest timer should NOT have started
+    expect(screen.queryByTestId('rest-timer-pill')).toBeNull();
+
+    // Clicking manual rest timer in header launches timer
+    const manualRestBtn = screen.getByTestId('rest-timer-btn');
+    fireEvent.click(manualRestBtn);
+
+    // Timer is now active and pill displayed
+    expect(screen.getByTestId('rest-timer-pill')).toBeDefined();
+    expect(screen.getByTestId('rest-timer-display').textContent).toBe('1:30');
+  });
+
+  it('switches to custom routine with empty exercises and correctly clears active exercises without stale state', async () => {
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'routine_templates') {
+        return {
+          select: vi.fn().mockReturnValue({
+            or: vi.fn().mockResolvedValue({
+              data: [
+                {
+                  id: 'tpl-empty-custom',
+                  name: 'Empty Custom Routine',
+                  days_of_week: [],
+                  exercises: [],
+                },
+              ],
+              error: null,
+            }),
+          }),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          or: vi.fn().mockResolvedValue({ data: [], error: null }),
+          in: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+    // First select Workout A which has exercises
+    await selectWorkoutA();
+    expect(await screen.findByText('Incline Bench Press')).toBeDefined();
+
+    // Now open routine modal and select Empty Custom Routine
+    const routineBtn = screen.getByTestId('routine-select-btn');
+    fireEvent.click(routineBtn);
+
+    const emptyOption = await screen.findByText('Empty Custom Routine');
+    fireEvent.click(emptyOption);
+
+    // Active exercises from previous routine should be cleared
+    await waitFor(() => {
+      expect(screen.queryByText('Incline Bench Press')).toBeNull();
+      expect(screen.getByText('Empty Custom Routine')).toBeDefined();
     });
   });
 });

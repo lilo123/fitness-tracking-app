@@ -12,6 +12,7 @@ import {
 import { getDishIcon } from '../../utils/dishIcons';
 import { Calendar, Dumbbell, Trophy, Search, Activity, Utensils, Trash2, AlertCircle, Edit2 } from 'lucide-react';
 import { EditMealModal } from '../nutrition/EditMealModal';
+import { groupSessionSetsByExercise } from '../../utils/historyGrouping';
 
 const CATEGORIES = ['All', 'Chest', 'Back', 'Arms', 'Shoulders', 'Legs', 'Core'];
 
@@ -114,21 +115,26 @@ export const HistoryView: React.FC = () => {
     },
   });
 
-  // Group by session (date) for workouts
+  // Group by session (workout_id, fallback to date) for workouts
   const sessions = useMemo(() => {
-    const map = new Map<string, { date: string; name: string; sets: any[] }>();
+    const map = new Map<
+      string,
+      { id: string; date: string; name: string; sets: (WorkoutSet & { workout_date: string; workout_name: string })[] }
+    >();
 
     allSets.forEach((set) => {
       const date = normalizeDateStr(set.workout_date);
       if (!date) return;
-      if (!map.has(date)) {
-        map.set(date, {
+      const sessionKey = set.workout_id || date;
+      if (!map.has(sessionKey)) {
+        map.set(sessionKey, {
+          id: sessionKey,
           date,
           name: set.workout_name,
           sets: [],
         });
       }
-      map.get(date)!.sets.push(set);
+      map.get(sessionKey)!.sets.push(set);
     });
 
     return Array.from(map.values()).sort((a, b) => b.date.localeCompare(a.date));
@@ -519,12 +525,12 @@ export const HistoryView: React.FC = () => {
 
               return (
                 <div
-                  key={session.date}
+                  key={session.id}
                   className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-5 shadow-2xl space-y-3"
                 >
                   <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
                     <div>
-                      <h3 className="text-sm font-black text-white">{session.name}</h3>
+                      <h3 className="text-sm font-black text-white">{session.name || 'Workout Session'}</h3>
                       <div className="text-[11px] font-mono text-cyan-400 mt-0.5">
                         {formatShortDate(session.date)} ({session.date})
                       </div>
@@ -539,22 +545,50 @@ export const HistoryView: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="space-y-1.5 pt-1">
-                    {session.sets.map((set, idx) => {
-                      const ex = exercises.find((e) => e.id === set.exercise_id);
-                      const exName = ex ? ex.name : set.exercise_id;
-                      return (
-                        <div
-                          key={set.id || idx}
-                          className="bg-zinc-950 border border-zinc-800/80 rounded-xl p-2.5 flex items-center justify-between text-xs"
-                        >
-                          <div className="font-extrabold text-white truncate">{exName}</div>
-                          <div className="font-mono font-bold text-cyan-300">
-                            {set.weight} lbs × {set.reps} reps
+                  <div className="space-y-3 pt-1">
+                    {groupSessionSetsByExercise(session.sets, exercises).map((group) => (
+                      <div
+                        key={group.exerciseName}
+                        className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-3 space-y-2"
+                      >
+                        <div className="flex items-center justify-between border-b border-zinc-800/60 pb-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Dumbbell className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                            <span className="font-extrabold text-white text-xs truncate">
+                              {group.exerciseName}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-zinc-800/90 text-zinc-300 border border-zinc-700/60 shrink-0">
+                              {group.bodyPart}
+                            </span>
+                          </div>
+                          <div className="text-[11px] font-mono font-bold text-amber-400/90 shrink-0 ml-2">
+                            {group.totalVolume.toLocaleString()} lbs
                           </div>
                         </div>
-                      );
-                    })}
+
+                        <div className="space-y-1.5">
+                          {group.sets.map((set, sIdx) => {
+                            const setNumber = (set.set_index != null && set.set_index > 0) ? set.set_index : (sIdx + 1);
+                            return (
+                              <div
+                                key={set.id || sIdx}
+                                className="bg-zinc-900/90 border border-zinc-800/60 rounded-xl px-2.5 py-1.5 flex items-center justify-between text-xs"
+                              >
+                                <div className="font-mono text-[11px] text-zinc-400 font-bold">
+                                  SET {setNumber}
+                                </div>
+                                <div className="font-mono font-bold text-cyan-300">
+                                  {set.weight} lbs × {set.reps} reps
+                                  {set.rpe != null && (
+                                    <span className="text-zinc-500 ml-1 text-[10px]">@{set.rpe}</span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               );

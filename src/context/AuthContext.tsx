@@ -26,6 +26,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data && !error) {
         setProfile(data as UserProfile);
         localStorage.setItem('cybergym_user', JSON.stringify(data));
+        if (data.auto_rest_timer !== undefined && data.auto_rest_timer !== null) {
+          localStorage.setItem('cybergym_auto_rest_timer', String(data.auto_rest_timer));
+        }
         if (data.role === 'coach') {
           const savedMode = localStorage.getItem('cybergym_view_mode') as UserRole;
           if (!savedMode) {
@@ -44,6 +47,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           target_carbs: 220,
           target_fat: 70,
           target_fiber: 30,
+          auto_rest_timer: true,
         };
         setProfile(fallbackProfile);
         localStorage.setItem('cybergym_user', JSON.stringify(fallbackProfile));
@@ -154,6 +158,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updated = { ...profile, ...safeUpdates };
     setProfile(updated);
     localStorage.setItem('cybergym_user', JSON.stringify(updated));
+    if (safeUpdates.auto_rest_timer !== undefined) {
+      localStorage.setItem('cybergym_auto_rest_timer', String(safeUpdates.auto_rest_timer));
+    }
 
     try {
       const { error } = await supabase

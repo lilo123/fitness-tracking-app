@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import type { UserProfile, UserRole } from '../../types/database';
-import { Settings, User, Target, CheckCircle2, Shield, Dumbbell } from 'lucide-react';
+import { Settings, User, Target, CheckCircle2, Shield, Dumbbell, Timer } from 'lucide-react';
 
 interface SettingsFormProps {
   profile: UserProfile | null;
@@ -22,8 +22,25 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
   const [targetCarbs, setTargetCarbs] = useState(profile?.target_carbs || 220);
   const [targetFat, setTargetFat] = useState(profile?.target_fat || 70);
   const [targetFiber, setTargetFiber] = useState(profile?.target_fiber ?? 30);
+  const [autoRestTimer, setAutoRestTimer] = useState<boolean>(() => {
+    if (profile?.auto_rest_timer !== undefined) return profile.auto_rest_timer;
+    const localVal = localStorage.getItem('cybergym_auto_rest_timer');
+    return localVal !== null ? localVal !== 'false' : true;
+  });
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const handleToggleAutoTimer = async () => {
+    const nextVal = !autoRestTimer;
+    setAutoRestTimer(nextVal);
+    localStorage.setItem('cybergym_auto_rest_timer', String(nextVal));
+
+    try {
+      await updateProfile({ auto_rest_timer: nextVal });
+    } catch {
+      // Graceful fallback: local state and localStorage already updated
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,6 +54,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
       target_carbs: Number(targetCarbs),
       target_fat: Number(targetFat),
       target_fiber: Number(targetFiber),
+      auto_rest_timer: autoRestTimer,
     });
 
     if (res.success) {
@@ -133,6 +151,43 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
             )}
           </div>
 
+        </div>
+      </div>
+
+      {/* Workout Preferences */}
+      <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-5 shadow-2xl space-y-4">
+        <div className="flex items-center gap-2 border-b border-zinc-800 pb-3">
+          <Timer className="w-4 h-4 text-cyan-400" />
+          <h3 className="text-sm font-black text-white uppercase tracking-wider">
+            Workout Preferences
+          </h3>
+        </div>
+
+        <div className="flex items-center justify-between gap-4 p-3 bg-zinc-950/80 border border-zinc-800/80 rounded-2xl">
+          <div className="space-y-0.5">
+            <div className="text-xs font-bold text-white">Auto-start Rest Timer on Set Log</div>
+            <div className="text-[11px] text-zinc-400 leading-relaxed">
+              Automatically start the 90s countdown timer when logging any set.
+            </div>
+          </div>
+
+          <button
+            type="button"
+            role="switch"
+            aria-checked={autoRestTimer}
+            data-testid="toggle-auto-timer"
+            onClick={handleToggleAutoTimer}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+              autoRestTimer ? 'bg-cyan-500' : 'bg-zinc-800'
+            }`}
+          >
+            <span
+              aria-hidden="true"
+              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                autoRestTimer ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
         </div>
       </div>
 

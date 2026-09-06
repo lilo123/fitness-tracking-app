@@ -40,11 +40,12 @@ import {
 } from 'lucide-react';
 
 export const WorkoutEngine: React.FC = () => {
-  const { user, role } = useAuth();
+  const { user, profile, role } = useAuth();
   const { selectedAthleteId } = useCoach();
   const queryClient = useQueryClient();
 
   const targetUserId = (role === 'coach' && selectedAthleteId ? selectedAthleteId : user?.id) || user?.id || '';
+  const autoRestTimer = profile?.auto_rest_timer ?? (localStorage.getItem('cybergym_auto_rest_timer') !== 'false');
 
   const [workoutDate, setWorkoutDate] = useState<string>(() => {
     return getLocalDateStr(new Date());
@@ -218,6 +219,28 @@ export const WorkoutEngine: React.FC = () => {
     },
   });
 
+  // Deduplicated routine templates with database precedence
+  const availableRoutines = useMemo(() => {
+    const seenCustomNames = new Set<string>();
+    const dedupedCustom: RoutineTemplate[] = [];
+    for (const t of customTemplates) {
+      const norm = t.name.trim().toLowerCase();
+      if (!seenCustomNames.has(norm)) {
+        seenCustomNames.add(norm);
+        dedupedCustom.push(t);
+      }
+    }
+
+    const fallbackDefaults = DEFAULT_WORKOUT_TEMPLATES.filter(
+      (dt) => !seenCustomNames.has(dt.name.trim().toLowerCase())
+    );
+
+    return {
+      custom: dedupedCustom,
+      defaults: fallbackDefaults,
+    };
+  }, [customTemplates]);
+
   // Fetch workouts and sets for target user
   const { data: userLogs = [], isFetched: logsFetched } = useQuery({
     queryKey: ['workout_sets', targetUserId],
@@ -335,8 +358,10 @@ export const WorkoutEngine: React.FC = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workout_sets', targetUserId] });
-      // Start a convenient 90s rest timer automatically
-      startTimer(90);
+      // Start a convenient 90s rest timer if autoRestTimer preference is enabled
+      if (autoRestTimer) {
+        startTimer(90);
+      }
     },
     onError: (err: any) => {
       setMutationError(err?.message || 'Failed to log set. Please try again.');
@@ -401,7 +426,9 @@ export const WorkoutEngine: React.FC = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workout_sets', targetUserId] });
-      startTimer(90);
+      if (autoRestTimer) {
+        startTimer(90);
+      }
     },
     onError: (err: any) => {
       setMutationError(err?.message || 'Failed to log sets. Please try again.');
@@ -441,25 +468,35 @@ export const WorkoutEngine: React.FC = () => {
   const loadCustomRoutineTemplate = useCallback(
     (tpl: RoutineTemplate) => {
       setActiveRoutineName(tpl.name);
-      if (!tpl.exercises) return;
+      const sortedExercises = [...(tpl.exercises || [])].sort(
+        (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
+      );
 
-      const exList = tpl.exercises
-        .sort((a, b) => a.order_index - b.order_index)
-        .map((e) => e.exercise?.name || e.exercise_name || exercises.find((ex) => ex.id === e.exercise_id)?.name || e.exercise_id);
-
+      const exList: string[] = [];
       const setTargets: Record<string, number> = {};
       const repTargets: Record<string, number> = {};
 
-      tpl.exercises.forEach((e) => {
-        const resolvedName = e.exercise?.name || e.exercise_name || exercises.find((ex) => ex.id === e.exercise_id)?.name || e.exercise_id;
-        setTargets[resolvedName] = e.target_sets || 3;
-        repTargets[resolvedName] = e.target_reps || 10;
+      sortedExercises.forEach((e) => {
+        const resolvedName =
+          e.exercise?.name ||
+          e.exercise_name ||
+          exercises.find((ex) => ex.id === e.exercise_id)?.name ||
+          e.exercise_id;
+        if (resolvedName) {
+          exList.push(resolvedName);
+          setTargets[resolvedName] = e.target_sets || 3;
+          repTargets[resolvedName] = e.target_reps || 10;
+        }
       });
 
       setActiveExercises(exList);
       setTargetSetCounts(setTargets);
       setTargetRepCounts(repTargets);
-      if (exList.length > 0) setExpandedExercises(new Set([exList[0]]));
+      if (exList.length > 0) {
+        setExpandedExercises(new Set([exList[0]]));
+      } else {
+        setExpandedExercises(new Set());
+      }
     },
     [exercises]
   );
@@ -492,9 +529,10 @@ export const WorkoutEngine: React.FC = () => {
 
     // 1. Existing logged workout for this date (preserves in-progress session)
     if (todaySets.length > 0) {
-      const loggedRoutineName = todaySets[0].workout_name || (todaySets[0] as any)?.workouts?.name;
-      const matchedCustom = customTemplates.find((t) => t.name === loggedRoutineName);
-      const matchedDef = DEFAULT_WORKOUT_TEMPLATES.find((t) => t.name === loggedRoutineName);
+      const loggedRoutineName = todaySets[0].workout_name || (todaySets[0] as any)?.workouts?.name || '';
+      const normLoggedName = loggedRoutineName.trim().toLowerCase();
+      const matchedCustom = customTemplates.find((t) => t.name.trim().toLowerCase() === normLoggedName);
+      const matchedDef = DEFAULT_WORKOUT_TEMPLATES.find((t) => t.name.trim().toLowerCase() === normLoggedName);
 
       if (matchedCustom && matchedCustom.exercises) {
         loadCustomRoutineTemplate(matchedCustom);
@@ -597,17 +635,21 @@ export const WorkoutEngine: React.FC = () => {
       return;
     }
 
-    // Check default templates
-    const defTpl = DEFAULT_WORKOUT_TEMPLATES.find((t) => t.name === routineName);
-    if (defTpl) {
-      loadDefaultRoutineTemplate(defTpl);
+    // Check custom DB templates FIRST (Database Precedence)
+    const customTpl = customTemplates.find(
+      (t) => t.name.trim().toLowerCase() === routineName.trim().toLowerCase()
+    );
+    if (customTpl) {
+      loadCustomRoutineTemplate(customTpl);
       return;
     }
 
-    // Check custom DB templates
-    const customTpl = customTemplates.find((t) => t.name === routineName);
-    if (customTpl) {
-      loadCustomRoutineTemplate(customTpl);
+    // Fallback to default templates SECOND
+    const defTpl = DEFAULT_WORKOUT_TEMPLATES.find(
+      (t) => t.name.trim().toLowerCase() === routineName.trim().toLowerCase()
+    );
+    if (defTpl) {
+      loadDefaultRoutineTemplate(defTpl);
     }
   };
 
@@ -942,7 +984,53 @@ export const WorkoutEngine: React.FC = () => {
                 {activeRoutineName === 'Rest Day' && <Check className="w-4 h-4 text-indigo-400" />}
               </button>
 
-              {DEFAULT_WORKOUT_TEMPLATES.map((tpl) => (
+              {availableRoutines.custom.map((tpl) => {
+                const isScheduledToday = tpl.days_of_week && tpl.days_of_week.includes(currentDayAbbr);
+                return (
+                  <button
+                    key={tpl.id}
+                    onClick={() => handleSelectRoutine(tpl.name)}
+                    className={`w-full text-left p-3.5 rounded-xl border transition ${
+                      activeRoutineName === tpl.name
+                        ? 'bg-cyan-500/15 border-cyan-500 text-cyan-300'
+                        : 'bg-zinc-950 border-zinc-800/80 text-white hover:bg-zinc-800'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between font-black">
+                      <div className="flex items-center gap-2">
+                        <span>{tpl.name}</span>
+                        {isScheduledToday && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            Scheduled Today
+                          </span>
+                        )}
+                      </div>
+                      {activeRoutineName === tpl.name && <Check className="w-4 h-4 text-cyan-400" />}
+                    </div>
+                    {tpl.days_of_week && tpl.days_of_week.length > 0 && (
+                      <div className="flex gap-1 mt-1">
+                        {tpl.days_of_week.map((d) => (
+                          <span
+                            key={d}
+                            className="bg-violet-500/20 text-violet-300 font-bold px-1.5 py-0.5 rounded text-[10px]"
+                          >
+                            {d}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {tpl.exercises && (
+                      <div className="text-[11px] font-normal text-zinc-400 mt-1 truncate">
+                        {tpl.exercises
+                          .map((e) => e.exercise?.name || e.exercise_name || exercises.find((ex) => ex.id === e.exercise_id)?.name || e.exercise_id)
+                          .join(', ')}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+
+              {availableRoutines.defaults.map((tpl) => (
                 <button
                   key={tpl.name}
                   onClick={() => handleSelectRoutine(tpl.name)}
@@ -978,52 +1066,6 @@ export const WorkoutEngine: React.FC = () => {
                   </div>
                 </button>
               ))}
-
-              {customTemplates.map((tpl) => {
-                const isScheduledToday = tpl.days_of_week && tpl.days_of_week.includes(currentDayAbbr);
-                return (
-                  <button
-                    key={tpl.id}
-                    onClick={() => handleSelectRoutine(tpl.name)}
-                    className={`w-full text-left p-3.5 rounded-xl border transition ${
-                      activeRoutineName === tpl.name
-                        ? 'bg-cyan-500/15 border-cyan-500 text-cyan-300'
-                        : 'bg-zinc-950 border-zinc-800/80 text-white hover:bg-zinc-800'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between font-black">
-                      <div className="flex items-center gap-2">
-                        <span>{tpl.name} (Custom)</span>
-                        {isScheduledToday && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                            Scheduled Today
-                          </span>
-                        )}
-                      </div>
-                      {activeRoutineName === tpl.name && <Check className="w-4 h-4 text-cyan-400" />}
-                    </div>
-                    {tpl.days_of_week && tpl.days_of_week.length > 0 && (
-                      <div className="flex gap-1 mt-1">
-                        {tpl.days_of_week.map((d) => (
-                          <span
-                            key={d}
-                            className="bg-violet-500/20 text-violet-300 font-bold px-1.5 py-0.5 rounded text-[10px]"
-                          >
-                            {d}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    {tpl.exercises && (
-                      <div className="text-[11px] font-normal text-zinc-400 mt-1 truncate">
-                        {tpl.exercises
-                          .map((e) => e.exercise?.name || e.exercise_name || exercises.find((ex) => ex.id === e.exercise_id)?.name || e.exercise_id)
-                          .join(', ')}
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
             </div>
           </div>
         </div>

@@ -4,7 +4,19 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useCoach } from '../../hooks/useCoach';
 import type { Exercise, RoutineTemplate } from '../../types/database';
-import { PlusCircle, BookOpen, CalendarPlus, Trash2, RefreshCw, Search, Check, AlertCircle } from 'lucide-react';
+import {
+  PlusCircle,
+  BookOpen,
+  CalendarPlus,
+  Trash2,
+  RefreshCw,
+  Search,
+  Check,
+  AlertCircle,
+  Pencil,
+  Copy,
+} from 'lucide-react';
+import { EditTemplateModal } from './EditTemplateModal';
 
 const MUSCLE_TAXONOMY = {
   "Chest": ["chest", "pecs", "pectoral", "upper chest", "lower chest"],
@@ -37,6 +49,8 @@ export const ExercisesView: React.FC = () => {
   const [selectedExercises, setSelectedExercises] = useState<{id: string, name: string}[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategoryFilter, setActiveCategoryFilter] = useState('All');
+  const [editingTemplate, setEditingTemplate] = useState<RoutineTemplate | null>(null);
+  const [isForking, setIsForking] = useState<boolean>(false);
 
   // Queries
   const { data: exercises = [] } = useQuery({
@@ -60,8 +74,8 @@ export const ExercisesView: React.FC = () => {
       if (!targetUserId) return [];
       const { data, error } = await supabase
         .from('routine_templates')
-        .select('*, exercises:template_exercises(*)')
-        .eq('user_id', targetUserId)
+        .select('*, exercises:template_exercises(*, exercise:exercises(name, body_part))')
+        .or(`user_id.eq.${targetUserId},is_master.eq.true,assigned_to.eq.${targetUserId}`)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data as RoutineTemplate[];
@@ -392,32 +406,105 @@ export const ExercisesView: React.FC = () => {
               <RefreshCw className="w-5 h-5 text-violet-400" /> Saved Templates ({templates.length})
             </h3>
             <div className="space-y-2">
-              {templates.map((tpl) => (
-                <div key={tpl.id} className="bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-4 flex justify-between items-center text-sm font-medium">
-                  <div>
-                    <div className="text-zinc-100">{tpl.name}</div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs text-zinc-500">{tpl.exercises?.length || 0} exercises</span>
-                      {tpl.days_of_week && tpl.days_of_week.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {tpl.days_of_week.map((d) => (
-                            <span key={d} className="text-[10px] font-bold px-1.5 py-0.5 bg-violet-500/20 text-violet-300 rounded border border-violet-500/30">
-                              {d}
-                            </span>
-                          ))}
-                        </div>
+              {templates.map((tpl) => {
+                const isOwner = tpl.user_id === user?.id;
+                const canEdit = !tpl.is_master && (isOwner || isCoach);
+                const isMasterOrAssigned = tpl.is_master || (!isOwner && !isCoach);
+
+                return (
+                  <div
+                    key={tpl.id}
+                    className="bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-4 flex justify-between items-center text-sm font-medium gap-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-zinc-100 font-bold truncate">{tpl.name}</span>
+                        {tpl.is_master && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 bg-cyan-500/20 text-cyan-300 rounded border border-cyan-500/30">
+                            Master
+                          </span>
+                        )}
+                        {tpl.assigned_to && tpl.assigned_to === user?.id && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 bg-amber-500/20 text-amber-300 rounded border border-amber-500/30">
+                            Assigned
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-zinc-500">{tpl.exercises?.length || 0} exercises</span>
+                        {tpl.days_of_week && tpl.days_of_week.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {tpl.days_of_week.map((d) => (
+                              <span
+                                key={d}
+                                className="text-[10px] font-bold px-1.5 py-0.5 bg-violet-500/20 text-violet-300 rounded border border-violet-500/30"
+                              >
+                                {d}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      {canEdit && (
+                        <button
+                          onClick={() => {
+                            setEditingTemplate(tpl);
+                            setIsForking(false);
+                          }}
+                          data-testid={`edit-template-${tpl.id}`}
+                          className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-violet-400 transition touch-manipulation"
+                          title="Edit Template"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      )}
+                      {isMasterOrAssigned && (
+                        <button
+                          onClick={() => {
+                            setEditingTemplate(tpl);
+                            setIsForking(true);
+                          }}
+                          data-testid={`fork-template-${tpl.id}`}
+                          className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-cyan-400 transition touch-manipulation"
+                          title="Duplicate & Customize"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      )}
+                      {(isOwner || isCoach) && (
+                        <button
+                          onClick={() => deleteTemplateMutation.mutate(tpl.id)}
+                          data-testid={`delete-template-${tpl.id}`}
+                          className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-500 hover:text-rose-400 transition touch-manipulation"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       )}
                     </div>
                   </div>
-                  <button onClick={() => deleteTemplateMutation.mutate(tpl.id)} className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-500 hover:text-rose-400 transition touch-manipulation" title="Delete">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
       )}
+
+      {/* Edit Template Modal */}
+      <EditTemplateModal
+        isOpen={Boolean(editingTemplate)}
+        template={editingTemplate}
+        exercises={exercises}
+        targetUserId={targetUserId}
+        isFork={isForking}
+        onClose={() => setEditingTemplate(null)}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['routine_templates', targetUserId] });
+        }}
+      />
     </div>
   );
 };

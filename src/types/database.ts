@@ -10,6 +10,7 @@ export interface UserProfile {
   target_carbs: number;
   target_fat: number;
   target_fiber?: number;
+  auto_rest_timer?: boolean;
   created_at?: string;
 }
 

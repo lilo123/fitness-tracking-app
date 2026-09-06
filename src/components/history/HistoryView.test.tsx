@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { HistoryView } from './HistoryView';
+import { groupSessionSetsByExercise } from '../../utils/historyGrouping';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../../context/AuthContext';
 import { CoachProvider } from '../../context/CoachContext';
@@ -447,6 +448,303 @@ describe('HistoryView', () => {
     fireEvent.click(modalBackdrop);
     await waitFor(() => {
       expect(screen.queryByTestId('edit-meal-modal')).toBeNull();
+    });
+  });
+
+  describe('Exercise Grouping & Session Separation (Bug 3)', () => {
+    it('groupSessionSetsByExercise groups alternating superset sets by exercise in chronological order', () => {
+      const mockExercises = [
+        { id: 'ex-row', name: 'Seated Cable Row', body_part: 'Back' },
+        { id: 'ex-situp', name: 'Sit-Up', body_part: 'Core' },
+      ];
+
+      const supersetList = [
+        {
+          id: 'set-1',
+          exercise_id: 'ex-row',
+          weight: 180,
+          reps: 10,
+          set_index: 1,
+          set_type: 'working' as const,
+          workout_date: '2026-09-04',
+          workout_name: 'Pull & Core',
+        },
+        {
+          id: 'set-2',
+          exercise_id: 'ex-situp',
+          weight: 0,
+          reps: 20,
+          set_index: 1,
+          set_type: 'working' as const,
+          workout_date: '2026-09-04',
+          workout_name: 'Pull & Core',
+        },
+        {
+          id: 'set-3',
+          exercise_id: 'ex-row',
+          weight: 190,
+          reps: 8,
+          set_index: 2,
+          set_type: 'working' as const,
+          workout_date: '2026-09-04',
+          workout_name: 'Pull & Core',
+        },
+        {
+          id: 'set-4',
+          exercise_id: 'ex-situp',
+          weight: 0,
+          reps: 20,
+          set_index: 2,
+          set_type: 'working' as const,
+          workout_date: '2026-09-04',
+          workout_name: 'Pull & Core',
+        },
+      ];
+
+      const groups = groupSessionSetsByExercise(supersetList, mockExercises);
+
+      expect(groups).toHaveLength(2);
+      expect(groups[0].exerciseName).toBe('Seated Cable Row');
+      expect(groups[0].bodyPart).toBe('Back');
+      expect(groups[0].sets).toHaveLength(2);
+      expect(groups[0].totalVolume).toBe(180 * 10 + 190 * 8); // 1800 + 1520 = 3320
+
+      expect(groups[1].exerciseName).toBe('Sit-Up');
+      expect(groups[1].bodyPart).toBe('Core');
+      expect(groups[1].sets).toHaveLength(2);
+      expect(groups[1].totalVolume).toBe(0);
+    });
+
+    it('renders workout session with exercise headers and nested numbered set rows', async () => {
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'workouts') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({
+                data: [{ id: 'w-group-test', date: '2026-09-04', name: 'Pull & Core Session' }],
+                error: null,
+              }),
+            }),
+          };
+        }
+        if (table === 'sets') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({
+                  data: [
+                    {
+                      id: 'set-a1',
+                      workout_id: 'w-group-test',
+                      exercise_id: 'Seated Cable Row',
+                      weight: 185,
+                      reps: 8,
+                      set_index: 1,
+                      created_at: '2026-09-04T10:00:00Z',
+                      workouts: { date: '2026-09-04', name: 'Pull & Core Session' },
+                    },
+                    {
+                      id: 'set-a2',
+                      workout_id: 'w-group-test',
+                      exercise_id: 'Seated Cable Row',
+                      weight: 185,
+                      reps: 8,
+                      set_index: 2,
+                      created_at: '2026-09-04T10:05:00Z',
+                      workouts: { date: '2026-09-04', name: 'Pull & Core Session' },
+                    },
+                  ],
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            }),
+          }),
+        };
+      });
+
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByText('Pull & Core Session')).toBeDefined();
+        expect(screen.getByText('Seated Cable Row')).toBeDefined();
+        expect(screen.getByText('SET 1')).toBeDefined();
+        expect(screen.getByText('SET 2')).toBeDefined();
+        expect(screen.getAllByText('185 lbs × 8 reps')).toHaveLength(2);
+      });
+    });
+
+    it('maintains discrete session cards for multiple workouts logged on the same calendar date', async () => {
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'workouts') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({
+                data: [
+                  { id: 'w-morning', date: '2026-09-05', name: 'Morning Cardio' },
+                  { id: 'w-evening', date: '2026-09-05', name: 'Evening Heavy Push' },
+                ],
+                error: null,
+              }),
+            }),
+          };
+        }
+        if (table === 'sets') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({
+                  data: [
+                    {
+                      id: 's-m1',
+                      workout_id: 'w-morning',
+                      exercise_id: 'Sit-Up',
+                      weight: 0,
+                      reps: 25,
+                      set_index: 1,
+                      created_at: '2026-09-05T07:00:00Z',
+                      workouts: { date: '2026-09-05', name: 'Morning Cardio' },
+                    },
+                    {
+                      id: 's-e1',
+                      workout_id: 'w-evening',
+                      exercise_id: 'Incline Bench Press',
+                      weight: 225,
+                      reps: 6,
+                      set_index: 1,
+                      created_at: '2026-09-05T18:00:00Z',
+                      workouts: { date: '2026-09-05', name: 'Evening Heavy Push' },
+                    },
+                  ],
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            }),
+          }),
+        };
+      });
+
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByText('Morning Cardio')).toBeDefined();
+        expect(screen.getByText('Evening Heavy Push')).toBeDefined();
+      });
+    });
+
+    it('handles undefined exercise_id and set_index zero gracefully in grouping and rendering', async () => {
+      // Direct unit test of groupSessionSetsByExercise with edge cases
+      const testSets = [
+        {
+          id: 'set-edge-1',
+          workout_id: 'w-1',
+          exercise_id: '',
+          exercise_name: 'Dumbbell Fly',
+          workout_date: '2026-09-06',
+          workout_name: '',
+          weight: 45,
+          reps: 12,
+          set_index: 0,
+          created_at: '2026-09-06T10:00:00Z',
+        },
+        {
+          id: 'set-edge-2',
+          workout_id: 'w-1',
+          exercise_id: 'unknown-uuid',
+          exercise_name: 'Dumbbell Fly',
+          workout_date: '2026-09-06',
+          workout_name: '',
+          weight: 50,
+          reps: 10,
+          set_index: 0,
+          created_at: '2026-09-06T10:05:00Z',
+        },
+      ] as any;
+
+      const exercises = [
+        { id: 'ex-fly', name: 'Dumbbell Fly', body_part: 'Chest' },
+      ] as any;
+
+      const groups = groupSessionSetsByExercise(testSets, exercises);
+      expect(groups.length).toBe(1);
+      expect(groups[0].exerciseName).toBe('Dumbbell Fly');
+      expect(groups[0].bodyPart).toBe('Chest');
+      expect(groups[0].sets[0].id).toBe('set-edge-1');
+      expect(groups[0].sets[1].id).toBe('set-edge-2');
+
+      // Now test rendering in HistoryView with blank session name
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'workouts') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({
+                data: [{ id: 'w-1', date: '2026-09-06', name: '' }],
+                error: null,
+              }),
+            }),
+          };
+        }
+        if (table === 'sets') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({
+                  data: [
+                    {
+                      id: 'set-edge-1',
+                      workout_id: 'w-1',
+                      exercise_id: 'ex-fly',
+                      exercise_name: 'Dumbbell Fly',
+                      weight: 45,
+                      reps: 12,
+                      set_index: 0,
+                      created_at: '2026-09-06T10:00:00Z',
+                      workouts: { date: '2026-09-06', name: '' },
+                    },
+                  ],
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: exercises, error: null }),
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            }),
+          }),
+        };
+      });
+
+      renderComponent();
+
+      await waitFor(() => {
+        // Fallback workout session title
+        expect(screen.getByText('Workout Session')).toBeDefined();
+        // Set index zero converted to 1-indexed SET 1
+        expect(screen.getByText('SET 1')).toBeDefined();
+        expect(screen.queryByText('SET 0')).toBeNull();
+      });
     });
   });
 });
