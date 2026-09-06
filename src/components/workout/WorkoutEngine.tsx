@@ -6,7 +6,6 @@ import { useCoach } from '../../hooks/useCoach';
 import type {
   WorkoutSet,
   Exercise,
-  SetType,
   RoutineTemplate,
 } from '../../types/database';
 import {
@@ -14,8 +13,11 @@ import {
   getExerciseBenchmarks,
   normalizeDateStr,
   formatShortDate,
+  getLocalDateStr,
+  getDayOfWeekAbbr,
   DEFAULT_EXERCISES_LIST,
   DEFAULT_WORKOUT_TEMPLATES,
+  type WorkoutTemplateDefinition,
 } from '../../utils/ghostSets';
 import {
   Layers,
@@ -45,36 +47,61 @@ export const WorkoutEngine: React.FC = () => {
   const targetUserId = (role === 'coach' && selectedAthleteId ? selectedAthleteId : user?.id) || user?.id || '';
 
   const [workoutDate, setWorkoutDate] = useState<string>(() => {
-    return normalizeDateStr(new Date().toISOString());
+    return getLocalDateStr(new Date());
   });
 
-  const [activeRoutineName, setActiveRoutineName] = useState<string>('Workout A (Push, Quads & Core)');
-  const [activeExercises, setActiveExercises] = useState<string[]>([
-    'Incline Bench Press',
-    'Cable Lateral Raises',
-    'Dips',
-    'Leg Extension Machine',
-    'Overhead Tricep Cable Pull',
-    'Leg Raise',
-  ]);
-
-  const [targetSetCounts, setTargetSetCounts] = useState<Record<string, number>>({
-    'Incline Bench Press': 4,
-    'Cable Lateral Raises': 3,
-    'Dips': 3,
-    'Leg Extension Machine': 3,
-    'Overhead Tricep Cable Pull': 3,
-    'Leg Raise': 3,
+  const [activeRoutineName, setActiveRoutineName] = useState<string>(() => {
+    const initialDateStr = getLocalDateStr(new Date());
+    const dayAbbr = getDayOfWeekAbbr(initialDateStr);
+    const defTpl = DEFAULT_WORKOUT_TEMPLATES.find((t) =>
+      t.days.some((d) => d === dayAbbr || d.slice(0, 3) === dayAbbr)
+    );
+    return defTpl ? defTpl.name : 'Rest Day';
   });
 
-  const [expandedExercises, setExpandedExercises] = useState<Set<string>>(
-    () => new Set(['Incline Bench Press'])
-  );
+  const [activeExercises, setActiveExercises] = useState<string[]>(() => {
+    const initialDateStr = getLocalDateStr(new Date());
+    const dayAbbr = getDayOfWeekAbbr(initialDateStr);
+    const defTpl = DEFAULT_WORKOUT_TEMPLATES.find((t) =>
+      t.days.some((d) => d === dayAbbr || d.slice(0, 3) === dayAbbr)
+    );
+    return defTpl ? [...defTpl.exercises] : [];
+  });
 
-  // Ghost set form input drafts: { [exerciseName_setIndex]: { weight, reps, setType, rpe } }
+  const [targetSetCounts, setTargetSetCounts] = useState<Record<string, number>>(() => {
+    const initialDateStr = getLocalDateStr(new Date());
+    const dayAbbr = getDayOfWeekAbbr(initialDateStr);
+    const defTpl = DEFAULT_WORKOUT_TEMPLATES.find((t) =>
+      t.days.some((d) => d === dayAbbr || d.slice(0, 3) === dayAbbr)
+    );
+    return defTpl ? { ...defTpl.targetSets } : {};
+  });
+
+  const [targetRepCounts, setTargetRepCounts] = useState<Record<string, number>>(() => {
+    const initialDateStr = getLocalDateStr(new Date());
+    const dayAbbr = getDayOfWeekAbbr(initialDateStr);
+    const defTpl = DEFAULT_WORKOUT_TEMPLATES.find((t) =>
+      t.days.some((d) => d === dayAbbr || d.slice(0, 3) === dayAbbr)
+    );
+    return defTpl?.targetReps ? { ...defTpl.targetReps } : {};
+  });
+
+  const [expandedExercises, setExpandedExercises] = useState<Set<string>>(() => {
+    const initialDateStr = getLocalDateStr(new Date());
+    const dayAbbr = getDayOfWeekAbbr(initialDateStr);
+    const defTpl = DEFAULT_WORKOUT_TEMPLATES.find((t) =>
+      t.days.some((d) => d === dayAbbr || d.slice(0, 3) === dayAbbr)
+    );
+    return defTpl && defTpl.exercises.length > 0 ? new Set([defTpl.exercises[0]]) : new Set();
+  });
+
+  // Ghost set form input drafts: { [exerciseName_setIndex]: { weight, reps } }
   const [inputDrafts, setInputDrafts] = useState<
-    Record<string, { weight: string; reps: string; setType: SetType; rpe: string }>
+    Record<string, { weight: string; reps: string }>
   >({});
+
+  const resolvedDateRef = useRef<string | null>(null);
+  const manualSelectionDateRef = useRef<string | null>(null);
 
   // Routine Selector Modal
   const [showRoutineModal, setShowRoutineModal] = useState(false);
@@ -174,7 +201,7 @@ export const WorkoutEngine: React.FC = () => {
   });
 
   // Fetch routine templates
-  const { data: customTemplates = [] } = useQuery({
+  const { data: customTemplates = [], isFetched: templatesFetched } = useQuery({
     queryKey: ['routine_templates', targetUserId],
     queryFn: async () => {
       if (!targetUserId) return [];
@@ -192,7 +219,7 @@ export const WorkoutEngine: React.FC = () => {
   });
 
   // Fetch workouts and sets for target user
-  const { data: userLogs = [] } = useQuery({
+  const { data: userLogs = [], isFetched: logsFetched } = useQuery({
     queryKey: ['workout_sets', targetUserId],
     queryFn: async () => {
       if (!targetUserId) return [];
@@ -220,9 +247,10 @@ export const WorkoutEngine: React.FC = () => {
           return {
             ...s,
             workout_date: normalizeDateStr(s.workouts?.date || s.created_at),
+            workout_name: s.workouts?.name || undefined,
             exercise_name: matched ? matched.name : s.exercise_id,
           };
-        }) as (WorkoutSet & { workout_date: string })[];
+        }) as (WorkoutSet & { workout_date: string; workout_name?: string })[];
       } catch {
         return [];
       }
@@ -271,8 +299,6 @@ export const WorkoutEngine: React.FC = () => {
       exerciseName: string;
       weight: number;
       reps: number;
-      setType: SetType;
-      rpe?: number | null;
       setIndex: number;
     }) => {
       const workoutId = await getOrCreateWorkout();
@@ -295,10 +321,10 @@ export const WorkoutEngine: React.FC = () => {
             workout_id: workoutId,
             exercise_id: exerciseId,
             set_index: payload.setIndex,
-            set_type: payload.setType,
+            set_type: 'working',
             weight: payload.weight,
             reps: payload.reps,
-            rpe: payload.rpe || null,
+            rpe: null,
           },
         ])
         .select()
@@ -324,8 +350,6 @@ export const WorkoutEngine: React.FC = () => {
         exerciseName: string;
         weight: number;
         reps: number;
-        setType: SetType;
-        rpe?: number | null;
         setIndex: number;
       }[]
     ) => {
@@ -344,10 +368,10 @@ export const WorkoutEngine: React.FC = () => {
             workout_id: workoutId,
             exercise_id: exerciseId,
             set_index: s.setIndex,
-            set_type: s.setType,
+            set_type: 'working',
             weight: s.weight,
             reps: s.reps,
-            rpe: s.rpe || null,
+            rpe: null,
           };
         })
         .filter((p): p is NonNullable<typeof p> => p !== null);
@@ -414,6 +438,116 @@ export const WorkoutEngine: React.FC = () => {
     });
   };
 
+  const loadCustomRoutineTemplate = useCallback(
+    (tpl: RoutineTemplate) => {
+      setActiveRoutineName(tpl.name);
+      if (!tpl.exercises) return;
+
+      const exList = tpl.exercises
+        .sort((a, b) => a.order_index - b.order_index)
+        .map((e) => e.exercise?.name || e.exercise_name || exercises.find((ex) => ex.id === e.exercise_id)?.name || e.exercise_id);
+
+      const setTargets: Record<string, number> = {};
+      const repTargets: Record<string, number> = {};
+
+      tpl.exercises.forEach((e) => {
+        const resolvedName = e.exercise?.name || e.exercise_name || exercises.find((ex) => ex.id === e.exercise_id)?.name || e.exercise_id;
+        setTargets[resolvedName] = e.target_sets || 3;
+        repTargets[resolvedName] = e.target_reps || 10;
+      });
+
+      setActiveExercises(exList);
+      setTargetSetCounts(setTargets);
+      setTargetRepCounts(repTargets);
+      if (exList.length > 0) setExpandedExercises(new Set([exList[0]]));
+    },
+    [exercises]
+  );
+
+  const loadDefaultRoutineTemplate = useCallback(
+    (tpl: WorkoutTemplateDefinition) => {
+      setActiveRoutineName(tpl.name);
+      setActiveExercises([...tpl.exercises]);
+      setTargetSetCounts({ ...tpl.targetSets });
+      setTargetRepCounts(tpl.targetReps ? { ...tpl.targetReps } : {});
+      if (tpl.exercises.length > 0) setExpandedExercises(new Set([tpl.exercises[0]]));
+    },
+    []
+  );
+
+  /* oxlint-disable react/set-state-in-effect */
+  useEffect(() => {
+    if (!templatesFetched || !logsFetched) return;
+
+    // Reset manual override if date changed away from where manual override was recorded
+    if (manualSelectionDateRef.current && manualSelectionDateRef.current !== workoutDate) {
+      manualSelectionDateRef.current = null;
+    }
+
+    // Honor explicit user routine selection on this date
+    if (manualSelectionDateRef.current === workoutDate) return;
+
+    if (resolvedDateRef.current === workoutDate) return;
+    resolvedDateRef.current = workoutDate;
+
+    // 1. Existing logged workout for this date (preserves in-progress session)
+    if (todaySets.length > 0) {
+      const loggedRoutineName = todaySets[0].workout_name || (todaySets[0] as any)?.workouts?.name;
+      const matchedCustom = customTemplates.find((t) => t.name === loggedRoutineName);
+      const matchedDef = DEFAULT_WORKOUT_TEMPLATES.find((t) => t.name === loggedRoutineName);
+
+      if (matchedCustom && matchedCustom.exercises) {
+        loadCustomRoutineTemplate(matchedCustom);
+      } else if (matchedDef) {
+        loadDefaultRoutineTemplate(matchedDef);
+      } else {
+        setActiveRoutineName(loggedRoutineName || 'Logged Workout');
+        const loggedExercises = Array.from(
+          new Set(todaySets.map((s) => s.exercise_name || s.exercise_id))
+        );
+        setActiveExercises(loggedExercises);
+        const setTargets: Record<string, number> = {};
+        loggedExercises.forEach((exName) => {
+          const exSets = todaySets.filter(
+            (s) => (s.exercise_name || s.exercise_id) === exName
+          );
+          const maxIdx = Math.max(
+            ...exSets.map((s) => s.set_index || 0),
+            exSets.length,
+            3
+          );
+          setTargets[exName] = maxIdx;
+        });
+        setTargetSetCounts(setTargets);
+        setTargetRepCounts({});
+      }
+      return;
+    }
+
+    // 2. Query scheduled custom templates
+    const dayAbbr = getDayOfWeekAbbr(workoutDate);
+    const scheduledCustom = customTemplates.find((t) => t.days_of_week?.includes(dayAbbr));
+    if (scheduledCustom && scheduledCustom.exercises) {
+      loadCustomRoutineTemplate(scheduledCustom);
+      return;
+    }
+
+    // 3. Fallback to default templates
+    const scheduledDef = DEFAULT_WORKOUT_TEMPLATES.find((t) =>
+      t.days.some((d) => d === dayAbbr || d.slice(0, 3) === dayAbbr)
+    );
+    if (scheduledDef) {
+      loadDefaultRoutineTemplate(scheduledDef);
+      return;
+    }
+
+    // 4. Sunday / Rest Day Fallback
+    setActiveRoutineName('Rest Day');
+    setActiveExercises([]);
+    setTargetSetCounts({});
+    setTargetRepCounts({});
+  }, [workoutDate, templatesFetched, logsFetched, customTemplates, todaySets, loadCustomRoutineTemplate, loadDefaultRoutineTemplate]);
+
   const toggleAccordion = (exName: string) => {
     setExpandedExercises((prev) => {
       const next = new Set(prev);
@@ -444,44 +578,36 @@ export const WorkoutEngine: React.FC = () => {
   };
 
   const handleSelectRoutine = (routineName: string) => {
-    setActiveRoutineName(routineName);
+    manualSelectionDateRef.current = workoutDate;
     setShowRoutineModal(false);
 
     if (routineName === 'Rest Day') {
+      setActiveRoutineName('Rest Day');
       setActiveExercises([]);
       setTargetSetCounts({});
+      setTargetRepCounts({});
       return;
     }
 
     if (routineName === 'Free Workout') {
+      setActiveRoutineName('Free Workout');
       setActiveExercises([]);
       setTargetSetCounts({});
+      setTargetRepCounts({});
       return;
     }
 
     // Check default templates
     const defTpl = DEFAULT_WORKOUT_TEMPLATES.find((t) => t.name === routineName);
     if (defTpl) {
-      setActiveExercises([...defTpl.exercises]);
-      setTargetSetCounts({ ...defTpl.targetSets });
-      setExpandedExercises(new Set([defTpl.exercises[0]]));
+      loadDefaultRoutineTemplate(defTpl);
       return;
     }
 
     // Check custom DB templates
     const customTpl = customTemplates.find((t) => t.name === routineName);
-    if (customTpl && customTpl.exercises) {
-      const exList = customTpl.exercises
-        .sort((a, b) => a.order_index - b.order_index)
-        .map((e) => e.exercise?.name || e.exercise_name || exercises.find((ex) => ex.id === e.exercise_id)?.name || e.exercise_id);
-      const targets: Record<string, number> = {};
-      customTpl.exercises.forEach((e) => {
-        const resolvedName = e.exercise?.name || e.exercise_name || exercises.find((ex) => ex.id === e.exercise_id)?.name || e.exercise_id;
-        targets[resolvedName] = e.target_sets || 3;
-      });
-      setActiveExercises(exList);
-      setTargetSetCounts(targets);
-      if (exList.length > 0) setExpandedExercises(new Set([exList[0]]));
+    if (customTpl) {
+      loadCustomRoutineTemplate(customTpl);
     }
   };
 
@@ -543,20 +669,15 @@ export const WorkoutEngine: React.FC = () => {
       ? ghostValues.reps
       : 0;
 
-    if (weightVal < 0 || repsVal <= 0) {
+    if (weightVal <= 0 || repsVal <= 0) {
       setMutationError('Please enter weight and reps or use previous set values.');
       return;
     }
-
-    const setType: SetType = draft?.setType || 'working';
-    const rpe = draft?.rpe ? Number(draft.rpe) : null;
 
     logSetMutation.mutate({
       exerciseName: exName,
       weight: weightVal,
       reps: repsVal,
-      setType,
-      rpe,
       setIndex,
     });
 
@@ -571,18 +692,15 @@ export const WorkoutEngine: React.FC = () => {
   const updateDraft = (
     exName: string,
     setIndex: number,
-    field: 'weight' | 'reps' | 'setType' | 'rpe',
+    field: 'weight' | 'reps',
     value: string
   ) => {
     const draftKey = `${exName}_${setIndex}`;
     setInputDrafts((prev) => ({
       ...prev,
       [draftKey]: {
-        weight: prev[draftKey]?.weight || '',
-        reps: prev[draftKey]?.reps || '',
-        setType: prev[draftKey]?.setType || 'working',
-        rpe: prev[draftKey]?.rpe || '',
-        [field]: value,
+        weight: field === 'weight' ? value : prev[draftKey]?.weight || '',
+        reps: field === 'reps' ? value : prev[draftKey]?.reps || '',
       },
     }));
   };
@@ -593,7 +711,12 @@ export const WorkoutEngine: React.FC = () => {
     ghostValues: { weight: number | ''; reps: number | '' }[],
     setsToday: WorkoutSet[]
   ) => {
-    const unloggedSets = [];
+    const unloggedSets: {
+      exerciseName: string;
+      weight: number;
+      reps: number;
+      setIndex: number;
+    }[] = [];
     for (let rowIdx = setsToday.length; rowIdx < targetCount; rowIdx++) {
       const setIndex = rowIdx + 1;
       const ghost = ghostValues[rowIdx] || { weight: '', reps: '' };
@@ -610,25 +733,27 @@ export const WorkoutEngine: React.FC = () => {
         ? Number(draft.reps)
         : typeof ghost.reps === 'number'
         ? ghost.reps
-        : 0;
+        : targetRepCounts[exName] || 0;
 
       if (weightVal <= 0 || repsVal <= 0) continue;
-
-      const setType: SetType = draft?.setType || 'working';
-      const rpe = draft?.rpe ? Number(draft.rpe) : null;
 
       unloggedSets.push({
         exerciseName: exName,
         weight: weightVal,
         reps: repsVal,
-        setType,
-        rpe,
         setIndex,
       });
     }
 
     if (unloggedSets.length > 0) {
       batchLogSetsMutation.mutate(unloggedSets);
+      setInputDrafts((prev) => {
+        const next = { ...prev };
+        unloggedSets.forEach((s) => {
+          delete next[`${s.exerciseName}_${s.setIndex}`];
+        });
+        return next;
+      });
     }
   };
 
@@ -637,8 +762,6 @@ export const WorkoutEngine: React.FC = () => {
       exerciseName: string;
       weight: number;
       reps: number;
-      setType: SetType;
-      rpe?: number | null;
       setIndex: number;
     }[] = [];
 
@@ -663,19 +786,14 @@ export const WorkoutEngine: React.FC = () => {
           ? Number(draft.reps)
           : typeof ghost.reps === 'number'
           ? ghost.reps
-          : 0;
+          : targetRepCounts[exName] || 0;
 
         if (weightVal <= 0 || repsVal <= 0) continue;
-
-        const setType: SetType = draft?.setType || 'working';
-        const rpe = draft?.rpe ? Number(draft.rpe) : null;
 
         allPendingSets.push({
           exerciseName: exName,
           weight: weightVal,
           reps: repsVal,
-          setType,
-          rpe,
           setIndex,
         });
       }
@@ -683,6 +801,13 @@ export const WorkoutEngine: React.FC = () => {
 
     if (allPendingSets.length > 0) {
       batchLogSetsMutation.mutate(allPendingSets);
+      setInputDrafts((prev) => {
+        const next = { ...prev };
+        allPendingSets.forEach((s) => {
+          delete next[`${s.exerciseName}_${s.setIndex}`];
+        });
+        return next;
+      });
     }
   };
 
@@ -693,7 +818,7 @@ export const WorkoutEngine: React.FC = () => {
     activeExercises.length > 0 &&
     activeExercises.every((exName) => getSetsForExerciseToday(exName).length >= (targetSetCounts[exName] || 3));
 
-  const todayAbbr = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date().getDay()];
+  const currentDayAbbr = getDayOfWeekAbbr(workoutDate);
 
   return (
     <div className="space-y-5">
@@ -759,6 +884,8 @@ export const WorkoutEngine: React.FC = () => {
                 if (confirm("Clear all exercises from today's workout?")) {
                   setActiveExercises([]);
                   setTargetSetCounts({});
+                  setTargetRepCounts({});
+                  manualSelectionDateRef.current = workoutDate;
                 }
               }}
               className="bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 font-extrabold px-2.5 py-1.5 rounded-xl text-xs transition flex items-center gap-1 shadow-[0_0_10px_rgba(244,63,94,0.15)] active:scale-95"
@@ -828,7 +955,7 @@ export const WorkoutEngine: React.FC = () => {
                   <div className="flex items-center justify-between font-black">
                     <div className="flex items-center gap-2">
                       <span>{tpl.name}</span>
-                      {tpl.days.includes(todayAbbr) && (
+                      {tpl.days.includes(currentDayAbbr) && (
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                           Scheduled Today
                         </span>
@@ -853,7 +980,7 @@ export const WorkoutEngine: React.FC = () => {
               ))}
 
               {customTemplates.map((tpl) => {
-                const isScheduledToday = tpl.days_of_week && tpl.days_of_week.includes(todayAbbr);
+                const isScheduledToday = tpl.days_of_week && tpl.days_of_week.includes(currentDayAbbr);
                 return (
                   <button
                     key={tpl.id}
@@ -1106,12 +1233,13 @@ export const WorkoutEngine: React.FC = () => {
                     {/* Accordion Body: Sets & Ghost Placeholders */}
                     {isExpanded && (
                       <div className="mt-4 pt-3 border-t border-zinc-800 space-y-2">
-                        <div className="grid grid-cols-12 gap-1 text-[10px] font-extrabold uppercase tracking-wider text-zinc-500 px-2">
-                          <div className="col-span-1 text-center">Set</div>
-                          <div className="col-span-2 text-center">Previous</div>
-                          <div className="col-span-2 text-center">Type</div>
-                          <div className="col-span-5 text-center">Weight × Reps × RPE</div>
-                          <div className="col-span-2 text-right">Action</div>
+                        {/* 5-Column Table Header */}
+                        <div className="grid grid-cols-12 gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-zinc-400 px-3 pb-1">
+                          <div className="col-span-2 sm:col-span-1 text-center">Set</div>
+                          <div className="col-span-3 sm:col-span-3 text-center">Previous</div>
+                          <div className="col-span-3 sm:col-span-3 text-center">Weight</div>
+                          <div className="col-span-2 sm:col-span-3 text-center">Reps</div>
+                          <div className="col-span-2 sm:col-span-2 text-right">Action</div>
                         </div>
 
                         {Array.from({ length: totalRows }, (_, rowIdx) => {
@@ -1128,56 +1256,29 @@ export const WorkoutEngine: React.FC = () => {
                           const draft = inputDrafts[draftKey] || {
                             weight: ghost.weight.toString(),
                             reps: ghost.reps.toString(),
-                            setType: 'working' as SetType,
-                            rpe: '',
                           };
 
                           if (loggedSet) {
                             return (
                               <div
                                 key={loggedSet.id || rowIdx}
-                                className="grid grid-cols-12 gap-1 sm:gap-2 py-2.5 px-2 rounded-xl items-center bg-zinc-950/60 border border-zinc-800/80 text-xs transition"
+                                className="grid grid-cols-12 gap-1.5 sm:gap-2 py-2.5 px-3 rounded-xl items-center bg-zinc-950/70 border border-zinc-800/80 text-xs transition"
                               >
-                                <div className="col-span-1 font-mono font-bold text-cyan-400 text-center flex items-center justify-center">
-                                  <span className="w-6 h-6 rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">
+                                <div className="col-span-2 sm:col-span-1 font-mono font-bold text-cyan-400 text-center flex items-center justify-center">
+                                  <span className="w-6 h-6 rounded-full bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center">
                                     {setIndex}
                                   </span>
                                 </div>
-                                <div className="col-span-2 text-zinc-500 font-mono text-center truncate px-0.5 text-[11px]">
+                                <div className="col-span-3 sm:col-span-3 text-zinc-400 font-mono text-center truncate text-[11px]">
                                   {ghost.hintText}
                                 </div>
-                                <div className="col-span-2 flex items-center justify-center">
-                                  {loggedSet.set_type === 'warmup' ? (
-                                    <span className="text-[10px] font-bold bg-amber-500/15 border border-amber-500/30 text-amber-400 px-1.5 py-0.5 rounded uppercase">
-                                      Warm
-                                    </span>
-                                  ) : loggedSet.set_type === 'drop' ? (
-                                    <span className="text-[10px] font-bold bg-purple-500/15 border border-purple-500/30 text-purple-400 px-1.5 py-0.5 rounded uppercase">
-                                      Drop
-                                    </span>
-                                  ) : (
-                                    <span className="text-[10px] font-medium text-zinc-500 font-mono">
-                                      Work
-                                    </span>
-                                  )}
+                                <div className="col-span-3 sm:col-span-3 text-center font-mono font-black text-white text-sm sm:text-base">
+                                  {loggedSet.weight} <span className="text-[10px] text-zinc-500 font-normal">lbs</span>
                                 </div>
-                                <div className="col-span-5 font-mono font-bold text-white text-center flex items-center justify-center gap-1.5">
-                                  <span className="text-sm text-cyan-300 font-extrabold">
-                                    {loggedSet.weight}
-                                  </span>
-                                  <span className="text-[10px] text-zinc-500 uppercase">lbs</span>
-                                  <span className="text-zinc-600 font-normal">×</span>
-                                  <span className="text-sm text-cyan-300 font-extrabold">
-                                    {loggedSet.reps}
-                                  </span>
-                                  <span className="text-[10px] text-zinc-500 uppercase">reps</span>
-                                  {loggedSet.rpe && (
-                                    <span className="text-[10px] bg-zinc-800 text-amber-300 px-1.5 py-0.5 rounded font-mono">
-                                      @{loggedSet.rpe}
-                                    </span>
-                                  )}
+                                <div className="col-span-2 sm:col-span-3 text-center font-mono font-black text-cyan-300 text-sm sm:text-base">
+                                  {loggedSet.reps} <span className="text-[10px] text-zinc-500 font-normal">reps</span>
                                 </div>
-                                <div className="col-span-2 flex justify-end">
+                                <div className="col-span-2 sm:col-span-2 flex justify-end">
                                   <button
                                     onClick={() => loggedSet.id && deleteSetMutation.mutate(loggedSet.id)}
                                     className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:w-8 sm:h-8 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center transition active:scale-95 touch-manipulation"
@@ -1193,74 +1294,53 @@ export const WorkoutEngine: React.FC = () => {
                             return (
                               <div
                                 key={rowIdx}
-                                className="grid grid-cols-12 gap-1 sm:gap-2 py-2 px-2 rounded-xl items-center bg-zinc-900/40 border border-dashed border-zinc-800/80 text-xs hover:border-zinc-700/80 transition"
+                                className="grid grid-cols-12 gap-1.5 sm:gap-2 py-2 px-3 rounded-xl items-center bg-zinc-900/40 border border-dashed border-zinc-800/80 text-xs hover:border-zinc-700/80 transition"
                               >
-                                <div className="col-span-1 font-mono font-bold text-zinc-500 text-center flex items-center justify-center">
+                                <div className="col-span-2 sm:col-span-1 font-mono font-bold text-zinc-500 text-center flex items-center justify-center">
                                   <span className="w-6 h-6 rounded-full bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-zinc-400">
                                     {setIndex}
                                   </span>
                                 </div>
-                                <div className="col-span-2 text-zinc-500 font-mono text-center truncate px-0.5 text-[11px]">
+                                <div className="col-span-3 sm:col-span-3 text-zinc-500 font-mono text-center truncate text-[11px]">
                                   {ghost.hintText}
                                 </div>
-                                <div className="col-span-2 flex items-center justify-center">
-                                  <select
-                                    value={draft.setType}
-                                    onChange={(e) =>
-                                      updateDraft(exName, setIndex, 'setType', e.target.value as SetType)
-                                    }
-                                    className="bg-zinc-950 border border-zinc-800 rounded-lg text-base sm:text-xs font-bold text-zinc-300 py-1.5 px-1 outline-none cursor-pointer"
-                                    data-testid={`set-type-select-${exIndex}-${rowIdx}`}
-                                    title="Set Type"
-                                  >
-                                    <option value="working">Work</option>
-                                    <option value="warmup">Warm</option>
-                                    <option value="drop">Drop</option>
-                                  </select>
+                                <div className="col-span-3 sm:col-span-3 flex items-center justify-center">
+                                  <div className="relative w-full max-w-[90px]">
+                                    <input
+                                      type="number"
+                                      inputMode="decimal"
+                                      placeholder={ghost.weight ? ghost.weight.toString() : 'lbs'}
+                                      value={draft.weight}
+                                      onChange={(e) => updateDraft(exName, setIndex, 'weight', e.target.value)}
+                                      className="w-full bg-zinc-950 border border-zinc-800 focus:border-cyan-500 text-white rounded-lg py-2 px-1 text-center font-mono font-bold text-sm sm:text-xs outline-none shadow-inner"
+                                      data-testid={`ghost-weight-${exIndex}-${rowIdx}`}
+                                    />
+                                  </div>
                                 </div>
-                                <div className="col-span-5 flex items-center justify-center gap-1">
-                                  <input
-                                    type="number"
-                                    inputMode="decimal"
-                                    placeholder={ghost.weight ? ghost.weight.toString() : 'lbs'}
-                                    value={draft.weight}
-                                    onChange={(e) =>
-                                      updateDraft(exName, setIndex, 'weight', e.target.value)
-                                    }
-                                    className="w-14 sm:w-14 bg-zinc-950 border border-zinc-800 focus:border-cyan-500 text-white rounded-lg py-1.5 px-1 text-center font-mono font-bold text-base sm:text-xs outline-none shadow-inner"
-                                    data-testid={`ghost-weight-${exIndex}-${rowIdx}`}
-                                  />
-                                  <span className="text-zinc-600 font-bold">×</span>
-                                  <input
-                                    type="number"
-                                    inputMode="numeric"
-                                    placeholder={ghost.reps ? ghost.reps.toString() : 'reps'}
-                                    value={draft.reps}
-                                    onChange={(e) =>
-                                      updateDraft(exName, setIndex, 'reps', e.target.value)
-                                    }
-                                    className="w-12 sm:w-12 bg-zinc-950 border border-zinc-800 focus:border-cyan-500 text-white rounded-lg py-1.5 px-1 text-center font-mono font-bold text-base sm:text-xs outline-none shadow-inner"
-                                    data-testid={`ghost-reps-${exIndex}-${rowIdx}`}
-                                  />
-                                  <input
-                                    type="number"
-                                    step="0.5"
-                                    inputMode="decimal"
-                                    placeholder="RPE"
-                                    value={draft.rpe}
-                                    onChange={(e) =>
-                                      updateDraft(exName, setIndex, 'rpe', e.target.value)
-                                    }
-                                    className="w-12 sm:w-12 bg-zinc-950 border border-zinc-800 focus:border-cyan-500 text-amber-300 rounded-lg py-1.5 px-1 text-center font-mono font-semibold text-base sm:text-xs outline-none shadow-inner"
-                                    data-testid={`rpe-input-${exIndex}-${rowIdx}`}
-                                    title="RPE (Rate of Perceived Exertion 1-10)"
-                                  />
+                                <div className="col-span-2 sm:col-span-3 flex items-center justify-center">
+                                  <div className="relative w-full max-w-[80px]">
+                                    <input
+                                      type="number"
+                                      inputMode="numeric"
+                                      placeholder={
+                                        ghost.reps
+                                          ? ghost.reps.toString()
+                                          : targetRepCounts[exName]
+                                          ? `${targetRepCounts[exName]}`
+                                          : 'reps'
+                                      }
+                                      value={draft.reps}
+                                      onChange={(e) => updateDraft(exName, setIndex, 'reps', e.target.value)}
+                                      className="w-full bg-zinc-950 border border-zinc-800 focus:border-cyan-500 text-white rounded-lg py-2 px-1 text-center font-mono font-bold text-sm sm:text-xs outline-none shadow-inner"
+                                      data-testid={`ghost-reps-${exIndex}-${rowIdx}`}
+                                    />
+                                  </div>
                                 </div>
-                                <div className="col-span-2 flex justify-end">
+                                <div className="col-span-2 sm:col-span-2 flex justify-end">
                                   <button
                                     onClick={() => handleCommitSet(exName, setIndex, ghost)}
                                     disabled={logSetMutation.isPending || batchLogSetsMutation.isPending}
-                                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:w-auto sm:h-8 sm:px-2.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 font-bold border border-cyan-500/40 flex items-center justify-center gap-1 transition shadow-[0_0_10px_rgba(6,182,212,0.1)] active:scale-95 shrink-0 disabled:opacity-50 touch-manipulation"
+                                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:w-auto sm:h-8 sm:px-3 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 font-bold border border-cyan-500/40 flex items-center justify-center gap-1 transition shadow-[0_0_10px_rgba(6,182,212,0.1)] active:scale-95 shrink-0 disabled:opacity-50 touch-manipulation"
                                     title="Commit Set (One-tap)"
                                     data-testid={`commit-set-btn-${exIndex}-${rowIdx}`}
                                   >

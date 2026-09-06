@@ -13,9 +13,11 @@ test.describe('Workout Flow E2E', () => {
     // Assert routine button and date input
     await expect(page.locator('[data-testid="routine-select-btn"]')).toBeVisible();
 
-    // Verify date input is present
+    // Verify date input is present and enforces native dark color-scheme
     const dateInput = page.locator('[data-testid="workout-date-input"]');
     await expect(dateInput).toBeVisible();
+    const colorScheme = await dateInput.evaluate((el) => window.getComputedStyle(el).colorScheme);
+    expect(colorScheme).toBe('dark');
 
     // Verify rest timer launcher button exists
     const timerBtn = page.locator('[data-testid="rest-timer-btn"]');
@@ -47,6 +49,14 @@ test.describe('Workout Flow E2E', () => {
   });
 
   test('interacts with workout sets, draft inputs, and commit action', async ({ page }) => {
+    // If on Rest Day, click Choose Routine to select Workout A so exercise set cards appear
+    const chooseRoutineBtn = page.locator('button:has-text("Choose Routine")');
+    if (await chooseRoutineBtn.isVisible()) {
+      await chooseRoutineBtn.click();
+      await page.click('button:has-text("Workout A (Push, Quads & Core)")');
+      await expect(page.locator('[data-testid="exercise-card-0"]')).toBeVisible();
+    }
+
     const commitBtn = page.locator('button[title*="Commit Set"]').first();
     const deleteBtn = page.locator('button[title*="Delete set"]').first();
 

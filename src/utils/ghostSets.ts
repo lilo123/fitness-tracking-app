@@ -23,6 +23,38 @@ export function normalizeDateStr(val: string | Date | null | undefined): string 
   return String(val);
 }
 
+/**
+ * Returns local YYYY-MM-DD string for a given Date or today.
+ */
+export function getLocalDateStr(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Timezone-safe local day of week abbreviation extractor.
+ * Avoids UTC date parsing shifts where UTC midnight becomes previous day in US time zones.
+ */
+export function getDayOfWeekAbbr(dateStr: string): string {
+  const norm = normalizeDateStr(dateStr);
+  if (!norm) return '';
+  const [year, month, day] = norm.split('-').map(Number);
+  if (isNaN(year) || isNaN(month) || isNaN(day)) return '';
+  const localDate = new Date(year, month - 1, day);
+  if (
+    isNaN(localDate.getTime()) ||
+    localDate.getFullYear() !== year ||
+    localDate.getMonth() !== month - 1 ||
+    localDate.getDate() !== day
+  ) {
+    return '';
+  }
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  return days[localDate.getDay()] || '';
+}
+
 export function formatShortDate(isoDateStr: string): string {
   if (!isoDateStr || typeof isoDateStr !== 'string') return '';
   const parts = isoDateStr.split('-');
@@ -125,26 +157,31 @@ export function getExerciseBenchmarks(
     return true;
   });
 
-  const historicalSets = validSets.filter((s) => {
+  // Strict session boundary: prior sessions only (excluding today)
+  const priorSets = validSets.filter((s) => {
     const setDate = normalizeDateStr(s.workout_date || s.date || s.created_at);
-    if (!setDate) return true;
+    if (!setDate) return false;
+    if (normCurrentDate && setDate >= normCurrentDate) return false;
+    return true;
+  });
+
+  // All historical sets up to and including today for PR calculation
+  const allTimeSets = validSets.filter((s) => {
+    const setDate = normalizeDateStr(s.workout_date || s.date || s.created_at);
+    if (!setDate) return false;
     if (normCurrentDate && setDate > normCurrentDate) return false;
     return true;
   });
 
-  if (historicalSets.length === 0) {
-    return { lastSession: null, pr: null };
-  }
-
-  // Find last session
+  // Find last session from priorSets
   const dates = Array.from(
-    new Set(historicalSets.map((s) => normalizeDateStr(s.workout_date || s.date || s.created_at)).filter(Boolean))
+    new Set(priorSets.map((s) => normalizeDateStr(s.workout_date || s.date || s.created_at)).filter(Boolean))
   ).sort((a, b) => b.localeCompare(a));
 
   let lastSession: ExerciseBenchmarks['lastSession'] = null;
   if (dates.length > 0) {
     const lastDate = dates[0];
-    const sessionSets = historicalSets
+    const sessionSets = priorSets
       .filter((s) => normalizeDateStr(s.workout_date || s.date || s.created_at) === lastDate)
       .sort((a, b) => (a.set_index || 0) - (b.set_index || 0));
 
@@ -156,9 +193,9 @@ export function getExerciseBenchmarks(
     };
   }
 
-  // Compute PR (max weight, tie-break max reps)
+  // Compute PR from allTimeSets (max weight, tie-break max reps)
   let bestSet: (WorkoutSet & { workout_date?: string; date?: string }) | null = null;
-  for (const s of historicalSets) {
+  for (const s of allTimeSets) {
     const weight = Number(s.weight) || 0;
     const reps = Number(s.reps) || 0;
     if (!bestSet) {
@@ -204,12 +241,63 @@ export interface WorkoutTemplateDefinition {
   days: string[];
   exercises: string[];
   targetSets: Record<string, number>;
+  targetReps?: Record<string, number>;
 }
 
 export const DEFAULT_WORKOUT_TEMPLATES: WorkoutTemplateDefinition[] = [
   {
+    name: 'Push, Quads, & Core - Reduced',
+    days: ['Mon', 'Thu'],
+    exercises: [
+      'Incline Bench Press',
+      'Cable Lateral Raises',
+      'Dips',
+      'Leg Extension Machine',
+      'Overhead Tricep Cable Pull',
+    ],
+    targetSets: {
+      'Incline Bench Press': 4,
+      'Cable Lateral Raises': 3,
+      'Dips': 3,
+      'Leg Extension Machine': 3,
+      'Overhead Tricep Cable Pull': 3,
+    },
+    targetReps: {
+      'Incline Bench Press': 8,
+      'Cable Lateral Raises': 12,
+      'Dips': 10,
+      'Leg Extension Machine': 12,
+      'Overhead Tricep Cable Pull': 12,
+    },
+  },
+  {
+    name: 'Pull, Hamstring, & Core - Reduced',
+    days: ['Tue', 'Fri'],
+    exercises: [
+      'Lat Pull Down',
+      'Seated Cable Row',
+      'Inclined Bicep Curl',
+      'Leg Curl',
+      'Face Pulls',
+    ],
+    targetSets: {
+      'Lat Pull Down': 4,
+      'Seated Cable Row': 3,
+      'Inclined Bicep Curl': 3,
+      'Leg Curl': 3,
+      'Face Pulls': 3,
+    },
+    targetReps: {
+      'Lat Pull Down': 10,
+      'Seated Cable Row': 10,
+      'Inclined Bicep Curl': 12,
+      'Leg Curl': 12,
+      'Face Pulls': 15,
+    },
+  },
+  {
     name: 'Workout A (Push, Quads & Core)',
-    days: ['Monday', 'Thursday'],
+    days: [],
     exercises: [
       'Incline Bench Press',
       'Cable Lateral Raises',
@@ -226,10 +314,18 @@ export const DEFAULT_WORKOUT_TEMPLATES: WorkoutTemplateDefinition[] = [
       'Overhead Tricep Cable Pull': 3,
       'Leg Raise': 3,
     },
+    targetReps: {
+      'Incline Bench Press': 8,
+      'Cable Lateral Raises': 12,
+      'Dips': 10,
+      'Leg Extension Machine': 12,
+      'Overhead Tricep Cable Pull': 12,
+      'Leg Raise': 15,
+    },
   },
   {
     name: 'Workout B (Pull, Hamstrings & Core)',
-    days: ['Tuesday', 'Friday'],
+    days: [],
     exercises: [
       'Lat Pull Down',
       'Seated Cable Row',
@@ -245,6 +341,14 @@ export const DEFAULT_WORKOUT_TEMPLATES: WorkoutTemplateDefinition[] = [
       'Leg Curl': 3,
       'Face Pulls': 3,
       'Weighted Sit-Up': 3,
+    },
+    targetReps: {
+      'Lat Pull Down': 10,
+      'Seated Cable Row': 10,
+      'Inclined Bicep Curl': 12,
+      'Leg Curl': 12,
+      'Face Pulls': 15,
+      'Weighted Sit-Up': 15,
     },
   },
 ];

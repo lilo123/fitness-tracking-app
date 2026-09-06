@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { WorkoutEngine } from './WorkoutEngine';
@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../../context/AuthContext';
 import { CoachProvider } from '../../context/CoachContext';
 import { supabase } from '../../lib/supabase';
+import { getLocalDateStr } from '../../utils/ghostSets';
 
 const { mockSession } = vi.hoisted(() => ({
   mockSession: {
@@ -27,8 +28,13 @@ vi.mock('../../lib/supabase', () => ({
 describe('WorkoutEngine', () => {
   let queryClient: QueryClient;
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.setSystemTime(new Date('2026-09-06T12:00:00Z'));
     localStorage.clear();
     localStorage.setItem(
       'cybergym_user',
@@ -83,17 +89,53 @@ describe('WorkoutEngine', () => {
       </QueryClientProvider>
     );
 
-  it('renders default routine (Workout A) with exercise list and Ghost sets placeholders', () => {
+  const selectWorkoutA = async () => {
+    const routineBtn = screen.getByTestId('routine-select-btn');
+    fireEvent.click(routineBtn);
+    const workoutABtn = await screen.findByText('Workout A (Push, Quads & Core)');
+    fireEvent.click(workoutABtn);
+  };
+
+  it('renders Sunday Rest Day card by default on Sunday when no routine is scheduled', () => {
     renderComponent();
 
     // Check Routine Label
     expect(screen.getByTestId('routine-select-btn')).toBeDefined();
-    expect(screen.getByText('Incline Bench Press')).toBeDefined();
-    expect(screen.getByText('Cable Lateral Raises')).toBeDefined();
+    expect(screen.getAllByText('Rest Day').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Rest & Recovery')).toBeDefined();
+    expect(screen.getByText('Choose Routine')).toBeDefined();
+  });
 
-    // Check Add Exercise Picker is present
-    expect(screen.getByTestId('add-exercise-select')).toBeDefined();
-    expect(screen.getByTestId('add-exercise-btn')).toBeDefined();
+  it('automatically schedules Push, Quads, & Core - Reduced on Monday', async () => {
+    renderComponent();
+
+    const dateInput = screen.getByTestId('workout-date-input');
+    fireEvent.change(dateInput, { target: { value: '2026-09-07' } });
+
+    await waitFor(() => {
+      expect(screen.getByText('Push, Quads, & Core - Reduced')).toBeDefined();
+      expect(screen.getByText('Incline Bench Press')).toBeDefined();
+      expect(screen.getByText('Cable Lateral Raises')).toBeDefined();
+      expect(screen.getByText('Dips')).toBeDefined();
+      expect(screen.getByText('Leg Extension Machine')).toBeDefined();
+      expect(screen.getByText('Overhead Tricep Cable Pull')).toBeDefined();
+    });
+  });
+
+  it('renders streamlined 5-column grid headers and omits Type and RPE inputs', async () => {
+    renderComponent();
+    await selectWorkoutA();
+
+    // Column headers
+    expect(await screen.findByText('Set')).toBeDefined();
+    expect(screen.getByText('Previous')).toBeDefined();
+    expect(screen.getByText('Weight')).toBeDefined();
+    expect(screen.getByText('Reps')).toBeDefined();
+    expect(screen.getByText('Action')).toBeDefined();
+
+    // Assert Type dropdown and RPE input are completely absent
+    expect(screen.queryByTestId('set-type-select-0-0')).toBeNull();
+    expect(screen.queryByPlaceholderText('RPE')).toBeNull();
   });
 
   it('allows opening routine selector and picking Free Workout', async () => {
@@ -112,7 +154,7 @@ describe('WorkoutEngine', () => {
     expect(screen.getByText("No exercises in today's workout yet")).toBeDefined();
   });
 
-  it('commits a ghost set on one-tap click', async () => {
+  it('commits a ghost set on one-tap click with set_type: working and rpe: null', async () => {
     const mockInsert = vi.fn().mockReturnValue({
       select: vi.fn().mockReturnValue({
         single: vi.fn().mockResolvedValue({ data: { id: 'set-1' }, error: null }),
@@ -152,6 +194,7 @@ describe('WorkoutEngine', () => {
     });
 
     renderComponent();
+    await selectWorkoutA();
 
     // First card (Incline Bench Press) set 0 input
     const weightInput = screen.getByTestId('ghost-weight-0-0');
@@ -172,66 +215,8 @@ describe('WorkoutEngine', () => {
     expect(payload.weight).toBe(185);
     expect(payload.reps).toBe(8);
     expect(payload.set_index).toBe(1);
-  });
-
-  it('supports set type selection and RPE input before committing', async () => {
-    const mockInsert = vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({ data: { id: 'set-1' }, error: null }),
-      }),
-    });
-
-    (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'sets') {
-        return { insert: mockInsert };
-      }
-      if (table === 'workouts') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ data: [{ id: 'workout-1' }], error: null }),
-            }),
-          }),
-        };
-      }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          or: vi.fn().mockResolvedValue({ data: [], error: null }),
-          in: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      };
-    });
-
-    renderComponent();
-
-    const setTypeSelect = screen.getByTestId('set-type-select-0-0');
-    const rpeInput = screen.getByTestId('rpe-input-0-0');
-    const weightInput = screen.getByTestId('ghost-weight-0-0');
-    const repsInput = screen.getByTestId('ghost-reps-0-0');
-    const commitBtn = screen.getByTestId('commit-set-btn-0-0');
-
-    await userEvent.selectOptions(setTypeSelect, 'warmup');
-    await userEvent.type(rpeInput, '7.5');
-    await userEvent.type(weightInput, '135');
-    await userEvent.type(repsInput, '12');
-
-    fireEvent.click(commitBtn);
-
-    await waitFor(() => {
-      expect(mockInsert).toHaveBeenCalled();
-    });
-
-    const payload = mockInsert.mock.calls[0][0][0];
-    expect(payload.set_type).toBe('warmup');
-    expect(payload.rpe).toBe(7.5);
-    expect(payload.weight).toBe(135);
-    expect(payload.reps).toBe(12);
+    expect(payload.set_type).toBe('working');
+    expect(payload.rpe).toBeNull();
   });
 
   it('allows batch logging all remaining sets for an exercise', async () => {
@@ -297,6 +282,7 @@ describe('WorkoutEngine', () => {
     });
 
     renderComponent();
+    await selectWorkoutA();
 
     await waitFor(() => {
       expect(screen.getByTestId('ghost-weight-0-0')).toHaveAttribute('placeholder', '185');
@@ -382,6 +368,7 @@ describe('WorkoutEngine', () => {
     });
 
     renderComponent();
+    await selectWorkoutA();
 
     await waitFor(() => {
       expect(screen.getByTestId('ghost-weight-0-0')).toHaveAttribute('placeholder', '185');
@@ -445,6 +432,7 @@ describe('WorkoutEngine', () => {
     });
 
     renderComponent();
+    await selectWorkoutA();
 
     await waitFor(() => {
       expect(supabase.auth.getSession).toHaveBeenCalled();
@@ -594,6 +582,7 @@ describe('WorkoutEngine', () => {
     });
 
     renderComponent();
+    await selectWorkoutA();
 
     const weightInput = screen.getByTestId('ghost-weight-0-0');
     const repsInput = screen.getByTestId('ghost-reps-0-0');
@@ -641,6 +630,7 @@ describe('WorkoutEngine', () => {
     });
 
     renderComponent();
+    await selectWorkoutA();
 
     const weightInput = screen.getByTestId('ghost-weight-0-0');
     const repsInput = screen.getByTestId('ghost-reps-0-0');
@@ -680,6 +670,7 @@ describe('WorkoutEngine', () => {
     });
 
     renderComponent();
+    await selectWorkoutA();
 
     const weightInput = screen.getByTestId('ghost-weight-0-0');
     const commitBtn = screen.getByTestId('commit-set-btn-0-0');
@@ -764,6 +755,240 @@ describe('WorkoutEngine', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/cannot be resolved to a valid UUID/i)).toBeDefined();
+    });
+  });
+
+  it('preserves uncompleted exercises when existing logged sets exist for today', async () => {
+    const today = getLocalDateStr(new Date());
+    const loggedSetsToday = [
+      {
+        id: 's-today-1',
+        workout_id: 'workout-today',
+        exercise_id: 'e0000000-0000-0000-0000-000000000001',
+        set_index: 1,
+        set_type: 'working',
+        weight: 185,
+        reps: 8,
+        rpe: null,
+        created_at: `${today}T10:00:00Z`,
+        workouts: { id: 'workout-today', date: today, name: 'Workout A (Push, Quads & Core)' },
+      },
+    ];
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'sets') {
+        return {
+          select: vi.fn().mockReturnValue({
+            in: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: loggedSetsToday, error: null }),
+            }),
+            order: vi.fn().mockResolvedValue({ data: loggedSetsToday, error: null }),
+          }),
+        };
+      }
+      if (table === 'workouts') {
+        const selectObj: any = {};
+        selectObj.eq = vi.fn((field: string) => {
+          if (field === 'user_id') {
+            const userChain: any = Promise.resolve({
+              data: [{ id: 'workout-today', date: today, name: 'Workout A (Push, Quads & Core)' }],
+              error: null,
+            });
+            userChain.eq = vi.fn().mockResolvedValue({
+              data: [{ id: 'workout-today', date: today, name: 'Workout A (Push, Quads & Core)' }],
+              error: null,
+            });
+            return userChain;
+          }
+          return Promise.resolve({ data: [], error: null });
+        });
+        return {
+          select: vi.fn().mockReturnValue(selectObj),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          or: vi.fn().mockResolvedValue({ data: [], error: null }),
+          in: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+
+    // Incline Bench Press was logged, but all remaining exercises in Workout A should still be preserved
+    await waitFor(() => {
+      expect(screen.getByText('Incline Bench Press')).toBeDefined();
+      expect(screen.getByText('Cable Lateral Raises')).toBeDefined();
+      expect(screen.getByText('Dips')).toBeDefined();
+      expect(screen.getByText('Leg Extension Machine')).toBeDefined();
+    });
+  });
+
+  it('automatically transitions to Rest Day when user selects Sunday date', async () => {
+    // Start on Monday
+    vi.setSystemTime(new Date('2026-09-07T12:00:00Z'));
+    renderComponent();
+
+    const dateInput = screen.getByTestId('workout-date-input');
+    // Change date to Sunday
+    fireEvent.change(dateInput, { target: { value: '2026-09-06' } });
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Rest Day').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText('Rest & Recovery')).toBeDefined();
+      expect(screen.getByText('Choose Routine')).toBeDefined();
+    });
+  });
+
+  it('prunes input drafts when batch logging an exercise', async () => {
+    const mockInsert = vi.fn().mockReturnValue({
+      select: vi.fn().mockResolvedValue({ data: [{ id: 's1' }], error: null }),
+    });
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'sets') {
+        return { insert: mockInsert };
+      }
+      if (table === 'workouts') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [{ id: 'workout-1' }], error: null }),
+            }),
+          }),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          or: vi.fn().mockResolvedValue({ data: [], error: null }),
+          in: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+    await selectWorkoutA();
+
+    // Type drafts for row 0
+    const weightInput = screen.getByTestId('ghost-weight-0-0');
+    const repsInput = screen.getByTestId('ghost-reps-0-0');
+    await userEvent.type(weightInput, '155');
+    await userEvent.type(repsInput, '8');
+
+    const batchBtn = screen.getByTestId('batch-log-exercise-btn-0');
+    fireEvent.click(batchBtn);
+
+    await waitFor(() => {
+      expect(mockInsert).toHaveBeenCalled();
+    });
+  });
+
+  it('populates targetSetCounts for logged workouts with unknown routine templates', async () => {
+    const today = '2026-09-06';
+    const loggedSets = [
+      {
+        id: 's-custom-1',
+        workout_id: 'w-custom-1',
+        exercise_id: 'e0000000-0000-0000-0000-000000000001',
+        exercise_name: 'Incline Bench Press',
+        set_index: 1,
+        set_type: 'working',
+        weight: 185,
+        reps: 8,
+        rpe: null,
+        created_at: `${today}T10:00:00Z`,
+        workouts: { id: 'w-custom-1', date: today, name: 'Ad-hoc Arm Blast' },
+      },
+      {
+        id: 's-custom-2',
+        workout_id: 'w-custom-1',
+        exercise_id: 'e0000000-0000-0000-0000-000000000001',
+        exercise_name: 'Incline Bench Press',
+        set_index: 2,
+        set_type: 'working',
+        weight: 185,
+        reps: 8,
+        rpe: null,
+        created_at: `${today}T10:05:00Z`,
+        workouts: { id: 'w-custom-1', date: today, name: 'Ad-hoc Arm Blast' },
+      },
+      {
+        id: 's-custom-3',
+        workout_id: 'w-custom-1',
+        exercise_id: 'e0000000-0000-0000-0000-000000000001',
+        exercise_name: 'Incline Bench Press',
+        set_index: 3,
+        set_type: 'working',
+        weight: 185,
+        reps: 8,
+        rpe: null,
+        created_at: `${today}T10:10:00Z`,
+        workouts: { id: 'w-custom-1', date: today, name: 'Ad-hoc Arm Blast' },
+      },
+    ];
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'sets') {
+        return {
+          select: vi.fn().mockReturnValue({
+            in: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: loggedSets, error: null }),
+            }),
+            order: vi.fn().mockResolvedValue({ data: loggedSets, error: null }),
+          }),
+        };
+      }
+      if (table === 'workouts') {
+        const selectObj: any = {};
+        selectObj.eq = vi.fn((field: string) => {
+          if (field === 'user_id') {
+            const userChain: any = Promise.resolve({
+              data: [{ id: 'w-custom-1', date: today, name: 'Ad-hoc Arm Blast' }],
+              error: null,
+            });
+            userChain.eq = vi.fn().mockResolvedValue({
+              data: [{ id: 'w-custom-1', date: today, name: 'Ad-hoc Arm Blast' }],
+              error: null,
+            });
+            return userChain;
+          }
+          return Promise.resolve({ data: [], error: null });
+        });
+        return { select: vi.fn().mockReturnValue(selectObj) };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          or: vi.fn().mockResolvedValue({ data: [], error: null }),
+          in: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('Ad-hoc Arm Blast')).toBeDefined();
+      expect(screen.getByText('Incline Bench Press')).toBeDefined();
+      expect(screen.getByText('3/3 Sets')).toBeDefined();
     });
   });
 });
