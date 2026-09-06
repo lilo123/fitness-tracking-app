@@ -281,7 +281,11 @@ export const WorkoutEngine: React.FC = () => {
       const matchedEx = exercises.find(
         (e) => e.name.toLowerCase() === payload.exerciseName.toLowerCase() || e.id === payload.exerciseName
       );
-      const exerciseId = matchedEx ? matchedEx.id : payload.exerciseName;
+      const isUUID = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+      const exerciseId = matchedEx ? matchedEx.id : (isUUID(payload.exerciseName) ? payload.exerciseName : null);
+      if (!exerciseId) {
+        throw new Error(`Exercise "${payload.exerciseName}" cannot be resolved to a valid UUID.`);
+      }
 
       // Insert set
       const { data: loggedSet, error: sErr } = await supabase
@@ -328,21 +332,44 @@ export const WorkoutEngine: React.FC = () => {
       if (setsToLog.length === 0) return [];
       const workoutId = await getOrCreateWorkout();
 
-      const payloads = setsToLog.map((s) => {
-        const matchedEx = exercises.find(
-          (e) => e.name.toLowerCase() === s.exerciseName.toLowerCase() || e.id === s.exerciseName
-        );
-        const exerciseId = matchedEx ? matchedEx.id : s.exerciseName;
-        return {
-          workout_id: workoutId,
-          exercise_id: exerciseId,
-          set_index: s.setIndex,
-          set_type: s.setType,
-          weight: s.weight,
-          reps: s.reps,
-          rpe: s.rpe || null,
-        };
-      });
+      const payloads = setsToLog
+        .map((s) => {
+          const matchedEx = exercises.find(
+            (e) => e.name.toLowerCase() === s.exerciseName.toLowerCase() || e.id === s.exerciseName
+          );
+          const isUUID = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+          const exerciseId = matchedEx ? matchedEx.id : (isUUID(s.exerciseName) ? s.exerciseName : null);
+          if (!exerciseId) return null;
+          return {
+            workout_id: workoutId,
+            exercise_id: exerciseId,
+            set_index: s.setIndex,
+            set_type: s.setType,
+            weight: s.weight,
+            reps: s.reps,
+            rpe: s.rpe || null,
+          };
+        })
+        .filter((p): p is NonNullable<typeof p> => p !== null);
+
+      if (payloads.length === 0) {
+        if (setsToLog.length > 0) {
+          throw new Error(`Exercise "${setsToLog[0].exerciseName}" cannot be resolved to a valid UUID.`);
+        }
+        return [];
+      }
+      if (payloads.length < setsToLog.length) {
+        const unresolvable = setsToLog.find((s) => {
+          const matchedEx = exercises.find(
+            (e) => e.name.toLowerCase() === s.exerciseName.toLowerCase() || e.id === s.exerciseName
+          );
+          const isUUID = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+          return !(matchedEx || isUUID(s.exerciseName));
+        });
+        if (unresolvable) {
+          throw new Error(`Exercise "${unresolvable.exerciseName}" cannot be resolved to a valid UUID.`);
+        }
+      }
 
       const { data, error } = await supabase.from('sets').insert(payloads).select();
       if (error) throw error;
@@ -516,7 +543,7 @@ export const WorkoutEngine: React.FC = () => {
       ? ghostValues.reps
       : 0;
 
-    if (weightVal <= 0 && repsVal <= 0) {
+    if (weightVal < 0 || repsVal <= 0) {
       setMutationError('Please enter weight and reps or use previous set values.');
       return;
     }
@@ -577,13 +604,15 @@ export const WorkoutEngine: React.FC = () => {
         ? Number(draft.weight)
         : typeof ghost.weight === 'number'
         ? ghost.weight
-        : 100;
+        : 0;
 
       const repsVal = draft?.reps !== undefined && draft.reps !== ''
         ? Number(draft.reps)
         : typeof ghost.reps === 'number'
         ? ghost.reps
-        : 10;
+        : 0;
+
+      if (weightVal <= 0 || repsVal <= 0) continue;
 
       const setType: SetType = draft?.setType || 'working';
       const rpe = draft?.rpe ? Number(draft.rpe) : null;
@@ -628,13 +657,15 @@ export const WorkoutEngine: React.FC = () => {
           ? Number(draft.weight)
           : typeof ghost.weight === 'number'
           ? ghost.weight
-          : 100;
+          : 0;
 
         const repsVal = draft?.reps !== undefined && draft.reps !== ''
           ? Number(draft.reps)
           : typeof ghost.reps === 'number'
           ? ghost.reps
-          : 10;
+          : 0;
+
+        if (weightVal <= 0 || repsVal <= 0) continue;
 
         const setType: SetType = draft?.setType || 'working';
         const rpe = draft?.rpe ? Number(draft.rpe) : null;

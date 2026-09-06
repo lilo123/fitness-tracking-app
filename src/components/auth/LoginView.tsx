@@ -48,6 +48,8 @@ export const LoginView: React.FC = () => {
         await switchRole('coach');
       }
       navigate(demoRole === 'coach' ? '/coach' : '/workout');
+    } else {
+      setError('Demo accounts are only available in local development. Please sign in or register above.');
     }
     setLoading(false);
   };

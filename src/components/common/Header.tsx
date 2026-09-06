@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useCoach } from '../../hooks/useCoach';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { Zap, Shield, Users, UserPlus, LogOut } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const { user, profile, role, signOut, switchRole } = useAuth();
   const { isCoach, selectedAthleteId, switchAthlete, athletes, addAthlete } = useCoach();
+  const isOnline = useOnlineStatus();
   const [showAddModal, setShowAddModal] = useState(false);
   const [newAthleteName, setNewAthleteName] = useState('');
   const [newAthleteEmail, setNewAthleteEmail] = useState('');
@@ -48,13 +50,22 @@ export const Header: React.FC = () => {
 
         {/* Right Action Badges */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Synced Badge */}
+          {/* Online / Offline Status Badge */}
           <div
-            className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/30 flex items-center gap-1.5 shadow-[0_0_10px_rgba(16,185,129,0.15)] select-none"
-            title="Database Synced"
+            className={`text-xs font-bold px-2.5 py-1 rounded-full border flex items-center gap-1.5 select-none ${
+              isOnline
+                ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.15)]'
+                : 'text-amber-400 bg-amber-500/10 border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.15)]'
+            }`}
+            data-testid="connection-status"
+            title={isOnline ? 'Online' : 'Offline'}
           >
-            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
-            <span className="hidden sm:inline">Synced</span>
+            <span
+              className={`w-2 h-2 rounded-full inline-block ${
+                isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+              }`}
+            />
+            <span className="hidden sm:inline">{isOnline ? 'Online' : 'Offline'}</span>
           </div>
 
           {/* Role Pill Switcher (Interactive only for verified coaches) */}

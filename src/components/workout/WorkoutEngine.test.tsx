@@ -239,9 +239,187 @@ describe('WorkoutEngine', () => {
       select: vi.fn().mockResolvedValue({ data: [{ id: 's1' }, { id: 's2' }, { id: 's3' }], error: null }),
     });
 
+    const pastWorkoutSets = [
+      {
+        id: 'ps-1',
+        workout_id: 'prev-w1',
+        exercise_id: 'e0000000-0000-0000-0000-000000000001',
+        set_index: 1,
+        set_type: 'working',
+        weight: 185,
+        reps: 8,
+        workouts: { date: '2026-08-30T10:00:00Z', name: 'Workout A' },
+      },
+    ];
+
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'sets') {
-        return { insert: mockInsert };
+        return {
+          insert: mockInsert,
+          select: vi.fn().mockReturnValue({
+            in: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: pastWorkoutSets, error: null }),
+            }),
+          }),
+        };
+      }
+      if (table === 'workouts') {
+        const selectObj: any = {};
+        selectObj.eq = vi.fn((field: string) => {
+          if (field === 'user_id') {
+            const userChain: any = Promise.resolve({ data: [{ id: 'prev-w1', date: '2026-08-30' }], error: null });
+            userChain.eq = vi.fn().mockResolvedValue({ data: [{ id: 'workout-1' }], error: null });
+            return userChain;
+          }
+          return Promise.resolve({ data: [], error: null });
+        });
+        return {
+          select: vi.fn().mockReturnValue(selectObj),
+          insert: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({ data: { id: 'workout-1' }, error: null }),
+            }),
+          }),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          or: vi.fn().mockResolvedValue({ data: [], error: null }),
+          in: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ghost-weight-0-0')).toHaveAttribute('placeholder', '185');
+    });
+
+    const batchExBtn = screen.getByTestId('batch-log-exercise-btn-0');
+    expect(batchExBtn).toBeDefined();
+
+    fireEvent.click(batchExBtn);
+
+    await waitFor(() => {
+      expect(mockInsert).toHaveBeenCalled();
+    });
+
+    const insertedSets = mockInsert.mock.calls[0][0];
+    expect(insertedSets.length).toBe(4); // 4 sets for Incline Bench Press in Workout A
+    insertedSets.forEach((set: any, idx: number) => {
+      expect(set.set_index).toBe(idx + 1);
+      expect(set.weight).toBe(185);
+      expect(set.reps).toBe(8);
+      // Verify zero 100x10 fallbacks
+      expect(set.weight).not.toBe(100);
+      expect(set.reps).not.toBe(10);
+    });
+  });
+
+  it('allows finishing entire workout and logging all remaining sets with zero 100x10 fallbacks', async () => {
+    const mockInsert = vi.fn().mockReturnValue({
+      select: vi.fn().mockResolvedValue({ data: [{ id: 's1' }], error: null }),
+    });
+
+    const pastWorkoutSets = [
+      { id: 'ps-1', workout_id: 'prev-w1', exercise_id: 'e0000000-0000-0000-0000-000000000001', set_index: 1, set_type: 'working', weight: 185, reps: 8, workouts: { date: '2026-08-30' } },
+      { id: 'ps-2', workout_id: 'prev-w1', exercise_id: 'e0000000-0000-0000-0000-000000000002', set_index: 1, set_type: 'working', weight: 35, reps: 12, workouts: { date: '2026-08-30' } },
+      { id: 'ps-3', workout_id: 'prev-w1', exercise_id: 'e0000000-0000-0000-0000-000000000003', set_index: 1, set_type: 'working', weight: 50, reps: 10, workouts: { date: '2026-08-30' } },
+      { id: 'ps-4', workout_id: 'prev-w1', exercise_id: 'e0000000-0000-0000-0000-000000000004', set_index: 1, set_type: 'working', weight: 140, reps: 12, workouts: { date: '2026-08-30' } },
+      { id: 'ps-5', workout_id: 'prev-w1', exercise_id: 'e0000000-0000-0000-0000-000000000005', set_index: 1, set_type: 'working', weight: 65, reps: 10, workouts: { date: '2026-08-30' } },
+      { id: 'ps-6', workout_id: 'prev-w1', exercise_id: 'e0000000-0000-0000-0000-000000000006', set_index: 1, set_type: 'working', weight: 25, reps: 15, workouts: { date: '2026-08-30' } },
+    ];
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'sets') {
+        return {
+          insert: mockInsert,
+          select: vi.fn().mockReturnValue({
+            in: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: pastWorkoutSets, error: null }),
+            }),
+          }),
+        };
+      }
+      if (table === 'workouts') {
+        const selectObj: any = {};
+        selectObj.eq = vi.fn((field: string) => {
+          if (field === 'user_id') {
+            const userChain: any = Promise.resolve({ data: [{ id: 'prev-w1', date: '2026-08-30' }], error: null });
+            userChain.eq = vi.fn().mockResolvedValue({ data: [{ id: 'workout-1' }], error: null });
+            return userChain;
+          }
+          return Promise.resolve({ data: [], error: null });
+        });
+        return {
+          select: vi.fn().mockReturnValue(selectObj),
+          insert: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({ data: { id: 'workout-1' }, error: null }),
+            }),
+          }),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          or: vi.fn().mockResolvedValue({ data: [], error: null }),
+          in: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ghost-weight-0-0')).toHaveAttribute('placeholder', '185');
+    });
+
+    const finishBtn = screen.getByTestId('finish-workout-btn');
+    expect(finishBtn).toBeDefined();
+
+    fireEvent.click(finishBtn);
+
+    await waitFor(() => {
+      expect(mockInsert).toHaveBeenCalled();
+    });
+
+    const allLoggedSets = mockInsert.mock.calls[0][0];
+    expect(allLoggedSets.length).toBeGreaterThanOrEqual(10); // Workout A has 6 exercises
+    allLoggedSets.forEach((set: any) => {
+      expect(set.weight).toBeGreaterThan(0);
+      expect(set.reps).toBeGreaterThan(0);
+      expect(set.weight === 100 && set.reps === 10).toBe(false);
+    });
+  });
+
+  it('prunes unperformed / blank sets and does not commit 100x10 when no ghost sets or input exist', async () => {
+    const mockInsert = vi.fn().mockReturnValue({
+      select: vi.fn().mockResolvedValue({ data: [], error: null }),
+    });
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'sets') {
+        return {
+          insert: mockInsert,
+          select: vi.fn().mockReturnValue({
+            in: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
+        };
       }
       if (table === 'workouts') {
         return {
@@ -273,71 +451,10 @@ describe('WorkoutEngine', () => {
     });
 
     const batchExBtn = screen.getByTestId('batch-log-exercise-btn-0');
-    expect(batchExBtn).toBeDefined();
-
     fireEvent.click(batchExBtn);
 
-    await waitFor(() => {
-      expect(mockInsert).toHaveBeenCalled();
-    });
-
-    const insertedSets = mockInsert.mock.calls[0][0];
-    expect(insertedSets.length).toBe(4); // 4 sets for Incline Bench Press in Workout A
-    expect(insertedSets[0].set_index).toBe(1);
-    expect(insertedSets[1].set_index).toBe(2);
-    expect(insertedSets[2].set_index).toBe(3);
-    expect(insertedSets[3].set_index).toBe(4);
-  });
-
-  it('allows finishing entire workout and logging all remaining sets', async () => {
-    const mockInsert = vi.fn().mockReturnValue({
-      select: vi.fn().mockResolvedValue({ data: [{ id: 's1' }], error: null }),
-    });
-
-    (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'sets') {
-        return { insert: mockInsert };
-      }
-      if (table === 'workouts') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ data: [{ id: 'workout-1' }], error: null }),
-            }),
-          }),
-        };
-      }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          or: vi.fn().mockResolvedValue({ data: [], error: null }),
-          in: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      };
-    });
-
-    renderComponent();
-
-    await waitFor(() => {
-      expect(supabase.auth.getSession).toHaveBeenCalled();
-    });
-
-    const finishBtn = screen.getByTestId('finish-workout-btn');
-    expect(finishBtn).toBeDefined();
-
-    fireEvent.click(finishBtn);
-
-    await waitFor(() => {
-      expect(mockInsert).toHaveBeenCalled();
-    });
-
-    const allLoggedSets = mockInsert.mock.calls[0][0];
-    expect(allLoggedSets.length).toBeGreaterThanOrEqual(10); // Workout A has 4 exercises with multiple sets
+    // Unperformed sets must be pruned: mockInsert must NOT have been called
+    expect(mockInsert).not.toHaveBeenCalled();
   });
 
   it('resolves exercise names for custom routine templates instead of displaying raw UUIDs', async () => {
@@ -540,6 +657,114 @@ describe('WorkoutEngine', () => {
     const payload = mockInsert.mock.calls[0][0][0];
     expect(payload.weight).toBe(22.5);
     expect(payload.reps).toBe(12);
+  });
+
+  it('rejects committing a set when reps is zero or blank without ghost values', async () => {
+    const mockInsert = vi.fn();
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'sets') {
+        return { insert: mockInsert };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          or: vi.fn().mockResolvedValue({ data: [], error: null }),
+          in: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+
+    const weightInput = screen.getByTestId('ghost-weight-0-0');
+    const commitBtn = screen.getByTestId('commit-set-btn-0-0');
+
+    // Only type weight, leave reps blank (0 reps)
+    await userEvent.type(weightInput, '150');
+    fireEvent.click(commitBtn);
+
+    // Should NOT commit and show error
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(screen.getByText('Please enter weight and reps or use previous set values.')).toBeDefined();
+  });
+
+  it('displays mutation error when batch logging an exercise that cannot be resolved to a UUID', async () => {
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'routine_templates') {
+        return {
+          select: vi.fn().mockReturnValue({
+            or: vi.fn().mockResolvedValue({
+              data: [
+                {
+                  id: 'custom-tpl-invalid',
+                  name: 'Custom Broken Routine',
+                  user_id: 'test-user-id',
+                  is_master: false,
+                  days_of_week: ['Mon'],
+                  exercises: [
+                    {
+                      id: 'te-1',
+                      template_id: 'custom-tpl-invalid',
+                      exercise_id: 'invalid-non-uuid-exercise',
+                      order_index: 0,
+                      target_sets: 2,
+                    },
+                  ],
+                },
+              ],
+              error: null,
+            }),
+          }),
+        };
+      }
+      if (table === 'workouts') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [{ id: 'workout-1' }], error: null }),
+            }),
+          }),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          or: vi.fn().mockResolvedValue({ data: [], error: null }),
+          in: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+
+    const routineBtn = screen.getByTestId('routine-select-btn');
+    fireEvent.click(routineBtn);
+
+    const customTplOption = await screen.findByText('Custom Broken Routine (Custom)');
+    fireEvent.click(customTplOption);
+
+    // Type into draft for this exercise
+    const weightInput = screen.getByTestId('ghost-weight-0-0');
+    const repsInput = screen.getByTestId('ghost-reps-0-0');
+    await userEvent.type(weightInput, '100');
+    await userEvent.type(repsInput, '10');
+
+    const batchBtn = screen.getByTestId('batch-log-exercise-btn-0');
+    fireEvent.click(batchBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/cannot be resolved to a valid UUID/i)).toBeDefined();
+    });
   });
 });
 

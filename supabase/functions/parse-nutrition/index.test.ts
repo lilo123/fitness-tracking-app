@@ -294,6 +294,54 @@ Deno.test("parse-nutrition should return 500 when Gemini API encounters a rate l
     }
 });
 
+Deno.test("parse-nutrition should return 500 rather than mock 200 data during service outages", async () => {
+    const originalKey = Deno.env.get("GEMINI_API_KEY");
+    Deno.env.set("GEMINI_API_KEY", "test-key");
+
+    const originalFetch = globalThis.fetch;
+    const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
+        const urlString = input.toString();
+        if (urlString.includes("/auth/v1/user")) {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        if (urlString.includes("generativelanguage.googleapis.com")) {
+            return new Response(JSON.stringify({ error: { code: 503, message: "Service Unavailable" } }), {
+                status: 503,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        return originalFetch(input, init);
+    };
+
+    globalThis.fetch = mockFetch;
+
+    try {
+        const req = new Request("http://localhost/parse-nutrition", {
+            method: "POST",
+            headers: { "Authorization": "Bearer valid-jwt-token" },
+            body: JSON.stringify({ input: "Had 2 scoops of whey protein" })
+        });
+
+        const res = await app.fetch(req);
+        assertEquals(res.status, 500);
+
+        const data = await res.json();
+        assertEquals(data.error, "Failed to parse meal nutrition. Please check your connection or use manual entry.");
+        assertEquals(data.calories, undefined);
+        assertEquals(data.name, undefined);
+    } finally {
+        globalThis.fetch = originalFetch;
+        if (originalKey) {
+            Deno.env.set("GEMINI_API_KEY", originalKey);
+        } else {
+            Deno.env.delete("GEMINI_API_KEY");
+        }
+    }
+});
+
 Deno.test("parse-nutrition handles conversational multi-dish meal input (Com Tam & Eggs) and elaborates dishes into components", async () => {
     const originalKey = Deno.env.get("GEMINI_API_KEY");
     Deno.env.set("GEMINI_API_KEY", "test-key");

@@ -6,25 +6,8 @@ import type { UserProfile, UserRole } from '../types/database';
 import { AuthContext } from './AuthContextTypes';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [profile, setProfile] = useState<UserProfile | null>(() => {
-    const stored = localStorage.getItem('cybergym_user');
-    if (!stored) return null;
-    try {
-      return JSON.parse(stored);
-    } catch {
-      return null;
-    }
-  });
-  const [user, setUser] = useState<User | null>(() => {
-    const stored = localStorage.getItem('cybergym_user');
-    if (!stored) return null;
-    try {
-      const parsed = JSON.parse(stored);
-      return parsed?.id ? ({ id: parsed.id, email: parsed.email } as User) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<UserRole>(() => {
     return (localStorage.getItem('cybergym_view_mode') as UserRole) || 'coach';

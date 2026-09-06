@@ -404,7 +404,7 @@ describe('NutritionEngine', () => {
     expect(parsedIngredients[1].name).toBe('Avocado');
   });
 
-  it('falls back to local parser when edge function invocation fails', async () => {
+  it('falls back to manual entry with error banner when edge function invocation fails', async () => {
     (supabase.functions.invoke as any).mockRejectedValue(new Error('Network error'));
 
     renderComponent();
@@ -416,13 +416,64 @@ describe('NutritionEngine', () => {
     fireEvent.click(screen.getByText('Analyze Meal'));
 
     await waitFor(() => {
-      expect(screen.getByText(/Itemized Breakdown/i)).toBeDefined();
+      expect(screen.getByTestId('status-message')).toBeDefined();
+      expect(screen.getByText('AI service unavailable: Network error')).toBeDefined();
     });
 
-    expect(screen.getByText('Eggs')).toBeDefined();
-    expect(screen.getByText('Sourdough Bread')).toBeDefined();
-    expect(screen.getByText('Butter')).toBeDefined();
-    expect(screen.getByText('Log Meal (+470 kcal)')).toBeDefined();
+    // Verify manual form is automatically opened
+    expect(screen.getByTestId('dish-name-input')).toBeDefined();
+    expect(screen.getByTestId('calories-input')).toBeDefined();
+
+    // Verify no synthetic staged meal was fabricated
+    expect(screen.queryByText(/Log Meal \(/i)).toBeNull();
+  });
+
+  it('falls back to manual entry with error banner when edge function returns error in payload without throwing', async () => {
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: { error: 'Model quota exceeded. Please try again later.' },
+      error: null,
+    });
+
+    renderComponent();
+
+    const input = screen.getByPlaceholderText(
+      'Describe what you ate (e.g., 3 eggs, 2 slices sourdough, 1 tbsp butter)'
+    );
+    await userEvent.type(input, 'grilled chicken and rice');
+    fireEvent.click(screen.getByText('Analyze Meal'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('status-message')).toBeDefined();
+      expect(screen.getByText('AI service unavailable: Model quota exceeded. Please try again later.')).toBeDefined();
+    });
+
+    // Verify manual form is automatically opened with dish name pre-populated
+    expect(screen.getByTestId('dish-name-input')).toHaveValue('grilled chicken and rice');
+    // Verify no synthetic staged meal was fabricated
+    expect(screen.queryByText(/Log Meal \(/i)).toBeNull();
+  });
+
+  it('falls back to manual entry when edge function returns invalid empty response without macro data', async () => {
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: {},
+      error: null,
+    });
+
+    renderComponent();
+
+    const input = screen.getByPlaceholderText(
+      'Describe what you ate (e.g., 3 eggs, 2 slices sourdough, 1 tbsp butter)'
+    );
+    await userEvent.type(input, 'mystery meal');
+    fireEvent.click(screen.getByText('Analyze Meal'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('status-message')).toBeDefined();
+      expect(screen.getByText('AI service unavailable: Invalid parsed response: missing nutrition data')).toBeDefined();
+    });
+
+    expect(screen.getByTestId('dish-name-input')).toBeDefined();
+    expect(screen.queryByText(/Log Meal \(/i)).toBeNull();
   });
 
   it('stages and unpacks a custom dish with JSON ingredients when clicking on the custom dish card in the quick-log carousel', async () => {
@@ -566,7 +617,23 @@ describe('NutritionEngine', () => {
   });
 
   it('accurately parses pre-analyzed structured breakdown text with line items and totals', async () => {
-    (supabase.functions.invoke as any).mockRejectedValue(new Error('Network offline'));
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: {
+        name: 'Scrambled Egg White, Sliced Turkey Breast & Plain Greek Yogurt',
+        calories: 318,
+        protein: 40,
+        carbs: 7,
+        fat: 7,
+        fiber: 0,
+        explanation: 'Total: 318 kcal | 40g P | 7g C | 7g F | 0g Fiber',
+        items: [
+          { name: 'Scrambled Egg White (with hot sauce & black pepper)', portion: '180 g', calories: 139, protein: 20, carbs: 1, fat: 5, fiber: 0 },
+          { name: 'Sliced Seasoned Turkey Breast', portion: '60 g', calories: 60, protein: 10, carbs: 1, fat: 1, fiber: 0 },
+          { name: '0% Plain Greek Yogurt', portion: '150 g', calories: 90, protein: 15, carbs: 5, fat: 1, fiber: 0 },
+        ],
+      },
+      error: null,
+    });
 
     renderComponent();
 
@@ -679,30 +746,26 @@ Total Fiber: 0 g`;
     expect(screen.getByText('Log Meal (+650 kcal)')).toBeDefined();
   });
 
-  it('parses "Com Tam & Eggs" into broken rice, pork chop, and fried egg via local fallback without dropping Com Tam', async () => {
-    (supabase.functions.invoke as any).mockRejectedValue(new Error('AI Edge function offline'));
-
-    renderComponent();
-
-    const input = screen.getByPlaceholderText(
-      'Describe what you ate (e.g., 3 eggs, 2 slices sourdough, 1 tbsp butter)'
-    );
-    await userEvent.type(input, 'com tam and eggs');
-    fireEvent.click(screen.getByText('Analyze Meal'));
-
-    await waitFor(() => {
-      expect(screen.getByText(/Itemized Breakdown \(3\)/i)).toBeDefined();
-    });
-
-    // Verify Com Tam was NOT dropped or reduced to just eggs
-    expect(screen.getByText('Broken Rice (Cơm Tấm)')).toBeDefined();
-    expect(screen.getByText('Grilled Pork Chop (Sườn Nướng)')).toBeDefined();
-    expect(screen.getByText('Fried Egg')).toBeDefined();
-    expect(screen.getByText('Log Meal (+650 kcal)')).toBeDefined();
-  });
-
   it('accurately parses the Friday Menu Grounded structured breakdown text preserving exact items and totals verbatim', async () => {
-    (supabase.functions.invoke as any).mockRejectedValue(new Error('Testing local structured parser'));
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: {
+        name: 'High-Protein Breakfast Plate & Chia Pudding Bowl (Friday Menu Grounded)',
+        calories: 550,
+        protein: 46,
+        carbs: 24,
+        fat: 30,
+        fiber: 8,
+        explanation: 'Total: 550 kcal | 46g P | 24g C | 30g F | 8g Fiber',
+        items: [
+          { name: 'Scrambled Egg White (with hot sauce & black pepper)', portion: '150 g', calories: 87, protein: 14, carbs: 1, fat: 3, fiber: 0 },
+          { name: 'Sliced Turkey Breast', portion: '60 g', calories: 80, protein: 10, carbs: 1, fat: 4, fiber: 0 },
+          { name: 'Smoked Salmon', portion: '50 g', calories: 68, protein: 8, carbs: 0, fat: 4, fiber: 0 },
+          { name: 'Chocolate Coconut Chia Pudding', portion: '150 g', calories: 227, protein: 5, carbs: 18, fat: 15, fiber: 8 },
+          { name: '2% Plain Greek Yogurt', portion: '100 g', calories: 88, protein: 9, carbs: 4, fat: 4, fiber: 0 },
+        ],
+      },
+      error: null,
+    });
 
     renderComponent();
 
@@ -772,7 +835,27 @@ Total Fiber: 8 g`;
       };
     });
 
-    (supabase.functions.invoke as any).mockRejectedValue(new Error('Local test'));
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: {
+        name: 'High-Protein Breakfast Plate & Chia Pudding Bowl (Friday Menu Grounded)',
+        calories: 550,
+        protein: 46,
+        carbs: 24,
+        fat: 30,
+        fiber: 8,
+        serving_size: 510,
+        serving_unit: 'g',
+        explanation: '87 kcal (Egg White) + 80 kcal (Turkey) + 68 kcal (Salmon) + 227 kcal (Chia) + 88 kcal (Yogurt) = 550 kcal',
+        items: [
+          { name: 'Scrambled Egg White (with hot sauce & black pepper)', portion: '150 g', calories: 87, protein: 14, carbs: 1, fat: 3, fiber: 0 },
+          { name: 'Sliced Turkey Breast', portion: '60 g', calories: 80, protein: 10, carbs: 1, fat: 4, fiber: 0 },
+          { name: 'Smoked Salmon', portion: '50 g', calories: 68, protein: 8, carbs: 0, fat: 4, fiber: 0 },
+          { name: 'Chocolate Coconut Chia Pudding', portion: '150 g', calories: 227, protein: 5, carbs: 18, fat: 15, fiber: 8 },
+          { name: '2% Plain Greek Yogurt', portion: '100 g', calories: 88, protein: 9, carbs: 4, fat: 4, fiber: 0 },
+        ],
+      },
+      error: null,
+    });
 
     renderComponent();
 
@@ -820,7 +903,22 @@ Total Fiber: 8 g
   });
 
   it('supports flexible structured formatting with numbered lists, pipe separators, and swapped macro order', async () => {
-    (supabase.functions.invoke as any).mockRejectedValue(new Error('Local test'));
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: {
+        name: 'High-Protein Chicken Bowl',
+        calories: 450,
+        protein: 49,
+        carbs: 45,
+        fat: 6,
+        fiber: 1,
+        explanation: '240 kcal (Grilled Chicken Breast) + 210 kcal (Jasmine Rice) = 450 kcal',
+        items: [
+          { name: 'Grilled Chicken Breast', portion: '150g', calories: 240, protein: 45, carbs: 0, fat: 5, fiber: 0 },
+          { name: 'Jasmine Rice', portion: '1 cup', calories: 210, protein: 4, carbs: 45, fat: 1, fiber: 1 },
+        ],
+      },
+      error: null,
+    });
 
     renderComponent();
 
