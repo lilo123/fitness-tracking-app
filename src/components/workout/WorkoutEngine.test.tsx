@@ -1211,5 +1211,182 @@ describe('WorkoutEngine', () => {
       expect(screen.getByText('Empty Custom Routine')).toBeDefined();
     });
   });
+
+  it('rejects non-numeric NaN values in weight and reps to protect against corrupt mutations', async () => {
+    const mockInsert = vi.fn();
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'sets') {
+        return { insert: mockInsert };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          or: vi.fn().mockResolvedValue({ data: [], error: null }),
+          in: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+    await selectWorkoutA();
+
+    const weightInput = screen.getByTestId('ghost-weight-0-0');
+    const repsInput = screen.getByTestId('ghost-reps-0-0');
+    const commitBtn = screen.getByTestId('commit-set-btn-0-0');
+
+    fireEvent.change(weightInput, { target: { value: 'abc' } });
+    fireEvent.change(repsInput, { target: { value: 'xyz' } });
+    fireEvent.click(commitBtn);
+
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(screen.getByText('Please enter weight and reps or use previous set values.')).toBeDefined();
+  });
+
+  it('clamps stepper decrement so target sets cannot drop below already logged sets count', async () => {
+    const todaySets = [
+      { id: 's1', workout_id: 'w1', exercise_id: 'e0000000-0000-0000-0000-000000000001', set_index: 1, weight: 185, reps: 8, set_type: 'working', workouts: { date: '2026-09-06', name: 'Workout A' } },
+      { id: 's2', workout_id: 'w1', exercise_id: 'e0000000-0000-0000-0000-000000000001', set_index: 2, weight: 185, reps: 8, set_type: 'working', workouts: { date: '2026-09-06', name: 'Workout A' } },
+    ];
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'sets') {
+        return {
+          select: vi.fn().mockReturnValue({
+            in: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: todaySets, error: null }),
+            }),
+          }),
+        };
+      }
+      if (table === 'workouts') {
+        const selectObj: any = {};
+        selectObj.eq = vi.fn((field: string) => {
+          if (field === 'user_id') {
+            const userChain: any = Promise.resolve({ data: [{ id: 'w1', date: '2026-09-06' }], error: null });
+            userChain.eq = vi.fn().mockResolvedValue({ data: [{ id: 'w1' }], error: null });
+            return userChain;
+          }
+          return Promise.resolve({ data: [], error: null });
+        });
+        return {
+          select: vi.fn().mockReturnValue(selectObj),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          or: vi.fn().mockResolvedValue({ data: [], error: null }),
+          in: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+    await selectWorkoutA();
+
+    // Wait for the query to resolve and display the initial 2/4 Sets badge
+    expect(await screen.findByText('2/4 Sets')).toBeDefined();
+
+    // Default target sets for Incline Bench Press in Workout A is 4
+    const decreaseBtns = screen.getAllByTitle('Decrease target sets');
+    const decreaseBtn = decreaseBtns[0];
+
+    // Decrement from 4 to 3
+    fireEvent.click(decreaseBtn);
+    expect(screen.getByText('2/3 Sets')).toBeDefined();
+
+    // Decrement from 3 to 2 (which equals setsToday.length)
+    fireEvent.click(decreaseBtn);
+    expect(screen.getByText('2/2 Sets')).toBeDefined();
+
+    // Now decreaseBtn should be disabled because targetCount == setsToday.length
+    expect(decreaseBtn).toBeDisabled();
+
+    // Attempting to click again should not reduce below 2
+    fireEvent.click(decreaseBtn);
+    expect(screen.getByText('2/2 Sets')).toBeDefined();
+  });
+
+  it('toggles exercise accordion via keyboard Space and Enter keys on Line 1 title row', async () => {
+    renderComponent();
+    await selectWorkoutA();
+
+    const titleButton = screen.getByLabelText(/Incline Bench Press, collapse exercise/i);
+    expect(titleButton).toHaveAttribute('aria-expanded', 'true');
+
+    // Press Enter to collapse
+    fireEvent.keyDown(titleButton, { key: 'Enter', code: 'Enter' });
+    expect(titleButton).toHaveAttribute('aria-expanded', 'false');
+
+    // Press Space to re-expand
+    fireEvent.keyDown(titleButton, { key: ' ', code: 'Space' });
+    expect(titleButton).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('sanitizes comma decimal separator to dot in weight input', async () => {
+    const mockInsert = vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({ data: { id: 'new-id' }, error: null }),
+      }),
+    });
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'sets') {
+        return { insert: mockInsert };
+      }
+      if (table === 'workouts') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [{ id: 'workout-1' }], error: null }),
+            }),
+          }),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          or: vi.fn().mockResolvedValue({ data: [], error: null }),
+          in: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+    await selectWorkoutA();
+
+    const weightInput = screen.getByTestId('ghost-weight-0-0');
+    const repsInput = screen.getByTestId('ghost-reps-0-0');
+    const commitBtn = screen.getByTestId('commit-set-btn-0-0');
+
+    // Type with comma
+    await userEvent.type(weightInput, '45,5');
+    await userEvent.type(repsInput, '10');
+    fireEvent.click(commitBtn);
+
+    await waitFor(() => {
+      expect(mockInsert).toHaveBeenCalled();
+    });
+
+    const payload = mockInsert.mock.calls[0][0][0];
+    expect(payload.weight).toBe(45.5);
+    expect(payload.reps).toBe(10);
+  });
 });
+
 

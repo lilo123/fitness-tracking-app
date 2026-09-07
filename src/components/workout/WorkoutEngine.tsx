@@ -684,9 +684,10 @@ export const WorkoutEngine: React.FC = () => {
   };
 
   const adjustTargetSets = (exName: string, delta: number) => {
+    const minSets = Math.max(1, getSetsForExerciseToday(exName).length);
     setTargetSetCounts((prev) => {
       const current = prev[exName] || 3;
-      const next = Math.max(1, current + delta);
+      const next = Math.max(minSets, current + delta);
       return { ...prev, [exName]: next };
     });
   };
@@ -711,7 +712,7 @@ export const WorkoutEngine: React.FC = () => {
       ? ghostValues.reps
       : 0;
 
-    if (weightVal <= 0 || repsVal <= 0) {
+    if (!Number.isFinite(weightVal) || weightVal <= 0 || !Number.isFinite(repsVal) || repsVal <= 0) {
       setMutationError('Please enter weight and reps or use previous set values.');
       return;
     }
@@ -737,12 +738,20 @@ export const WorkoutEngine: React.FC = () => {
     field: 'weight' | 'reps',
     value: string
   ) => {
+    let sanitized = value;
+    if (field === 'weight') {
+      sanitized = sanitized.replace(',', '.');
+      if (sanitized !== '' && !/^\d*\.?\d*$/.test(sanitized)) return;
+    } else if (field === 'reps') {
+      if (sanitized !== '' && !/^\d*$/.test(sanitized)) return;
+    }
+
     const draftKey = `${exName}_${setIndex}`;
     setInputDrafts((prev) => ({
       ...prev,
       [draftKey]: {
-        weight: field === 'weight' ? value : prev[draftKey]?.weight || '',
-        reps: field === 'reps' ? value : prev[draftKey]?.reps || '',
+        weight: field === 'weight' ? sanitized : prev[draftKey]?.weight || '',
+        reps: field === 'reps' ? sanitized : prev[draftKey]?.reps || '',
       },
     }));
   };
@@ -777,7 +786,7 @@ export const WorkoutEngine: React.FC = () => {
         ? ghost.reps
         : targetRepCounts[exName] || 0;
 
-      if (weightVal <= 0 || repsVal <= 0) continue;
+      if (!Number.isFinite(weightVal) || weightVal <= 0 || !Number.isFinite(repsVal) || repsVal <= 0) continue;
 
       unloggedSets.push({
         exerciseName: exName,
@@ -830,7 +839,7 @@ export const WorkoutEngine: React.FC = () => {
           ? ghost.reps
           : targetRepCounts[exName] || 0;
 
-        if (weightVal <= 0 || repsVal <= 0) continue;
+        if (!Number.isFinite(weightVal) || weightVal <= 0 || !Number.isFinite(repsVal) || repsVal <= 0) continue;
 
         allPendingSets.push({
           exerciseName: exName,
@@ -1133,6 +1142,7 @@ export const WorkoutEngine: React.FC = () => {
                 const isExpanded = expandedExercises.has(exName);
                 const targetCount = targetSetCounts[exName] || 3;
                 const isCompleted = setsToday.length >= targetCount;
+                const unloggedCount = Math.max(0, targetCount - setsToday.length);
 
                 // Compute ghost set placeholders for this exercise
                 const ghostValues = computeGhostSets(exName, targetCount, userLogs, workoutDate);
@@ -1141,147 +1151,159 @@ export const WorkoutEngine: React.FC = () => {
                 return (
                   <div
                     key={exName}
-                    className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-4 shadow-xl text-white transition-all"
+                    className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-3 shadow-lg space-y-2.5 text-white transition-all"
                     data-testid={`exercise-card-${exIndex}`}
                   >
-                    {/* Card Header */}
+                    {/* LINE 1: Full-Width Title & Accordion Chevron */}
                     <div
+                      role="button"
+                      tabIndex={0}
+                      aria-expanded={isExpanded}
                       onClick={() => toggleAccordion(exName)}
-                      className="flex items-center justify-between cursor-pointer select-none pb-1"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          toggleAccordion(exName);
+                        }
+                      }}
+                      className="flex items-center justify-between cursor-pointer select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 rounded-xl touch-manipulation"
+                      aria-label={`${exName}, ${isExpanded ? 'collapse' : 'expand'} exercise`}
                     >
-                      <div className="flex items-center gap-3 min-w-0 pr-2">
-                        <span className="w-7 h-7 rounded-xl bg-zinc-800 border border-zinc-700/80 flex items-center justify-center text-xs font-bold text-cyan-400 shrink-0 shadow-sm">
+                      <div className="flex items-center gap-2 min-w-0 pr-2">
+                        <span className="w-6 h-6 rounded-lg bg-zinc-800 border border-zinc-700/80 flex items-center justify-center font-mono font-bold text-cyan-400 text-xs shrink-0">
                           {exIndex + 1}
                         </span>
-                        <span className="font-extrabold text-white text-base tracking-tight truncate block">
+                        <span className="text-white font-extrabold text-base tracking-tight leading-snug break-words">
                           {exName}
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                        {isCompleted ? (
-                          <span className="inline-flex items-center text-xs font-black bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 px-2.5 py-1 rounded-full shrink-0 shadow-[0_0_10px_rgba(16,185,129,0.15)]">
-                            <Check className="w-3 h-3 mr-1" />
-                            <span>
-                              {setsToday.length}/{targetCount} Sets
-                            </span>
-                          </span>
-                        ) : setsToday.length > 0 ? (
-                          <span className="inline-flex items-center text-xs font-bold bg-amber-500/10 border border-amber-500/30 text-amber-400 px-2.5 py-1 rounded-full shrink-0">
-                            <span>
-                              {setsToday.length}/{targetCount} Sets
-                            </span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center text-xs font-bold bg-zinc-800 border border-zinc-700/80 text-zinc-400 px-2.5 py-1 rounded-full shrink-0">
-                            <span>0/{targetCount} Sets</span>
-                          </span>
-                        )}
-
-                        {/* Reorder and Delete controls */}
-                        {exIndex > 0 && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              moveExercise(exIndex, -1);
-                            }}
-                            className="min-w-[44px] min-h-[44px] rounded-xl bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700/80 flex items-center justify-center text-zinc-400 hover:text-cyan-400 transition touch-manipulation"
-                            title="Move up"
-                          >
-                            <ArrowUp className="w-4 h-4" />
-                          </button>
-                        )}
-
-                        {exIndex < activeExercises.length - 1 && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              moveExercise(exIndex, 1);
-                            }}
-                            className="min-w-[44px] min-h-[44px] rounded-xl bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700/80 flex items-center justify-center text-zinc-400 hover:text-cyan-400 transition touch-manipulation"
-                            title="Move down"
-                          >
-                            <ArrowDown className="w-4 h-4" />
-                          </button>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeExercise(exIndex);
-                          }}
-                          className="min-w-[44px] min-h-[44px] rounded-xl bg-zinc-800/80 hover:bg-rose-500/20 border border-zinc-700/80 text-zinc-500 hover:text-rose-400 flex items-center justify-center transition touch-manipulation"
-                          title="Remove from workout"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-
+                      <div className="w-7 h-7 rounded-lg text-zinc-400 flex items-center justify-center shrink-0">
                         <ChevronDown
-                          className={`w-4 h-4 text-zinc-400 transition-transform ${
+                          className={`w-4 h-4 transition-transform duration-200 ${
                             isExpanded ? 'rotate-180 text-cyan-400' : ''
                           }`}
                         />
                       </div>
                     </div>
 
-                    {/* Benchmark & Target Set Sub-bar */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 mt-2 pt-2 border-t border-zinc-800/60 text-xs">
-                      <div className="flex flex-wrap items-center gap-1.5">
+                    {/* LINE 2: Benchmarks + Sets status on Left, Stepper + Quick Actions on Right */}
+                    <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-zinc-800/60">
+                      {/* Left side: Benchmarks & Sets status */}
+                      <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                         {benchmarks.lastSession ? (
                           <span
-                            className="inline-flex items-center text-[11px] bg-zinc-800/80 border border-zinc-700/60 text-zinc-300 px-2.5 py-0.5 rounded-full font-medium"
-                            title={`Last session (${formatShortDate(benchmarks.lastSession.date)})`}
+                            className="inline-flex items-center text-[10px] font-mono bg-zinc-800/80 text-zinc-300 border border-zinc-700/50 px-2 py-0.5 rounded-full max-w-[140px] truncate"
+                            title={`Last session (${formatShortDate(benchmarks.lastSession.date)}): ${benchmarks.lastSession.summaryText}`}
                           >
-                            Last ({formatShortDate(benchmarks.lastSession.date)}):{' '}
-                            {benchmarks.lastSession.summaryText}
+                            Last: {benchmarks.lastSession.summaryText}
                           </span>
                         ) : (
-                          <span className="text-[11px] text-zinc-500 font-mono">No prior session</span>
+                          <span className="text-[10px] text-zinc-500 font-mono">No prior session</span>
                         )}
 
                         {benchmarks.pr && (
-                          <span className="inline-flex items-center text-[11px] bg-amber-500/10 border border-amber-500/30 text-amber-400 px-2.5 py-0.5 rounded-full font-bold">
-                            <Trophy className="w-3 h-3 mr-1 text-amber-400" />
-                            PR: {benchmarks.pr.weight}×{benchmarks.pr.reps}
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-500/10 border border-amber-500/30 text-amber-400 px-2 py-0.5 rounded-full">
+                            <Trophy className="w-3 h-3 text-amber-400 shrink-0" />
+                            <span>PR: {benchmarks.pr.weight}×{benchmarks.pr.reps}</span>
+                          </span>
+                        )}
+
+                        {isCompleted ? (
+                          <span className="inline-flex items-center text-[10px] font-black bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 px-2 py-0.5 rounded-full shrink-0 shadow-[0_0_10px_rgba(16,185,129,0.15)]">
+                            <Check className="w-2.5 h-2.5 mr-1" />
+                            <span>{setsToday.length}/{targetCount} Sets</span>
+                          </span>
+                        ) : setsToday.length > 0 ? (
+                          <span className="inline-flex items-center text-[10px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full shrink-0">
+                            <span>{setsToday.length}/{targetCount} Sets</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center text-[10px] font-bold bg-zinc-800 border border-zinc-700/80 text-zinc-400 px-2 py-0.5 rounded-full shrink-0">
+                            <span>0/{targetCount} Sets</span>
                           </span>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-1.5 text-zinc-400">
-                        <span className="text-[11px] font-bold uppercase tracking-wider">Target:</span>
+                      {/* Right side: Stepper + 1-Tap Quick Actions */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        {/* Stepper Pill */}
+                        <div className="flex items-center bg-zinc-800/90 border border-zinc-700/70 rounded-lg h-7 px-1 text-xs">
+                          <button
+                            type="button"
+                            onClick={() => adjustTargetSets(exName, -1)}
+                            disabled={targetCount <= Math.max(1, setsToday.length)}
+                            className="relative w-5 h-5 flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-30 disabled:hover:text-zinc-400 font-bold touch-manipulation before:absolute before:-inset-2 before:content-['']"
+                            title="Decrease target sets"
+                            aria-label={`Decrease target sets for ${exName}`}
+                          >
+                            −
+                          </button>
+                          <span className="font-mono font-bold text-white px-1 text-[11px]">{targetCount}</span>
+                          <button
+                            type="button"
+                            onClick={() => adjustTargetSets(exName, 1)}
+                            className="relative w-5 h-5 flex items-center justify-center text-zinc-400 hover:text-white font-bold touch-manipulation before:absolute before:-inset-2 before:content-['']"
+                            title="Increase target sets"
+                            aria-label={`Increase target sets for ${exName}`}
+                          >
+                            +
+                          </button>
+                        </div>
+
+                        {/* 1-Tap Quick Icons */}
+                        {exIndex > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => moveExercise(exIndex, -1)}
+                            className="relative w-7 h-7 rounded-lg bg-zinc-800/60 hover:bg-zinc-700 border border-zinc-700/50 flex items-center justify-center text-zinc-400 hover:text-cyan-400 transition touch-manipulation before:absolute before:-inset-1.5 before:content-['']"
+                            title="Move up"
+                            aria-label={`Move ${exName} up`}
+                          >
+                            <ArrowUp className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+
+                        {exIndex < activeExercises.length - 1 && (
+                          <button
+                            type="button"
+                            onClick={() => moveExercise(exIndex, 1)}
+                            className="relative w-7 h-7 rounded-lg bg-zinc-800/60 hover:bg-zinc-700 border border-zinc-700/50 flex items-center justify-center text-zinc-400 hover:text-cyan-400 transition touch-manipulation before:absolute before:-inset-1.5 before:content-['']"
+                            title="Move down"
+                            aria-label={`Move ${exName} down`}
+                          >
+                            <ArrowDown className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+
                         <button
                           type="button"
-                          onClick={() => adjustTargetSets(exName, -1)}
-                          className="min-w-[44px] min-h-[44px] rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 flex items-center justify-center font-bold text-sm touch-manipulation"
-                          title="Decrease target sets"
+                          onClick={() => removeExercise(exIndex)}
+                          className="relative w-7 h-7 rounded-lg bg-zinc-800/60 hover:bg-rose-500/20 border border-zinc-700/50 flex items-center justify-center text-zinc-500 hover:text-rose-400 transition touch-manipulation before:absolute before:-inset-1.5 before:content-['']"
+                          title="Remove from workout"
+                          aria-label={`Remove ${exName} from workout`}
                         >
-                          -
-                        </button>
-                        <span className="font-mono font-bold text-white text-xs px-1">{targetCount}</span>
-                        <button
-                          type="button"
-                          onClick={() => adjustTargetSets(exName, 1)}
-                          className="min-w-[44px] min-h-[44px] rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 flex items-center justify-center font-bold text-sm touch-manipulation"
-                          title="Increase target sets"
-                        >
-                          +
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
 
                     {/* Accordion Body: Sets & Ghost Placeholders */}
                     {isExpanded && (
-                      <div className="mt-4 pt-3 border-t border-zinc-800 space-y-2">
+                      <div className="pt-1 space-y-1">
                         {/* 5-Column Table Header */}
-                        <div className="grid grid-cols-12 gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-zinc-400 px-3 pb-1">
-                          <div className="col-span-2 sm:col-span-1 text-center">Set</div>
-                          <div className="col-span-3 sm:col-span-3 text-center">Previous</div>
-                          <div className="col-span-3 sm:col-span-3 text-center">Weight</div>
-                          <div className="col-span-2 sm:col-span-3 text-center">Reps</div>
-                          <div className="col-span-2 sm:col-span-2 text-right">Action</div>
+                        <div className="grid grid-cols-12 gap-1 text-[10px] font-black uppercase tracking-wider text-zinc-500 px-2 pb-1 text-center">
+                          <div className="col-span-2">Set</div>
+                          <div className="col-span-3">Previous</div>
+                          <div className="col-span-3">
+                            <span className="sr-only">Weight</span>
+                            <span aria-hidden="true">Lbs</span>
+                          </div>
+                          <div className="col-span-2">Reps</div>
+                          <div className="col-span-2 text-right pr-1">
+                            <span className="sr-only">Action</span>
+                            <span aria-hidden="true">Log</span>
+                          </div>
                         </div>
 
                         {Array.from({ length: totalRows }, (_, rowIdx) => {
@@ -1304,30 +1326,36 @@ export const WorkoutEngine: React.FC = () => {
                             return (
                               <div
                                 key={loggedSet.id || rowIdx}
-                                className="grid grid-cols-12 gap-1.5 sm:gap-2 py-2.5 px-3 rounded-xl items-center bg-zinc-950/70 border border-zinc-800/80 text-xs transition"
+                                className="grid grid-cols-12 gap-1 py-1.5 px-2 rounded-xl items-center bg-cyan-500/10 border border-cyan-500/20 text-xs my-1 transition"
                               >
-                                <div className="col-span-2 sm:col-span-1 font-mono font-bold text-cyan-400 text-center flex items-center justify-center">
-                                  <span className="w-6 h-6 rounded-full bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center">
+                                <div className="col-span-2 font-mono font-bold text-cyan-400 text-center flex items-center justify-center">
+                                  <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-[11px] flex items-center justify-center font-bold">
                                     {setIndex}
                                   </span>
                                 </div>
-                                <div className="col-span-3 sm:col-span-3 text-zinc-400 font-mono text-center truncate text-[11px]">
+                                <div className="col-span-3 text-zinc-400 font-mono text-center text-[11px] truncate">
                                   {ghost.hintText}
                                 </div>
-                                <div className="col-span-3 sm:col-span-3 text-center font-mono font-black text-white text-sm sm:text-base">
-                                  {loggedSet.weight} <span className="text-[10px] text-zinc-500 font-normal">lbs</span>
+                                <div className="col-span-3 flex justify-center">
+                                  <div className="w-full max-w-[76px] h-8 rounded-lg bg-zinc-950/80 border border-zinc-700/60 flex items-center justify-center font-mono font-black text-white text-sm">
+                                    {loggedSet.weight}
+                                  </div>
                                 </div>
-                                <div className="col-span-2 sm:col-span-3 text-center font-mono font-black text-cyan-300 text-sm sm:text-base">
-                                  {loggedSet.reps} <span className="text-[10px] text-zinc-500 font-normal">reps</span>
+                                <div className="col-span-2 flex justify-center">
+                                  <div className="w-full max-w-[64px] h-8 rounded-lg bg-zinc-950/80 border border-zinc-700/60 flex items-center justify-center font-mono font-black text-cyan-300 text-sm">
+                                    {loggedSet.reps}
+                                  </div>
                                 </div>
-                                <div className="col-span-2 sm:col-span-2 flex justify-end">
+                                <div className="col-span-2 flex justify-end">
                                   <button
+                                    type="button"
                                     onClick={() => loggedSet.id && deleteSetMutation.mutate(loggedSet.id)}
-                                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:w-8 sm:h-8 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center transition active:scale-95 touch-manipulation"
+                                    className="relative w-7.5 h-7.5 rounded-full bg-cyan-500 text-zinc-950 flex items-center justify-center shadow-[0_0_10px_rgba(6,182,212,0.4)] transition active:scale-95 touch-manipulation before:absolute before:-inset-2 before:content-['']"
                                     title="Delete set"
+                                    aria-label={`Delete set ${setIndex} for ${exName}`}
                                     data-testid={`delete-set-btn-${exIndex}-${rowIdx}`}
                                   >
-                                    <Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                                    <Check className="w-4 h-4 stroke-[3]" />
                                   </button>
                                 </div>
                               </div>
@@ -1336,58 +1364,58 @@ export const WorkoutEngine: React.FC = () => {
                             return (
                               <div
                                 key={rowIdx}
-                                className="grid grid-cols-12 gap-1.5 sm:gap-2 py-2 px-3 rounded-xl items-center bg-zinc-900/40 border border-dashed border-zinc-800/80 text-xs hover:border-zinc-700/80 transition"
+                                className="grid grid-cols-12 gap-1 py-1.5 px-2 rounded-xl items-center border border-transparent hover:bg-zinc-800/30 text-xs my-1 transition"
                               >
-                                <div className="col-span-2 sm:col-span-1 font-mono font-bold text-zinc-500 text-center flex items-center justify-center">
-                                  <span className="w-6 h-6 rounded-full bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-zinc-400">
+                                <div className="col-span-2 font-mono font-bold text-zinc-500 text-center flex items-center justify-center">
+                                  <span className="w-5 h-5 rounded-full bg-zinc-800 text-[11px] flex items-center justify-center text-zinc-400">
                                     {setIndex}
                                   </span>
                                 </div>
-                                <div className="col-span-3 sm:col-span-3 text-zinc-500 font-mono text-center truncate text-[11px]">
+                                <div className="col-span-3 text-zinc-500 font-mono text-center text-[11px] truncate">
                                   {ghost.hintText}
                                 </div>
-                                <div className="col-span-3 sm:col-span-3 flex items-center justify-center">
-                                  <div className="relative w-full max-w-[90px]">
-                                    <input
-                                      type="number"
-                                      inputMode="decimal"
-                                      placeholder={ghost.weight ? ghost.weight.toString() : 'lbs'}
-                                      value={draft.weight}
-                                      onChange={(e) => updateDraft(exName, setIndex, 'weight', e.target.value)}
-                                      className="w-full bg-zinc-950 border border-zinc-800 focus:border-cyan-500 text-white rounded-lg py-2 px-1 text-center font-mono font-bold text-sm sm:text-xs outline-none shadow-inner"
-                                      data-testid={`ghost-weight-${exIndex}-${rowIdx}`}
-                                    />
-                                  </div>
+                                <div className="col-span-3 flex justify-center">
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    placeholder={ghost.weight ? ghost.weight.toString() : 'lbs'}
+                                    value={draft.weight}
+                                    onChange={(e) => updateDraft(exName, setIndex, 'weight', e.target.value)}
+                                    aria-label={`Set ${setIndex} weight`}
+                                    className="h-8 w-full max-w-[76px] bg-zinc-800/80 border border-zinc-700/70 rounded-lg text-center font-mono font-bold text-white text-base sm:text-sm focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 outline-none transition"
+                                    data-testid={`ghost-weight-${exIndex}-${rowIdx}`}
+                                  />
                                 </div>
-                                <div className="col-span-2 sm:col-span-3 flex items-center justify-center">
-                                  <div className="relative w-full max-w-[80px]">
-                                    <input
-                                      type="number"
-                                      inputMode="numeric"
-                                      placeholder={
-                                        ghost.reps
-                                          ? ghost.reps.toString()
-                                          : targetRepCounts[exName]
-                                          ? `${targetRepCounts[exName]}`
-                                          : 'reps'
-                                      }
-                                      value={draft.reps}
-                                      onChange={(e) => updateDraft(exName, setIndex, 'reps', e.target.value)}
-                                      className="w-full bg-zinc-950 border border-zinc-800 focus:border-cyan-500 text-white rounded-lg py-2 px-1 text-center font-mono font-bold text-sm sm:text-xs outline-none shadow-inner"
-                                      data-testid={`ghost-reps-${exIndex}-${rowIdx}`}
-                                    />
-                                  </div>
+                                <div className="col-span-2 flex justify-center">
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    placeholder={
+                                      ghost.reps
+                                        ? ghost.reps.toString()
+                                        : targetRepCounts[exName]
+                                        ? `${targetRepCounts[exName]}`
+                                        : 'reps'
+                                    }
+                                    value={draft.reps}
+                                    onChange={(e) => updateDraft(exName, setIndex, 'reps', e.target.value)}
+                                    aria-label={`Set ${setIndex} reps`}
+                                    className="h-8 w-full max-w-[64px] bg-zinc-800/80 border border-zinc-700/70 rounded-lg text-center font-mono font-bold text-white text-base sm:text-sm focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 outline-none transition"
+                                    data-testid={`ghost-reps-${exIndex}-${rowIdx}`}
+                                  />
                                 </div>
-                                <div className="col-span-2 sm:col-span-2 flex justify-end">
+                                <div className="col-span-2 flex justify-end">
                                   <button
+                                    type="button"
                                     onClick={() => handleCommitSet(exName, setIndex, ghost)}
                                     disabled={logSetMutation.isPending || batchLogSetsMutation.isPending}
-                                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:w-auto sm:h-8 sm:px-3 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 font-bold border border-cyan-500/40 flex items-center justify-center gap-1 transition shadow-[0_0_10px_rgba(6,182,212,0.1)] active:scale-95 shrink-0 disabled:opacity-50 touch-manipulation"
+                                    className="relative w-7.5 h-7.5 rounded-full border-2 border-zinc-700 hover:border-cyan-400 hover:bg-cyan-500/10 text-transparent hover:text-cyan-400 flex items-center justify-center transition active:scale-95 disabled:opacity-50 touch-manipulation before:absolute before:-inset-2 before:content-['']"
                                     title="Commit Set (One-tap)"
+                                    aria-label={`Commit set ${setIndex} for ${exName}`}
                                     data-testid={`commit-set-btn-${exIndex}-${rowIdx}`}
                                   >
-                                    <Check className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
-                                    <span className="hidden sm:inline text-xs">Log</span>
+                                    <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                                   </button>
                                 </div>
                               </div>
@@ -1397,16 +1425,16 @@ export const WorkoutEngine: React.FC = () => {
 
                         {/* Batch Log Button inside accordion if unlogged sets remain */}
                         {!isCompleted && (
-                          <div className="pt-2 flex justify-end">
+                          <div className="flex justify-end pt-1">
                             <button
                               type="button"
                               onClick={() => handleBatchLogExercise(exName, targetCount, ghostValues, setsToday)}
                               disabled={batchLogSetsMutation.isPending}
-                              className="text-xs font-bold text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 px-3 py-2 min-h-[36px] rounded-xl transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                              className="text-xs font-bold text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 px-3 py-1.5 rounded-full transition flex items-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-50 touch-manipulation"
                               data-testid={`batch-log-exercise-btn-${exIndex}`}
                             >
-                              <Check className="w-3.5 h-3.5 text-cyan-400" />
-                              <span>Log All Sets for {exName}</span>
+                              <Check className="w-3.5 h-3.5 text-cyan-400 stroke-[2.5]" />
+                              <span>Log All ({unloggedCount})</span>
                             </button>
                           </div>
                         )}
