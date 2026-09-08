@@ -364,7 +364,7 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition shrink-0"
+            className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition shrink-0 touch-manipulation"
           >
             <X className="w-5 h-5" />
           </button>
@@ -400,7 +400,7 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
                     type="button"
                     data-testid="close-exercise-picker"
                     onClick={() => setIsPickerOpen(false)}
-                    className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition"
+                    className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition touch-manipulation"
                   >
                     <ArrowLeft className="w-4 h-4" />
                   </button>
@@ -409,7 +409,7 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsPickerOpen(false)}
-                  className="px-3 py-1 bg-violet-500/20 text-violet-300 border border-violet-500/40 rounded-lg text-xs font-bold hover:bg-violet-500/30 transition"
+                  className="px-4 py-2 min-h-[44px] flex items-center justify-center bg-violet-500/20 text-violet-300 border border-violet-500/40 rounded-xl text-xs font-bold hover:bg-violet-500/30 transition touch-manipulation"
                 >
                   Done
                 </button>
@@ -434,7 +434,7 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
                     key={cat}
                     type="button"
                     onClick={() => setSelectedCategory(cat)}
-                    className={`px-3 py-1.5 rounded-lg text-[11px] font-bold shrink-0 transition ${
+                    className={`px-3.5 py-2 min-h-[44px] flex items-center justify-center rounded-xl text-xs font-bold shrink-0 transition touch-manipulation ${
                       selectedCategory === cat
                         ? 'bg-violet-500 text-white shadow-neon-violet'
                         : 'bg-zinc-950 text-zinc-400 border border-zinc-800 hover:border-zinc-700'
@@ -460,7 +460,7 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
                       type="button"
                       data-testid={`add-exercise-btn-${ex.id}`}
                       onClick={() => addExercise(ex)}
-                      className="px-3.5 py-1.5 min-h-[36px] bg-violet-500/15 hover:bg-violet-500/25 text-violet-300 border border-violet-500/30 rounded-xl text-xs font-bold flex items-center gap-1 transition active:scale-95 shrink-0"
+                      className="px-4 py-2 min-h-[44px] bg-violet-500/15 hover:bg-violet-500/25 text-violet-300 border border-violet-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shrink-0 touch-manipulation"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Add</span>
@@ -509,7 +509,7 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
                         type="button"
                         data-testid={`day-pill-${d}`}
                         onClick={() => toggleDay(d)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                        className={`px-3.5 py-2 min-h-[44px] flex items-center justify-center rounded-xl text-xs font-bold transition touch-manipulation ${
                           active
                             ? 'bg-violet-500 text-white shadow-neon-violet'
                             : 'bg-zinc-950 border border-zinc-800 text-zinc-400 hover:border-zinc-700'
@@ -561,47 +561,47 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
                             disabled={idx === 0}
                             data-testid={`move-up-${idx}`}
                             onClick={() => moveExercise(idx, -1)}
-                            className="p-1.5 rounded-lg text-zinc-400 hover:text-white disabled:opacity-30 transition"
+                            className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-zinc-400 hover:text-white disabled:opacity-30 transition touch-manipulation hover:bg-zinc-900"
                             title="Move Up"
                           >
-                            <ArrowUp className="w-3.5 h-3.5" />
+                            <ArrowUp className="w-4 h-4" />
                           </button>
                           <button
                             type="button"
                             disabled={idx === templateExercises.length - 1}
                             data-testid={`move-down-${idx}`}
                             onClick={() => moveExercise(idx, 1)}
-                            className="p-1.5 rounded-lg text-zinc-400 hover:text-white disabled:opacity-30 transition"
+                            className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-zinc-400 hover:text-white disabled:opacity-30 transition touch-manipulation hover:bg-zinc-900"
                             title="Move Down"
                           >
-                            <ArrowDown className="w-3.5 h-3.5" />
+                            <ArrowDown className="w-4 h-4" />
                           </button>
                           <button
                             type="button"
                             data-testid={`remove-exercise-${idx}`}
                             onClick={() => removeExercise(idx)}
-                            className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 transition"
+                            className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-zinc-500 hover:text-rose-400 transition touch-manipulation hover:bg-zinc-900"
                             title="Remove"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
 
                       {/* Steppers Row */}
-                      <div className="flex items-center gap-4 pt-1 border-t border-zinc-900">
+                      <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 pt-1 border-t border-zinc-900">
                         {/* Sets Stepper */}
-                        <div className="flex items-center gap-1.5 flex-1">
-                          <span className="text-[10px] text-zinc-500 font-bold uppercase">Sets</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Sets</span>
                           <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-0.5">
                             <button
                               type="button"
                               data-testid={`dec-sets-${idx}`}
                               onClick={() => updateSets(idx, te.target_sets - 1)}
                               disabled={te.target_sets <= 1}
-                              className="w-8 h-8 min-w-[32px] min-h-[32px] flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-30 rounded-lg active:scale-95 touch-manipulation"
+                              className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-30 rounded-lg active:scale-95 touch-manipulation"
                             >
-                              <Minus className="w-3 h-3" />
+                              <Minus className="w-3.5 h-3.5" />
                             </button>
                             <input
                               type="number"
@@ -610,32 +610,32 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
                               data-testid={`sets-input-${idx}`}
                               value={te.target_sets}
                               onChange={(e) => updateSets(idx, parseInt(e.target.value, 10))}
-                              className="w-8 bg-transparent text-white font-mono font-black text-xs text-center outline-none"
+                              className="w-9 bg-transparent text-white font-mono font-black text-xs text-center outline-none"
                             />
                             <button
                               type="button"
                               data-testid={`inc-sets-${idx}`}
                               onClick={() => updateSets(idx, te.target_sets + 1)}
                               disabled={te.target_sets >= 20}
-                              className="w-8 h-8 min-w-[32px] min-h-[32px] flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-30 rounded-lg active:scale-95 touch-manipulation"
+                              className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-30 rounded-lg active:scale-95 touch-manipulation"
                             >
-                              <Plus className="w-3 h-3" />
+                              <Plus className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </div>
 
                         {/* Reps Stepper */}
-                        <div className="flex items-center gap-1.5 flex-1">
-                          <span className="text-[10px] text-zinc-500 font-bold uppercase">Reps</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Reps</span>
                           <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-0.5">
                             <button
                               type="button"
                               data-testid={`dec-reps-${idx}`}
                               onClick={() => updateReps(idx, te.target_reps - 1)}
                               disabled={te.target_reps <= 1}
-                              className="w-8 h-8 min-w-[32px] min-h-[32px] flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-30 rounded-lg active:scale-95 touch-manipulation"
+                              className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-30 rounded-lg active:scale-95 touch-manipulation"
                             >
-                              <Minus className="w-3 h-3" />
+                              <Minus className="w-3.5 h-3.5" />
                             </button>
                             <input
                               type="number"
@@ -644,16 +644,16 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
                               data-testid={`reps-input-${idx}`}
                               value={te.target_reps}
                               onChange={(e) => updateReps(idx, parseInt(e.target.value, 10))}
-                              className="w-10 bg-transparent text-white font-mono font-black text-xs text-center outline-none"
+                              className="w-11 bg-transparent text-white font-mono font-black text-xs text-center outline-none"
                             />
                             <button
                               type="button"
                               data-testid={`inc-reps-${idx}`}
                               onClick={() => updateReps(idx, te.target_reps + 1)}
                               disabled={te.target_reps >= 100}
-                              className="w-8 h-8 min-w-[32px] min-h-[32px] flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-30 rounded-lg active:scale-95 touch-manipulation"
+                              className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-30 rounded-lg active:scale-95 touch-manipulation"
                             >
-                              <Plus className="w-3 h-3" />
+                              <Plus className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </div>
@@ -667,7 +667,7 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
                   type="button"
                   data-testid="open-exercise-picker"
                   onClick={() => setIsPickerOpen(true)}
-                  className="w-full py-3.5 min-h-[48px] rounded-2xl border border-dashed border-zinc-700 hover:border-violet-500/60 bg-zinc-950/60 hover:bg-violet-500/5 text-xs font-bold text-zinc-300 hover:text-violet-300 flex items-center justify-center gap-2 transition active:scale-98"
+                  className="w-full py-3.5 min-h-[48px] rounded-2xl border border-dashed border-zinc-700 hover:border-violet-500/60 bg-zinc-950/60 hover:bg-violet-500/5 text-xs font-bold text-zinc-300 hover:text-violet-300 flex items-center justify-center gap-2 transition active:scale-98 touch-manipulation"
                 >
                   <Plus className="w-4 h-4 text-violet-400" />
                   <span>Add Exercise to Routine</span>
@@ -683,7 +683,7 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
             type="button"
             data-testid="cancel-template-btn"
             onClick={onClose}
-            className="px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition active:scale-95"
+            className="px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition active:scale-95 touch-manipulation"
           >
             Cancel
           </button>
@@ -692,7 +692,7 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
             data-testid="save-template-btn"
             disabled={saving}
             onClick={handleSave}
-            className="px-6 py-2.5 min-h-[44px] rounded-xl text-xs font-black bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-400 hover:to-indigo-500 text-white shadow-neon-violet transition active:scale-95 disabled:opacity-50 flex items-center gap-2"
+            className="px-6 py-2.5 min-h-[44px] rounded-xl text-xs font-black bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-400 hover:to-indigo-500 text-white shadow-neon-violet transition active:scale-95 disabled:opacity-50 flex items-center gap-2 touch-manipulation"
           >
             <Check className="w-4 h-4" />
             <span>

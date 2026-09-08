@@ -162,12 +162,12 @@ export const ExercisesView: React.FC = () => {
   });
 
   return (
-    <div className="space-y-6 pb-8 animate-fade-in">
+    <div className="space-y-6 pb-[max(env(safe-area-inset-bottom),2rem)] animate-fade-in">
       {/* View Tabs */}
       <div className="flex gap-2 p-1 bg-zinc-900 rounded-xl mb-4">
         <button
           onClick={() => setActiveTab('exercises')}
-          className={`flex-1 py-2 min-h-[44px] text-xs font-bold rounded-lg transition-all flex flex-col items-center justify-center ${
+          className={`flex-1 py-2 min-h-[44px] text-xs font-bold rounded-lg transition-all flex flex-col items-center justify-center touch-manipulation ${
             activeTab === 'exercises' ? 'bg-zinc-800 text-cyan-400 shadow-md' : 'text-zinc-500 hover:text-zinc-300'
           }`}
         >
@@ -176,7 +176,7 @@ export const ExercisesView: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('templates')}
-          className={`flex-1 py-2 min-h-[44px] text-xs font-bold rounded-lg transition-all flex flex-col items-center justify-center ${
+          className={`flex-1 py-2 min-h-[44px] text-xs font-bold rounded-lg transition-all flex flex-col items-center justify-center touch-manipulation ${
             activeTab === 'templates' ? 'bg-zinc-800 text-violet-400 shadow-md' : 'text-zinc-500 hover:text-zinc-300'
           }`}
         >
@@ -206,14 +206,14 @@ export const ExercisesView: React.FC = () => {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider">Target Muscle Groups <span className="text-zinc-500 font-normal">(Tap multiple)</span></label>
-                  <button type="button" onClick={() => setSelectedBodyParts([])} className="text-xs font-bold text-zinc-500 hover:text-zinc-300 transition">Clear</button>
+                  <button type="button" onClick={() => setSelectedBodyParts([])} className="text-xs font-bold text-zinc-500 hover:text-zinc-300 transition min-h-[44px] px-2 flex items-center touch-manipulation">Clear</button>
                 </div>
                 <div className="flex flex-wrap gap-1.5 p-2 bg-zinc-950/80 border border-zinc-800/80 rounded-xl">
                   {Object.keys(MUSCLE_TAXONOMY).map(part => (
                     <button
                       key={part}
                       onClick={() => toggleBodyPart(part)}
-                      className={`px-3 py-1.5 min-h-[36px] flex items-center justify-center rounded-full text-xs font-bold transition touch-manipulation ${selectedBodyParts.includes(part) ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' : 'bg-zinc-900 text-zinc-400 border border-zinc-800'}`}
+                      className={`px-3.5 py-2 min-h-[44px] flex items-center justify-center rounded-full text-xs font-bold transition touch-manipulation ${selectedBodyParts.includes(part) ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' : 'bg-zinc-900 text-zinc-400 border border-zinc-800'}`}
                     >
                       {part}
                     </button>
@@ -224,7 +224,7 @@ export const ExercisesView: React.FC = () => {
               <button
                 disabled={!exerciseName || createExerciseMutation.isPending}
                 onClick={() => createExerciseMutation.mutate()}
-                className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black py-3 min-h-[44px] rounded-xl disabled:opacity-50"
+                className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black py-3 min-h-[44px] rounded-xl disabled:opacity-50 touch-manipulation"
               >
                 Save to Library
               </button>
@@ -302,7 +302,7 @@ export const ExercisesView: React.FC = () => {
                 setIsForking(false);
                 setIsTemplateModalOpen(true);
               }}
-              className="px-4 py-2 min-h-[40px] bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-400 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-neon-violet transition active:scale-95 flex items-center gap-1.5"
+              className="px-4 py-2 min-h-[44px] bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-400 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-neon-violet transition active:scale-95 flex items-center gap-1.5 touch-manipulation"
             >
               <PlusCircle className="w-4 h-4" />
               <span>+ New Routine</span>
@@ -317,7 +317,7 @@ export const ExercisesView: React.FC = () => {
                 type="button"
                 data-testid={`day-filter-${d}`}
                 onClick={() => setSelectedDayFilter(d)}
-                className={`px-3 py-1.5 min-h-[36px] rounded-xl text-xs font-bold transition shrink-0 ${
+                className={`px-3.5 py-2 min-h-[44px] flex items-center justify-center rounded-xl text-xs font-bold transition shrink-0 touch-manipulation ${
                   selectedDayFilter === d
                     ? 'bg-violet-500 text-white shadow-neon-violet'
                     : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white'

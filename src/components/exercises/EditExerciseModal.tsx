@@ -153,7 +153,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition shrink-0"
+            className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition shrink-0 touch-manipulation"
           >
             <X className="w-5 h-5" />
           </button>
@@ -195,7 +195,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
               <button
                 type="button"
                 onClick={() => setSelectedBodyParts([])}
-                className="text-xs font-bold text-zinc-500 hover:text-zinc-300 transition"
+                className="text-xs font-bold text-zinc-500 hover:text-zinc-300 transition min-h-[44px] px-2 flex items-center touch-manipulation"
               >
                 Clear
               </button>
@@ -208,7 +208,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
                     key={part}
                     type="button"
                     onClick={() => toggleBodyPart(part)}
-                    className={`px-3 py-1.5 min-h-[36px] flex items-center justify-center rounded-full text-xs font-bold transition touch-manipulation ${
+                    className={`px-3.5 py-2 min-h-[44px] flex items-center justify-center rounded-full text-xs font-bold transition touch-manipulation ${
                       isSelected
                         ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
                         : 'bg-zinc-900 text-zinc-400 border border-zinc-800 hover:border-zinc-700'
@@ -228,7 +228,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
             type="button"
             data-testid="cancel-exercise-btn"
             onClick={onClose}
-            className="px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition active:scale-95"
+            className="px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition active:scale-95 touch-manipulation"
           >
             Cancel
           </button>
@@ -237,7 +237,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
             data-testid="save-exercise-btn"
             disabled={!name.trim() || isSubmitting}
             onClick={handleSave}
-            className="px-6 py-2.5 min-h-[44px] rounded-xl text-xs font-black bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-neon-cyan transition active:scale-95 disabled:opacity-50 flex items-center gap-2"
+            className="px-6 py-2.5 min-h-[44px] rounded-xl text-xs font-black bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-neon-cyan transition active:scale-95 disabled:opacity-50 flex items-center gap-2 touch-manipulation"
           >
             <Check className="w-4 h-4" />
             <span>{isSubmitting ? 'Saving...' : 'Save Changes'}</span>
