@@ -2,9 +2,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { WorkoutEngine } from './WorkoutEngine';
+import { GlobalRestTimerPill } from '../common/GlobalRestTimerPill';
+import { restTimerStore } from '../../utils/restTimerStore';
+import { workoutSessionStore } from '../../utils/workoutSessionStore';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../../context/AuthContext';
 import { CoachProvider } from '../../context/CoachContext';
+import { useCoach } from '../../hooks/useCoach';
 import { supabase } from '../../lib/supabase';
 import { getLocalDateStr } from '../../utils/ghostSets';
 
@@ -36,6 +40,9 @@ describe('WorkoutEngine', () => {
     vi.clearAllMocks();
     vi.setSystemTime(new Date('2026-09-06T12:00:00Z'));
     localStorage.clear();
+    sessionStorage.clear();
+    restTimerStore.resetForTesting();
+    workoutSessionStore.resetForTesting();
     localStorage.setItem(
       'cybergym_user',
       JSON.stringify({
@@ -85,6 +92,7 @@ describe('WorkoutEngine', () => {
         <AuthProvider>
           <CoachProvider>
             <WorkoutEngine />
+            <GlobalRestTimerPill />
           </CoachProvider>
         </AuthProvider>
       </QueryClientProvider>
@@ -1655,6 +1663,388 @@ describe('WorkoutEngine', () => {
       expect(screen.getByText('Lat Pull Down')).toBeDefined();
     });
   });
+
+  describe('Workout Session Store State-Loss Bug Resolution (7 Dedicated Integration Tests)', () => {
+    it('persists target sets stepper changes across unmount and remount (Bug 1)', async () => {
+      const { unmount } = renderComponent();
+      await selectWorkoutA();
+
+      // Workout A initially has Incline Bench Press with 4 target sets (0/4 Sets)
+      expect(await screen.findByText('0/4 Sets')).toBeDefined();
+
+      const incBtns = screen.getAllByTitle('Increase target sets');
+      fireEvent.click(incBtns[0]);
+
+      // Target sets incremented to 5
+      expect(screen.getByText('0/5 Sets')).toBeDefined();
+
+      // Unmount simulating tab change
+      unmount();
+
+      // Remount
+      renderComponent();
+
+      // Target sets should remain 5, not revert to 4
+      expect(await screen.findByText('0/5 Sets')).toBeDefined();
+    });
+
+    it('persists exercise deletion with 0 logged sets across unmount and remount without resurrection (Bug 2)', async () => {
+      const { unmount } = renderComponent();
+      await selectWorkoutA();
+
+      expect(await screen.findByText('Incline Bench Press')).toBeDefined();
+
+      const removeBtn = screen.getByLabelText(/Remove Incline Bench Press from workout/i);
+      fireEvent.click(removeBtn);
+
+      expect(screen.queryByText('Incline Bench Press')).toBeNull();
+
+      unmount();
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.queryByText('Incline Bench Press')).toBeNull();
+        expect(screen.getByText('Cable Lateral Raises')).toBeDefined();
+      });
+    });
+
+    it('persists exercise deletion when other exercises have logged sets today across unmount and remount (Bug 3)', async () => {
+      const today = '2026-09-06';
+      const loggedSetsToday = [
+        {
+          id: 's-today-1',
+          workout_id: 'workout-today',
+          exercise_id: 'e0000000-0000-0000-0000-000000000001',
+          exercise_name: 'Incline Bench Press',
+          set_index: 1,
+          set_type: 'working',
+          weight: 185,
+          reps: 8,
+          rpe: null,
+          created_at: `${today}T10:00:00Z`,
+          workouts: { id: 'workout-today', date: today, name: 'Workout A (Push, Quads & Core)' },
+        },
+      ];
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'sets') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: loggedSetsToday, error: null }),
+              }),
+            }),
+          };
+        }
+        if (table === 'workouts') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({
+                data: [{ id: 'workout-today', date: today, name: 'Workout A (Push, Quads & Core)' }],
+                error: null,
+              }),
+            }),
+          };
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
+        };
+      });
+
+      const { unmount } = renderComponent();
+
+      // Should automatically load Workout A because of logged sets
+      expect(await screen.findByText('Incline Bench Press')).toBeDefined();
+      expect(screen.getByText('Dips')).toBeDefined();
+
+      // Delete Dips (which has 0 logged sets)
+      const removeDipsBtn = screen.getByLabelText(/Remove Dips from workout/i);
+      fireEvent.click(removeDipsBtn);
+
+      expect(screen.queryByText('Dips')).toBeNull();
+
+      unmount();
+      renderComponent();
+
+      // Dips should remain deleted and NOT resurrect despite todaySets > 0
+      await waitFor(() => {
+        expect(screen.queryByText('Dips')).toBeNull();
+        expect(screen.getByText('Incline Bench Press')).toBeDefined();
+      });
+    });
+
+    it('persists exercise reorder across unmount and remount (Bug 4)', async () => {
+      const { unmount } = renderComponent();
+      await selectWorkoutA();
+
+      expect(await screen.findByText('Incline Bench Press')).toBeDefined();
+
+      // Move Cable Lateral Raises (index 1) up to index 0
+      const moveUpBtns = screen.getAllByTitle('Move up');
+      fireEvent.click(moveUpBtns[0]);
+
+      // Verify order updated in session store
+      const session = workoutSessionStore.getActiveSession('test-user-id', '2026-09-06');
+      expect(session?.exercises[0]).toBe('Cable Lateral Raises');
+      expect(session?.exercises[1]).toBe('Incline Bench Press');
+
+      unmount();
+      renderComponent();
+
+      await waitFor(() => {
+        const sessionAfter = workoutSessionStore.getActiveSession('test-user-id', '2026-09-06');
+        expect(sessionAfter?.exercises[0]).toBe('Cable Lateral Raises');
+        expect(sessionAfter?.exercises[1]).toBe('Incline Bench Press');
+      });
+      const headings = screen.getAllByRole('button', { name: /collapse exercise|expand exercise/i });
+      expect(headings[0].textContent).toContain('Cable Lateral Raises');
+      expect(headings[1].textContent).toContain('Incline Bench Press');
+    });
+
+    it('persists uncommitted input drafts (weight and reps) across unmount and remount (Bug 5)', async () => {
+      const { unmount } = renderComponent();
+      await selectWorkoutA();
+
+      const weightInput = await screen.findByTestId('ghost-weight-0-0');
+      const repsInput = screen.getByTestId('ghost-reps-0-0');
+
+      fireEvent.change(weightInput, { target: { value: '225' } });
+      fireEvent.change(repsInput, { target: { value: '5' } });
+
+      expect(weightInput).toHaveValue('225');
+      expect(repsInput).toHaveValue('5');
+
+      // Unmount triggers flushPendingWrites
+      unmount();
+
+      // Verify written to session store
+      const session = workoutSessionStore.getActiveSession('test-user-id', '2026-09-06');
+      expect(session?.inputDrafts['Incline Bench Press_1']).toEqual({ weight: '225', reps: '5' });
+
+      // Remount
+      renderComponent();
+
+      // Input fields should restore the typed draft values
+      await waitFor(() => {
+        expect(screen.getByTestId('ghost-weight-0-0')).toHaveValue('225');
+        expect(screen.getByTestId('ghost-reps-0-0')).toHaveValue('5');
+      });
+    });
+
+    it('preserves active workout date across midnight rollover via pointer architecture (Bug 6)', async () => {
+      // Set system clock to 23:50 on 2026-09-08
+      vi.setSystemTime(new Date('2026-09-08T23:50:00Z'));
+
+      const { unmount } = renderComponent();
+      const dateInput = screen.getByTestId('workout-date-input') as HTMLInputElement;
+      expect(dateInput.value).toBe('2026-09-08');
+
+      await selectWorkoutA();
+
+      expect(localStorage.getItem('cybergym_current_session_pointer_test-user-id')).toBe('2026-09-08');
+
+      unmount();
+
+      // Clock rolls over past midnight
+      vi.setSystemTime(new Date('2026-09-09T00:10:00Z'));
+      expect(getLocalDateStr(new Date())).toBe('2026-09-09');
+
+      // Remount
+      renderComponent();
+
+      await waitFor(() => {
+        const dateInputAfter = screen.getByTestId('workout-date-input') as HTMLInputElement;
+        expect(dateInputAfter.value).toBe('2026-09-08');
+        expect(screen.getByText('Workout A (Push, Quads & Core)')).toBeDefined();
+      });
+    });
+
+    it('isolates session drafts strictly by target athlete in Coach mode (Bug 7)', async () => {
+      const athleteAId = '11111111-1111-4111-8111-111111111111';
+      const athleteBId = '22222222-2222-4222-8222-222222222222';
+
+      localStorage.setItem(
+        'cybergym_user',
+        JSON.stringify({ id: 'coach-id', email: 'coach@example.com', role: 'coach' })
+      );
+      localStorage.setItem('cybergym_view_mode', 'coach');
+      localStorage.setItem(
+        'cybergym_athletes',
+        JSON.stringify([
+          { id: athleteAId, name: 'Athlete A', email: 'a@example.com', status: 'Active' },
+          { id: athleteBId, name: 'Athlete B', email: 'b@example.com', status: 'Active' },
+        ])
+      );
+      localStorage.setItem('cybergym_selected_athlete', athleteAId);
+      (supabase.auth.getUser as any).mockResolvedValue({ data: { user: { id: 'coach-id' } } });
+      (supabase.auth.getSession as any).mockResolvedValue({
+        data: { session: { user: { id: 'coach-id', email: 'coach@example.com' } } },
+      });
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'users') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn((col: string) => {
+                if (col === 'id') {
+                  return {
+                    single: vi.fn().mockResolvedValue({
+                      data: { id: 'coach-id', email: 'coach@example.com', role: 'coach', auto_rest_timer: true },
+                      error: null,
+                    }),
+                  };
+                }
+                if (col === 'role') {
+                  return {
+                    order: vi.fn().mockResolvedValue({
+                      data: [
+                        { id: athleteAId, username: 'Athlete A', email: 'a@example.com', role: 'athlete', created_at: '2026-09-01' },
+                        { id: athleteBId, username: 'Athlete B', email: 'b@example.com', role: 'athlete', created_at: '2026-09-01' },
+                      ],
+                      error: null,
+                    }),
+                  };
+                }
+                return { order: vi.fn().mockResolvedValue({ data: [], error: null }) };
+              }),
+            }),
+          };
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+            in: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
+        };
+      });
+
+      const CoachTestHarness: React.FC = () => {
+        const { switchAthlete, selectedAthleteId } = useCoach();
+        return (
+          <div>
+            <div data-testid="current-selected-athlete">{selectedAthleteId}</div>
+            <button onClick={() => switchAthlete(athleteBId)} data-testid="switch-to-b">
+              Switch to B
+            </button>
+            <button onClick={() => switchAthlete(athleteAId)} data-testid="switch-to-a">
+              Switch to A
+            </button>
+            <WorkoutEngine />
+            <GlobalRestTimerPill />
+          </div>
+        );
+      };
+
+      render(
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <CoachProvider>
+              <CoachTestHarness />
+            </CoachProvider>
+          </AuthProvider>
+        </QueryClientProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('current-selected-athlete')).toHaveTextContent(athleteAId);
+      });
+
+      // Athlete A chooses Workout A and types draft 275 lbs x 8 reps
+      await selectWorkoutA();
+      const weightInputA = await screen.findByTestId('ghost-weight-0-0');
+      const repsInputA = screen.getByTestId('ghost-reps-0-0');
+
+      fireEvent.change(weightInputA, { target: { value: '275' } });
+      fireEvent.change(repsInputA, { target: { value: '8' } });
+      expect(weightInputA).toHaveValue('275');
+      expect(repsInputA).toHaveValue('8');
+
+      // Coach switches to Athlete B
+      fireEvent.click(screen.getByTestId('switch-to-b'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('current-selected-athlete')).toHaveTextContent(athleteBId);
+      });
+
+      // Select Workout A for Athlete B
+      await selectWorkoutA();
+
+      // Athlete B's inputs must be clean and empty with zero leakage from Athlete A
+      const weightInputB = await screen.findByTestId('ghost-weight-0-0');
+      const repsInputB = screen.getByTestId('ghost-reps-0-0');
+      expect(weightInputB).toHaveValue('');
+      expect(repsInputB).toHaveValue('');
+
+      // Coach switches back to Athlete A
+      fireEvent.click(screen.getByTestId('switch-to-a'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('current-selected-athlete')).toHaveTextContent(athleteAId);
+      });
+
+      // Athlete A's draft must be preserved intact
+      await waitFor(() => {
+        expect(screen.getByTestId('ghost-weight-0-0')).toHaveValue('275');
+        expect(screen.getByTestId('ghost-reps-0-0')).toHaveValue('8');
+      });
+    });
+
+    it('discards local draft customizations and reloads scheduled template on "Reload Scheduled Routine" button click', async () => {
+      // Set system clock to Monday (2026-09-07)
+      vi.setSystemTime(new Date('2026-09-07T10:00:00Z'));
+
+      renderComponent();
+
+      // Wait for Monday default template to resolve and mount
+      await waitFor(() => {
+        expect(screen.getByText('Push, Quads, & Core - Reduced')).toBeDefined();
+        expect(screen.getByText('Incline Bench Press')).toBeDefined();
+        expect(screen.getByText('0/4 Sets')).toBeDefined();
+      });
+
+      // Modify target sets to 5
+      const incBtns = screen.getAllByTitle('Increase target sets');
+      fireEvent.click(incBtns[0]);
+      await waitFor(() => {
+        expect(screen.getByText('0/5 Sets')).toBeDefined();
+      });
+
+      // Delete an exercise (e.g. Cable Lateral Raises)
+      const removeBtn = screen.getByLabelText(/Remove Cable Lateral Raises from workout/i);
+      fireEvent.click(removeBtn);
+      await waitFor(() => {
+        expect(screen.queryByText('Cable Lateral Raises')).toBeNull();
+      });
+
+      // Open Routine Modal
+      const routineSelectBtn = screen.getByTestId('routine-select-btn');
+      fireEvent.click(routineSelectBtn);
+
+      // Click "Reload Scheduled Routine"
+      const reloadBtn = await screen.findByTestId('reload-scheduled-routine-btn');
+      fireEvent.click(reloadBtn);
+
+      // Verify that the virgin scheduled routine was restored (Cable Lateral Raises restored, target sets back to 4, NOT Free Workout)
+      await waitFor(() => {
+        expect(screen.getByText('Push, Quads, & Core - Reduced')).toBeDefined();
+        expect(screen.getByText('Cable Lateral Raises')).toBeDefined();
+        expect(screen.getByText('0/4 Sets')).toBeDefined();
+        expect(screen.queryByText('Free Workout')).toBeNull();
+      });
+    });
+  });
 });
+
 
 

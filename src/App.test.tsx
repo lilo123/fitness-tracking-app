@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import App from './App';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { supabase } from './lib/supabase';
+import { restTimerStore } from './utils/restTimerStore';
 
 const { mockSession } = vi.hoisted(() => ({
   mockSession: {
@@ -131,6 +132,49 @@ describe('App Shell & Navigation', () => {
     await waitFor(() => {
       expect(screen.getAllByText('Sign In').length).toBeGreaterThanOrEqual(1);
       expect(screen.getByPlaceholderText('athlete@cybergym.io')).toBeDefined();
+    });
+  });
+
+  it('persists global rest timer pill across /workout, /nutrition, and /history navigation', async () => {
+    render(
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('CyberGym')).toBeDefined();
+    });
+
+    // Start timer globally
+    act(() => {
+      restTimerStore.start(90);
+    });
+
+    // Pill is visible on /workout
+    await waitFor(() => {
+      expect(screen.getByTestId('rest-timer-pill')).toBeDefined();
+      expect(screen.getByTestId('rest-timer-display').textContent).toBe('1:30');
+    });
+
+    // Navigate to /nutrition
+    const nutritionTab = screen.getByTestId('nav-nutrition');
+    fireEvent.click(nutritionTab);
+
+    await waitFor(() => {
+      expect(screen.getByText("Today's Nutrition")).toBeDefined();
+      expect(screen.getByTestId('rest-timer-pill')).toBeDefined();
+      expect(screen.getByTestId('rest-timer-display')).toBeDefined();
+    });
+
+    // Navigate to /history
+    const historyTab = screen.getByTestId('nav-history');
+    fireEvent.click(historyTab);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('history-tab-workouts')).toBeDefined();
+      expect(screen.getByTestId('rest-timer-pill')).toBeDefined();
+      expect(screen.getByTestId('rest-timer-display')).toBeDefined();
     });
   });
 });

@@ -10,6 +10,7 @@ import { NutritionEngine } from './components/nutrition/NutritionEngine';
 import { SettingsView } from './components/settings/SettingsView';
 import { LoginView } from './components/auth/LoginView';
 import { ExercisesView } from './components/exercises/ExercisesView';
+import { GlobalRestTimerPill } from './components/common/GlobalRestTimerPill';
 import './App.css';
 
 const CoachCockpit = React.lazy(() =>
@@ -68,7 +69,7 @@ function AppLayout() {
   return (
     <div className="min-h-[100dvh] flex flex-col bg-zinc-950 text-zinc-100 selection:bg-cyan-500/20 selection:text-cyan-300">
       <Header />
-      <main className="flex-1 max-w-xl w-full mx-auto p-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))]">
+      <main className="flex-1 max-w-xl w-full mx-auto p-4 pb-[calc(8.5rem+env(safe-area-inset-bottom,0px))]">
         <Routes>
           <Route path="/" element={<Navigate to="/workout" replace />} />
           <Route
@@ -134,6 +135,7 @@ function AppLayout() {
           <Route path="*" element={<Navigate to="/workout" replace />} />
         </Routes>
       </main>
+      <GlobalRestTimerPill />
       <BottomNav />
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
@@ -17,8 +17,9 @@ import {
   getDayOfWeekAbbr,
   DEFAULT_EXERCISES_LIST,
   DEFAULT_WORKOUT_TEMPLATES,
-  type WorkoutTemplateDefinition,
 } from '../../utils/ghostSets';
+import { workoutSessionStore, type SetDraftInput } from '../../utils/workoutSessionStore';
+import { restTimerStore } from '../../utils/restTimerStore';
 import {
   Layers,
   Calendar,
@@ -30,9 +31,6 @@ import {
   ArrowUp,
   ArrowDown,
   Timer,
-  Play,
-  Pause,
-  RotateCw,
   Trophy,
   Dumbbell,
   Bed,
@@ -59,12 +57,18 @@ export const WorkoutEngine: React.FC = () => {
   const autoRestTimer = profile?.auto_rest_timer ?? (localStorage.getItem('cybergym_auto_rest_timer') !== 'false');
 
   const [workoutDate, setWorkoutDate] = useState<string>(() => {
+    const activeSession = workoutSessionStore.getActiveSession(targetUserId);
+    if (activeSession && activeSession.workoutDate) {
+      return activeSession.workoutDate;
+    }
     return getLocalDateStr(new Date());
   });
 
+  const initialSession = workoutSessionStore.getActiveSession(targetUserId, workoutDate);
+
   const [activeRoutineName, setActiveRoutineName] = useState<string>(() => {
-    const initialDateStr = getLocalDateStr(new Date());
-    const dayAbbr = getDayOfWeekAbbr(initialDateStr);
+    if (initialSession) return initialSession.routineName;
+    const dayAbbr = getDayOfWeekAbbr(workoutDate);
     const defTpl = DEFAULT_WORKOUT_TEMPLATES.find((t) =>
       t.days.some((d) => d === dayAbbr || d.slice(0, 3) === dayAbbr)
     );
@@ -72,8 +76,8 @@ export const WorkoutEngine: React.FC = () => {
   });
 
   const [activeExercises, setActiveExercises] = useState<string[]>(() => {
-    const initialDateStr = getLocalDateStr(new Date());
-    const dayAbbr = getDayOfWeekAbbr(initialDateStr);
+    if (initialSession) return initialSession.exercises;
+    const dayAbbr = getDayOfWeekAbbr(workoutDate);
     const defTpl = DEFAULT_WORKOUT_TEMPLATES.find((t) =>
       t.days.some((d) => d === dayAbbr || d.slice(0, 3) === dayAbbr)
     );
@@ -81,8 +85,8 @@ export const WorkoutEngine: React.FC = () => {
   });
 
   const [targetSetCounts, setTargetSetCounts] = useState<Record<string, number>>(() => {
-    const initialDateStr = getLocalDateStr(new Date());
-    const dayAbbr = getDayOfWeekAbbr(initialDateStr);
+    if (initialSession) return initialSession.targetSetCounts;
+    const dayAbbr = getDayOfWeekAbbr(workoutDate);
     const defTpl = DEFAULT_WORKOUT_TEMPLATES.find((t) =>
       t.days.some((d) => d === dayAbbr || d.slice(0, 3) === dayAbbr)
     );
@@ -90,8 +94,8 @@ export const WorkoutEngine: React.FC = () => {
   });
 
   const [targetRepCounts, setTargetRepCounts] = useState<Record<string, number>>(() => {
-    const initialDateStr = getLocalDateStr(new Date());
-    const dayAbbr = getDayOfWeekAbbr(initialDateStr);
+    if (initialSession) return initialSession.targetRepCounts;
+    const dayAbbr = getDayOfWeekAbbr(workoutDate);
     const defTpl = DEFAULT_WORKOUT_TEMPLATES.find((t) =>
       t.days.some((d) => d === dayAbbr || d.slice(0, 3) === dayAbbr)
     );
@@ -99,8 +103,8 @@ export const WorkoutEngine: React.FC = () => {
   });
 
   const [expandedExercises, setExpandedExercises] = useState<Set<string>>(() => {
-    const initialDateStr = getLocalDateStr(new Date());
-    const dayAbbr = getDayOfWeekAbbr(initialDateStr);
+    if (initialSession) return new Set(initialSession.expandedExercises);
+    const dayAbbr = getDayOfWeekAbbr(workoutDate);
     const defTpl = DEFAULT_WORKOUT_TEMPLATES.find((t) =>
       t.days.some((d) => d === dayAbbr || d.slice(0, 3) === dayAbbr)
     );
@@ -108,14 +112,9 @@ export const WorkoutEngine: React.FC = () => {
   });
 
   // Ghost set form input drafts: { [exerciseName_setIndex]: { weight, reps } }
-  const [inputDrafts, setInputDrafts] = useState<
-    Record<string, { weight: string; reps: string }>
-  >({});
-
-  const getDraftExercisesKey = (userId: string, date: string) =>
-    `cybergym_active_exercises_${userId}_${date}`;
-  const getRoutineKey = (userId: string, date: string) =>
-    `cybergym_routine_${userId}_${date}`;
+  const [inputDrafts, setInputDrafts] = useState<Record<string, SetDraftInput>>(
+    () => initialSession?.inputDrafts ?? {}
+  );
 
   const resolvedDateRef = useRef<string | null>(null);
   const manualSelectionDateRef = useRef<string | null>(null);
@@ -125,84 +124,6 @@ export const WorkoutEngine: React.FC = () => {
   const [showRoutineModal, setShowRoutineModal] = useState(false);
   const [selectedExerciseToAdd, setSelectedExerciseToAdd] = useState('');
   const [mutationError, setMutationError] = useState<string | null>(null);
-
-  // Rest Timer State (Timestamp-based drift calculation & background resilience)
-  const [timerSeconds, setTimerSeconds] = useState<number>(0);
-  const [timerActive, setTimerActive] = useState<boolean>(false);
-  const timerEndTimestampRef = useRef<number | null>(null);
-
-  const updateTimerDelta = useCallback(() => {
-    if (!timerEndTimestampRef.current) return;
-    const remainingMs = timerEndTimestampRef.current - Date.now();
-    const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
-    setTimerSeconds(remainingSec);
-    if (remainingSec <= 0) {
-      timerEndTimestampRef.current = null;
-      setTimerActive(false);
-      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-        try {
-          navigator.vibrate([200, 100, 200]);
-        } catch {
-          // ignore
-        }
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!timerActive || !timerEndTimestampRef.current) return;
-    const interval = setInterval(updateTimerDelta, 250);
-    return () => clearInterval(interval);
-  }, [timerActive, updateTimerDelta]);
-
-  useEffect(() => {
-    const handleSync = () => {
-      if (timerActive && timerEndTimestampRef.current) {
-        updateTimerDelta();
-      }
-    };
-    document.addEventListener('visibilitychange', handleSync);
-    window.addEventListener('focus', handleSync);
-    return () => {
-      document.removeEventListener('visibilitychange', handleSync);
-      window.removeEventListener('focus', handleSync);
-    };
-  }, [timerActive, updateTimerDelta]);
-
-  const startTimer = (seconds: number) => {
-    timerEndTimestampRef.current = Date.now() + seconds * 1000;
-    setTimerSeconds(seconds);
-    setTimerActive(true);
-  };
-
-  const pauseTimer = () => {
-    if (timerActive && timerEndTimestampRef.current) {
-      const remainingMs = timerEndTimestampRef.current - Date.now();
-      const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
-      timerEndTimestampRef.current = null;
-      setTimerSeconds(remainingSec);
-      setTimerActive(false);
-    } else if (!timerActive && timerSeconds > 0) {
-      timerEndTimestampRef.current = Date.now() + timerSeconds * 1000;
-      setTimerActive(true);
-    }
-  };
-
-  const addTimerSeconds = (additionalSeconds: number) => {
-    const base = timerEndTimestampRef.current
-      ? Math.max(0, Math.ceil((timerEndTimestampRef.current - Date.now()) / 1000))
-      : timerSeconds;
-    const newTotal = base + additionalSeconds;
-    timerEndTimestampRef.current = Date.now() + newTotal * 1000;
-    setTimerSeconds(newTotal);
-    setTimerActive(true);
-  };
-
-  const stopTimer = () => {
-    timerEndTimestampRef.current = null;
-    setTimerSeconds(0);
-    setTimerActive(false);
-  };
 
   // Fetch exercises library
   const { data: exercises = DEFAULT_EXERCISES_LIST } = useQuery({
@@ -377,7 +298,7 @@ export const WorkoutEngine: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['workout_sets', targetUserId] });
       // Start a convenient 90s rest timer if autoRestTimer preference is enabled
       if (autoRestTimer) {
-        startTimer(90);
+        restTimerStore.start(90);
       }
     },
     onError: (err: any) => {
@@ -444,7 +365,7 @@ export const WorkoutEngine: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workout_sets', targetUserId] });
       if (autoRestTimer) {
-        startTimer(90);
+        restTimerStore.start(90);
       }
     },
     onError: (err: any) => {
@@ -482,62 +403,23 @@ export const WorkoutEngine: React.FC = () => {
     });
   };
 
-  const loadCustomRoutineTemplate = useCallback(
-    (tpl: RoutineTemplate) => {
-      setActiveRoutineName(tpl.name);
-      const sortedExercises = [...(tpl.exercises || [])].sort(
-        (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
-      );
-
-      const exList: string[] = [];
-      const setTargets: Record<string, number> = {};
-      const repTargets: Record<string, number> = {};
-
-      sortedExercises.forEach((e) => {
-        const resolvedName =
-          e.exercise?.name ||
-          e.exercise_name ||
-          exercises.find((ex) => ex.id === e.exercise_id)?.name ||
-          e.exercise_id;
-        if (resolvedName) {
-          exList.push(resolvedName);
-          setTargets[resolvedName] = e.target_sets || 3;
-          repTargets[resolvedName] = e.target_reps || 10;
-        }
-      });
-
-      setActiveExercises(exList);
-      setTargetSetCounts(setTargets);
-      setTargetRepCounts(repTargets);
-      if (exList.length > 0) {
-        setExpandedExercises(new Set([exList[0]]));
-      } else {
-        setExpandedExercises(new Set());
-      }
-    },
-    [exercises]
-  );
-
-  const loadDefaultRoutineTemplate = useCallback(
-    (tpl: WorkoutTemplateDefinition) => {
-      setActiveRoutineName(tpl.name);
-      setActiveExercises([...tpl.exercises]);
-      setTargetSetCounts({ ...tpl.targetSets });
-      setTargetRepCounts(tpl.targetReps ? { ...tpl.targetReps } : {});
-      if (tpl.exercises.length > 0) setExpandedExercises(new Set([tpl.exercises[0]]));
-    },
-    []
-  );
-
   /* oxlint-disable react/set-state-in-effect */
   useEffect(() => {
     // Reset date tracking when switching athletes
     if (lastTargetUserRef.current !== targetUserId) {
       lastTargetUserRef.current = targetUserId;
+      // 1. Synchronously flush previous athlete's pending writes
+      workoutSessionStore.flushPendingWrites();
+      // 2. Immediately wipe in-memory state to prevent visual ghosting
+      setInputDrafts({});
+      setActiveExercises([]);
+      setTargetSetCounts({});
+      setTargetRepCounts({});
       resolvedDateRef.current = null;
       manualSelectionDateRef.current = null;
     }
 
+    // Safety Gate: Do NOT execute resolution while queries are loading
     if (!templatesFetched || !logsFetched) return;
 
     // Reset manual override if date changed away from where manual override was recorded
@@ -551,31 +433,57 @@ export const WorkoutEngine: React.FC = () => {
     if (resolvedDateRef.current === workoutDate) return;
     resolvedDateRef.current = workoutDate;
 
-    // Read draft exercises from sessionStorage
-    let storedDrafts: string[] = [];
-    if (typeof window !== 'undefined' && targetUserId && workoutDate) {
-      try {
-        const raw = sessionStorage.getItem(getDraftExercisesKey(targetUserId, workoutDate));
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) storedDrafts = parsed;
+    // 1. DRAFT PRECEDENCE: If an active session draft exists in the store, IT IS AUTHORITATIVE
+    const existingSession = workoutSessionStore.getActiveSession(targetUserId, workoutDate);
+    if (existingSession) {
+      const updatedTargets = { ...existingSession.targetSetCounts };
+      existingSession.exercises.forEach((exName) => {
+        const matchedEx = exercises.find((e) => e.name.toLowerCase() === exName.toLowerCase());
+        const loggedCount = todaySets.filter((s) => {
+          if (s.exercise_id === exName) return true;
+          if (matchedEx && s.exercise_id === matchedEx.id) return true;
+          if (s.exercise_name === exName) return true;
+          return false;
+        }).length;
+        if ((updatedTargets[exName] || 0) < loggedCount) {
+          updatedTargets[exName] = loggedCount;
         }
-      } catch {
-        // ignore
-      }
+      });
+
+      setActiveRoutineName(existingSession.routineName);
+      setActiveExercises(existingSession.exercises); // STRICT RESPECT FOR REORDERING & DELETIONS
+      setTargetSetCounts(updatedTargets);
+      setTargetRepCounts(existingSession.targetRepCounts);
+      setInputDrafts(existingSession.inputDrafts || {});
+      setExpandedExercises(new Set(existingSession.expandedExercises));
+      return;
     }
 
-    // 1. Existing logged workout for this date (preserves in-progress session)
+    // 2. NO EXISTING DRAFT: Resolve from DB logged sets or templates
+    let resolvedRoutine = 'Rest Day';
+    let resolvedExList: string[] = [];
+    let resolvedTargets: Record<string, number> = {};
+    let resolvedReps: Record<string, number> = {};
+
     if (todaySets.length > 0) {
-      const loggedRoutineName = todaySets[0].workout_name || (todaySets[0] as any)?.workouts?.name || '';
+      const loggedRoutineName =
+        todaySets[0].workout_name || (todaySets[0] as any)?.workouts?.name || '';
       const normLoggedName = loggedRoutineName.trim().toLowerCase();
       const matchedCustom = customTemplates.find((t) => {
         const tNorm = t.name.trim().toLowerCase();
-        return tNorm === normLoggedName || (normLoggedName.length > 0 && (tNorm.startsWith(normLoggedName) || normLoggedName.startsWith(tNorm)));
+        return (
+          tNorm === normLoggedName ||
+          (normLoggedName.length > 0 &&
+            (tNorm.startsWith(normLoggedName) || normLoggedName.startsWith(tNorm)))
+        );
       });
       const matchedDef = DEFAULT_WORKOUT_TEMPLATES.find((t) => {
         const tNorm = t.name.trim().toLowerCase();
-        return tNorm === normLoggedName || (normLoggedName.length > 0 && (tNorm.startsWith(normLoggedName) || normLoggedName.startsWith(tNorm)));
+        return (
+          tNorm === normLoggedName ||
+          (normLoggedName.length > 0 &&
+            (tNorm.startsWith(normLoggedName) || normLoggedName.startsWith(tNorm)))
+        );
       });
 
       let baseExercises: string[] = [];
@@ -583,7 +491,7 @@ export const WorkoutEngine: React.FC = () => {
       let repTargets: Record<string, number> = {};
 
       if (matchedCustom && matchedCustom.exercises) {
-        setActiveRoutineName(matchedCustom.name);
+        resolvedRoutine = matchedCustom.name;
         const sortedExercises = [...(matchedCustom.exercises || [])].sort(
           (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
         );
@@ -600,18 +508,29 @@ export const WorkoutEngine: React.FC = () => {
           }
         });
       } else if (matchedDef) {
-        setActiveRoutineName(matchedDef.name);
+        resolvedRoutine = matchedDef.name;
         baseExercises = [...matchedDef.exercises];
         Object.assign(setTargets, matchedDef.targetSets);
         repTargets = matchedDef.targetReps ? { ...matchedDef.targetReps } : {};
       } else {
-        setActiveRoutineName(loggedRoutineName || 'Logged Workout');
+        resolvedRoutine = loggedRoutineName || 'Logged Workout';
         baseExercises = Array.from(
-          new Set(todaySets.map((s) => s.exercise_name || s.exercise_id).filter(Boolean))
+          new Set(
+            todaySets
+              .map(
+                (s) =>
+                  exercises.find((ex) => ex.id === s.exercise_id)?.name ||
+                  s.exercise_name ||
+                  s.exercise_id
+              )
+              .filter(Boolean)
+          )
         );
         baseExercises.forEach((exName) => {
           const exSets = todaySets.filter(
-            (s) => (s.exercise_name || s.exercise_id) === exName
+            (s) =>
+              (s.exercise_name || s.exercise_id) === exName ||
+              exercises.find((ex) => ex.id === s.exercise_id)?.name === exName
           );
           const maxIdx = Math.max(
             ...exSets.map((s) => s.set_index || 0),
@@ -624,163 +543,86 @@ export const WorkoutEngine: React.FC = () => {
 
       // Merge logged exercises not in base template
       const loggedExercises = Array.from(
-        new Set(todaySets.map((s) => s.exercise_name || s.exercise_id).filter(Boolean))
+        new Set(
+          todaySets
+            .map(
+              (s) =>
+                exercises.find((ex) => ex.id === s.exercise_id)?.name ||
+                s.exercise_name ||
+                s.exercise_id
+            )
+            .filter(Boolean)
+        )
       );
       const distinctLoggedNotInBase = loggedExercises.filter((name) => !baseExercises.includes(name));
 
-      // Merge uncommitted ad-hoc drafts from sessionStorage
-      const distinctDraftNotInBase = storedDrafts.filter(
-        (name) => !baseExercises.includes(name) && !distinctLoggedNotInBase.includes(name)
+      resolvedExList = [...baseExercises, ...distinctLoggedNotInBase];
+      resolvedTargets = setTargets;
+      resolvedReps = repTargets;
+
+      resolvedExList.forEach((exName) => {
+        const loggedSetsForEx = todaySets.filter(
+          (s) =>
+            (s.exercise_name || s.exercise_id) === exName ||
+            exercises.find((ex) => ex.id === s.exercise_id)?.name === exName
+        );
+        const currentTarget = resolvedTargets[exName] || 3;
+        resolvedTargets[exName] = Math.max(currentTarget, loggedSetsForEx.length);
+      });
+    } else {
+      const dayAbbr = getDayOfWeekAbbr(workoutDate);
+      const scheduledCustom = customTemplates.find((t) => t.days_of_week?.includes(dayAbbr));
+      const scheduledDef = DEFAULT_WORKOUT_TEMPLATES.find((t) =>
+        t.days.some((d) => d === dayAbbr || d.slice(0, 3) === dayAbbr)
       );
 
-      const finalExercises = [...baseExercises, ...distinctLoggedNotInBase, ...distinctDraftNotInBase];
-      setActiveExercises(finalExercises);
-
-      // Adjust target counts to accommodate all logged sets
-      finalExercises.forEach((exName) => {
-        const loggedSetsForEx = todaySets.filter(
-          (s) => (s.exercise_name || s.exercise_id) === exName
-        );
-        const currentTarget = setTargets[exName] || 3;
-        setTargets[exName] = Math.max(currentTarget, loggedSetsForEx.length);
-      });
-      setTargetSetCounts(setTargets);
-      setTargetRepCounts(repTargets);
-      if (finalExercises.length > 0) {
-        setExpandedExercises((prev) => (prev.size > 0 ? prev : new Set([finalExercises[0]])));
-      }
-      return;
-    }
-
-    // Helper to merge drafts into active routine
-    const applyRoutineWithDrafts = (
-      routineName: string,
-      baseExs: string[],
-      baseTargets: Record<string, number>,
-      baseReps: Record<string, number>
-    ) => {
-      setActiveRoutineName(routineName);
-      const extraDrafts = storedDrafts.filter((e) => !baseExs.includes(e));
-      const mergedExs = [...baseExs, ...extraDrafts];
-      setActiveExercises(mergedExs);
-      const mergedTargets = { ...baseTargets };
-      extraDrafts.forEach((e) => {
-        if (!mergedTargets[e]) mergedTargets[e] = 3;
-      });
-      setTargetSetCounts(mergedTargets);
-      setTargetRepCounts(baseReps);
-      if (mergedExs.length > 0) {
-        setExpandedExercises((prev) => (prev.size > 0 ? prev : new Set([mergedExs[0]])));
-      } else {
-        setExpandedExercises(new Set());
-      }
-    };
-
-    // Read stored routine selection from sessionStorage if any
-    let storedRoutine: string | null = null;
-    if (typeof window !== 'undefined' && targetUserId && workoutDate) {
-      try {
-        storedRoutine = sessionStorage.getItem(getRoutineKey(targetUserId, workoutDate));
-      } catch {
-        // ignore
-      }
-    }
-
-    if (storedRoutine) {
-      if (storedRoutine === 'Rest Day') {
-        applyRoutineWithDrafts('Rest Day', [], {}, {});
-        return;
-      }
-      if (storedRoutine === 'Free Workout') {
-        applyRoutineWithDrafts('Free Workout', [], {}, {});
-        return;
-      }
-      const customTpl = customTemplates.find((t) => {
-        const tNorm = t.name.trim().toLowerCase();
-        const sNorm = storedRoutine!.trim().toLowerCase();
-        return tNorm === sNorm || (sNorm.length > 0 && (tNorm.startsWith(sNorm) || sNorm.startsWith(tNorm)));
-      });
-      if (customTpl && customTpl.exercises) {
-        const sortedExercises = [...(customTpl.exercises || [])].sort(
-          (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
-        );
-        const exList: string[] = [];
-        const setTargets: Record<string, number> = {};
-        const repTargets: Record<string, number> = {};
-        sortedExercises.forEach((e) => {
-          const resolvedName =
+      if (scheduledCustom && scheduledCustom.exercises) {
+        resolvedRoutine = scheduledCustom.name;
+        const sorted = [...scheduledCustom.exercises].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+        sorted.forEach((e) => {
+          const name =
             e.exercise?.name ||
             e.exercise_name ||
             exercises.find((ex) => ex.id === e.exercise_id)?.name ||
             e.exercise_id;
-          if (resolvedName) {
-            exList.push(resolvedName);
-            setTargets[resolvedName] = e.target_sets || 3;
-            repTargets[resolvedName] = e.target_reps || 10;
+          if (name) {
+            resolvedExList.push(name);
+            resolvedTargets[name] = e.target_sets || 3;
+            resolvedReps[name] = e.target_reps || 10;
           }
         });
-        applyRoutineWithDrafts(customTpl.name, exList, setTargets, repTargets);
-        return;
-      }
-
-      const defTpl = DEFAULT_WORKOUT_TEMPLATES.find((t) => {
-        const tNorm = t.name.trim().toLowerCase();
-        const sNorm = storedRoutine!.trim().toLowerCase();
-        return tNorm === sNorm || (sNorm.length > 0 && (tNorm.startsWith(sNorm) || sNorm.startsWith(tNorm)));
-      });
-      if (defTpl) {
-        applyRoutineWithDrafts(
-          defTpl.name,
-          [...defTpl.exercises],
-          { ...defTpl.targetSets },
-          defTpl.targetReps ? { ...defTpl.targetReps } : {}
-        );
-        return;
+      } else if (scheduledDef) {
+        resolvedRoutine = scheduledDef.name;
+        resolvedExList = [...scheduledDef.exercises];
+        resolvedTargets = { ...scheduledDef.targetSets };
+        resolvedReps = scheduledDef.targetReps ? { ...scheduledDef.targetReps } : {};
       }
     }
 
-    // 2. Query scheduled custom templates
-    const dayAbbr = getDayOfWeekAbbr(workoutDate);
-    const scheduledCustom = customTemplates.find((t) => t.days_of_week?.includes(dayAbbr));
-    if (scheduledCustom && scheduledCustom.exercises) {
-      const sortedExercises = [...(scheduledCustom.exercises || [])].sort(
-        (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
-      );
-      const exList: string[] = [];
-      const setTargets: Record<string, number> = {};
-      const repTargets: Record<string, number> = {};
-      sortedExercises.forEach((e) => {
-        const resolvedName =
-          e.exercise?.name ||
-          e.exercise_name ||
-          exercises.find((ex) => ex.id === e.exercise_id)?.name ||
-          e.exercise_id;
-        if (resolvedName) {
-          exList.push(resolvedName);
-          setTargets[resolvedName] = e.target_sets || 3;
-          repTargets[resolvedName] = e.target_reps || 10;
-        }
+    // Pure inspection mode for dates that are not today: NEVER write to store unless mutated
+    const isToday = workoutDate === getLocalDateStr(new Date());
+    if (isToday) {
+      const newSession = workoutSessionStore.getOrInitSession(targetUserId, workoutDate, {
+        routineName: resolvedRoutine,
+        exercises: resolvedExList,
+        targetSetCounts: resolvedTargets,
+        targetRepCounts: resolvedReps,
       });
-      applyRoutineWithDrafts(scheduledCustom.name, exList, setTargets, repTargets);
-      return;
+      setActiveRoutineName(newSession.routineName);
+      setActiveExercises(newSession.exercises);
+      setTargetSetCounts(newSession.targetSetCounts);
+      setTargetRepCounts(newSession.targetRepCounts);
+      setInputDrafts(newSession.inputDrafts || {});
+      setExpandedExercises(new Set(newSession.expandedExercises));
+    } else {
+      // Pure inspection mode for past/future dates: ephemeral display only
+      setActiveRoutineName(resolvedRoutine);
+      setActiveExercises(resolvedExList);
+      setTargetSetCounts(resolvedTargets);
+      setTargetRepCounts(resolvedReps);
+      setInputDrafts({});
+      setExpandedExercises(resolvedExList.length > 0 ? new Set([resolvedExList[0]]) : new Set());
     }
-
-    // 3. Fallback to default templates
-    const scheduledDef = DEFAULT_WORKOUT_TEMPLATES.find((t) =>
-      t.days.some((d) => d === dayAbbr || d.slice(0, 3) === dayAbbr)
-    );
-    if (scheduledDef) {
-      applyRoutineWithDrafts(
-        scheduledDef.name,
-        [...scheduledDef.exercises],
-        { ...scheduledDef.targetSets },
-        scheduledDef.targetReps ? { ...scheduledDef.targetReps } : {}
-      );
-      return;
-    }
-
-    // 4. Sunday / Rest Day Fallback
-    applyRoutineWithDrafts('Rest Day', [], {}, {});
   }, [workoutDate, targetUserId, templatesFetched, logsFetched, customTemplates, todaySets, exercises]);
 
   const toggleAccordion = (exName: string) => {
@@ -788,6 +630,7 @@ export const WorkoutEngine: React.FC = () => {
       const next = new Set(prev);
       if (next.has(exName)) next.delete(exName);
       else next.add(exName);
+      workoutSessionStore.setExpandedExercises(targetUserId, workoutDate, Array.from(next));
       return next;
     });
   };
@@ -801,104 +644,299 @@ export const WorkoutEngine: React.FC = () => {
         next.add(exName);
       }
     });
+    workoutSessionStore.setExpandedExercises(targetUserId, workoutDate, Array.from(next));
     setExpandedExercises(next);
   };
 
   const toggleAllAccordions = (expand: boolean) => {
-    if (expand) {
-      setExpandedExercises(new Set(activeExercises));
-    } else {
-      setExpandedExercises(new Set());
-    }
+    const next = expand ? new Set(activeExercises) : new Set<string>();
+    workoutSessionStore.setExpandedExercises(targetUserId, workoutDate, Array.from(next));
+    setExpandedExercises(next);
   };
 
   const handleSelectRoutine = (routineName: string) => {
     manualSelectionDateRef.current = workoutDate;
     setShowRoutineModal(false);
 
-    // Clear uncommitted ad-hoc drafts from sessionStorage to prevent cross-routine pollution
-    if (typeof window !== 'undefined' && targetUserId && workoutDate) {
-      try {
-        sessionStorage.removeItem(getDraftExercisesKey(targetUserId, workoutDate));
-        sessionStorage.setItem(getRoutineKey(targetUserId, workoutDate), routineName);
-      } catch {
-        // ignore
-      }
-    }
-
-    // Update workouts.name if todaySets.length > 0
-    if (todaySets.length > 0) {
-      const workoutId = todaySets[0].workout_id;
-      if (workoutId) {
-        const workoutsTable = supabase.from('workouts');
-        if (workoutsTable && typeof workoutsTable.update === 'function') {
-          Promise.resolve(workoutsTable.update({ name: routineName }).eq('id', workoutId))
-            .then(() => {
-              queryClient.invalidateQueries({ queryKey: ['workout_sets', targetUserId] });
-            })
-            .catch((err: unknown) => {
-              console.error('Failed to update workout name:', err);
-            });
-        }
-      }
-    }
+    let resolvedExList: string[] = [];
+    let resolvedTargets: Record<string, number> = {};
+    let resolvedReps: Record<string, number> = {};
 
     if (routineName === 'Rest Day') {
       setActiveRoutineName('Rest Day');
       setActiveExercises([]);
       setTargetSetCounts({});
       setTargetRepCounts({});
-      return;
-    }
-
-    if (routineName === 'Free Workout') {
+      setExpandedExercises(new Set());
+    } else if (routineName === 'Free Workout') {
       setActiveRoutineName('Free Workout');
       setActiveExercises([]);
       setTargetSetCounts({});
       setTargetRepCounts({});
-      return;
+      setExpandedExercises(new Set());
+    } else {
+      const customTpl = customTemplates.find((t) => {
+        const tNorm = t.name.trim().toLowerCase();
+        const rNorm = routineName.trim().toLowerCase();
+        return tNorm === rNorm || (rNorm.length > 0 && (tNorm.startsWith(rNorm) || rNorm.startsWith(tNorm)));
+      });
+      const defTpl = DEFAULT_WORKOUT_TEMPLATES.find((t) => {
+        const tNorm = t.name.trim().toLowerCase();
+        const rNorm = routineName.trim().toLowerCase();
+        return tNorm === rNorm || (rNorm.length > 0 && (tNorm.startsWith(rNorm) || rNorm.startsWith(tNorm)));
+      });
+
+      if (customTpl && customTpl.exercises) {
+        resolvedExList = [...customTpl.exercises]
+          .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+          .map(
+            (e) =>
+              e.exercise?.name ||
+              e.exercise_name ||
+              exercises.find((ex) => ex.id === e.exercise_id)?.name ||
+              e.exercise_id
+          )
+          .filter(Boolean);
+        customTpl.exercises.forEach((e) => {
+          const name =
+            e.exercise?.name ||
+            e.exercise_name ||
+            exercises.find((ex) => ex.id === e.exercise_id)?.name ||
+            e.exercise_id;
+          if (name) {
+            resolvedTargets[name] = e.target_sets || 3;
+            resolvedReps[name] = e.target_reps || 10;
+          }
+        });
+      } else if (defTpl) {
+        resolvedExList = [...defTpl.exercises];
+        resolvedTargets = { ...defTpl.targetSets };
+        resolvedReps = defTpl.targetReps ? { ...defTpl.targetReps } : {};
+      }
+
+      setActiveRoutineName(routineName);
+      setActiveExercises(resolvedExList);
+      setTargetSetCounts(resolvedTargets);
+      setTargetRepCounts(resolvedReps);
+      if (resolvedExList.length > 0) setExpandedExercises(new Set([resolvedExList[0]]));
+      else setExpandedExercises(new Set());
     }
 
-    // Check custom DB templates FIRST (Database Precedence)
-    const customTpl = customTemplates.find((t) => {
-      const tNorm = t.name.trim().toLowerCase();
-      const rNorm = routineName.trim().toLowerCase();
-      return tNorm === rNorm || (rNorm.length > 0 && (tNorm.startsWith(rNorm) || rNorm.startsWith(tNorm)));
-    });
-    if (customTpl) {
-      loadCustomRoutineTemplate(customTpl);
-      return;
+    workoutSessionStore.updateRoutine(
+      targetUserId,
+      workoutDate,
+      routineName,
+      resolvedExList,
+      resolvedTargets,
+      resolvedReps
+    );
+
+    if (todaySets.length > 0 && todaySets[0].workout_id) {
+      const workoutId = todaySets[0].workout_id;
+      const workoutsTable = supabase.from('workouts');
+      if (workoutsTable && typeof workoutsTable.update === 'function') {
+        Promise.resolve(workoutsTable.update({ name: routineName }).eq('id', workoutId))
+          .then(() => {
+            queryClient.invalidateQueries({ queryKey: ['workout_sets', targetUserId] });
+          })
+          .catch((err: unknown) => {
+            console.error('Failed to update workout name:', err);
+          });
+      }
+    }
+  };
+
+  const handleReloadScheduledRoutine = () => {
+    workoutSessionStore.deleteSession(targetUserId, workoutDate);
+    manualSelectionDateRef.current = null;
+    resolvedDateRef.current = null;
+    setShowRoutineModal(false);
+
+    let resolvedRoutine = 'Rest Day';
+    let resolvedExList: string[] = [];
+    let resolvedTargets: Record<string, number> = {};
+    let resolvedReps: Record<string, number> = {};
+
+    if (todaySets.length > 0) {
+      const loggedRoutineName =
+        todaySets[0].workout_name || (todaySets[0] as any)?.workouts?.name || '';
+      const normLoggedName = loggedRoutineName.trim().toLowerCase();
+      const matchedCustom = customTemplates.find((t) => {
+        const tNorm = t.name.trim().toLowerCase();
+        return (
+          tNorm === normLoggedName ||
+          (normLoggedName.length > 0 &&
+            (tNorm.startsWith(normLoggedName) || normLoggedName.startsWith(tNorm)))
+        );
+      });
+      const matchedDef = DEFAULT_WORKOUT_TEMPLATES.find((t) => {
+        const tNorm = t.name.trim().toLowerCase();
+        return (
+          tNorm === normLoggedName ||
+          (normLoggedName.length > 0 &&
+            (tNorm.startsWith(normLoggedName) || normLoggedName.startsWith(tNorm)))
+        );
+      });
+
+      let baseExercises: string[] = [];
+      const setTargets: Record<string, number> = {};
+      let repTargets: Record<string, number> = {};
+
+      if (matchedCustom && matchedCustom.exercises) {
+        resolvedRoutine = matchedCustom.name;
+        const sortedExercises = [...(matchedCustom.exercises || [])].sort(
+          (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
+        );
+        sortedExercises.forEach((e) => {
+          const resolvedName =
+            e.exercise?.name ||
+            e.exercise_name ||
+            exercises.find((ex) => ex.id === e.exercise_id)?.name ||
+            e.exercise_id;
+          if (resolvedName) {
+            baseExercises.push(resolvedName);
+            setTargets[resolvedName] = e.target_sets || 3;
+            repTargets[resolvedName] = e.target_reps || 10;
+          }
+        });
+      } else if (matchedDef) {
+        resolvedRoutine = matchedDef.name;
+        baseExercises = [...matchedDef.exercises];
+        Object.assign(setTargets, matchedDef.targetSets);
+        repTargets = matchedDef.targetReps ? { ...matchedDef.targetReps } : {};
+      } else {
+        resolvedRoutine = loggedRoutineName || 'Logged Workout';
+        baseExercises = Array.from(
+          new Set(
+            todaySets
+              .map(
+                (s) =>
+                  exercises.find((ex) => ex.id === s.exercise_id)?.name ||
+                  s.exercise_name ||
+                  s.exercise_id
+              )
+              .filter(Boolean)
+          )
+        );
+        baseExercises.forEach((exName) => {
+          const exSets = todaySets.filter(
+            (s) =>
+              (s.exercise_name || s.exercise_id) === exName ||
+              exercises.find((ex) => ex.id === s.exercise_id)?.name === exName
+          );
+          const maxIdx = Math.max(
+            ...exSets.map((s) => s.set_index || 0),
+            exSets.length,
+            3
+          );
+          setTargets[exName] = maxIdx;
+        });
+      }
+
+      const loggedExercises = Array.from(
+        new Set(
+          todaySets
+            .map(
+              (s) =>
+                exercises.find((ex) => ex.id === s.exercise_id)?.name ||
+                s.exercise_name ||
+                s.exercise_id
+            )
+            .filter(Boolean)
+        )
+      );
+      const distinctLoggedNotInBase = loggedExercises.filter((name) => !baseExercises.includes(name));
+
+      resolvedExList = [...baseExercises, ...distinctLoggedNotInBase];
+      resolvedTargets = setTargets;
+      resolvedReps = repTargets;
+
+      resolvedExList.forEach((exName) => {
+        const loggedSetsForEx = todaySets.filter(
+          (s) =>
+            (s.exercise_name || s.exercise_id) === exName ||
+            exercises.find((ex) => ex.id === s.exercise_id)?.name === exName
+        );
+        const currentTarget = resolvedTargets[exName] || 3;
+        resolvedTargets[exName] = Math.max(currentTarget, loggedSetsForEx.length);
+      });
+    } else {
+      const dayAbbr = getDayOfWeekAbbr(workoutDate);
+      const scheduledCustom = customTemplates.find((t) => t.days_of_week?.includes(dayAbbr));
+      const scheduledDef = DEFAULT_WORKOUT_TEMPLATES.find((t) =>
+        t.days.some((d) => d === dayAbbr || d.slice(0, 3) === dayAbbr)
+      );
+
+      if (scheduledCustom && scheduledCustom.exercises) {
+        resolvedRoutine = scheduledCustom.name;
+        const sorted = [...scheduledCustom.exercises].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+        sorted.forEach((e) => {
+          const name =
+            e.exercise?.name ||
+            e.exercise_name ||
+            exercises.find((ex) => ex.id === e.exercise_id)?.name ||
+            e.exercise_id;
+          if (name) {
+            resolvedExList.push(name);
+            resolvedTargets[name] = e.target_sets || 3;
+            resolvedReps[name] = e.target_reps || 10;
+          }
+        });
+      } else if (scheduledDef) {
+        resolvedRoutine = scheduledDef.name;
+        resolvedExList = [...scheduledDef.exercises];
+        resolvedTargets = { ...scheduledDef.targetSets };
+        resolvedReps = scheduledDef.targetReps ? { ...scheduledDef.targetReps } : {};
+      }
     }
 
-    // Fallback to default templates SECOND
-    const defTpl = DEFAULT_WORKOUT_TEMPLATES.find((t) => {
-      const tNorm = t.name.trim().toLowerCase();
-      const rNorm = routineName.trim().toLowerCase();
-      return tNorm === rNorm || (rNorm.length > 0 && (tNorm.startsWith(rNorm) || rNorm.startsWith(tNorm)));
-    });
-    if (defTpl) {
-      loadDefaultRoutineTemplate(defTpl);
+    const isToday = workoutDate === getLocalDateStr(new Date());
+    if (isToday) {
+      const newSession = workoutSessionStore.getOrInitSession(targetUserId, workoutDate, {
+        routineName: resolvedRoutine,
+        exercises: resolvedExList,
+        targetSetCounts: resolvedTargets,
+        targetRepCounts: resolvedReps,
+      });
+      setActiveRoutineName(newSession.routineName);
+      setActiveExercises(newSession.exercises);
+      setTargetSetCounts(newSession.targetSetCounts);
+      setTargetRepCounts(newSession.targetRepCounts);
+      setInputDrafts(newSession.inputDrafts || {});
+      setExpandedExercises(new Set(newSession.expandedExercises));
+    } else {
+      setActiveRoutineName(resolvedRoutine);
+      setActiveExercises(resolvedExList);
+      setTargetSetCounts(resolvedTargets);
+      setTargetRepCounts(resolvedReps);
+      setInputDrafts({});
+      setExpandedExercises(resolvedExList.length > 0 ? new Set([resolvedExList[0]]) : new Set());
     }
+  };
+
+  const ensureSession = () => {
+    manualSelectionDateRef.current = workoutDate;
+    let session = workoutSessionStore.getActiveSession(targetUserId, workoutDate);
+    if (!session) {
+      session = workoutSessionStore.getOrInitSession(targetUserId, workoutDate, {
+        routineName: activeRoutineName,
+        exercises: activeExercises,
+        targetSetCounts,
+        targetRepCounts,
+      });
+    }
+    return session;
   };
 
   const handleAddExercise = () => {
     if (!selectedExerciseToAdd) return;
+    ensureSession();
     if (!activeExercises.includes(selectedExerciseToAdd)) {
       const next = [...activeExercises, selectedExerciseToAdd];
       setActiveExercises(next);
       setTargetSetCounts((prev) => ({ ...prev, [selectedExerciseToAdd]: 3 }));
       setExpandedExercises((prev) => new Set(prev).add(selectedExerciseToAdd));
-
-      if (typeof window !== 'undefined' && targetUserId && workoutDate) {
-        try {
-          sessionStorage.setItem(
-            getDraftExercisesKey(targetUserId, workoutDate),
-            JSON.stringify(next)
-          );
-        } catch {
-          // ignore
-        }
-      }
+      workoutSessionStore.addExercise(targetUserId, workoutDate, selectedExerciseToAdd, 3);
     }
     setSelectedExerciseToAdd('');
   };
@@ -906,26 +944,25 @@ export const WorkoutEngine: React.FC = () => {
   const moveExercise = (index: number, direction: number) => {
     const newIdx = index + direction;
     if (newIdx < 0 || newIdx >= activeExercises.length) return;
+    ensureSession();
     const copy = [...activeExercises];
     const item = copy[index];
     copy[index] = copy[newIdx];
     copy[newIdx] = item;
     setActiveExercises(copy);
-
-    if (typeof window !== 'undefined' && targetUserId && workoutDate) {
-      try {
-        sessionStorage.setItem(
-          getDraftExercisesKey(targetUserId, workoutDate),
-          JSON.stringify(copy)
-        );
-      } catch {
-        // ignore
-      }
-    }
+    workoutSessionStore.reorderExercises(targetUserId, workoutDate, copy);
   };
 
   const removeExercise = (index: number) => {
     const exName = activeExercises[index];
+    const loggedSets = getSetsForExerciseToday(exName);
+    if (loggedSets.length > 0) {
+      const confirmed = window.confirm(
+        `"${exName}" has ${loggedSets.length} logged set(s). Remove from workout? (Logged sets will be preserved in history)`
+      );
+      if (!confirmed) return;
+    }
+    ensureSession();
     const next = activeExercises.filter((_, i) => i !== index);
     setActiveExercises(next);
     setTargetSetCounts((prev) => {
@@ -933,24 +970,21 @@ export const WorkoutEngine: React.FC = () => {
       delete copy[exName];
       return copy;
     });
-
-    if (typeof window !== 'undefined' && targetUserId && workoutDate) {
-      try {
-        sessionStorage.setItem(
-          getDraftExercisesKey(targetUserId, workoutDate),
-          JSON.stringify(next)
-        );
-      } catch {
-        // ignore
-      }
-    }
+    setTargetRepCounts((prev) => {
+      const copy = { ...prev };
+      delete copy[exName];
+      return copy;
+    });
+    workoutSessionStore.removeExercise(targetUserId, workoutDate, exName);
   };
 
   const adjustTargetSets = (exName: string, delta: number) => {
     const minSets = Math.max(1, getSetsForExerciseToday(exName).length);
+    ensureSession();
     setTargetSetCounts((prev) => {
       const current = prev[exName] || 3;
       const next = Math.max(minSets, current + delta);
+      workoutSessionStore.updateTargetSets(targetUserId, workoutDate, exName, next);
       return { ...prev, [exName]: next };
     });
   };
@@ -989,12 +1023,12 @@ export const WorkoutEngine: React.FC = () => {
       setIndex,
     });
 
-    // Clear draft
     setInputDrafts((prev) => {
       const next = { ...prev };
       delete next[draftKey];
       return next;
     });
+    workoutSessionStore.clearDraft(targetUserId, workoutDate, exName, setIndex);
   };
 
   const updateDraft = (
@@ -1012,13 +1046,18 @@ export const WorkoutEngine: React.FC = () => {
     }
 
     const draftKey = `${exName}_${setIndex}`;
-    setInputDrafts((prev) => ({
-      ...prev,
-      [draftKey]: {
+    ensureSession();
+    setInputDrafts((prev) => {
+      const updated = {
         weight: field === 'weight' ? sanitized : prev[draftKey]?.weight || '',
         reps: field === 'reps' ? sanitized : prev[draftKey]?.reps || '',
-      },
-    }));
+      };
+      workoutSessionStore.setDraftInput(targetUserId, workoutDate, exName, setIndex, updated);
+      return {
+        ...prev,
+        [draftKey]: updated,
+      };
+    });
   };
 
   const handleBatchLogExercise = (
@@ -1069,6 +1108,9 @@ export const WorkoutEngine: React.FC = () => {
           delete next[`${s.exerciseName}_${s.setIndex}`];
         });
         return next;
+      });
+      unloggedSets.forEach((s) => {
+        workoutSessionStore.clearDraft(targetUserId, workoutDate, s.exerciseName, s.setIndex);
       });
     }
   };
@@ -1124,6 +1166,9 @@ export const WorkoutEngine: React.FC = () => {
         });
         return next;
       });
+      allPendingSets.forEach((s) => {
+        workoutSessionStore.clearDraft(targetUserId, workoutDate, s.exerciseName, s.setIndex);
+      });
     }
   };
 
@@ -1133,6 +1178,34 @@ export const WorkoutEngine: React.FC = () => {
   const isWholeWorkoutCompleted =
     activeExercises.length > 0 &&
     activeExercises.every((exName) => getSetsForExerciseToday(exName).length >= (targetSetCounts[exName] || 3));
+
+  // Reactive workout completion & set deletion sync effect
+  useEffect(() => {
+    if (!logsFetched || activeExercises.length === 0) return;
+    const isToday = workoutDate === getLocalDateStr(new Date());
+    if (!isToday) return;
+
+    const session = workoutSessionStore.getSession(targetUserId, workoutDate);
+    if (!session) return;
+
+    if (isWholeWorkoutCompleted && todaySets.length > 0) {
+      if (!session.completedAt) {
+        workoutSessionStore.completeSession(targetUserId, workoutDate);
+      }
+    } else {
+      // Reopen session if a previously completed workout had a set deleted (from History or Workout tab)
+      if (session.completedAt) {
+        workoutSessionStore.reopenSession(targetUserId, workoutDate);
+      }
+    }
+  }, [isWholeWorkoutCompleted, logsFetched, activeExercises.length, todaySets.length, targetUserId, workoutDate]);
+
+  // Synchronous teardown on date switch or unmount
+  useEffect(() => {
+    return () => {
+      workoutSessionStore.flushPendingWrites();
+    };
+  }, [workoutDate, targetUserId]);
 
   const currentDayAbbr = getDayOfWeekAbbr(workoutDate);
 
@@ -1174,7 +1247,7 @@ export const WorkoutEngine: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => (timerSeconds > 0 ? pauseTimer() : startTimer(90))}
+              onClick={() => restTimerStore.toggleHeaderTimer()}
               className="bg-zinc-800/90 hover:bg-zinc-700/80 border border-zinc-700/80 hover:border-cyan-500/50 text-cyan-300 text-xs font-bold px-3 py-1.5 min-h-[44px] rounded-xl flex items-center gap-1.5 transition-all shadow-sm touch-manipulation shrink-0"
               title="Rest Timer"
               data-testid="rest-timer-btn"
@@ -1191,26 +1264,23 @@ export const WorkoutEngine: React.FC = () => {
             <input
               type="date"
               value={workoutDate}
-              onChange={(e) => setWorkoutDate(e.target.value)}
+              onChange={(e) => {
+                workoutSessionStore.flushPendingWrites();
+                setWorkoutDate(e.target.value);
+              }}
               className="bg-zinc-950 border border-zinc-800 text-cyan-400 rounded-xl px-2.5 py-1.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none shadow-inner cursor-pointer"
               data-testid="workout-date-input"
             />
             <button
               onClick={() => {
-                if (confirm("Clear all exercises from today's workout?")) {
+                if (window.confirm("Clear all exercises from today's workout?")) {
                   setActiveRoutineName('Free Workout');
                   setActiveExercises([]);
                   setTargetSetCounts({});
                   setTargetRepCounts({});
+                  setInputDrafts({});
                   manualSelectionDateRef.current = workoutDate;
-                  if (typeof window !== 'undefined' && targetUserId && workoutDate) {
-                    try {
-                      sessionStorage.removeItem(getDraftExercisesKey(targetUserId, workoutDate));
-                      sessionStorage.setItem(getRoutineKey(targetUserId, workoutDate), 'Free Workout');
-                    } catch {
-                      // ignore
-                    }
-                  }
+                  workoutSessionStore.clearWorkout(targetUserId, workoutDate);
                 }
               }}
               className="bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 font-extrabold px-2.5 py-1.5 rounded-xl text-xs transition flex items-center gap-1 shadow-[0_0_10px_rgba(244,63,94,0.15)] active:scale-95"
@@ -1240,6 +1310,17 @@ export const WorkoutEngine: React.FC = () => {
             </div>
 
             <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+              <button
+                type="button"
+                onClick={handleReloadScheduledRoutine}
+                className="w-full py-2.5 px-3 mb-2 rounded-xl border border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 text-cyan-400 font-bold text-xs flex items-center justify-center gap-1.5 transition"
+                data-testid="reload-scheduled-routine-btn"
+                title="Discard draft and reload scheduled routine"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reload Scheduled Routine</span>
+              </button>
+
               <button
                 onClick={() => handleSelectRoutine('Free Workout')}
                 className={`w-full text-left p-3.5 rounded-xl border flex items-center justify-between font-black transition ${
@@ -1781,54 +1862,6 @@ export const WorkoutEngine: React.FC = () => {
             </div>
           )}
         </>
-      )}
-
-      {/* Rest Timer Sticky Floating Bottom Pill */}
-      {timerSeconds > 0 && (
-        <div
-          className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] left-4 right-4 z-50 max-w-lg mx-auto bg-zinc-900/95 backdrop-blur-xl border border-cyan-500/50 rounded-2xl p-3 flex items-center justify-between shadow-[0_4px_25px_rgba(6,182,212,0.3)] animate-pulse"
-          data-testid="rest-timer-pill"
-        >
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center shrink-0">
-              <Timer className="w-5 h-5 text-cyan-400" />
-            </div>
-            <div>
-              <div className="text-[10px] uppercase font-mono tracking-wider text-cyan-400 font-bold">
-                Rest Timer
-              </div>
-              <div className="text-xl font-black font-mono text-white" data-testid="rest-timer-display">
-                {Math.floor(timerSeconds / 60)}:{(timerSeconds % 60).toString().padStart(2, '0')}
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={pauseTimer}
-              className="min-w-[44px] min-h-[44px] rounded-xl bg-zinc-800 hover:bg-zinc-700 text-cyan-300 flex items-center justify-center transition"
-              title={timerActive ? 'Pause timer' : 'Resume timer'}
-            >
-              {timerActive ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-            </button>
-            <button
-              type="button"
-              onClick={() => addTimerSeconds(90)}
-              className="min-w-[44px] min-h-[44px] px-3 py-2 text-xs font-bold rounded-xl bg-zinc-800 text-zinc-300 hover:text-white flex items-center justify-center transition"
-              title="Add 90 seconds"
-            >
-              +90s
-            </button>
-            <button
-              type="button"
-              onClick={stopTimer}
-              className="min-w-[44px] min-h-[44px] rounded-xl bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 flex items-center justify-center transition"
-              title="Stop timer"
-            >
-              <RotateCw className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
       )}
     </div>
   );
