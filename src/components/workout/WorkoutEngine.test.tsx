@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { WorkoutEngine } from './WorkoutEngine';
+import { HistoryView } from '../history/HistoryView';
 import { GlobalRestTimerPill } from '../common/GlobalRestTimerPill';
 import { restTimerStore } from '../../utils/restTimerStore';
 import { workoutSessionStore } from '../../utils/workoutSessionStore';
@@ -2145,7 +2146,439 @@ describe('WorkoutEngine', () => {
       });
     });
   });
+
+  describe('Cold-Load & PostgREST Relational Join Architecture (Tests 42-44)', () => {
+    it('cold loads directly with real database UUIDs via PostgREST join without tab switch (Test 42)', async () => {
+      const today = '2026-09-06';
+      const realExerciseUUID = '8f2d91b4-1234-4567-89ab-cdef01234567';
+      const workoutId = 'w-cold-load-1';
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'workouts') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({
+                data: [{ id: workoutId, date: today, name: 'Heavy Squat Day' }],
+                error: null,
+              }),
+            }),
+          };
+        }
+        if (table === 'sets') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({
+                  data: [
+                    {
+                      id: 's-cold-1',
+                      workout_id: workoutId,
+                      exercise_id: realExerciseUUID,
+                      set_index: 1,
+                      set_type: 'working',
+                      weight: 315,
+                      reps: 5,
+                      rpe: null,
+                      created_at: `${today}T10:00:00Z`,
+                      workouts: {
+                        date: today,
+                        name: 'Heavy Squat Day',
+                      },
+                      exercise: {
+                        id: realExerciseUUID,
+                        name: 'Barbell Back Squat',
+                        body_part: 'Legs',
+                      },
+                    },
+                  ],
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === 'exercises') {
+          return {
+            select: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          };
+        }
+        if (table === 'routine_templates') {
+          return {
+            select: vi.fn().mockReturnValue({
+              or: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          };
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            }),
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            or: vi.fn().mockResolvedValue({ data: [], error: null }),
+            in: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
+        };
+      });
+
+      renderComponent();
+
+      // On cold load, the exercise card and routine name should render immediately
+      await waitFor(() => {
+        expect(screen.getByText('Barbell Back Squat')).toBeDefined();
+        expect(screen.getByText('Heavy Squat Day')).toBeDefined();
+      });
+
+      // The raw UUID must NEVER be rendered as an accordion header
+      expect(screen.queryByText(realExerciseUUID)).toBeNull();
+
+      // Completed set checkmark and values render cleanly
+      expect(screen.getByText('315')).toBeDefined();
+      expect(screen.getByText('5')).toBeDefined();
+      expect(screen.getByTestId('delete-set-btn-0-0')).toBeDefined();
+    });
+
+    it('auto-heals corrupted localStorage active session containing raw UUIDs without losing drafts (Test 43)', async () => {
+      const today = '2026-09-06';
+      const corruptedUUID = 'a1b2c3d4-e5f6-4a7b-8c9d-0123456789ab';
+      const cleanExerciseName = 'Bulgarian Split Squat';
+
+      // Pre-seed corrupted session into localStorage
+      const corruptedSession = {
+        schemaVersion: 1,
+        sessionId: 'session_test-user-id_2026-09-06_12345',
+        userId: 'test-user-id',
+        workoutDate: today,
+        routineName: 'Leg Destruction',
+        exercises: [corruptedUUID],
+        targetSetCounts: { [corruptedUUID]: 4 },
+        targetRepCounts: { [corruptedUUID]: 12 },
+        expandedExercises: [corruptedUUID],
+        inputDrafts: {
+          [`${corruptedUUID}_1`]: { weight: '135', reps: '10' },
+        },
+        startedAt: `${today}T10:00:00Z`,
+        lastModifiedAt: `${today}T10:00:00Z`,
+        completedAt: null,
+      };
+      localStorage.setItem(
+        `cybergym_active_session_test-user-id_${today}`,
+        JSON.stringify(corruptedSession)
+      );
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'exercises') {
+          return {
+            select: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({
+                data: [
+                  { id: corruptedUUID, name: cleanExerciseName, body_part: 'Legs' },
+                ],
+                error: null,
+              }),
+            }),
+          };
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            }),
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            or: vi.fn().mockResolvedValue({ data: [], error: null }),
+            in: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
+        };
+      });
+
+      renderComponent();
+
+      // Verify that after auto-healing, the clean exercise name is rendered
+      await waitFor(() => {
+        expect(screen.getByText('Bulgarian Split Squat')).toBeDefined();
+      });
+
+      // Verify raw UUID is not displayed
+      expect(screen.queryByText(corruptedUUID)).toBeNull();
+
+      // Verify input drafts were migrated to clean name: Bulgarian Split Squat
+      const weightInput = screen.getByTestId('ghost-weight-0-0') as HTMLInputElement;
+      expect(weightInput.value).toBe('135');
+      const repsInput = screen.getByTestId('ghost-reps-0-0') as HTMLInputElement;
+      expect(repsInput.value).toBe('10');
+
+      // Verify localStorage was healed
+      const healedSession = workoutSessionStore.getActiveSession('test-user-id', today);
+      expect(healedSession).toBeDefined();
+      expect(healedSession?.exercises).toEqual(['Bulgarian Split Squat']);
+      expect(healedSession?.targetSetCounts['Bulgarian Split Squat']).toBe(4);
+      expect(healedSession?.targetRepCounts['Bulgarian Split Squat']).toBe(12);
+      expect(healedSession?.expandedExercises).toEqual(['Bulgarian Split Squat']);
+      expect(healedSession?.inputDrafts['Bulgarian Split Squat_1']).toEqual({ weight: '135', reps: '10' });
+      expect(healedSession?.inputDrafts[`${corruptedUUID}_1`]).toBeUndefined();
+    });
+
+    it('shares consistent PostgREST joined sets cache across tabs without UUID poisoning (Test 44)', async () => {
+      const today = '2026-09-06';
+      const realExerciseUUID = 'c9d8e7f6-5432-10fe-ba98-76543210fedc';
+      const workoutId = 'w-cache-test-1';
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'workouts') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({
+                data: [{ id: workoutId, date: today, name: 'Cross-Tab Sync Workout' }],
+                error: null,
+              }),
+            }),
+          };
+        }
+        if (table === 'sets') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({
+                  data: [
+                    {
+                      id: 's-sync-1',
+                      workout_id: workoutId,
+                      exercise_id: realExerciseUUID,
+                      set_index: 1,
+                      set_type: 'working',
+                      weight: 225,
+                      reps: 8,
+                      rpe: null,
+                      created_at: `${today}T10:00:00Z`,
+                      workouts: {
+                        date: today,
+                        name: 'Cross-Tab Sync Workout',
+                      },
+                      exercise: {
+                        id: realExerciseUUID,
+                        name: 'Overhead Press',
+                        body_part: 'Shoulders',
+                      },
+                    },
+                  ],
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === 'nutrition_logs') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              }),
+            }),
+          };
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            }),
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            or: vi.fn().mockResolvedValue({ data: [], error: null }),
+            in: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
+        };
+      });
+
+      // Render WorkoutEngine
+      const { unmount } = renderComponent();
+      await waitFor(() => {
+        expect(screen.getByText('Overhead Press')).toBeDefined();
+      });
+
+      // Verify cached entry has clean exercise_name
+      const cachedData = queryClient.getQueryData<any[]>(['workout_sets', 'test-user-id']);
+      expect(cachedData).toBeDefined();
+      expect(cachedData?.[0]?.exercise_name).toBe('Overhead Press');
+      expect(cachedData?.[0]?.workout_name).toBe('Cross-Tab Sync Workout');
+
+      unmount();
+
+      // Mount HistoryView with the exact same shared queryClient
+      render(
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <CoachProvider>
+              <HistoryView />
+            </CoachProvider>
+          </AuthProvider>
+        </QueryClientProvider>
+      );
+
+      // Verify HistoryView renders the clean exercise from shared cache without lag or UUIDs
+      await waitFor(() => {
+        expect(screen.getByText('Overhead Press')).toBeDefined();
+      });
+      expect(screen.queryByText(realExerciseUUID)).toBeNull();
+    });
+
+    it('handles multi-tier auto-healing with partial unknown/deleted UUID fallback without crashing drafts (Test 45)', async () => {
+      const today = '2026-09-06';
+      const uuidCatalog = '11111111-2222-3333-4444-555555555555';
+      const uuidSets = '66666666-7777-8888-9999-000000000000';
+      const uuidDefault = 'e0000000-0000-0000-0000-000000000002'; // Cable Lateral Raises
+      const uuidUnknown = 'deadbeef-dead-beef-dead-beefdeadbeef';
+
+      const corruptedSession = {
+        schemaVersion: 1,
+        sessionId: 'session_test-user-id_2026-09-06_99999',
+        userId: 'test-user-id',
+        workoutDate: today,
+        routineName: 'Mixed Tier Test',
+        exercises: [uuidCatalog, uuidSets, uuidDefault, uuidUnknown],
+        targetSetCounts: {
+          [uuidCatalog]: 3,
+          [uuidSets]: 4,
+          [uuidDefault]: 3,
+          [uuidUnknown]: 2,
+        },
+        targetRepCounts: {
+          [uuidCatalog]: 10,
+          [uuidSets]: 12,
+          [uuidDefault]: 15,
+          [uuidUnknown]: 8,
+        },
+        expandedExercises: [uuidCatalog, uuidSets, uuidUnknown],
+        inputDrafts: {
+          [`${uuidCatalog}_1`]: { weight: '225', reps: '10' },
+          [`${uuidSets}_1`]: { weight: '65', reps: '12' },
+          [`${uuidDefault}_1`]: { weight: '30', reps: '15' },
+          [`${uuidUnknown}_1`]: { weight: '100', reps: '8' },
+        },
+        startedAt: `${today}T10:00:00Z`,
+        lastModifiedAt: `${today}T10:00:00Z`,
+        completedAt: null,
+      };
+
+      localStorage.setItem(
+        `cybergym_active_session_test-user-id_${today}`,
+        JSON.stringify(corruptedSession)
+      );
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'exercises') {
+          return {
+            select: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({
+                data: [
+                  { id: uuidCatalog, name: 'Romanian Deadlift', body_part: 'Hamstrings' },
+                ],
+                error: null,
+              }),
+            }),
+          };
+        }
+        if (table === 'sets') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({
+                  data: [
+                    {
+                      id: 's-joined-1',
+                      workout_id: 'w-1',
+                      exercise_id: uuidSets,
+                      set_index: 1,
+                      set_type: 'working',
+                      weight: 65,
+                      reps: 12,
+                      rpe: null,
+                      created_at: `${today}T10:00:00Z`,
+                      workouts: { date: today, name: 'Mixed Tier Test' },
+                      exercise: {
+                        id: uuidSets,
+                        name: 'Cable Face Pulls',
+                        body_part: 'Shoulders',
+                      },
+                    },
+                  ],
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === 'workouts') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({
+                data: [{ id: 'w-1', date: today, name: 'Mixed Tier Test' }],
+                error: null,
+              }),
+            }),
+          };
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            }),
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            or: vi.fn().mockResolvedValue({ data: [], error: null }),
+            in: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
+        };
+      });
+
+      renderComponent();
+
+      // Tier 1: DB Catalog resolved
+      await waitFor(() => {
+        expect(screen.getByText('Romanian Deadlift')).toBeDefined();
+      });
+
+      // Tier 2: Synthetic Default List resolved
+      expect(screen.getByText('Cable Lateral Raises')).toBeDefined();
+
+      // Tier 3: Today's joined sets resolved
+      expect(screen.getByText('Cable Face Pulls')).toBeDefined();
+
+      // Fallback: Unknown UUID safely displayed without crash
+      expect(screen.getByText(uuidUnknown)).toBeDefined();
+
+      // Verify healed session in store
+      const healedSession = workoutSessionStore.getActiveSession('test-user-id', today);
+      expect(healedSession).toBeDefined();
+      expect(healedSession?.exercises).toEqual([
+        'Romanian Deadlift',
+        'Cable Face Pulls',
+        'Cable Lateral Raises',
+        uuidUnknown,
+      ]);
+      expect(healedSession?.inputDrafts['Romanian Deadlift_1']).toEqual({ weight: '225', reps: '10' });
+      expect(healedSession?.inputDrafts['Cable Face Pulls_1']).toEqual({ weight: '65', reps: '12' });
+      expect(healedSession?.inputDrafts['Cable Lateral Raises_1']).toEqual({ weight: '30', reps: '15' });
+      expect(healedSession?.inputDrafts[`${uuidUnknown}_1`]).toEqual({ weight: '100', reps: '8' });
+    });
+  });
 });
+
 
 
 

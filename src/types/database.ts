@@ -31,6 +31,17 @@ export interface WorkoutSet {
   workout_id?: string;
   exercise_id: string;
   exercise_name?: string;
+  exercise?: {
+    id?: string;
+    name: string;
+    body_part?: string | null;
+  } | null;
+  workouts?: {
+    date?: string;
+    name?: string | null;
+  } | null;
+  workout_date?: string;
+  workout_name?: string;
   set_index: number;
   set_type: SetType;
   weight: number;

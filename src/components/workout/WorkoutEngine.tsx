@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
@@ -36,6 +36,215 @@ import {
   Bed,
   AlertCircle,
 } from 'lucide-react';
+
+const isUUID = (val: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
+function resolveCleanExerciseName(
+  rawVal: string,
+  exerciseCatalog: Exercise[],
+  todaySets: WorkoutSet[] = []
+): string {
+  if (!isUUID(rawVal) && rawVal.trim().length > 0) {
+    return rawVal;
+  }
+  // Tier 1: DB Exercise Catalog
+  const match = exerciseCatalog.find(
+    (e) => e.id === rawVal || e.name.toLowerCase() === rawVal.toLowerCase()
+  );
+  if (match) return match.name;
+
+  // Tier 2: Default Synthetic Exercises Catalog
+  const defaultMatch = DEFAULT_EXERCISES_LIST.find(
+    (e) => e.id === rawVal || e.name.toLowerCase() === rawVal.toLowerCase()
+  );
+  if (defaultMatch) return defaultMatch.name;
+
+  // Tier 3: Today's Joined Sets (prioritize set with joined exercise object, then set with clean exercise_name)
+  const setWithExercise = todaySets.find(
+    (s) => (s.exercise_id === rawVal || s.exercise?.id === rawVal) && Boolean(s.exercise?.name)
+  );
+  if (setWithExercise?.exercise?.name) return setWithExercise.exercise.name;
+
+  const setWithName = todaySets.find(
+    (s) =>
+      (s.exercise_id === rawVal || s.exercise?.id === rawVal) &&
+      Boolean(s.exercise_name && !isUUID(s.exercise_name))
+  );
+  if (setWithName?.exercise_name) return setWithName.exercise_name;
+
+  return rawVal;
+}
+
+interface ResolvedRoutineResult {
+  routineName: string;
+  exercises: string[];
+  targetSets: Record<string, number>;
+  targetReps: Record<string, number>;
+}
+
+function resolveRoutineAndExercises(
+  workoutDate: string,
+  todaySets: WorkoutSet[],
+  customTemplates: RoutineTemplate[],
+  exerciseCatalog: Exercise[]
+): ResolvedRoutineResult {
+  let resolvedRoutine = 'Rest Day';
+  let resolvedExList: string[] = [];
+  let resolvedTargets: Record<string, number> = {};
+  let resolvedReps: Record<string, number> = {};
+
+  if (todaySets.length > 0) {
+    const isSetForExercise = (s: WorkoutSet, exName: string) => {
+      const norm = exName.trim().toLowerCase();
+      return (
+        (s.exercise?.name && s.exercise.name.trim().toLowerCase() === norm) ||
+        (s.exercise_name && s.exercise_name.trim().toLowerCase() === norm) ||
+        s.exercise_id === exName ||
+        (exerciseCatalog.find((ex) => ex.id === s.exercise_id)?.name.trim().toLowerCase() === norm) ||
+        (DEFAULT_EXERCISES_LIST.find((ex) => ex.id === s.exercise_id)?.name.trim().toLowerCase() === norm)
+      );
+    };
+
+    const loggedRoutineName =
+      todaySets[0].workout_name || (todaySets[0] as any)?.workouts?.name || '';
+    const normLoggedName = loggedRoutineName.trim().toLowerCase();
+    const matchedCustom = customTemplates.find((t) => {
+      const tNorm = t.name.trim().toLowerCase();
+      return (
+        tNorm === normLoggedName ||
+        (normLoggedName.length > 0 &&
+          (tNorm.startsWith(normLoggedName) || normLoggedName.startsWith(tNorm)))
+      );
+    });
+    const matchedDef = DEFAULT_WORKOUT_TEMPLATES.find((t) => {
+      const tNorm = t.name.trim().toLowerCase();
+      return (
+        tNorm === normLoggedName ||
+        (normLoggedName.length > 0 &&
+          (tNorm.startsWith(normLoggedName) || normLoggedName.startsWith(tNorm)))
+      );
+    });
+
+    let baseExercises: string[] = [];
+    const setTargets: Record<string, number> = {};
+    let repTargets: Record<string, number> = {};
+
+    if (matchedCustom && matchedCustom.exercises) {
+      resolvedRoutine = matchedCustom.name;
+      const sortedExercises = [...(matchedCustom.exercises || [])].sort(
+        (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
+      );
+      sortedExercises.forEach((e) => {
+        const resolvedName =
+          e.exercise?.name ||
+          e.exercise_name ||
+          exerciseCatalog.find((ex) => ex.id === e.exercise_id)?.name ||
+          DEFAULT_EXERCISES_LIST.find((ex) => ex.id === e.exercise_id)?.name ||
+          e.exercise_id;
+        if (resolvedName) {
+          baseExercises.push(resolvedName);
+          setTargets[resolvedName] = e.target_sets || 3;
+          repTargets[resolvedName] = e.target_reps || 10;
+        }
+      });
+    } else if (matchedDef) {
+      resolvedRoutine = matchedDef.name;
+      baseExercises = [...matchedDef.exercises];
+      Object.assign(setTargets, matchedDef.targetSets);
+      repTargets = matchedDef.targetReps ? { ...matchedDef.targetReps } : {};
+    } else {
+      resolvedRoutine = loggedRoutineName || 'Logged Workout';
+      baseExercises = Array.from(
+        new Set(
+          todaySets
+            .map(
+              (s) =>
+                s.exercise?.name ||
+                exerciseCatalog.find((ex) => ex.id === s.exercise_id)?.name ||
+                DEFAULT_EXERCISES_LIST.find((ex) => ex.id === s.exercise_id)?.name ||
+                s.exercise_name ||
+                s.exercise_id
+            )
+            .filter(Boolean)
+        )
+      );
+
+      baseExercises.forEach((exName) => {
+        const exSets = todaySets.filter((s) => isSetForExercise(s, exName));
+        const maxIdx = Math.max(
+          ...exSets.map((s) => s.set_index || 0),
+          exSets.length,
+          3
+        );
+        setTargets[exName] = maxIdx;
+      });
+    }
+
+    // Merge logged exercises not in base template
+    const loggedExercises = Array.from(
+      new Set(
+        todaySets
+          .map(
+            (s) =>
+              s.exercise?.name ||
+              exerciseCatalog.find((ex) => ex.id === s.exercise_id)?.name ||
+              DEFAULT_EXERCISES_LIST.find((ex) => ex.id === s.exercise_id)?.name ||
+              s.exercise_name ||
+              s.exercise_id
+          )
+          .filter(Boolean)
+      )
+    );
+    const distinctLoggedNotInBase = loggedExercises.filter((name) => !baseExercises.includes(name));
+
+    resolvedExList = [...baseExercises, ...distinctLoggedNotInBase];
+    resolvedTargets = setTargets;
+    resolvedReps = repTargets;
+
+    resolvedExList.forEach((exName) => {
+      const loggedSetsForEx = todaySets.filter((s) => isSetForExercise(s, exName));
+      const currentTarget = resolvedTargets[exName] || 3;
+      resolvedTargets[exName] = Math.max(currentTarget, loggedSetsForEx.length);
+    });
+  } else {
+    const dayAbbr = getDayOfWeekAbbr(workoutDate);
+    const scheduledCustom = customTemplates.find((t) => t.days_of_week?.includes(dayAbbr));
+    const scheduledDef = DEFAULT_WORKOUT_TEMPLATES.find((t) =>
+      t.days.some((d) => d === dayAbbr || d.slice(0, 3) === dayAbbr)
+    );
+
+    if (scheduledCustom && scheduledCustom.exercises) {
+      resolvedRoutine = scheduledCustom.name;
+      const sorted = [...scheduledCustom.exercises].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+      sorted.forEach((e) => {
+        const name =
+          e.exercise?.name ||
+          e.exercise_name ||
+          exerciseCatalog.find((ex) => ex.id === e.exercise_id)?.name ||
+          DEFAULT_EXERCISES_LIST.find((ex) => ex.id === e.exercise_id)?.name ||
+          e.exercise_id;
+        if (name) {
+          resolvedExList.push(name);
+          resolvedTargets[name] = e.target_sets || 3;
+          resolvedReps[name] = e.target_reps || 10;
+        }
+      });
+    } else if (scheduledDef) {
+      resolvedRoutine = scheduledDef.name;
+      resolvedExList = [...scheduledDef.exercises];
+      resolvedTargets = { ...scheduledDef.targetSets };
+      resolvedReps = scheduledDef.targetReps ? { ...scheduledDef.targetReps } : {};
+    }
+  }
+
+  return {
+    routineName: resolvedRoutine,
+    exercises: resolvedExList,
+    targetSets: resolvedTargets,
+    targetReps: resolvedReps,
+  };
+}
 
 export const WorkoutEngine: React.FC = () => {
   const { user, profile, role } = useAuth();
@@ -116,7 +325,7 @@ export const WorkoutEngine: React.FC = () => {
     () => initialSession?.inputDrafts ?? {}
   );
 
-  const resolvedDateRef = useRef<string | null>(null);
+  const resolvedKeyRef = useRef<string | null>(null);
   const manualSelectionDateRef = useRef<string | null>(null);
   const lastTargetUserRef = useRef<string>(targetUserId);
 
@@ -126,7 +335,7 @@ export const WorkoutEngine: React.FC = () => {
   const [mutationError, setMutationError] = useState<string | null>(null);
 
   // Fetch exercises library
-  const { data: exercises = DEFAULT_EXERCISES_LIST } = useQuery({
+  const { data: exercises = DEFAULT_EXERCISES_LIST, isFetched: exercisesFetched } = useQuery({
     queryKey: ['exercises'],
     queryFn: async () => {
       try {
@@ -137,11 +346,13 @@ export const WorkoutEngine: React.FC = () => {
         return DEFAULT_EXERCISES_LIST;
       }
     },
+    staleTime: 5 * 60 * 1000,
   });
 
   // Fetch routine templates
   const { data: customTemplates = [], isFetched: templatesFetched } = useQuery({
     queryKey: ['routine_templates', targetUserId],
+    enabled: Boolean(targetUserId),
     queryFn: async () => {
       if (!targetUserId) return [];
       try {
@@ -192,6 +403,7 @@ export const WorkoutEngine: React.FC = () => {
   // Fetch workouts and sets for target user
   const { data: userLogs = [], isFetched: logsFetched } = useQuery({
     queryKey: ['workout_sets', targetUserId],
+    enabled: Boolean(targetUserId),
     queryFn: async () => {
       if (!targetUserId) return [];
       try {
@@ -207,21 +419,22 @@ export const WorkoutEngine: React.FC = () => {
 
         const { data: setsData, error: sError } = await supabase
           .from('sets')
-          .select('*, workouts(date, name)')
+          .select('*, workouts(date, name), exercise:exercises(id, name, body_part)')
           .in('workout_id', workoutIds)
           .order('created_at', { ascending: true });
 
         if (sError || !setsData) return [];
 
-        return setsData.map((s: any) => {
-          const matched = exercises.find((e) => e.id === s.exercise_id || e.name === s.exercise_id);
-          return {
-            ...s,
-            workout_date: normalizeDateStr(s.workouts?.date || s.created_at),
-            workout_name: s.workouts?.name || undefined,
-            exercise_name: matched ? matched.name : s.exercise_id,
-          };
-        }) as (WorkoutSet & { workout_date: string; workout_name?: string })[];
+        return setsData.map((s: any) => ({
+          ...s,
+          workout_date: normalizeDateStr(s.workouts?.date || s.created_at),
+          workout_name: s.workouts?.name || 'Workout Session',
+          exercise_name:
+            s.exercise?.name ||
+            DEFAULT_EXERCISES_LIST.find((e) => e.id === s.exercise_id || e.name === s.exercise_id)?.name ||
+            s.exercise_name ||
+            s.exercise_id,
+        })) as (WorkoutSet & { workout_date: string; workout_name?: string })[];
       } catch {
         return [];
       }
@@ -278,7 +491,6 @@ export const WorkoutEngine: React.FC = () => {
       const matchedEx = exercises.find(
         (e) => e.name.toLowerCase() === payload.exerciseName.toLowerCase() || e.id === payload.exerciseName
       );
-      const isUUID = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
       const exerciseId = matchedEx ? matchedEx.id : (isUUID(payload.exerciseName) ? payload.exerciseName : null);
       if (!exerciseId) {
         throw new Error(`Exercise "${payload.exerciseName}" cannot be resolved to a valid UUID.`);
@@ -334,7 +546,6 @@ export const WorkoutEngine: React.FC = () => {
           const matchedEx = exercises.find(
             (e) => e.name.toLowerCase() === s.exerciseName.toLowerCase() || e.id === s.exerciseName
           );
-          const isUUID = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
           const exerciseId = matchedEx ? matchedEx.id : (isUUID(s.exerciseName) ? s.exerciseName : null);
           if (!exerciseId) return null;
           return {
@@ -360,7 +571,6 @@ export const WorkoutEngine: React.FC = () => {
           const matchedEx = exercises.find(
             (e) => e.name.toLowerCase() === s.exerciseName.toLowerCase() || e.id === s.exerciseName
           );
-          const isUUID = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
           return !(matchedEx || isUUID(s.exerciseName));
         });
         if (unresolvable) {
@@ -403,15 +613,19 @@ export const WorkoutEngine: React.FC = () => {
   }, [userLogs, workoutDate]);
 
   // Helper to get sets logged today for a specific exercise
-  const getSetsForExerciseToday = (exName: string) => {
-    const matchedEx = exercises.find((e) => e.name.toLowerCase() === exName.toLowerCase());
+  const getSetsForExerciseToday = useCallback((exName: string) => {
+    const norm = exName.trim().toLowerCase();
     return todaySets.filter((s) => {
       if (s.exercise_id === exName) return true;
-      if (matchedEx && s.exercise_id === matchedEx.id) return true;
-      if (s.exercise_name === exName) return true;
+      if (s.exercise?.name && s.exercise.name.trim().toLowerCase() === norm) return true;
+      if (s.exercise_name && s.exercise_name.trim().toLowerCase() === norm) return true;
+      const matchedEx = exercises.find((e) => e.name.toLowerCase() === norm || e.id === exName);
+      if (matchedEx && (s.exercise_id === matchedEx.id || s.exercise?.id === matchedEx.id)) return true;
+      const defEx = DEFAULT_EXERCISES_LIST.find((e) => e.name.toLowerCase() === norm || e.id === exName);
+      if (defEx && (s.exercise_id === defEx.id || s.exercise?.id === defEx.id)) return true;
       return false;
     });
-  };
+  }, [exercises, todaySets]);
 
   /* oxlint-disable react/set-state-in-effect */
   useEffect(() => {
@@ -425,12 +639,12 @@ export const WorkoutEngine: React.FC = () => {
       setActiveExercises([]);
       setTargetSetCounts({});
       setTargetRepCounts({});
-      resolvedDateRef.current = null;
+      resolvedKeyRef.current = null;
       manualSelectionDateRef.current = null;
     }
 
     // Safety Gate: Do NOT execute resolution while queries are loading
-    if (!templatesFetched || !logsFetched) return;
+    if (!templatesFetched || !logsFetched || !exercisesFetched) return;
 
     // Reset manual override if date changed away from where manual override was recorded
     if (manualSelectionDateRef.current && manualSelectionDateRef.current !== workoutDate) {
@@ -440,183 +654,111 @@ export const WorkoutEngine: React.FC = () => {
     // Honor explicit user routine selection on this date
     if (manualSelectionDateRef.current === workoutDate) return;
 
-    if (resolvedDateRef.current === workoutDate) return;
-    resolvedDateRef.current = workoutDate;
+    const resolutionKey = `${targetUserId}_${workoutDate}`;
+    if (resolvedKeyRef.current === resolutionKey) return;
+    resolvedKeyRef.current = resolutionKey;
 
     // 1. DRAFT PRECEDENCE: If an active session draft exists in the store, IT IS AUTHORITATIVE
     const existingSession = workoutSessionStore.getActiveSession(targetUserId, workoutDate);
     if (existingSession) {
-      const updatedTargets = { ...existingSession.targetSetCounts };
-      existingSession.exercises.forEach((exName) => {
-        const matchedEx = exercises.find((e) => e.name.toLowerCase() === exName.toLowerCase());
-        const loggedCount = todaySets.filter((s) => {
-          if (s.exercise_id === exName) return true;
-          if (matchedEx && s.exercise_id === matchedEx.id) return true;
-          if (s.exercise_name === exName) return true;
-          return false;
-        }).length;
+      const hasUUIDs =
+        existingSession.exercises.some(isUUID) ||
+        existingSession.expandedExercises.some(isUUID) ||
+        Object.keys(existingSession.inputDrafts || {}).some((k) => {
+          const idx = k.lastIndexOf('_');
+          const prefix = idx > 0 ? k.slice(0, idx) : k;
+          return isUUID(prefix);
+        });
+      let sessionToApply = existingSession;
+
+      if (hasUUIDs) {
+        // 1. Remap exercises array
+        const cleanedExercises = existingSession.exercises.map((ex) =>
+          resolveCleanExerciseName(ex, exercises, todaySets)
+        );
+
+        // 2. Remap targetSetCounts
+        const newTargets: Record<string, number> = {};
+        existingSession.exercises.forEach((ex, i) => {
+          const clean = cleanedExercises[i];
+          newTargets[clean] = existingSession.targetSetCounts[ex] || 3;
+        });
+
+        // 3. Remap targetRepCounts
+        const newReps: Record<string, number> = {};
+        existingSession.exercises.forEach((ex, i) => {
+          const clean = cleanedExercises[i];
+          if (existingSession.targetRepCounts[ex]) {
+            newReps[clean] = existingSession.targetRepCounts[ex];
+          }
+        });
+
+        // 4. Remap expandedExercises
+        const newExpanded = existingSession.expandedExercises.map((ex) =>
+          resolveCleanExerciseName(ex, exercises, todaySets)
+        );
+
+        // 5. Remap inputDrafts: convert ${uuid}_${setIndex} -> ${cleanName}_${setIndex}
+        const newInputDrafts: Record<string, SetDraftInput> = {};
+        Object.entries(existingSession.inputDrafts || {}).forEach(([draftKey, draftValue]) => {
+          const lastUnderscore = draftKey.lastIndexOf('_');
+          if (lastUnderscore > 0) {
+            const rawPrefix = draftKey.slice(0, lastUnderscore);
+            const setSuffix = draftKey.slice(lastUnderscore + 1);
+            const cleanPrefix = resolveCleanExerciseName(rawPrefix, exercises, todaySets);
+            newInputDrafts[`${cleanPrefix}_${setSuffix}`] = draftValue;
+          } else {
+            newInputDrafts[draftKey] = draftValue;
+          }
+        });
+
+        sessionToApply = {
+          ...existingSession,
+          exercises: cleanedExercises,
+          targetSetCounts: newTargets,
+          targetRepCounts: newReps,
+          expandedExercises: newExpanded,
+          inputDrafts: newInputDrafts,
+        };
+
+        // Commit healed session to localStorage
+        workoutSessionStore.saveSession(sessionToApply, workoutDate === getLocalDateStr(new Date()));
+      }
+
+      // Synchronize target counts with logged sets count
+      const updatedTargets = { ...sessionToApply.targetSetCounts };
+      sessionToApply.exercises.forEach((exName) => {
+        const loggedCount = getSetsForExerciseToday(exName).length;
         if ((updatedTargets[exName] || 0) < loggedCount) {
           updatedTargets[exName] = loggedCount;
         }
       });
 
-      setActiveRoutineName(existingSession.routineName);
-      setActiveExercises(existingSession.exercises); // STRICT RESPECT FOR REORDERING & DELETIONS
+      setActiveRoutineName(sessionToApply.routineName);
+      setActiveExercises(sessionToApply.exercises);
       setTargetSetCounts(updatedTargets);
-      setTargetRepCounts(existingSession.targetRepCounts);
-      setInputDrafts(existingSession.inputDrafts || {});
-      setExpandedExercises(new Set(existingSession.expandedExercises));
+      setTargetRepCounts(sessionToApply.targetRepCounts);
+      setInputDrafts(sessionToApply.inputDrafts || {});
+      setExpandedExercises(new Set(sessionToApply.expandedExercises));
       return;
     }
 
     // 2. NO EXISTING DRAFT: Resolve from DB logged sets or templates
-    let resolvedRoutine = 'Rest Day';
-    let resolvedExList: string[] = [];
-    let resolvedTargets: Record<string, number> = {};
-    let resolvedReps: Record<string, number> = {};
-
-    if (todaySets.length > 0) {
-      const loggedRoutineName =
-        todaySets[0].workout_name || (todaySets[0] as any)?.workouts?.name || '';
-      const normLoggedName = loggedRoutineName.trim().toLowerCase();
-      const matchedCustom = customTemplates.find((t) => {
-        const tNorm = t.name.trim().toLowerCase();
-        return (
-          tNorm === normLoggedName ||
-          (normLoggedName.length > 0 &&
-            (tNorm.startsWith(normLoggedName) || normLoggedName.startsWith(tNorm)))
-        );
-      });
-      const matchedDef = DEFAULT_WORKOUT_TEMPLATES.find((t) => {
-        const tNorm = t.name.trim().toLowerCase();
-        return (
-          tNorm === normLoggedName ||
-          (normLoggedName.length > 0 &&
-            (tNorm.startsWith(normLoggedName) || normLoggedName.startsWith(tNorm)))
-        );
-      });
-
-      let baseExercises: string[] = [];
-      const setTargets: Record<string, number> = {};
-      let repTargets: Record<string, number> = {};
-
-      if (matchedCustom && matchedCustom.exercises) {
-        resolvedRoutine = matchedCustom.name;
-        const sortedExercises = [...(matchedCustom.exercises || [])].sort(
-          (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
-        );
-        sortedExercises.forEach((e) => {
-          const resolvedName =
-            e.exercise?.name ||
-            e.exercise_name ||
-            exercises.find((ex) => ex.id === e.exercise_id)?.name ||
-            e.exercise_id;
-          if (resolvedName) {
-            baseExercises.push(resolvedName);
-            setTargets[resolvedName] = e.target_sets || 3;
-            repTargets[resolvedName] = e.target_reps || 10;
-          }
-        });
-      } else if (matchedDef) {
-        resolvedRoutine = matchedDef.name;
-        baseExercises = [...matchedDef.exercises];
-        Object.assign(setTargets, matchedDef.targetSets);
-        repTargets = matchedDef.targetReps ? { ...matchedDef.targetReps } : {};
-      } else {
-        resolvedRoutine = loggedRoutineName || 'Logged Workout';
-        baseExercises = Array.from(
-          new Set(
-            todaySets
-              .map(
-                (s) =>
-                  exercises.find((ex) => ex.id === s.exercise_id)?.name ||
-                  s.exercise_name ||
-                  s.exercise_id
-              )
-              .filter(Boolean)
-          )
-        );
-        baseExercises.forEach((exName) => {
-          const exSets = todaySets.filter(
-            (s) =>
-              (s.exercise_name || s.exercise_id) === exName ||
-              exercises.find((ex) => ex.id === s.exercise_id)?.name === exName
-          );
-          const maxIdx = Math.max(
-            ...exSets.map((s) => s.set_index || 0),
-            exSets.length,
-            3
-          );
-          setTargets[exName] = maxIdx;
-        });
-      }
-
-      // Merge logged exercises not in base template
-      const loggedExercises = Array.from(
-        new Set(
-          todaySets
-            .map(
-              (s) =>
-                exercises.find((ex) => ex.id === s.exercise_id)?.name ||
-                s.exercise_name ||
-                s.exercise_id
-            )
-            .filter(Boolean)
-        )
-      );
-      const distinctLoggedNotInBase = loggedExercises.filter((name) => !baseExercises.includes(name));
-
-      resolvedExList = [...baseExercises, ...distinctLoggedNotInBase];
-      resolvedTargets = setTargets;
-      resolvedReps = repTargets;
-
-      resolvedExList.forEach((exName) => {
-        const loggedSetsForEx = todaySets.filter(
-          (s) =>
-            (s.exercise_name || s.exercise_id) === exName ||
-            exercises.find((ex) => ex.id === s.exercise_id)?.name === exName
-        );
-        const currentTarget = resolvedTargets[exName] || 3;
-        resolvedTargets[exName] = Math.max(currentTarget, loggedSetsForEx.length);
-      });
-    } else {
-      const dayAbbr = getDayOfWeekAbbr(workoutDate);
-      const scheduledCustom = customTemplates.find((t) => t.days_of_week?.includes(dayAbbr));
-      const scheduledDef = DEFAULT_WORKOUT_TEMPLATES.find((t) =>
-        t.days.some((d) => d === dayAbbr || d.slice(0, 3) === dayAbbr)
-      );
-
-      if (scheduledCustom && scheduledCustom.exercises) {
-        resolvedRoutine = scheduledCustom.name;
-        const sorted = [...scheduledCustom.exercises].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
-        sorted.forEach((e) => {
-          const name =
-            e.exercise?.name ||
-            e.exercise_name ||
-            exercises.find((ex) => ex.id === e.exercise_id)?.name ||
-            e.exercise_id;
-          if (name) {
-            resolvedExList.push(name);
-            resolvedTargets[name] = e.target_sets || 3;
-            resolvedReps[name] = e.target_reps || 10;
-          }
-        });
-      } else if (scheduledDef) {
-        resolvedRoutine = scheduledDef.name;
-        resolvedExList = [...scheduledDef.exercises];
-        resolvedTargets = { ...scheduledDef.targetSets };
-        resolvedReps = scheduledDef.targetReps ? { ...scheduledDef.targetReps } : {};
-      }
-    }
+    const resolved = resolveRoutineAndExercises(
+      workoutDate,
+      todaySets,
+      customTemplates,
+      exercises
+    );
 
     // Pure inspection mode for dates that are not today: NEVER write to store unless mutated
     const isToday = workoutDate === getLocalDateStr(new Date());
     if (isToday) {
       const newSession = workoutSessionStore.getOrInitSession(targetUserId, workoutDate, {
-        routineName: resolvedRoutine,
-        exercises: resolvedExList,
-        targetSetCounts: resolvedTargets,
-        targetRepCounts: resolvedReps,
+        routineName: resolved.routineName,
+        exercises: resolved.exercises,
+        targetSetCounts: resolved.targetSets,
+        targetRepCounts: resolved.targetReps,
       });
       setActiveRoutineName(newSession.routineName);
       setActiveExercises(newSession.exercises);
@@ -626,14 +768,14 @@ export const WorkoutEngine: React.FC = () => {
       setExpandedExercises(new Set(newSession.expandedExercises));
     } else {
       // Pure inspection mode for past/future dates: ephemeral display only
-      setActiveRoutineName(resolvedRoutine);
-      setActiveExercises(resolvedExList);
-      setTargetSetCounts(resolvedTargets);
-      setTargetRepCounts(resolvedReps);
+      setActiveRoutineName(resolved.routineName);
+      setActiveExercises(resolved.exercises);
+      setTargetSetCounts(resolved.targetSets);
+      setTargetRepCounts(resolved.targetReps);
       setInputDrafts({});
-      setExpandedExercises(resolvedExList.length > 0 ? new Set([resolvedExList[0]]) : new Set());
+      setExpandedExercises(resolved.exercises.length > 0 ? new Set([resolved.exercises[0]]) : new Set());
     }
-  }, [workoutDate, targetUserId, templatesFetched, logsFetched, customTemplates, todaySets, exercises]);
+  }, [workoutDate, targetUserId, templatesFetched, logsFetched, exercisesFetched, customTemplates, todaySets, exercises, getSetsForExerciseToday]);
 
   const toggleAccordion = (exName: string) => {
     setExpandedExercises((prev) => {
@@ -759,154 +901,23 @@ export const WorkoutEngine: React.FC = () => {
   const handleReloadScheduledRoutine = () => {
     workoutSessionStore.deleteSession(targetUserId, workoutDate);
     manualSelectionDateRef.current = null;
-    resolvedDateRef.current = null;
+    resolvedKeyRef.current = null;
     setShowRoutineModal(false);
 
-    let resolvedRoutine = 'Rest Day';
-    let resolvedExList: string[] = [];
-    let resolvedTargets: Record<string, number> = {};
-    let resolvedReps: Record<string, number> = {};
-
-    if (todaySets.length > 0) {
-      const loggedRoutineName =
-        todaySets[0].workout_name || (todaySets[0] as any)?.workouts?.name || '';
-      const normLoggedName = loggedRoutineName.trim().toLowerCase();
-      const matchedCustom = customTemplates.find((t) => {
-        const tNorm = t.name.trim().toLowerCase();
-        return (
-          tNorm === normLoggedName ||
-          (normLoggedName.length > 0 &&
-            (tNorm.startsWith(normLoggedName) || normLoggedName.startsWith(tNorm)))
-        );
-      });
-      const matchedDef = DEFAULT_WORKOUT_TEMPLATES.find((t) => {
-        const tNorm = t.name.trim().toLowerCase();
-        return (
-          tNorm === normLoggedName ||
-          (normLoggedName.length > 0 &&
-            (tNorm.startsWith(normLoggedName) || normLoggedName.startsWith(tNorm)))
-        );
-      });
-
-      let baseExercises: string[] = [];
-      const setTargets: Record<string, number> = {};
-      let repTargets: Record<string, number> = {};
-
-      if (matchedCustom && matchedCustom.exercises) {
-        resolvedRoutine = matchedCustom.name;
-        const sortedExercises = [...(matchedCustom.exercises || [])].sort(
-          (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
-        );
-        sortedExercises.forEach((e) => {
-          const resolvedName =
-            e.exercise?.name ||
-            e.exercise_name ||
-            exercises.find((ex) => ex.id === e.exercise_id)?.name ||
-            e.exercise_id;
-          if (resolvedName) {
-            baseExercises.push(resolvedName);
-            setTargets[resolvedName] = e.target_sets || 3;
-            repTargets[resolvedName] = e.target_reps || 10;
-          }
-        });
-      } else if (matchedDef) {
-        resolvedRoutine = matchedDef.name;
-        baseExercises = [...matchedDef.exercises];
-        Object.assign(setTargets, matchedDef.targetSets);
-        repTargets = matchedDef.targetReps ? { ...matchedDef.targetReps } : {};
-      } else {
-        resolvedRoutine = loggedRoutineName || 'Logged Workout';
-        baseExercises = Array.from(
-          new Set(
-            todaySets
-              .map(
-                (s) =>
-                  exercises.find((ex) => ex.id === s.exercise_id)?.name ||
-                  s.exercise_name ||
-                  s.exercise_id
-              )
-              .filter(Boolean)
-          )
-        );
-        baseExercises.forEach((exName) => {
-          const exSets = todaySets.filter(
-            (s) =>
-              (s.exercise_name || s.exercise_id) === exName ||
-              exercises.find((ex) => ex.id === s.exercise_id)?.name === exName
-          );
-          const maxIdx = Math.max(
-            ...exSets.map((s) => s.set_index || 0),
-            exSets.length,
-            3
-          );
-          setTargets[exName] = maxIdx;
-        });
-      }
-
-      const loggedExercises = Array.from(
-        new Set(
-          todaySets
-            .map(
-              (s) =>
-                exercises.find((ex) => ex.id === s.exercise_id)?.name ||
-                s.exercise_name ||
-                s.exercise_id
-            )
-            .filter(Boolean)
-        )
-      );
-      const distinctLoggedNotInBase = loggedExercises.filter((name) => !baseExercises.includes(name));
-
-      resolvedExList = [...baseExercises, ...distinctLoggedNotInBase];
-      resolvedTargets = setTargets;
-      resolvedReps = repTargets;
-
-      resolvedExList.forEach((exName) => {
-        const loggedSetsForEx = todaySets.filter(
-          (s) =>
-            (s.exercise_name || s.exercise_id) === exName ||
-            exercises.find((ex) => ex.id === s.exercise_id)?.name === exName
-        );
-        const currentTarget = resolvedTargets[exName] || 3;
-        resolvedTargets[exName] = Math.max(currentTarget, loggedSetsForEx.length);
-      });
-    } else {
-      const dayAbbr = getDayOfWeekAbbr(workoutDate);
-      const scheduledCustom = customTemplates.find((t) => t.days_of_week?.includes(dayAbbr));
-      const scheduledDef = DEFAULT_WORKOUT_TEMPLATES.find((t) =>
-        t.days.some((d) => d === dayAbbr || d.slice(0, 3) === dayAbbr)
-      );
-
-      if (scheduledCustom && scheduledCustom.exercises) {
-        resolvedRoutine = scheduledCustom.name;
-        const sorted = [...scheduledCustom.exercises].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
-        sorted.forEach((e) => {
-          const name =
-            e.exercise?.name ||
-            e.exercise_name ||
-            exercises.find((ex) => ex.id === e.exercise_id)?.name ||
-            e.exercise_id;
-          if (name) {
-            resolvedExList.push(name);
-            resolvedTargets[name] = e.target_sets || 3;
-            resolvedReps[name] = e.target_reps || 10;
-          }
-        });
-      } else if (scheduledDef) {
-        resolvedRoutine = scheduledDef.name;
-        resolvedExList = [...scheduledDef.exercises];
-        resolvedTargets = { ...scheduledDef.targetSets };
-        resolvedReps = scheduledDef.targetReps ? { ...scheduledDef.targetReps } : {};
-      }
-    }
+    const resolved = resolveRoutineAndExercises(
+      workoutDate,
+      todaySets,
+      customTemplates,
+      exercises
+    );
 
     const isToday = workoutDate === getLocalDateStr(new Date());
     if (isToday) {
       const newSession = workoutSessionStore.getOrInitSession(targetUserId, workoutDate, {
-        routineName: resolvedRoutine,
-        exercises: resolvedExList,
-        targetSetCounts: resolvedTargets,
-        targetRepCounts: resolvedReps,
+        routineName: resolved.routineName,
+        exercises: resolved.exercises,
+        targetSetCounts: resolved.targetSets,
+        targetRepCounts: resolved.targetReps,
       });
       setActiveRoutineName(newSession.routineName);
       setActiveExercises(newSession.exercises);
@@ -915,12 +926,12 @@ export const WorkoutEngine: React.FC = () => {
       setInputDrafts(newSession.inputDrafts || {});
       setExpandedExercises(new Set(newSession.expandedExercises));
     } else {
-      setActiveRoutineName(resolvedRoutine);
-      setActiveExercises(resolvedExList);
-      setTargetSetCounts(resolvedTargets);
-      setTargetRepCounts(resolvedReps);
+      setActiveRoutineName(resolved.routineName);
+      setActiveExercises(resolved.exercises);
+      setTargetSetCounts(resolved.targetSets);
+      setTargetRepCounts(resolved.targetReps);
       setInputDrafts({});
-      setExpandedExercises(resolvedExList.length > 0 ? new Set([resolvedExList[0]]) : new Set());
+      setExpandedExercises(resolved.exercises.length > 0 ? new Set([resolved.exercises[0]]) : new Set());
     }
   };
 

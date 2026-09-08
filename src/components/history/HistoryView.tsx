@@ -44,39 +44,42 @@ export const HistoryView: React.FC = () => {
         return DEFAULT_EXERCISES_LIST;
       }
     },
+    staleTime: 5 * 60 * 1000,
   });
 
   // Fetch all sets for user
   const { data: allSets = [] } = useQuery({
     queryKey: ['workout_sets', targetUserId],
+    enabled: Boolean(targetUserId),
     queryFn: async () => {
       if (!targetUserId) return [];
       try {
-        const { data: workoutsData } = await supabase
+        const { data: workoutsData, error: wError } = await supabase
           .from('workouts')
           .select('id, date, name')
           .eq('user_id', targetUserId);
 
-        if (!workoutsData || workoutsData.length === 0) return [];
+        if (wError || !workoutsData || workoutsData.length === 0) return [];
         const workoutIds = workoutsData.map((w: any) => w.id);
 
-        const { data: setsData } = await supabase
+        const { data: setsData, error: sError } = await supabase
           .from('sets')
-          .select('*, workouts(date, name)')
+          .select('*, workouts(date, name), exercise:exercises(id, name, body_part)')
           .in('workout_id', workoutIds)
           .order('created_at', { ascending: true });
 
-        if (!setsData) return [];
+        if (sError || !setsData) return [];
 
-        return setsData.map((s: any) => {
-          const matched = exercises.find((e) => e.id === s.exercise_id || e.name === s.exercise_id);
-          return {
-            ...s,
-            workout_date: normalizeDateStr(s.workouts?.date || s.created_at),
-            workout_name: s.workouts?.name || 'Workout Session',
-            exercise_name: matched ? matched.name : s.exercise_id,
-          };
-        }) as (WorkoutSet & { workout_date: string; workout_name: string })[];
+        return setsData.map((s: any) => ({
+          ...s,
+          workout_date: normalizeDateStr(s.workouts?.date || s.created_at),
+          workout_name: s.workouts?.name || 'Workout Session',
+          exercise_name:
+            s.exercise?.name ||
+            DEFAULT_EXERCISES_LIST.find((e) => e.id === s.exercise_id || e.name === s.exercise_id)?.name ||
+            s.exercise_name ||
+            s.exercise_id,
+        })) as (WorkoutSet & { workout_date: string; workout_name: string })[];
       } catch {
         return [];
       }
@@ -86,6 +89,7 @@ export const HistoryView: React.FC = () => {
   // Fetch nutrition logs for target user
   const { data: nutritionLogs = [] } = useQuery({
     queryKey: ['nutrition_logs', targetUserId],
+    enabled: Boolean(targetUserId),
     queryFn: async () => {
       if (!targetUserId) return [];
       try {
