@@ -12,6 +12,7 @@ import {
 import { getDishIcon } from '../../utils/dishIcons';
 import { Calendar, Dumbbell, Trophy, Search, Activity, Utensils, Trash2, AlertCircle, Edit2 } from 'lucide-react';
 import { EditMealModal } from '../nutrition/EditMealModal';
+import { EditSetModal } from '../workout/EditSetModal';
 import { groupSessionSetsByExercise } from '../../utils/historyGrouping';
 
 const CATEGORIES = ['All', 'Chest', 'Back', 'Arms', 'Shoulders', 'Legs', 'Core'];
@@ -29,6 +30,7 @@ export const HistoryView: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [editingMealLog, setEditingMealLog] = useState<NutritionLog | null>(null);
+  const [editingSet, setEditingSet] = useState<(WorkoutSet & { workout_date?: string; workout_name?: string }) | null>(null);
 
   // Fetch exercises
   const { data: exercises = DEFAULT_EXERCISES_LIST } = useQuery({
@@ -537,7 +539,7 @@ export const HistoryView: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <div className="text-xs font-mono font-bold text-amber-400">
-                        {totalVolume.toLocaleString()} lbs volume
+                        {totalVolume > 0 ? `${totalVolume.toLocaleString()} lbs volume` : '0 lbs (BW)'}
                       </div>
                       <div className="text-[10px] text-zinc-500 font-mono">
                         {session.sets.length} sets completed
@@ -562,7 +564,7 @@ export const HistoryView: React.FC = () => {
                             </span>
                           </div>
                           <div className="text-[11px] font-mono font-bold text-amber-400/90 shrink-0 ml-2">
-                            {group.totalVolume.toLocaleString()} lbs
+                            {group.totalVolume > 0 ? `${group.totalVolume.toLocaleString()} lbs` : '0 lbs (BW)'}
                           </div>
                         </div>
 
@@ -577,11 +579,23 @@ export const HistoryView: React.FC = () => {
                                 <div className="font-mono text-[11px] text-zinc-400 font-bold">
                                   SET {setNumber}
                                 </div>
-                                <div className="font-mono font-bold text-cyan-300">
-                                  {set.weight} lbs × {set.reps} reps
-                                  {set.rpe != null && (
-                                    <span className="text-zinc-500 ml-1 text-[10px]">@{set.rpe}</span>
-                                  )}
+                                <div className="flex items-center gap-2">
+                                  <div className="font-mono font-bold text-cyan-300">
+                                    {set.weight} lbs × {set.reps} reps
+                                    {set.rpe != null && (
+                                      <span className="text-zinc-500 ml-1 text-[10px]">@{set.rpe}</span>
+                                    )}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingSet(set)}
+                                    className="min-w-[44px] min-h-[44px] rounded-lg bg-zinc-800/70 hover:bg-cyan-500/20 text-zinc-400 hover:text-cyan-300 flex items-center justify-center transition active:scale-95 touch-manipulation"
+                                    title="Edit set"
+                                    aria-label={`Edit set ${setNumber} of ${group.exerciseName}`}
+                                    data-testid={`edit-set-btn-${set.id || sIdx}`}
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
                                 </div>
                               </div>
                             );
@@ -641,11 +655,11 @@ export const HistoryView: React.FC = () => {
                       {stat.exercise.body_part || 'Full Body'}
                     </span>
                   </div>
-                  {stat.maxWeight > 0 ? (
+                  {stat.sets.length > 0 ? (
                     <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-2xl text-amber-400 text-xs font-black font-mono">
                       <Trophy className="w-3.5 h-3.5" />
                       <span>
-                        PR: {stat.maxWeight} lbs × {stat.prReps}
+                        PR: {stat.maxWeight > 0 ? `${stat.maxWeight} lbs` : 'Bodyweight'} × {stat.prReps}
                       </span>
                     </div>
                   ) : (
@@ -665,9 +679,21 @@ export const HistoryView: React.FC = () => {
                           className="bg-zinc-950 border border-zinc-800/60 rounded-xl px-3 py-2 flex items-center justify-between text-xs font-mono"
                         >
                           <span className="text-zinc-400">{formatShortDate(s.workout_date)}</span>
-                          <span className="text-cyan-300 font-bold">
-                            {s.weight} lbs × {s.reps} reps
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-cyan-300 font-bold">
+                              {s.weight} lbs × {s.reps} reps
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setEditingSet(s)}
+                              className="min-w-[44px] min-h-[44px] rounded-lg bg-zinc-800/70 hover:bg-cyan-500/20 text-zinc-400 hover:text-cyan-300 flex items-center justify-center transition active:scale-95 touch-manipulation"
+                              title="Edit set"
+                              aria-label={`Edit recent set of ${stat.exercise.name}`}
+                              data-testid={`edit-recent-set-btn-${s.id || idx}`}
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -684,6 +710,15 @@ export const HistoryView: React.FC = () => {
         isOpen={!!editingMealLog}
         meal={editingMealLog}
         onClose={() => setEditingMealLog(null)}
+        targetUserId={targetUserId}
+      />
+
+      {/* Edit Set Modal */}
+      <EditSetModal
+        isOpen={!!editingSet}
+        set={editingSet}
+        exercises={exercises}
+        onClose={() => setEditingSet(null)}
         targetUserId={targetUserId}
       />
     </div>

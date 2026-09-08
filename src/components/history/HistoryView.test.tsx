@@ -121,6 +121,10 @@ describe('HistoryView', () => {
               }),
             }),
           }),
+          delete: vi.fn().mockReturnValue({
+            eq: mockDeleteEq,
+          }),
+          update: mockUpdate,
         };
       }
 
@@ -744,6 +748,116 @@ describe('HistoryView', () => {
         // Set index zero converted to 1-indexed SET 1
         expect(screen.getByText('SET 1')).toBeDefined();
         expect(screen.queryByText('SET 0')).toBeNull();
+      });
+    });
+
+    it('displays 0 lbs (BW) session volume and PR: Bodyweight × reps for 0 lbs sets', async () => {
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'workouts') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({
+                data: [{ id: 'w-bw', date: '2026-09-02', name: 'Calisthenics' }],
+                error: null,
+              }),
+            }),
+          };
+        }
+        if (table === 'sets') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({
+                  data: [
+                    {
+                      id: 'set-bw-1',
+                      workout_id: 'w-bw',
+                      exercise_id: 'Pull-ups',
+                      weight: 0,
+                      reps: 15,
+                      set_index: 1,
+                      created_at: '2026-09-02T10:00:00Z',
+                      workouts: { date: '2026-09-02', name: 'Calisthenics' },
+                    },
+                  ],
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [{ id: 'ex-pullup', name: 'Pull-ups', body_part: 'Back' }], error: null }),
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            }),
+          }),
+        };
+      });
+
+      renderComponent();
+
+      // Session view volume
+      await waitFor(() => {
+        expect(screen.getAllByText('0 lbs (BW)').length).toBeGreaterThan(0);
+      });
+
+      // Switch to exercise view
+      const exToggle = screen.getByText('By Exercise');
+      fireEvent.click(exToggle);
+
+      await waitFor(() => {
+        expect(screen.getByText('PR: Bodyweight × 15')).toBeDefined();
+      });
+    });
+
+    it('opens EditSetModal on set edit button click, edits set, and submits update mutation', async () => {
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('edit-set-btn-s1')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByTestId('edit-set-btn-s1'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('edit-set-modal')).toBeDefined();
+      });
+
+      const weightInput = screen.getByTestId('edit-set-weight-input');
+      const repsInput = screen.getByTestId('edit-set-reps-input');
+      const saveBtn = screen.getByTestId('save-set-btn');
+
+      fireEvent.change(weightInput, { target: { value: '235' } });
+      fireEvent.change(repsInput, { target: { value: '9' } });
+      fireEvent.click(saveBtn);
+
+      await waitFor(() => {
+        expect(mockUpdate).toHaveBeenCalled();
+        expect(mockUpdateEq).toHaveBeenCalledWith('id', 's1');
+      });
+    });
+
+    it('opens EditSetModal and deletes set when confirmed', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('edit-set-btn-s1')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByTestId('edit-set-btn-s1'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('delete-set-btn')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByTestId('delete-set-btn'));
+
+      await waitFor(() => {
+        expect(mockDeleteEq).toHaveBeenCalledWith('id', 's1');
       });
     });
   });

@@ -70,6 +70,7 @@ describe('WorkoutEngine', () => {
           single: vi.fn().mockResolvedValue({ data: { id: 'new-id' }, error: null }),
         }),
       }),
+      update: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
       delete: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
     }));
 
@@ -1275,6 +1276,7 @@ describe('WorkoutEngine', () => {
         });
         return {
           select: vi.fn().mockReturnValue(selectObj),
+          update: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
         };
       }
       return {
@@ -1386,6 +1388,272 @@ describe('WorkoutEngine', () => {
     const payload = mockInsert.mock.calls[0][0][0];
     expect(payload.weight).toBe(45.5);
     expect(payload.reps).toBe(10);
+  });
+
+  it('allows logging 0 lbs bodyweight sets with positive reps', async () => {
+    const mockInsert = vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({ data: { id: 'new-id' }, error: null }),
+      }),
+    });
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'sets') return { insert: mockInsert };
+      if (table === 'workouts') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [{ id: 'workout-1' }], error: null }),
+            }),
+          }),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          or: vi.fn().mockResolvedValue({ data: [], error: null }),
+          in: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+    await selectWorkoutA();
+
+    const weightInput = screen.getByTestId('ghost-weight-0-0');
+    const repsInput = screen.getByTestId('ghost-reps-0-0');
+    const commitBtn = screen.getByTestId('commit-set-btn-0-0');
+
+    await userEvent.type(weightInput, '0');
+    await userEvent.type(repsInput, '15');
+    fireEvent.click(commitBtn);
+
+    await waitFor(() => {
+      expect(mockInsert).toHaveBeenCalled();
+    });
+
+    const payload = mockInsert.mock.calls[0][0][0];
+    expect(payload.weight).toBe(0);
+    expect(payload.reps).toBe(15);
+  });
+
+  it('rejects logging set when weight is negative or reps <= 0', async () => {
+    const mockInsert = vi.fn();
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'sets') return { insert: mockInsert };
+      if (table === 'workouts') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [{ id: 'workout-1' }], error: null }),
+            }),
+          }),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          or: vi.fn().mockResolvedValue({ data: [], error: null }),
+          in: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+    await selectWorkoutA();
+
+    const repsInput = screen.getByTestId('ghost-reps-0-0');
+    const commitBtn = screen.getByTestId('commit-set-btn-0-0');
+
+    // reps 0
+    await userEvent.type(repsInput, '0');
+    fireEvent.click(commitBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('Please enter weight and reps or use previous set values.')).toBeDefined();
+    });
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it('renders 0 instead of lbs in placeholder and BW in PR badge when ghost set weight is 0', async () => {
+    const historicalSets = [
+      {
+        id: 'hist-1',
+        workout_id: 'w-prev',
+        exercise_id: 'Incline Bench Press',
+        exercise_name: 'Incline Bench Press',
+        weight: 0,
+        reps: 12,
+        set_index: 1,
+        set_type: 'working',
+        created_at: '2026-09-01T10:00:00Z',
+        workout_date: '2026-09-01',
+        workouts: { date: '2026-09-01', name: 'Workout A' },
+      },
+    ];
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'workouts') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ data: [{ id: 'w-prev', date: '2026-09-01', name: 'Workout A' }], error: null }),
+          }),
+        };
+      }
+      if (table === 'sets') {
+        return {
+          select: vi.fn().mockReturnValue({
+            in: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: historicalSets, error: null }),
+            }),
+          }),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+    await selectWorkoutA();
+
+    await waitFor(() => {
+      const weightInput = screen.getByTestId('ghost-weight-0-0');
+      expect(weightInput).toHaveAttribute('placeholder', '0');
+      expect(screen.getByText('PR: BW×12')).toBeDefined();
+    });
+  });
+
+  it('preserves ad-hoc added exercises in sessionStorage across remount (simulated tab switch)', async () => {
+    sessionStorage.clear();
+    const { unmount } = renderComponent();
+    await selectWorkoutA();
+
+    // Select and add an exercise
+    const addSelect = screen.getByTestId('add-exercise-select');
+    fireEvent.change(addSelect, { target: { value: 'Lat Pull Down' } });
+    fireEvent.click(screen.getByTestId('add-exercise-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Lat Pull Down')).toBeDefined();
+    });
+
+    // Simulate tab switch by unmounting and remounting
+    unmount();
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('Lat Pull Down')).toBeDefined();
+    });
+  });
+
+  it('clears uncommitted ad-hoc drafts from sessionStorage when selecting a new routine', async () => {
+    sessionStorage.clear();
+    renderComponent();
+    await selectWorkoutA();
+
+    const addSelect = screen.getByTestId('add-exercise-select');
+    fireEvent.change(addSelect, { target: { value: 'Lat Pull Down' } });
+    fireEvent.click(screen.getByTestId('add-exercise-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Lat Pull Down')).toBeDefined();
+    });
+
+    const draftKey = 'cybergym_active_exercises_test-user-id_2026-09-06';
+    expect(sessionStorage.getItem(draftKey)).toContain('Lat Pull Down');
+
+    // Select Rest Day
+    const routineBtn = screen.getByTestId('routine-select-btn');
+    fireEvent.click(routineBtn);
+    const restDayBtn = await screen.findByText('Rest Day');
+    fireEvent.click(restDayBtn);
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Rest Day').length).toBeGreaterThan(0);
+      // Lat Pull Down should NOT be in Rest Day since uncommitted drafts were cleared
+      expect(screen.queryByText('Lat Pull Down')).toBeNull();
+      expect(sessionStorage.getItem(draftKey)).toBeNull();
+    });
+  });
+
+  it('persists cleared workout state (Free Workout) across unmount and remount', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    sessionStorage.clear();
+    const { unmount } = renderComponent();
+    await selectWorkoutA();
+
+    // Verify Workout A exercises are present
+    expect(screen.getByText('Incline Bench Press')).toBeDefined();
+
+    // Click Clear Workout
+    const clearBtn = screen.getByTitle('Clear Workout');
+    fireEvent.click(clearBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText("No exercises in today's workout yet")).toBeDefined();
+    });
+
+    const routineKey = 'cybergym_routine_test-user-id_2026-09-06';
+    expect(sessionStorage.getItem(routineKey)).toBe('Free Workout');
+
+    // Simulate tab switch by unmounting and remounting
+    unmount();
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText("No exercises in today's workout yet")).toBeDefined();
+      expect(screen.queryByText('Incline Bench Press')).toBeNull();
+    });
+  });
+
+  it('persists reordered exercise list in sessionStorage across remount', async () => {
+    sessionStorage.clear();
+    const { unmount } = renderComponent();
+    await selectWorkoutA();
+
+    // Add another exercise so we have multiple
+    const addSelect = screen.getByTestId('add-exercise-select');
+    fireEvent.change(addSelect, { target: { value: 'Lat Pull Down' } });
+    fireEvent.click(screen.getByTestId('add-exercise-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Lat Pull Down')).toBeDefined();
+    });
+
+    // Move Lat Pull Down (which is at the end) up
+    const moveUpBtns = screen.getAllByTitle('Move up');
+    const lastMoveUpBtn = moveUpBtns[moveUpBtns.length - 1];
+    fireEvent.click(lastMoveUpBtn);
+
+    const draftKey = 'cybergym_active_exercises_test-user-id_2026-09-06';
+    const stored = JSON.parse(sessionStorage.getItem(draftKey) || '[]');
+    expect(stored.indexOf('Lat Pull Down')).toBe(stored.length - 2);
+
+    // Remount
+    unmount();
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('Lat Pull Down')).toBeDefined();
+    });
   });
 });
 

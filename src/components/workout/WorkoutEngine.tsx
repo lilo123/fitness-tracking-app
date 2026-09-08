@@ -44,7 +44,18 @@ export const WorkoutEngine: React.FC = () => {
   const { selectedAthleteId } = useCoach();
   const queryClient = useQueryClient();
 
-  const targetUserId = (role === 'coach' && selectedAthleteId ? selectedAthleteId : user?.id) || user?.id || '';
+  const targetUserId =
+    (role === 'coach' && selectedAthleteId ? selectedAthleteId : user?.id) ||
+    user?.id ||
+    (() => {
+      try {
+        const cached = localStorage.getItem('cybergym_user');
+        if (cached) return JSON.parse(cached)?.id || '';
+      } catch {
+        return '';
+      }
+      return '';
+    })();
   const autoRestTimer = profile?.auto_rest_timer ?? (localStorage.getItem('cybergym_auto_rest_timer') !== 'false');
 
   const [workoutDate, setWorkoutDate] = useState<string>(() => {
@@ -101,8 +112,14 @@ export const WorkoutEngine: React.FC = () => {
     Record<string, { weight: string; reps: string }>
   >({});
 
+  const getDraftExercisesKey = (userId: string, date: string) =>
+    `cybergym_active_exercises_${userId}_${date}`;
+  const getRoutineKey = (userId: string, date: string) =>
+    `cybergym_routine_${userId}_${date}`;
+
   const resolvedDateRef = useRef<string | null>(null);
   const manualSelectionDateRef = useRef<string | null>(null);
+  const lastTargetUserRef = useRef<string>(targetUserId);
 
   // Routine Selector Modal
   const [showRoutineModal, setShowRoutineModal] = useState(false);
@@ -514,6 +531,13 @@ export const WorkoutEngine: React.FC = () => {
 
   /* oxlint-disable react/set-state-in-effect */
   useEffect(() => {
+    // Reset date tracking when switching athletes
+    if (lastTargetUserRef.current !== targetUserId) {
+      lastTargetUserRef.current = targetUserId;
+      resolvedDateRef.current = null;
+      manualSelectionDateRef.current = null;
+    }
+
     if (!templatesFetched || !logsFetched) return;
 
     // Reset manual override if date changed away from where manual override was recorded
@@ -527,25 +551,65 @@ export const WorkoutEngine: React.FC = () => {
     if (resolvedDateRef.current === workoutDate) return;
     resolvedDateRef.current = workoutDate;
 
+    // Read draft exercises from sessionStorage
+    let storedDrafts: string[] = [];
+    if (typeof window !== 'undefined' && targetUserId && workoutDate) {
+      try {
+        const raw = sessionStorage.getItem(getDraftExercisesKey(targetUserId, workoutDate));
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) storedDrafts = parsed;
+        }
+      } catch {
+        // ignore
+      }
+    }
+
     // 1. Existing logged workout for this date (preserves in-progress session)
     if (todaySets.length > 0) {
       const loggedRoutineName = todaySets[0].workout_name || (todaySets[0] as any)?.workouts?.name || '';
       const normLoggedName = loggedRoutineName.trim().toLowerCase();
-      const matchedCustom = customTemplates.find((t) => t.name.trim().toLowerCase() === normLoggedName);
-      const matchedDef = DEFAULT_WORKOUT_TEMPLATES.find((t) => t.name.trim().toLowerCase() === normLoggedName);
+      const matchedCustom = customTemplates.find((t) => {
+        const tNorm = t.name.trim().toLowerCase();
+        return tNorm === normLoggedName || (normLoggedName.length > 0 && (tNorm.startsWith(normLoggedName) || normLoggedName.startsWith(tNorm)));
+      });
+      const matchedDef = DEFAULT_WORKOUT_TEMPLATES.find((t) => {
+        const tNorm = t.name.trim().toLowerCase();
+        return tNorm === normLoggedName || (normLoggedName.length > 0 && (tNorm.startsWith(normLoggedName) || normLoggedName.startsWith(tNorm)));
+      });
+
+      let baseExercises: string[] = [];
+      const setTargets: Record<string, number> = {};
+      let repTargets: Record<string, number> = {};
 
       if (matchedCustom && matchedCustom.exercises) {
-        loadCustomRoutineTemplate(matchedCustom);
+        setActiveRoutineName(matchedCustom.name);
+        const sortedExercises = [...(matchedCustom.exercises || [])].sort(
+          (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
+        );
+        sortedExercises.forEach((e) => {
+          const resolvedName =
+            e.exercise?.name ||
+            e.exercise_name ||
+            exercises.find((ex) => ex.id === e.exercise_id)?.name ||
+            e.exercise_id;
+          if (resolvedName) {
+            baseExercises.push(resolvedName);
+            setTargets[resolvedName] = e.target_sets || 3;
+            repTargets[resolvedName] = e.target_reps || 10;
+          }
+        });
       } else if (matchedDef) {
-        loadDefaultRoutineTemplate(matchedDef);
+        setActiveRoutineName(matchedDef.name);
+        baseExercises = [...matchedDef.exercises];
+        Object.assign(setTargets, matchedDef.targetSets);
+        repTargets = matchedDef.targetReps ? { ...matchedDef.targetReps } : {};
       } else {
         setActiveRoutineName(loggedRoutineName || 'Logged Workout');
-        const loggedExercises = Array.from(
-          new Set(todaySets.map((s) => s.exercise_name || s.exercise_id))
+        baseExercises = Array.from(
+          new Set(todaySets.map((s) => s.exercise_name || s.exercise_id).filter(Boolean))
         );
-        setActiveExercises(loggedExercises);
-        const setTargets: Record<string, number> = {};
-        loggedExercises.forEach((exName) => {
+        baseExercises.forEach((exName) => {
           const exSets = todaySets.filter(
             (s) => (s.exercise_name || s.exercise_id) === exName
           );
@@ -556,17 +620,148 @@ export const WorkoutEngine: React.FC = () => {
           );
           setTargets[exName] = maxIdx;
         });
-        setTargetSetCounts(setTargets);
-        setTargetRepCounts({});
+      }
+
+      // Merge logged exercises not in base template
+      const loggedExercises = Array.from(
+        new Set(todaySets.map((s) => s.exercise_name || s.exercise_id).filter(Boolean))
+      );
+      const distinctLoggedNotInBase = loggedExercises.filter((name) => !baseExercises.includes(name));
+
+      // Merge uncommitted ad-hoc drafts from sessionStorage
+      const distinctDraftNotInBase = storedDrafts.filter(
+        (name) => !baseExercises.includes(name) && !distinctLoggedNotInBase.includes(name)
+      );
+
+      const finalExercises = [...baseExercises, ...distinctLoggedNotInBase, ...distinctDraftNotInBase];
+      setActiveExercises(finalExercises);
+
+      // Adjust target counts to accommodate all logged sets
+      finalExercises.forEach((exName) => {
+        const loggedSetsForEx = todaySets.filter(
+          (s) => (s.exercise_name || s.exercise_id) === exName
+        );
+        const currentTarget = setTargets[exName] || 3;
+        setTargets[exName] = Math.max(currentTarget, loggedSetsForEx.length);
+      });
+      setTargetSetCounts(setTargets);
+      setTargetRepCounts(repTargets);
+      if (finalExercises.length > 0) {
+        setExpandedExercises((prev) => (prev.size > 0 ? prev : new Set([finalExercises[0]])));
       }
       return;
+    }
+
+    // Helper to merge drafts into active routine
+    const applyRoutineWithDrafts = (
+      routineName: string,
+      baseExs: string[],
+      baseTargets: Record<string, number>,
+      baseReps: Record<string, number>
+    ) => {
+      setActiveRoutineName(routineName);
+      const extraDrafts = storedDrafts.filter((e) => !baseExs.includes(e));
+      const mergedExs = [...baseExs, ...extraDrafts];
+      setActiveExercises(mergedExs);
+      const mergedTargets = { ...baseTargets };
+      extraDrafts.forEach((e) => {
+        if (!mergedTargets[e]) mergedTargets[e] = 3;
+      });
+      setTargetSetCounts(mergedTargets);
+      setTargetRepCounts(baseReps);
+      if (mergedExs.length > 0) {
+        setExpandedExercises((prev) => (prev.size > 0 ? prev : new Set([mergedExs[0]])));
+      } else {
+        setExpandedExercises(new Set());
+      }
+    };
+
+    // Read stored routine selection from sessionStorage if any
+    let storedRoutine: string | null = null;
+    if (typeof window !== 'undefined' && targetUserId && workoutDate) {
+      try {
+        storedRoutine = sessionStorage.getItem(getRoutineKey(targetUserId, workoutDate));
+      } catch {
+        // ignore
+      }
+    }
+
+    if (storedRoutine) {
+      if (storedRoutine === 'Rest Day') {
+        applyRoutineWithDrafts('Rest Day', [], {}, {});
+        return;
+      }
+      if (storedRoutine === 'Free Workout') {
+        applyRoutineWithDrafts('Free Workout', [], {}, {});
+        return;
+      }
+      const customTpl = customTemplates.find((t) => {
+        const tNorm = t.name.trim().toLowerCase();
+        const sNorm = storedRoutine!.trim().toLowerCase();
+        return tNorm === sNorm || (sNorm.length > 0 && (tNorm.startsWith(sNorm) || sNorm.startsWith(tNorm)));
+      });
+      if (customTpl && customTpl.exercises) {
+        const sortedExercises = [...(customTpl.exercises || [])].sort(
+          (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
+        );
+        const exList: string[] = [];
+        const setTargets: Record<string, number> = {};
+        const repTargets: Record<string, number> = {};
+        sortedExercises.forEach((e) => {
+          const resolvedName =
+            e.exercise?.name ||
+            e.exercise_name ||
+            exercises.find((ex) => ex.id === e.exercise_id)?.name ||
+            e.exercise_id;
+          if (resolvedName) {
+            exList.push(resolvedName);
+            setTargets[resolvedName] = e.target_sets || 3;
+            repTargets[resolvedName] = e.target_reps || 10;
+          }
+        });
+        applyRoutineWithDrafts(customTpl.name, exList, setTargets, repTargets);
+        return;
+      }
+
+      const defTpl = DEFAULT_WORKOUT_TEMPLATES.find((t) => {
+        const tNorm = t.name.trim().toLowerCase();
+        const sNorm = storedRoutine!.trim().toLowerCase();
+        return tNorm === sNorm || (sNorm.length > 0 && (tNorm.startsWith(sNorm) || sNorm.startsWith(tNorm)));
+      });
+      if (defTpl) {
+        applyRoutineWithDrafts(
+          defTpl.name,
+          [...defTpl.exercises],
+          { ...defTpl.targetSets },
+          defTpl.targetReps ? { ...defTpl.targetReps } : {}
+        );
+        return;
+      }
     }
 
     // 2. Query scheduled custom templates
     const dayAbbr = getDayOfWeekAbbr(workoutDate);
     const scheduledCustom = customTemplates.find((t) => t.days_of_week?.includes(dayAbbr));
     if (scheduledCustom && scheduledCustom.exercises) {
-      loadCustomRoutineTemplate(scheduledCustom);
+      const sortedExercises = [...(scheduledCustom.exercises || [])].sort(
+        (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
+      );
+      const exList: string[] = [];
+      const setTargets: Record<string, number> = {};
+      const repTargets: Record<string, number> = {};
+      sortedExercises.forEach((e) => {
+        const resolvedName =
+          e.exercise?.name ||
+          e.exercise_name ||
+          exercises.find((ex) => ex.id === e.exercise_id)?.name ||
+          e.exercise_id;
+        if (resolvedName) {
+          exList.push(resolvedName);
+          setTargets[resolvedName] = e.target_sets || 3;
+          repTargets[resolvedName] = e.target_reps || 10;
+        }
+      });
+      applyRoutineWithDrafts(scheduledCustom.name, exList, setTargets, repTargets);
       return;
     }
 
@@ -575,16 +770,18 @@ export const WorkoutEngine: React.FC = () => {
       t.days.some((d) => d === dayAbbr || d.slice(0, 3) === dayAbbr)
     );
     if (scheduledDef) {
-      loadDefaultRoutineTemplate(scheduledDef);
+      applyRoutineWithDrafts(
+        scheduledDef.name,
+        [...scheduledDef.exercises],
+        { ...scheduledDef.targetSets },
+        scheduledDef.targetReps ? { ...scheduledDef.targetReps } : {}
+      );
       return;
     }
 
     // 4. Sunday / Rest Day Fallback
-    setActiveRoutineName('Rest Day');
-    setActiveExercises([]);
-    setTargetSetCounts({});
-    setTargetRepCounts({});
-  }, [workoutDate, templatesFetched, logsFetched, customTemplates, todaySets, loadCustomRoutineTemplate, loadDefaultRoutineTemplate]);
+    applyRoutineWithDrafts('Rest Day', [], {}, {});
+  }, [workoutDate, targetUserId, templatesFetched, logsFetched, customTemplates, todaySets, exercises]);
 
   const toggleAccordion = (exName: string) => {
     setExpandedExercises((prev) => {
@@ -619,6 +816,33 @@ export const WorkoutEngine: React.FC = () => {
     manualSelectionDateRef.current = workoutDate;
     setShowRoutineModal(false);
 
+    // Clear uncommitted ad-hoc drafts from sessionStorage to prevent cross-routine pollution
+    if (typeof window !== 'undefined' && targetUserId && workoutDate) {
+      try {
+        sessionStorage.removeItem(getDraftExercisesKey(targetUserId, workoutDate));
+        sessionStorage.setItem(getRoutineKey(targetUserId, workoutDate), routineName);
+      } catch {
+        // ignore
+      }
+    }
+
+    // Update workouts.name if todaySets.length > 0
+    if (todaySets.length > 0) {
+      const workoutId = todaySets[0].workout_id;
+      if (workoutId) {
+        const workoutsTable = supabase.from('workouts');
+        if (workoutsTable && typeof workoutsTable.update === 'function') {
+          Promise.resolve(workoutsTable.update({ name: routineName }).eq('id', workoutId))
+            .then(() => {
+              queryClient.invalidateQueries({ queryKey: ['workout_sets', targetUserId] });
+            })
+            .catch((err: unknown) => {
+              console.error('Failed to update workout name:', err);
+            });
+        }
+      }
+    }
+
     if (routineName === 'Rest Day') {
       setActiveRoutineName('Rest Day');
       setActiveExercises([]);
@@ -636,18 +860,22 @@ export const WorkoutEngine: React.FC = () => {
     }
 
     // Check custom DB templates FIRST (Database Precedence)
-    const customTpl = customTemplates.find(
-      (t) => t.name.trim().toLowerCase() === routineName.trim().toLowerCase()
-    );
+    const customTpl = customTemplates.find((t) => {
+      const tNorm = t.name.trim().toLowerCase();
+      const rNorm = routineName.trim().toLowerCase();
+      return tNorm === rNorm || (rNorm.length > 0 && (tNorm.startsWith(rNorm) || rNorm.startsWith(tNorm)));
+    });
     if (customTpl) {
       loadCustomRoutineTemplate(customTpl);
       return;
     }
 
     // Fallback to default templates SECOND
-    const defTpl = DEFAULT_WORKOUT_TEMPLATES.find(
-      (t) => t.name.trim().toLowerCase() === routineName.trim().toLowerCase()
-    );
+    const defTpl = DEFAULT_WORKOUT_TEMPLATES.find((t) => {
+      const tNorm = t.name.trim().toLowerCase();
+      const rNorm = routineName.trim().toLowerCase();
+      return tNorm === rNorm || (rNorm.length > 0 && (tNorm.startsWith(rNorm) || rNorm.startsWith(tNorm)));
+    });
     if (defTpl) {
       loadDefaultRoutineTemplate(defTpl);
     }
@@ -656,9 +884,21 @@ export const WorkoutEngine: React.FC = () => {
   const handleAddExercise = () => {
     if (!selectedExerciseToAdd) return;
     if (!activeExercises.includes(selectedExerciseToAdd)) {
-      setActiveExercises((prev) => [...prev, selectedExerciseToAdd]);
+      const next = [...activeExercises, selectedExerciseToAdd];
+      setActiveExercises(next);
       setTargetSetCounts((prev) => ({ ...prev, [selectedExerciseToAdd]: 3 }));
       setExpandedExercises((prev) => new Set(prev).add(selectedExerciseToAdd));
+
+      if (typeof window !== 'undefined' && targetUserId && workoutDate) {
+        try {
+          sessionStorage.setItem(
+            getDraftExercisesKey(targetUserId, workoutDate),
+            JSON.stringify(next)
+          );
+        } catch {
+          // ignore
+        }
+      }
     }
     setSelectedExerciseToAdd('');
   };
@@ -671,16 +911,39 @@ export const WorkoutEngine: React.FC = () => {
     copy[index] = copy[newIdx];
     copy[newIdx] = item;
     setActiveExercises(copy);
+
+    if (typeof window !== 'undefined' && targetUserId && workoutDate) {
+      try {
+        sessionStorage.setItem(
+          getDraftExercisesKey(targetUserId, workoutDate),
+          JSON.stringify(copy)
+        );
+      } catch {
+        // ignore
+      }
+    }
   };
 
   const removeExercise = (index: number) => {
     const exName = activeExercises[index];
-    setActiveExercises((prev) => prev.filter((_, i) => i !== index));
+    const next = activeExercises.filter((_, i) => i !== index);
+    setActiveExercises(next);
     setTargetSetCounts((prev) => {
       const copy = { ...prev };
       delete copy[exName];
       return copy;
     });
+
+    if (typeof window !== 'undefined' && targetUserId && workoutDate) {
+      try {
+        sessionStorage.setItem(
+          getDraftExercisesKey(targetUserId, workoutDate),
+          JSON.stringify(next)
+        );
+      } catch {
+        // ignore
+      }
+    }
   };
 
   const adjustTargetSets = (exName: string, delta: number) => {
@@ -700,19 +963,21 @@ export const WorkoutEngine: React.FC = () => {
     const draftKey = `${exName}_${setIndex}`;
     const draft = inputDrafts[draftKey];
 
-    const weightVal = draft?.weight !== undefined && draft.weight !== ''
+    const hasDraftWeight = draft?.weight !== undefined && draft.weight.trim() !== '';
+    const weightVal = hasDraftWeight
       ? Number(draft.weight)
       : typeof ghostValues.weight === 'number'
       ? ghostValues.weight
-      : 0;
+      : NaN;
 
-    const repsVal = draft?.reps !== undefined && draft.reps !== ''
+    const hasDraftReps = draft?.reps !== undefined && draft.reps.trim() !== '';
+    const repsVal = hasDraftReps
       ? Number(draft.reps)
       : typeof ghostValues.reps === 'number'
       ? ghostValues.reps
-      : 0;
+      : NaN;
 
-    if (!Number.isFinite(weightVal) || weightVal <= 0 || !Number.isFinite(repsVal) || repsVal <= 0) {
+    if (!Number.isFinite(weightVal) || weightVal < 0 || !Number.isFinite(repsVal) || repsVal <= 0) {
       setMutationError('Please enter weight and reps or use previous set values.');
       return;
     }
@@ -774,19 +1039,19 @@ export const WorkoutEngine: React.FC = () => {
       const draftKey = `${exName}_${setIndex}`;
       const draft = inputDrafts[draftKey];
 
-      const weightVal = draft?.weight !== undefined && draft.weight !== ''
+      const weightVal = draft?.weight !== undefined && draft.weight.trim() !== ''
         ? Number(draft.weight)
         : typeof ghost.weight === 'number'
         ? ghost.weight
-        : 0;
+        : NaN;
 
-      const repsVal = draft?.reps !== undefined && draft.reps !== ''
+      const repsVal = draft?.reps !== undefined && draft.reps.trim() !== ''
         ? Number(draft.reps)
         : typeof ghost.reps === 'number'
         ? ghost.reps
-        : targetRepCounts[exName] || 0;
+        : targetRepCounts[exName] || NaN;
 
-      if (!Number.isFinite(weightVal) || weightVal <= 0 || !Number.isFinite(repsVal) || repsVal <= 0) continue;
+      if (!Number.isFinite(weightVal) || weightVal < 0 || !Number.isFinite(repsVal) || repsVal <= 0) continue;
 
       unloggedSets.push({
         exerciseName: exName,
@@ -827,19 +1092,19 @@ export const WorkoutEngine: React.FC = () => {
         const draftKey = `${exName}_${setIndex}`;
         const draft = inputDrafts[draftKey];
 
-        const weightVal = draft?.weight !== undefined && draft.weight !== ''
+        const weightVal = draft?.weight !== undefined && draft.weight.trim() !== ''
           ? Number(draft.weight)
           : typeof ghost.weight === 'number'
           ? ghost.weight
-          : 0;
+          : NaN;
 
-        const repsVal = draft?.reps !== undefined && draft.reps !== ''
+        const repsVal = draft?.reps !== undefined && draft.reps.trim() !== ''
           ? Number(draft.reps)
           : typeof ghost.reps === 'number'
           ? ghost.reps
-          : targetRepCounts[exName] || 0;
+          : targetRepCounts[exName] || NaN;
 
-        if (!Number.isFinite(weightVal) || weightVal <= 0 || !Number.isFinite(repsVal) || repsVal <= 0) continue;
+        if (!Number.isFinite(weightVal) || weightVal < 0 || !Number.isFinite(repsVal) || repsVal <= 0) continue;
 
         allPendingSets.push({
           exerciseName: exName,
@@ -891,10 +1156,10 @@ export const WorkoutEngine: React.FC = () => {
       )}
 
       {/* Routine & Date Control Banner */}
-      <div className="bg-gradient-to-b from-zinc-900 to-zinc-900/80 border border-zinc-800/80 rounded-2xl p-4 shadow-xl">
+      <div className="bg-gradient-to-b from-zinc-900 to-zinc-900/80 border border-zinc-800/80 rounded-2xl p-4 shadow-xl overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-extrabold uppercase tracking-widest text-zinc-400">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-extrabold uppercase tracking-widest text-zinc-400 shrink-0">
               Routine:
             </span>
             <button
@@ -902,19 +1167,19 @@ export const WorkoutEngine: React.FC = () => {
               className="bg-zinc-800/90 hover:bg-zinc-700/80 border border-zinc-700/80 hover:border-cyan-500/50 text-white text-xs font-bold px-3 py-1.5 min-h-[44px] rounded-xl flex items-center gap-2 transition-all shadow-sm"
               data-testid="routine-select-btn"
             >
-              <Layers className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="truncate max-w-[150px] sm:max-w-[200px]">{activeRoutineName}</span>
-              <ChevronDown className="w-3 h-3 text-zinc-400 ml-0.5" />
+              <Layers className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              <span className="truncate max-w-[110px] sm:max-w-[200px]">{activeRoutineName}</span>
+              <ChevronDown className="w-3 h-3 text-zinc-400 ml-0.5 shrink-0" />
             </button>
 
             <button
               type="button"
               onClick={() => (timerSeconds > 0 ? pauseTimer() : startTimer(90))}
-              className="bg-zinc-800/90 hover:bg-zinc-700/80 border border-zinc-700/80 hover:border-cyan-500/50 text-cyan-300 text-xs font-bold px-3 py-1.5 min-h-[44px] rounded-xl flex items-center gap-1.5 transition-all shadow-sm touch-manipulation"
+              className="bg-zinc-800/90 hover:bg-zinc-700/80 border border-zinc-700/80 hover:border-cyan-500/50 text-cyan-300 text-xs font-bold px-3 py-1.5 min-h-[44px] rounded-xl flex items-center gap-1.5 transition-all shadow-sm touch-manipulation shrink-0"
               title="Rest Timer"
               data-testid="rest-timer-btn"
             >
-              <Timer className="w-3.5 h-3.5 text-cyan-400" />
+              <Timer className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
               <span>Rest Timer</span>
             </button>
           </div>
@@ -933,10 +1198,19 @@ export const WorkoutEngine: React.FC = () => {
             <button
               onClick={() => {
                 if (confirm("Clear all exercises from today's workout?")) {
+                  setActiveRoutineName('Free Workout');
                   setActiveExercises([]);
                   setTargetSetCounts({});
                   setTargetRepCounts({});
                   manualSelectionDateRef.current = workoutDate;
+                  if (typeof window !== 'undefined' && targetUserId && workoutDate) {
+                    try {
+                      sessionStorage.removeItem(getDraftExercisesKey(targetUserId, workoutDate));
+                      sessionStorage.setItem(getRoutineKey(targetUserId, workoutDate), 'Free Workout');
+                    } catch {
+                      // ignore
+                    }
+                  }
                 }
               }}
               className="bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 font-extrabold px-2.5 py-1.5 rounded-xl text-xs transition flex items-center gap-1 shadow-[0_0_10px_rgba(244,63,94,0.15)] active:scale-95"
@@ -1205,7 +1479,7 @@ export const WorkoutEngine: React.FC = () => {
                         {benchmarks.pr && (
                           <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-500/10 border border-amber-500/30 text-amber-400 px-2 py-0.5 rounded-full">
                             <Trophy className="w-3 h-3 text-amber-400 shrink-0" />
-                            <span>PR: {benchmarks.pr.weight}×{benchmarks.pr.reps}</span>
+                            <span>PR: {benchmarks.pr.weight > 0 ? `${benchmarks.pr.weight}×` : 'BW×'}{benchmarks.pr.reps}</span>
                           </span>
                         )}
 
@@ -1378,7 +1652,7 @@ export const WorkoutEngine: React.FC = () => {
                                   <input
                                     type="text"
                                     inputMode="decimal"
-                                    placeholder={ghost.weight ? ghost.weight.toString() : 'lbs'}
+                                    placeholder={typeof ghost.weight === 'number' ? ghost.weight.toString() : 'lbs'}
                                     value={draft.weight}
                                     onChange={(e) => updateDraft(exName, setIndex, 'weight', e.target.value)}
                                     aria-label={`Set ${setIndex} weight`}
@@ -1392,7 +1666,7 @@ export const WorkoutEngine: React.FC = () => {
                                     inputMode="numeric"
                                     pattern="[0-9]*"
                                     placeholder={
-                                      ghost.reps
+                                      typeof ghost.reps === 'number'
                                         ? ghost.reps.toString()
                                         : targetRepCounts[exName]
                                         ? `${targetRepCounts[exName]}`
@@ -1447,15 +1721,15 @@ export const WorkoutEngine: React.FC = () => {
           )}
 
           {/* Add Exercise to Workout Picker */}
-          <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-4 shadow-xl">
+          <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-4 shadow-xl overflow-hidden">
             <div className="text-xs font-extrabold uppercase tracking-widest text-zinc-400 mb-2.5 flex items-center gap-1.5">
               <Plus className="w-4 h-4 text-cyan-400" /> Add Exercise
             </div>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
               <select
                 value={selectedExerciseToAdd}
                 onChange={(e) => setSelectedExerciseToAdd(e.target.value)}
-                className="flex-1 bg-zinc-950 border border-zinc-800 text-white rounded-xl px-3 py-2 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none"
+                className="flex-1 min-w-0 bg-zinc-950 border border-zinc-800 text-white rounded-xl px-3 py-2 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none truncate"
                 data-testid="add-exercise-select"
               >
                 <option value="">-- Choose Exercise --</option>
@@ -1468,7 +1742,7 @@ export const WorkoutEngine: React.FC = () => {
               <button
                 onClick={handleAddExercise}
                 disabled={!selectedExerciseToAdd}
-                className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black px-4 py-2 min-h-[44px] rounded-xl text-xs uppercase tracking-wider shadow-[0_0_12px_rgba(6,182,212,0.3)] transition-all active:scale-95 disabled:opacity-50"
+                className="shrink-0 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black px-4 py-2 min-h-[44px] rounded-xl text-xs uppercase tracking-wider shadow-[0_0_12px_rgba(6,182,212,0.3)] transition-all active:scale-95 disabled:opacity-50"
                 data-testid="add-exercise-btn"
               >
                 Add
