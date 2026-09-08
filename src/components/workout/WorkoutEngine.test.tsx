@@ -2043,6 +2043,107 @@ describe('WorkoutEngine', () => {
         expect(screen.queryByText('Free Workout')).toBeNull();
       });
     });
+
+    it('applies deterministic precedence sort where athlete custom template shadows master template with identical name', async () => {
+      const masterTemplate = {
+        id: 'tpl-master-push',
+        user_id: 'coach-id-999',
+        name: 'Master Hypertrophy Push',
+        is_master: true,
+        assigned_to: null,
+        created_at: '2026-09-01T00:00:00Z',
+        exercises: [
+          {
+            exercise_id: 'ex-bench',
+            order_index: 0,
+            target_sets: 3,
+            target_reps: 10,
+            exercise: { name: 'Incline Bench Press' },
+          },
+        ],
+      };
+
+      const athleteCustomTemplate = {
+        id: 'tpl-custom-push',
+        user_id: 'test-user-id',
+        name: 'Master Hypertrophy Push',
+        is_master: false,
+        assigned_to: null,
+        created_at: '2026-09-02T00:00:00Z',
+        exercises: [
+          {
+            exercise_id: 'ex-custom-press',
+            order_index: 0,
+            target_sets: 5,
+            target_reps: 8,
+            exercise: { name: 'Personalized Heavy Press' },
+          },
+        ],
+      };
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'routine_templates') {
+          return {
+            select: vi.fn().mockReturnValue({
+              or: vi.fn().mockResolvedValue({
+                // Deliberately return master FIRST to test that precedence sorting promotes custom
+                data: [masterTemplate, athleteCustomTemplate],
+                error: null,
+              }),
+            }),
+          };
+        }
+        if (table === 'exercises') {
+          return {
+            select: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({
+                data: [
+                  { id: 'ex-bench', name: 'Incline Bench Press', body_part: 'Chest' },
+                  { id: 'ex-custom-press', name: 'Personalized Heavy Press', body_part: 'Chest' },
+                ],
+                error: null,
+              }),
+            }),
+          };
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            or: vi.fn().mockResolvedValue({ data: [], error: null }),
+            in: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
+        };
+      });
+
+      renderComponent();
+
+      // Open routine selection modal
+      const routineBtn = screen.getByTestId('routine-select-btn');
+      fireEvent.click(routineBtn);
+
+      // Wait for routine modal to populate with the custom exercise subtitle
+      await screen.findByText(/Personalized Heavy Press/);
+
+      // Routine appears exactly once in the list (deduplicated by name)
+      const matchingRoutines = screen.getAllByText('Master Hypertrophy Push');
+      expect(matchingRoutines.length).toBe(1);
+
+      // Select the routine
+      fireEvent.click(matchingRoutines[0]);
+
+      // Verify that the athlete's custom routine was loaded (Personalized Heavy Press 0/5 Sets),
+      // deterministically shadowing the master template (Incline Bench Press 0/3 Sets)
+      await waitFor(() => {
+        expect(screen.getByText('Personalized Heavy Press')).toBeDefined();
+        expect(screen.getByText('0/5 Sets')).toBeDefined();
+        expect(screen.queryByText('Incline Bench Press')).toBeNull();
+      });
+    });
   });
 });
 

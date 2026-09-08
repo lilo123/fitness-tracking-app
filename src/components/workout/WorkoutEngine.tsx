@@ -150,7 +150,17 @@ export const WorkoutEngine: React.FC = () => {
           .select('*, exercises:template_exercises(*, exercise:exercises(name))')
           .or(`user_id.eq.${targetUserId},is_master.eq.true,assigned_to.eq.${targetUserId}`);
         if (error || !data) return [];
-        return data as RoutineTemplate[];
+        return (data as RoutineTemplate[]).sort((a, b) => {
+          const getScore = (t: RoutineTemplate) => {
+            if (t.user_id === targetUserId && !t.is_master) return 3;
+            if (t.assigned_to === targetUserId && !t.is_master) return 2;
+            if (t.is_master) return 1;
+            return 0;
+          };
+          const diff = getScore(b) - getScore(a);
+          if (diff !== 0) return diff;
+          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+        });
       } catch {
         return [];
       }

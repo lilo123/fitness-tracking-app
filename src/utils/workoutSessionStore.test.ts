@@ -350,5 +350,159 @@ describe('workoutSessionStore', () => {
     });
     expect(localStorage.getItem(`cybergym_current_session_pointer_${userId}`)).toBeNull();
   });
+
+  it('16. renameExercise migrates exercises, targets, and inputDrafts with cross-user isolation', () => {
+    const user1 = 'athlete-user-1';
+    const user2 = 'athlete-user-2';
+
+    // Set up user 1 session
+    workoutSessionStore.getOrInitSession(user1, today, {
+      routineName: 'Push Day',
+      exercises: ['Bench Press', 'Incline DB'],
+      targetSetCounts: { 'Bench Press': 4, 'Incline DB': 3 },
+      targetRepCounts: { 'Bench Press': 10, 'Incline DB': 12 },
+    });
+    workoutSessionStore.setExpandedExercises(user1, today, ['Bench Press']);
+    workoutSessionStore.setDraftInput(user1, today, 'Bench Press', 0, { weight: '135', reps: '10' });
+    workoutSessionStore.setDraftInput(user1, today, 'Bench Press', 1, { weight: '185', reps: '8' });
+    workoutSessionStore.setDraftInput(user1, today, 'Incline DB', 0, { weight: '50', reps: '10' });
+    workoutSessionStore.flushPendingWrites();
+
+    // Set up user 2 session with same exercise name
+    workoutSessionStore.getOrInitSession(user2, today, {
+      routineName: 'Chest Day',
+      exercises: ['Bench Press'],
+      targetSetCounts: { 'Bench Press': 3 },
+      targetRepCounts: { 'Bench Press': 8 },
+    });
+    workoutSessionStore.setDraftInput(user2, today, 'Bench Press', 0, { weight: '225', reps: '5' });
+    workoutSessionStore.flushPendingWrites();
+
+    // Rename for user 1
+    workoutSessionStore.renameExercise(user1, 'Bench Press', 'Barbell Bench Press');
+
+    const session1 = workoutSessionStore.getSession(user1, today);
+    expect(session1?.exercises).toEqual(['Barbell Bench Press', 'Incline DB']);
+    expect(session1?.targetSetCounts['Barbell Bench Press']).toBe(4);
+    expect(session1?.targetSetCounts['Bench Press']).toBeUndefined();
+    expect(session1?.targetRepCounts['Barbell Bench Press']).toBe(10);
+    expect(session1?.targetRepCounts['Bench Press']).toBeUndefined();
+    expect(session1?.expandedExercises).toEqual(['Barbell Bench Press']);
+    expect(session1?.inputDrafts['Barbell Bench Press_0']).toEqual({ weight: '135', reps: '10' });
+    expect(session1?.inputDrafts['Barbell Bench Press_1']).toEqual({ weight: '185', reps: '8' });
+    expect(session1?.inputDrafts['Bench Press_0']).toBeUndefined();
+    expect(session1?.inputDrafts['Incline DB_0']).toEqual({ weight: '50', reps: '10' });
+
+    // SessionStorage mirror updated
+    const mirror1 = sessionStorage.getItem(`cybergym_active_exercises_${user1}_${today}`);
+    expect(JSON.parse(mirror1!)).toEqual(['Barbell Bench Press', 'Incline DB']);
+
+    // User 2 session remains completely untouched
+    const session2 = workoutSessionStore.getSession(user2, today);
+    expect(session2?.exercises).toEqual(['Bench Press']);
+    expect(session2?.targetSetCounts['Bench Press']).toBe(3);
+    expect(session2?.targetRepCounts['Bench Press']).toBe(8);
+    expect(session2?.inputDrafts['Bench Press_0']).toEqual({ weight: '225', reps: '5' });
+    expect(session2?.inputDrafts['Barbell Bench Press_0']).toBeUndefined();
+  });
+
+  it('17. renameExercise flushes debounced drafts and handles boundary guards', () => {
+    workoutSessionStore.getOrInitSession(userId, today, {
+      routineName: 'Leg Day',
+      exercises: ['Squat'],
+      targetSetCounts: { Squat: 3 },
+      targetRepCounts: { Squat: 5 },
+    });
+
+    // Queue draft without flushing or advancing timers
+    workoutSessionStore.setDraftInput(userId, today, 'Squat', 1, { weight: '315', reps: '5' });
+
+    // Rename flushes and migrates
+    workoutSessionStore.renameExercise(userId, 'Squat', 'Back Squat');
+
+    const session = workoutSessionStore.getSession(userId, today);
+    expect(session?.exercises).toEqual(['Back Squat']);
+    expect(session?.targetSetCounts['Back Squat']).toBe(3);
+    expect(session?.targetRepCounts['Back Squat']).toBe(5);
+    expect(session?.inputDrafts['Back Squat_1']).toEqual({ weight: '315', reps: '5' });
+    expect(session?.inputDrafts['Squat_1']).toBeUndefined();
+
+    // Boundary guards: no-ops
+    workoutSessionStore.renameExercise(userId, 'Back Squat', 'Back Squat');
+    expect(workoutSessionStore.getSession(userId, today)?.exercises).toEqual(['Back Squat']);
+
+    workoutSessionStore.renameExercise(userId, 'Back Squat', '   ');
+    expect(workoutSessionStore.getSession(userId, today)?.exercises).toEqual(['Back Squat']);
+
+    workoutSessionStore.renameExercise(userId, '   ', 'Front Squat');
+    expect(workoutSessionStore.getSession(userId, today)?.exercises).toEqual(['Back Squat']);
+
+    workoutSessionStore.renameExercise('', 'Back Squat', 'Front Squat');
+    expect(workoutSessionStore.getSession(userId, today)?.exercises).toEqual(['Back Squat']);
+  });
+
+  it('18. renameExercise and removeExercise protect draft keys with overlapping prefix names', () => {
+    workoutSessionStore.getOrInitSession(userId, today, {
+      routineName: 'Upper Body',
+      exercises: ['Push', 'Push_Ups'],
+      targetSetCounts: { Push: 3, Push_Ups: 4 },
+      targetRepCounts: { Push: 10, Push_Ups: 20 },
+    });
+
+    workoutSessionStore.setDraftInput(userId, today, 'Push', 0, { weight: '100', reps: '10' });
+    workoutSessionStore.setDraftInput(userId, today, 'Push_Ups', 0, { weight: '0', reps: '20' });
+    workoutSessionStore.flushPendingWrites();
+
+    // Renaming 'Push' must NOT corrupt or touch 'Push_Ups' drafts
+    workoutSessionStore.renameExercise(userId, 'Push', 'Push Press');
+
+    const session = workoutSessionStore.getSession(userId, today);
+    expect(session?.exercises).toEqual(['Push Press', 'Push_Ups']);
+    expect(session?.inputDrafts['Push Press_0']).toEqual({ weight: '100', reps: '10' });
+    expect(session?.inputDrafts['Push_0']).toBeUndefined();
+    // Crucial check: Push_Ups_0 was preserved and NOT mangled into 'Push Press_Ups_0'
+    expect(session?.inputDrafts['Push_Ups_0']).toEqual({ weight: '0', reps: '20' });
+    expect(session?.targetSetCounts['Push Press']).toBe(3);
+    expect(session?.targetSetCounts['Push_Ups']).toBe(4);
+
+    // Removing 'Push Press' must NOT delete 'Push_Ups' drafts
+    workoutSessionStore.removeExercise(userId, today, 'Push Press');
+    const sessionAfterRemove = workoutSessionStore.getSession(userId, today);
+    expect(sessionAfterRemove?.exercises).toEqual(['Push_Ups']);
+    expect(sessionAfterRemove?.inputDrafts['Push_Ups_0']).toEqual({ weight: '0', reps: '20' });
+  });
+
+  it('19. renameExercise cleanly migrates names with special characters and whitespace padding', () => {
+    workoutSessionStore.getOrInitSession(userId, today, {
+      routineName: 'Leg Day',
+      exercises: ['Leg Press 45° (Plate-Loaded)'],
+      targetSetCounts: { 'Leg Press 45° (Plate-Loaded)': 4 },
+      targetRepCounts: { 'Leg Press 45° (Plate-Loaded)': 12 },
+    });
+
+    workoutSessionStore.setDraftInput(userId, today, 'Leg Press 45° (Plate-Loaded)', 0, {
+      weight: '450',
+      reps: '12',
+    });
+    workoutSessionStore.flushPendingWrites();
+
+    // Rename with whitespace padding and special characters
+    workoutSessionStore.renameExercise(
+      userId,
+      '  Leg Press 45° (Plate-Loaded)  ',
+      '  Hack Squat 45° (Plate-Loaded)  '
+    );
+
+    const session = workoutSessionStore.getSession(userId, today);
+    expect(session?.exercises).toEqual(['Hack Squat 45° (Plate-Loaded)']);
+    expect(session?.targetSetCounts['Hack Squat 45° (Plate-Loaded)']).toBe(4);
+    expect(session?.targetSetCounts['Leg Press 45° (Plate-Loaded)']).toBeUndefined();
+    expect(session?.targetRepCounts['Hack Squat 45° (Plate-Loaded)']).toBe(12);
+    expect(session?.inputDrafts['Hack Squat 45° (Plate-Loaded)_0']).toEqual({
+      weight: '450',
+      reps: '12',
+    });
+    expect(session?.inputDrafts['Leg Press 45° (Plate-Loaded)_0']).toBeUndefined();
+  });
 });
 
