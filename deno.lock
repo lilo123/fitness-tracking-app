@@ -4,6 +4,7 @@
     "jsr:@deno/installer-shell-setup@*": "0.3.4",
     "jsr:@supabase/functions-js@*": "2.112.4",
     "npm:@capacitor/android@^7.6.8": "7.6.9_@capacitor+core@7.6.9",
+    "npm:@capacitor/camera@^7.0.5": "7.0.5_@capacitor+core@7.6.9",
     "npm:@capacitor/cli@^7.6.8": "7.6.9",
     "npm:@capacitor/core@^7.6.8": "7.6.9",
     "npm:@google/genai@*": "2.19.0",
@@ -100,6 +101,12 @@
     },
     "@capacitor/android@7.6.9_@capacitor+core@7.6.9": {
       "integrity": "sha512-jvfU42aOuj92/KJqRscfDm+5612WzJainFL09xjJgD9oI3OMXN4PBfccn8Ig9i8x7bkVqZv/XNwFshiIRqmggg==",
+      "dependencies": [
+        "@capacitor/core"
+      ]
+    },
+    "@capacitor/camera@7.0.5_@capacitor+core@7.6.9": {
+      "integrity": "sha512-+53f1xHq8on7O+ULXbgWp00ooWvn3fUkWxTP3p5zHi1nVriCxLbYnY0zTpZQqn52M96vclFKkoABbTVQ3x755w==",
       "dependencies": [
         "@capacitor/core"
       ]
@@ -2200,6 +2207,7 @@
     "packageJson": {
       "dependencies": [
         "npm:@capacitor/android@^7.6.8",
+        "npm:@capacitor/camera@^7.0.5",
         "npm:@capacitor/cli@^7.6.8",
         "npm:@capacitor/core@^7.6.8",
         "npm:@kiwi-health/capacitor-health-connect@^0.0.42",

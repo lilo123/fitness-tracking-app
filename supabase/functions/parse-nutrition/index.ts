@@ -9,108 +9,8 @@ const corsHeaders = {
   'Access-Control-Max-Age': '86400',
 };
 
-function isRateLimitError(err: any): boolean {
-  if (!err) return false;
-  if (err.status === 429 || err.statusCode === 429 || err.code === 429) return true;
-  if (err.error?.code === 429 || err.error?.status === 429 || err.response?.status === 429) return true;
-  const msgParts: string[] = [
-    typeof err.message === 'string' ? err.message : '',
-    typeof err.error?.message === 'string' ? err.error.message : '',
-    typeof err.statusText === 'string' ? err.statusText : '',
-    typeof err.cause?.message === 'string' ? err.cause.message : '',
-    String(err),
-  ];
-  try {
-    msgParts.push(JSON.stringify(err));
-  } catch {
-    // ignore circular json error
-  }
-  const msg = msgParts.join(' ').toLowerCase();
-  return (
-    msg.includes('429') ||
-    msg.includes('resource_exhausted') ||
-    msg.includes('resource has been exhausted') ||
-    msg.includes('quota') ||
-    msg.includes('rate limit')
-  );
-}
-
-export default {
-  async fetch(req: Request) {
-    if (req.method === 'OPTIONS') {
-      return new Response('ok', { headers: corsHeaders });
-    }
-
-    // Verify Authorization header presence and Bearer token format
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return new Response(
-        JSON.stringify({ error: 'Missing or invalid Authorization header. Authentication required.' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    try {
-      const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-      const anonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
-
-      if (!supabaseUrl || !anonKey) {
-        throw new Error('Supabase environment variables not configured');
-      }
-
-      // Verify caller authentication via Supabase Auth
-      const userClient = createClient(supabaseUrl, anonKey, {
-        global: { headers: { Authorization: authHeader } },
-      });
-      const { data: { user }, error: userError } = await userClient.auth.getUser();
-      if (userError || !user) {
-        return new Response(
-          JSON.stringify({ error: 'Unauthorized: Invalid token' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      let body: any;
-      try {
-        body = await req.json();
-      } catch (jsonErr: any) {
-        console.error("[parse-nutrition] Failed to parse request JSON:", jsonErr?.message || jsonErr);
-        return new Response(
-          JSON.stringify({ error: 'Malformed JSON or payload too large.' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const rawImage = body.image_base64 || body.imageBase64 || body.image || "";
-      const rawMimeType = body.imageMimeType || body.image_mime_type || body.mimeType || body.mime_type || "";
-      const imageBase64 = typeof rawImage === 'string' ? rawImage.trim() : "";
-      const cleanBase64 = (imageBase64 === 'data:,' || imageBase64.startsWith('data:,'))
-        ? ""
-        : imageBase64
-            .replace(/^data:[^,]*;base64,/i, '')
-            .replace(/\s/g, '')
-            .trim();
-      const dataUriMatch = imageBase64.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9+.-]+)(?:;[^,]*)?;base64,/i);
-      const detectedMime = dataUriMatch ? dataUriMatch[1] : "";
-      const imageMimeType = (typeof rawMimeType === 'string' && rawMimeType.trim())
-        ? rawMimeType.trim()
-        : (detectedMime || "image/jpeg");
-
-      const rawInput = body.input || body.prompt || body.text || "";
-      const input = typeof rawInput === 'string' ? rawInput.trim().slice(0, 2000) : "";
-      if (!input && !cleanBase64) {
-        return new Response(
-          JSON.stringify({ error: 'Input text or meal photo is required for nutrition parsing.' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const apiKey = Deno.env.get("GEMINI_API_KEY");
-      if (!apiKey) {
-        throw new Error("GEMINI_API_KEY is not configured");
-      }
-
-interface StructuredNutritionResult {
+export interface StructuredNutritionResult {
+  is_food?: boolean;
   name: string;
   calories: number;
   protein: number;
@@ -131,7 +31,7 @@ interface StructuredNutritionResult {
   }>;
 }
 
-function parseStructuredNutritionText(input: string): StructuredNutritionResult | null {
+export function parseStructuredNutritionText(input: string): StructuredNutritionResult | null {
   const lines = input.split('\n');
   const items: Array<{
     name: string;
@@ -233,6 +133,7 @@ function parseStructuredNutritionText(input: string): StructuredNutritionResult 
     .join(' + ') + ` = ${totalCal} kcal`;
 
   return {
+    is_food: true,
     name: mealTitle,
     calories: totalCal,
     protein: totalP,
@@ -246,57 +147,215 @@ function parseStructuredNutritionText(input: string): StructuredNutritionResult 
   };
 }
 
+function isRateLimitError(err: any): boolean {
+  if (!err) return false;
+  if (err.status === 429 || err.statusCode === 429 || err.code === 429) return true;
+  if (err.error?.code === 429 || err.error?.status === 429 || err.response?.status === 429) return true;
+  const msgParts: string[] = [
+    typeof err.message === 'string' ? err.message : '',
+    typeof err.error?.message === 'string' ? err.error.message : '',
+    typeof err.statusText === 'string' ? err.statusText : '',
+    typeof err.cause?.message === 'string' ? err.cause.message : '',
+    String(err),
+  ];
+  try {
+    msgParts.push(JSON.stringify(err));
+  } catch {
+    // ignore circular json error
+  }
+  const msg = msgParts.join(' ').toLowerCase();
+  return (
+    msg.includes('429') ||
+    msg.includes('resource_exhausted') ||
+    msg.includes('resource has been exhausted') ||
+    msg.includes('quota') ||
+    msg.includes('rate limit')
+  );
+}
+
+function isCapacityError(err: any): boolean {
+  if (!err) return false;
+  if (err.code === 'CAPACITY_EXHAUSTED') return true;
+  const msgParts: string[] = [
+    typeof err.message === 'string' ? err.message : '',
+    typeof err.error?.message === 'string' ? err.error.message : '',
+    typeof err.statusText === 'string' ? err.statusText : '',
+    typeof err.cause?.message === 'string' ? err.cause.message : '',
+    String(err),
+  ];
+  try {
+    msgParts.push(JSON.stringify(err));
+  } catch {
+    // ignore circular json error
+  }
+  const msg = msgParts.join(' ').toLowerCase();
+  return (
+    msg.includes('capacity') ||
+    msg.includes('high demand') ||
+    msg.includes('overloaded') ||
+    msg.includes('preempted') ||
+    msg.includes('decode_preempted')
+  );
+}
+
+function isTimeoutError(err: any): boolean {
+  if (!err) return false;
+  if (err.name === 'AbortError' || err.name === 'TimeoutError') return true;
+  if (err.status === 504 || err.statusCode === 504 || err.code === 504) return true;
+  const msgParts: string[] = [
+    typeof err.message === 'string' ? err.message : '',
+    typeof err.error?.message === 'string' ? err.error.message : '',
+    String(err),
+  ];
+  const msg = msgParts.join(' ').toLowerCase();
+  return (
+    msg.includes('504') ||
+    msg.includes('timeout') ||
+    msg.includes('timed out') ||
+    msg.includes('abort') ||
+    msg.includes('deadline_exceeded')
+  );
+}
+
+export default {
+  async fetch(req: Request) {
+    if (req.method === 'OPTIONS') {
+      return new Response('ok', { headers: corsHeaders });
+    }
+
+    // Verify Authorization header presence and Bearer token format
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Missing or invalid Authorization header. Authentication required.' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+      const anonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
+
+      if (!supabaseUrl || !anonKey) {
+        throw new Error('Supabase environment variables not configured');
+      }
+
+      // Verify caller authentication via Supabase Auth
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: { user }, error: userError } = await userClient.auth.getUser();
+      if (userError || !user) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized: Invalid token' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      let body: any;
+      try {
+        body = await req.json();
+      } catch (jsonErr: any) {
+        console.error("[parse-nutrition] Failed to parse request JSON:", jsonErr?.message || jsonErr);
+        return new Response(
+          JSON.stringify({ error: 'Malformed JSON or payload too large.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const rawImage = body.image_base64 || body.imageBase64 || body.image || "";
+      const rawMimeType = body.imageMimeType || body.image_mime_type || body.mimeType || body.mime_type || "";
+      const imageBase64 = typeof rawImage === 'string' ? rawImage.trim() : "";
+      const cleanBase64 = (imageBase64 === 'data:,' || imageBase64.startsWith('data:,'))
+        ? ""
+        : imageBase64
+            .replace(/^data:[^,]*;base64,/i, '')
+            .replace(/\s/g, '')
+            .trim();
+      const dataUriMatch = imageBase64.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9+.-]+)(?:;[^,]*)?;base64,/i);
+      const detectedMime = dataUriMatch ? dataUriMatch[1] : "";
+      const imageMimeType = (typeof rawMimeType === 'string' && rawMimeType.trim())
+        ? rawMimeType.trim()
+        : (detectedMime || "image/jpeg");
+
+      const rawInput = body.input || body.prompt || body.text || "";
+      const input = typeof rawInput === 'string' ? rawInput.trim().slice(0, 2000) : "";
+      if (!input && !cleanBase64) {
+        return new Response(
+          JSON.stringify({ error: 'Input text or meal photo is required for nutrition parsing.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Fast-path: Pre-structured text-only input (< 1ms bypass without touching Google Gen AI)
+      if (!cleanBase64 && input) {
+        const fastPathResult = parseStructuredNutritionText(input);
+        if (fastPathResult) {
+          return new Response(JSON.stringify(fastPathResult), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
+      const apiKey = Deno.env.get("GEMINI_API_KEY");
+      if (!apiKey) {
+        throw new Error("GEMINI_API_KEY is not configured");
+      }
+
       const custom_dishes = Array.isArray(body.custom_dishes) ? body.custom_dishes.slice(0, 50) : [];
       let contextStr = "";
       if (custom_dishes.length > 0) {
         contextStr = ` Known custom dishes for this user: ${JSON.stringify(custom_dishes)}.`;
       }
 
+      const systemInstruction = `You are an expert sports nutritionist, food data parser, and visual meal recognition engine.
+
+CORE RESPONSIBILITIES & GUIDELINES:
+1. FOOD RECOGNITION & GUARDRAILS:
+   - Determine if the provided input (text or image) represents food, drink, or nutrition-related items.
+   - If the input or photo does NOT contain food (e.g. random objects, electronics, scenery, animals, non-edible items, or irrelevant queries), set "is_food" to false and provide zero/empty values for nutrition.
+   - If the input does represent food or drink, set "is_food" to true.
+
+2. UNIVERSAL MULTI-DISH DECOMPOSITION:
+   - Accurately parse and decompose composite meals and multi-dish combinations across any global cuisine (e.g., proteins, starches, sides, sauces, toppings, garnishes).
+   - Elaborate individual components in the "items" list. Estimate realistic weights/portions (e.g. grams, cups, pieces) and compute corresponding macronutrients (calories, protein, carbs, fat, fiber).
+   - Only include ingredients that are explicitly mentioned or clearly visible; do not assume unlisted or invisible ingredients.
+
+3. PRE-STRUCTURED / EXPLICIT MACROS:
+   - If explicit calorie or macronutrient numbers are supplied (e.g. nutrition facts labels, recipe logs, lines like 'X g | Y kcal | Z g P'), extract those exact numbers and names verbatim rather than re-estimating.
+
+4. CUSTOM DISHES SEMANTIC GUIDANCE:${contextStr ? `\n   - Prioritize the user's custom dishes list:${contextStr}\n   - Match names semantically and scale macronutrients proportionally to the requested portion size.` : `\n   - If known custom dishes are provided, prioritize matching them and scale macros proportionally to portion size.`}
+
+5. MATHEMATICAL CONSISTENCY:
+   - Total calories, protein, carbs, fat, and fiber must equal the sum of the individual component items.
+   - Provide a clear mathematical explanation (e.g. "X kcal (item 1) + Y kcal (item 2) = Total kcal").
+   - Output strictly valid JSON matching the provided schema.`;
+
       let candidateModels: string[];
       let contents: any;
 
       if (cleanBase64) {
-        const userNotes = input ? `User notes: "${input}"` : "No additional text description provided.";
-        const multimodalPrompt = `You are an expert sports nutritionist, food data parser, and visual meal recognition engine.
-Analyze this meal photo:
-"""
-${userNotes}
-"""
-${contextStr}
-
-INSTRUCTIONS:
-1. PHOTO / VISUAL RECOGNITION: Carefully identify each food item, portion size, and ingredient visible in the photo. Estimate realistic weights/portions (e.g. grams, cups, pieces) and compute corresponding macronutrients (calories, protein, carbs, fat, fiber).
-2. PRE-STRUCTURED / EXPLICIT MACROS: If text or image already provides explicit calorie or macronutrient breakdowns (e.g. nutrition facts label, recipe logs, lines with 'X g | Y kcal | Z g P'), you MUST extract those exact ingredient names, portion sizes, and numbers directly rather than re-estimating. Preserve exact component items, portions, calories, and macros verbatim. Extract total portion size and serving unit if present.
-3. NATURAL LANGUAGE & MULTI-DISH LOGGING: If informal or conversational, compute accurate itemized estimates. If a meal or multi-dish combination is mentioned or seen (such as "Com Tam & Eggs", "Steak and Potatoes", "Pho with beef and tendon"), you MUST analyze ALL dishes and elaborate their individual components. Never omit or truncate dishes from a multi-dish meal.
-4. OUTPUT: Extract meal name, total calories, protein (g), carbs (g), fat (g), fiber (g), serving_size (number if present), serving_unit (string if present), itemized list of components, and mathematical explanation. Output strictly JSON.`;
-
+        const userNotes = input || "Analyze this meal photo.";
         contents = [
           { inlineData: { data: cleanBase64, mimeType: imageMimeType } },
-          multimodalPrompt,
+          { text: userNotes },
         ];
+        const defaultVisionModel = Deno.env.get("GEMINI_VISION_MODEL_ID") || "gemini-3.8-flash";
         candidateModels = Array.from(new Set([
-          Deno.env.get("GEMINI_VISION_MODEL_ID") || "gemini-3.8-flash",
-          "gemini-3.7-flash",
-          "gemini-3.5-flash",
+          defaultVisionModel,
+          "gemini-3.8-flash",
+          "gemini-3.5-flash-lite",
+          "gemini-3.1-flash-lite",
         ]));
       } else {
-        const promptContent = `You are an expert sports nutritionist and food data parser.
-Analyze this meal input:
-"""
-${input}
-"""
-${contextStr}
-
-INSTRUCTIONS:
-1. PRE-STRUCTURED / EXPLICIT MACROS: If the text already provides explicit calorie or macronutrient breakdowns (e.g. lines with 'X g | Y kcal | Z g P', 'Total Calories: N', nutrition facts labels, or recipe logs), you MUST extract those exact ingredient names, portion sizes, and numbers directly rather than re-estimating. Preserve exact component items, portions, calories, and macros verbatim. Extract total portion size and serving unit if present.
-2. NATURAL LANGUAGE & MULTI-DISH LOGGING: If informal or conversational, compute accurate itemized estimates. If a meal or multi-dish combination is mentioned (such as "Com Tam & Eggs", "Steak and Potatoes", "Pho with beef and tendon"), you MUST analyze ALL dishes and elaborate their individual components (for example, Com Tam typically includes broken rice, grilled pork chop, egg meatloaf/chả trứng or fried egg, pickled vegetables, and fish sauce dressing). Never omit or truncate dishes from a multi-dish meal.
-3. OUTPUT: Extract meal name, total calories, protein (g), carbs (g), fat (g), fiber (g), serving_size (number if present), serving_unit (string if present), itemized list of components, and mathematical explanation. Output strictly JSON.`;
-
-        contents = promptContent;
-        const configuredModel = Deno.env.get("GEMINI_MODEL_ID") || "gemini-3.6-flash";
+        contents = [
+          { text: input },
+        ];
+        const defaultTextModel = Deno.env.get("GEMINI_MODEL_ID") || "gemini-3.7-flash";
         candidateModels = Array.from(new Set([
-          configuredModel,
-          "gemini-3.5-flash",
+          defaultTextModel,
+          "gemini-3.7-flash",
+          "gemini-3.5-flash-lite",
           "gemini-3.1-flash-lite",
         ]));
       }
@@ -304,6 +363,10 @@ INSTRUCTIONS:
       const responseSchema = {
         type: Type.OBJECT,
         properties: {
+          is_food: {
+            type: Type.BOOLEAN,
+            description: "True if the input or image contains food, drink, or nutrition-related items. False if it contains non-food objects, animals, landscapes, or irrelevant queries.",
+          },
           name: { type: Type.STRING },
           calories: { type: Type.NUMBER },
           protein: { type: Type.NUMBER },
@@ -330,22 +393,28 @@ INSTRUCTIONS:
             },
           },
         },
-        required: ["name", "calories", "protein", "carbs", "fat", "fiber", "items", "explanation"],
+        required: ["is_food", "name", "calories", "protein", "carbs", "fat", "fiber", "items", "explanation"],
       };
 
       const ai = new GoogleGenAI({ apiKey });
       let responseText = "";
       let lastAiError: any = null;
       let rateLimitEncountered: any = null;
+      let capacityErrorEncountered: any = null;
+      let timeoutEncountered: any = null;
 
       for (const model of candidateModels) {
         try {
+          const timeoutSignal = AbortSignal.timeout(5000);
           const response = await ai.models.generateContent({
             model,
             contents,
             config: {
+              systemInstruction,
+              temperature: 0.1,
               responseMimeType: "application/json",
               responseSchema,
+              abortSignal: timeoutSignal,
             },
           });
           if (response?.text) {
@@ -354,11 +423,23 @@ INSTRUCTIONS:
             if (fenceMatch) {
               candidateText = fenceMatch[1].trim();
             }
-            // Validate that response.text can be parsed as JSON and contains meal nutrition before breaking
+            // Validate that response.text can be parsed as JSON
             const parsedCandidate = JSON.parse(candidateText);
             if (!parsedCandidate || typeof parsedCandidate !== 'object') {
               throw new Error("Candidate model returned non-object JSON");
             }
+
+            // Non-Food Fast Fail: immediately return HTTP 422 without triggering fallback catch loop
+            if (parsedCandidate.is_food === false || parsedCandidate.is_food === 'false') {
+              return new Response(
+                JSON.stringify({
+                  error: "No food detected in input or image. Please provide a meal photo or food description.",
+                  code: "NON_FOOD_DETECTED",
+                }),
+                { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              );
+            }
+
             if (
               parsedCandidate.calories === undefined &&
               (!Array.isArray(parsedCandidate.items) || parsedCandidate.items.length === 0)
@@ -372,6 +453,10 @@ INSTRUCTIONS:
           lastAiError = modelErr;
           if (isRateLimitError(modelErr)) {
             rateLimitEncountered = modelErr;
+          } else if (isCapacityError(modelErr)) {
+            capacityErrorEncountered = modelErr;
+          } else if (isTimeoutError(modelErr)) {
+            timeoutEncountered = modelErr;
           }
           console.warn(`[parse-nutrition] Model ${model} encountered error:`, modelErr?.message || modelErr);
         }
@@ -387,6 +472,7 @@ INSTRUCTIONS:
             });
           }
         }
+
         if (isRateLimitError(lastAiError) || rateLimitEncountered) {
           return new Response(
             JSON.stringify({
@@ -404,6 +490,41 @@ INSTRUCTIONS:
             }
           );
         }
+
+        if (isCapacityError(lastAiError) || capacityErrorEncountered) {
+          return new Response(
+            JSON.stringify({
+              error: "AI model capacity is temporarily exhausted. Please try again in 5 seconds or switch to manual entry.",
+              code: "CAPACITY_EXHAUSTED",
+              retryAfter: 5,
+            }),
+            {
+              status: 503,
+              headers: {
+                ...corsHeaders,
+                'Content-Type': 'application/json',
+                'Retry-After': '5',
+              },
+            }
+          );
+        }
+
+        if (isTimeoutError(lastAiError) || timeoutEncountered) {
+          return new Response(
+            JSON.stringify({
+              error: "AI model request timed out. Please try again or switch to manual entry.",
+              code: "TIMEOUT",
+            }),
+            {
+              status: 504,
+              headers: {
+                ...corsHeaders,
+                'Content-Type': 'application/json',
+              },
+            }
+          );
+        }
+
         throw lastAiError || new Error("All AI models failed to generate content");
       }
 
@@ -430,6 +551,38 @@ INSTRUCTIONS:
               ...corsHeaders,
               'Content-Type': 'application/json',
               'Retry-After': '15',
+            },
+          }
+        );
+      }
+      if (isCapacityError(error)) {
+        return new Response(
+          JSON.stringify({
+            error: "AI model capacity is temporarily exhausted. Please try again in 5 seconds or switch to manual entry.",
+            code: "CAPACITY_EXHAUSTED",
+            retryAfter: 5,
+          }),
+          {
+            status: 503,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json',
+              'Retry-After': '5',
+            },
+          }
+        );
+      }
+      if (isTimeoutError(error)) {
+        return new Response(
+          JSON.stringify({
+            error: "AI model request timed out. Please try again or switch to manual entry.",
+            code: "TIMEOUT",
+          }),
+          {
+            status: 504,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json',
             },
           }
         );

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NutritionEngine } from './nutrition/NutritionEngine';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -1909,6 +1909,321 @@ Total Fiber: 1 g`;
       expect(screen.getByTestId('rate-limit-banner')).toBeDefined();
     });
   });
+
+  it('unwraps HTTP 400 JSON error from error.context and replaces generic non-2xx status message', async () => {
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: null,
+      error: {
+        message: 'Edge Function returned a non-2xx status code',
+        context: {
+          status: 400,
+          clone: () => ({
+            json: async () => ({ error: 'Input text or meal photo is required for nutrition parsing.' }),
+          }),
+        },
+      },
+    });
+
+    renderComponent();
+
+    const input = screen.getByPlaceholderText('Describe what you ate (e.g., 3 eggs, 2 slices sourdough, 1 tbsp butter)');
+    await userEvent.type(input, 'Something');
+
+    fireEvent.click(screen.getByText('Analyze Meal'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('status-message')).toBeDefined();
+    });
+
+    expect(screen.getByText(/Input text or meal photo is required for nutrition parsing/i)).toBeDefined();
+    expect(screen.queryByText(/non-2xx/i)).toBeNull();
+  });
+
+  it('unwraps HTTP 422 non-food error from error.context and displays descriptive warning banner', async () => {
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: null,
+      error: {
+        message: 'Edge Function returned a non-2xx status code',
+        context: {
+          status: 422,
+          clone: () => ({
+            json: async () => ({
+              error: 'No food detected in input or image. Please provide a meal photo or food description.',
+              code: 'NON_FOOD_DETECTED',
+            }),
+          }),
+        },
+      },
+    });
+
+    renderComponent();
+
+    const input = screen.getByPlaceholderText('Describe what you ate (e.g., 3 eggs, 2 slices sourdough, 1 tbsp butter)');
+    await userEvent.type(input, 'My mechanical keyboard');
+
+    fireEvent.click(screen.getByText('Analyze Meal'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('status-message')).toBeDefined();
+    });
+
+    expect(screen.getByText(/No food detected in input or image/i)).toBeDefined();
+  });
+
+  it('unwraps HTTP 503 capacity overload from error.context and displays capacity message', async () => {
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: null,
+      error: {
+        message: 'Edge Function returned a non-2xx status code',
+        context: {
+          status: 503,
+          clone: () => ({
+            json: async () => ({
+              error: 'AI model capacity is temporarily exhausted. Please try again in 5 seconds or switch to manual entry.',
+              code: 'CAPACITY_EXHAUSTED',
+              retryAfter: 5,
+            }),
+          }),
+        },
+      },
+    });
+
+    renderComponent();
+
+    const input = screen.getByPlaceholderText('Describe what you ate (e.g., 3 eggs, 2 slices sourdough, 1 tbsp butter)');
+    await userEvent.type(input, 'Steak and eggs');
+
+    fireEvent.click(screen.getByText('Analyze Meal'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('status-message')).toBeDefined();
+    });
+
+    expect(screen.getByText(/AI model capacity is temporarily exhausted/i)).toBeDefined();
+  });
+
+  it('enforces adaptive timeouts of 30s for text-only input', async () => {
+    (supabase.functions.invoke as any).mockImplementation(() => new Promise(() => {}));
+
+    renderComponent();
+
+    const input = screen.getByPlaceholderText('Describe what you ate (e.g., 3 eggs, 2 slices sourdough, 1 tbsp butter)');
+    await userEvent.type(input, 'Text meal');
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(screen.getByTestId('analyze-meal-button'));
+
+      // Advance by 29 seconds (should not timeout yet)
+      await act(async () => {
+        vi.advanceTimersByTime(29000);
+      });
+      expect(screen.queryByText(/Edge function timeout/i)).toBeNull();
+
+      // Advance past 30 seconds
+      await act(async () => {
+        vi.advanceTimersByTime(2000);
+      });
+      expect(screen.getByText(/Edge function timeout after 30s/i)).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('enforces 45s timeout boundary when photo is attached', async () => {
+    const { Camera } = await import('@capacitor/camera');
+    (Camera.getPhoto as any).mockResolvedValue({
+      base64String: 'dGVzdC1waG90bw==',
+      format: 'jpeg',
+    });
+
+    (supabase.functions.invoke as any).mockImplementation(() => new Promise(() => {}));
+
+    renderComponent();
+
+    fireEvent.click(screen.getByTestId('camera-trigger'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('photo-preview')).toBeDefined();
+    });
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(screen.getByTestId('analyze-meal-button'));
+
+      // Advance by 35 seconds (past the 30s text timeout, should NOT timeout yet because photo timeout is 45s)
+      await act(async () => {
+        vi.advanceTimersByTime(35000);
+      });
+      expect(screen.queryByText(/Edge function timeout/i)).toBeNull();
+
+      // Advance past 45s
+      await act(async () => {
+        vi.advanceTimersByTime(11000);
+      });
+      expect(screen.getByText(/Edge function timeout after 45s/i)).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('preserves attached photo preview in DOM when edge function analysis fails', async () => {
+    const { Camera } = await import('@capacitor/camera');
+    (Camera.getPhoto as any).mockResolvedValue({
+      base64String: 'dGVzdC1waG90bw==',
+      format: 'jpeg',
+    });
+
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: null,
+      error: new Error('Network error'),
+    });
+
+    renderComponent();
+
+    fireEvent.click(screen.getByTestId('camera-trigger'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('photo-preview')).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByTestId('analyze-meal-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('status-message')).toBeDefined();
+    });
+
+    // Photo preview must still be visible and preserved
+    expect(screen.getByTestId('photo-preview')).toBeDefined();
+  });
+
+  it('displays Retry Analysis button in error banner and succeeds on retry', async () => {
+    let callCount = 0;
+    (supabase.functions.invoke as any).mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        return {
+          data: null,
+          error: {
+            message: 'Edge Function returned a non-2xx status code',
+            context: {
+              status: 503,
+              clone: () => ({
+                json: async () => ({ error: 'AI model capacity is temporarily exhausted. Please try again in 5 seconds or switch to manual entry.' }),
+              }),
+            },
+          },
+        };
+      }
+      return {
+        data: {
+          name: 'Healthy Chicken Salad',
+          calories: 350,
+          protein: 40,
+          carbs: 10,
+          fat: 15,
+          fiber: 5,
+          explanation: 'Chicken and salad',
+          items: [{ name: 'Chicken Salad', portion: '1 bowl', calories: 350, protein: 40, carbs: 10, fat: 15, fiber: 5 }],
+        },
+        error: null,
+      };
+    });
+
+    renderComponent();
+
+    const input = screen.getByPlaceholderText('Describe what you ate (e.g., 3 eggs, 2 slices sourdough, 1 tbsp butter)');
+    await userEvent.type(input, 'Chicken Salad');
+
+    fireEvent.click(screen.getByText('Analyze Meal'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('retry-analysis-button')).toBeDefined();
+    });
+
+    // Click retry
+    fireEvent.click(screen.getByTestId('retry-analysis-button'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Itemized Breakdown/i)).toBeDefined();
+    });
+
+    // Error banner and retry button should be cleared on success
+    expect(screen.queryByTestId('retry-analysis-button')).toBeNull();
+    expect(callCount).toBe(2);
+  });
+
+  it('complies with WCAG 2.5.5 touch target size (min 44x44px) and touch-manipulation on Retry Analysis button', async () => {
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: null,
+      error: new Error('AI failed'),
+    });
+
+    renderComponent();
+
+    const input = screen.getByPlaceholderText('Describe what you ate (e.g., 3 eggs, 2 slices sourdough, 1 tbsp butter)');
+    await userEvent.type(input, 'Lunch');
+
+    fireEvent.click(screen.getByText('Analyze Meal'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('retry-analysis-button')).toBeDefined();
+    });
+
+    const retryBtn = screen.getByTestId('retry-analysis-button');
+    expect(retryBtn.className).toContain('min-h-[44px]');
+    expect(retryBtn.className).toContain('min-w-[44px]');
+    expect(retryBtn.className).toContain('touch-manipulation');
+  });
+
+  it('unwraps error from error.context when context is a plain object without .clone()', async () => {
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: null,
+      error: {
+        message: 'Edge Function returned a non-2xx status code',
+        context: {
+          status: 400,
+          error: 'Direct context error message without clone',
+          code: 'CUSTOM_ERROR',
+        },
+      },
+    });
+
+    renderComponent();
+
+    const input = screen.getByPlaceholderText('Describe what you ate (e.g., 3 eggs, 2 slices sourdough, 1 tbsp butter)');
+    await userEvent.type(input, 'Protein shake');
+
+    fireEvent.click(screen.getByText('Analyze Meal'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('status-message')).toBeDefined();
+    });
+
+    expect(screen.getByText(/Direct context error message without clone/i)).toBeDefined();
+  });
+
+  it('parses edge function response containing markdown json code fences', async () => {
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: '```json\n{"name": "Fenced Omelette", "calories": 300, "protein": 24, "carbs": 2, "fat": 20, "fiber": 0, "items": [{"name": "Omelette", "portion": "3 eggs", "calories": 300, "protein": 24, "carbs": 2, "fat": 20, "fiber": 0}]}\n```',
+      error: null,
+    });
+
+    renderComponent();
+
+    const input = screen.getByPlaceholderText('Describe what you ate (e.g., 3 eggs, 2 slices sourdough, 1 tbsp butter)');
+    await userEvent.type(input, '3 egg omelette');
+
+    fireEvent.click(screen.getByText('Analyze Meal'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('staged-meal-card')).toBeDefined();
+      expect(screen.getByTestId('dish-name-input')).toHaveValue('Fenced Omelette');
+    });
+
+    expect(screen.getByText(/Itemized Breakdown/i)).toBeDefined();
+  });
 });
+
 
 

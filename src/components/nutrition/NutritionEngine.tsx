@@ -32,6 +32,7 @@ import {
   ChevronUp,
   Camera as CameraIcon,
   Image as ImageIcon,
+  RotateCcw,
 } from 'lucide-react';
 
 export interface StagedItem {
@@ -401,9 +402,11 @@ export const NutritionEngine: React.FC = () => {
     setIsRateLimited(false);
 
     try {
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Edge function timeout after 35s')), 35000)
-      );
+      let timeoutId: any;
+      const timeoutMs = selectedPhoto ? 45000 : 30000;
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(`Edge function timeout after ${timeoutMs / 1000}s`)), timeoutMs);
+      });
 
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
@@ -426,37 +429,88 @@ export const NutritionEngine: React.FC = () => {
         },
       });
 
-      const { data, error } = (await Promise.race([invokePromise, timeoutPromise])) as any;
+      let data: any;
+      let error: any;
+      try {
+        const result = (await Promise.race([invokePromise, timeoutPromise])) as any;
+        data = result?.data;
+        error = result?.error;
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+      }
+
       if (error) {
-        if (error?.context?.status === 429 || error?.status === 429) {
-          let retryAfter = 15;
-          let rateLimitMsg = 'Gemini rate limit exceeded (15 RPM). Please wait 15 seconds or switch to manual entry.';
+        let serverMessage = '';
+        let errorCode = '';
+        let retryAfterSeconds: number | undefined;
+
+        if (error?.context) {
           try {
-            if (error.context?.headers) {
-              const headerRetry = error.context.headers.get?.('Retry-After') || error.context.headers.get?.('retry-after');
-              if (headerRetry && !isNaN(parseInt(headerRetry, 10))) {
-                retryAfter = parseInt(headerRetry, 10);
-              }
-            }
             const ctxClone = typeof error.context?.clone === 'function' ? error.context.clone() : error.context;
-            const errData = await ctxClone?.json?.();
-            if (errData?.retryAfter) retryAfter = errData.retryAfter;
-            if (errData?.error) rateLimitMsg = errData.error;
+            if (typeof ctxClone?.json === 'function') {
+              const errData = await ctxClone.json();
+              if (errData?.error) serverMessage = errData.error;
+              if (errData?.code) errorCode = errData.code;
+              if (errData?.retryAfter) retryAfterSeconds = Number(errData.retryAfter);
+            } else if (ctxClone && typeof ctxClone === 'object' && ctxClone.error) {
+              serverMessage = ctxClone.error;
+              if (ctxClone.code) errorCode = ctxClone.code;
+              if (ctxClone.retryAfter) retryAfterSeconds = Number(ctxClone.retryAfter);
+            }
           } catch {
-            // ignore JSON unwrap error
+            try {
+              const ctxCloneText = typeof error.context?.clone === 'function' ? error.context.clone() : error.context;
+              if (typeof ctxCloneText?.text === 'function') {
+                const textData = await ctxCloneText.text();
+                if (textData && textData.length < 500) {
+                  serverMessage = textData;
+                }
+              }
+            } catch {
+              // ignore
+            }
           }
+
+          if (!retryAfterSeconds && error.context?.headers) {
+            const headers = error.context.headers;
+            const headerRetry = typeof headers?.get === 'function'
+              ? (headers.get('Retry-After') || headers.get('retry-after'))
+              : (headers['Retry-After'] || headers['retry-after']);
+            if (headerRetry && !isNaN(parseInt(headerRetry, 10))) {
+              retryAfterSeconds = parseInt(headerRetry, 10);
+            }
+          }
+        }
+
+        const is429 = error?.context?.status === 429 || error?.status === 429;
+        if (is429) {
+          const rateLimitMsg = serverMessage || 'Gemini rate limit exceeded (15 RPM). Please wait 15 seconds or switch to manual entry.';
           const rateErr = new Error(rateLimitMsg);
           (rateErr as any).is429 = true;
-          (rateErr as any).retryAfter = retryAfter;
+          (rateErr as any).retryAfter = retryAfterSeconds || 15;
           throw rateErr;
         }
+
+        if (serverMessage) {
+          const customErr = new Error(serverMessage);
+          (customErr as any).code = errorCode;
+          (customErr as any).status = error?.context?.status || error?.status;
+          throw customErr;
+        }
+
         throw error;
       }
 
-      const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+      let parsed = data;
+      if (typeof data === 'string') {
+        const cleaned = data.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+        parsed = JSON.parse(cleaned);
+      }
 
       if (parsed?.error) {
-        throw new Error(parsed.error);
+        const err = new Error(parsed.error);
+        if (parsed.code) (err as any).code = parsed.code;
+        throw err;
       }
 
       if (parsed && (parsed.calories !== undefined || (Array.isArray(parsed.items) && parsed.items.length > 0))) {
@@ -1621,18 +1675,32 @@ export const NutritionEngine: React.FC = () => {
         {status && !isRateLimited && (
           <div
             data-testid="status-message"
-            className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
+            className={`p-3 rounded-xl text-xs flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 ${
               isError
                 ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
                 : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
             }`}
           >
-            {isError ? (
-              <AlertCircle className="w-4 h-4 shrink-0" />
-            ) : (
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              {isError ? (
+                <AlertCircle className="w-4 h-4 shrink-0" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+              )}
+              <span className="break-words">{status}</span>
+            </div>
+            {isError && (
+              <button
+                type="button"
+                data-testid="retry-analysis-button"
+                onClick={handleAnalyze}
+                disabled={isAnalyzing}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-rose-300 bg-rose-500/20 hover:bg-rose-500/30 active:scale-95 rounded-lg transition-all min-h-[44px] min-w-[44px] touch-manipulation cursor-pointer shrink-0 disabled:opacity-50"
+              >
+                <RotateCcw className="w-3.5 h-3.5 shrink-0" />
+                <span>Retry Analysis</span>
+              </button>
             )}
-            <span>{status}</span>
           </div>
         )}
       </div>
