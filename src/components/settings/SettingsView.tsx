@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import type { UserProfile, UserRole } from '../../types/database';
-import { Settings, User, Target, CheckCircle2, Shield, Dumbbell, Timer } from 'lucide-react';
+import { Settings, User, Target, CheckCircle2, AlertCircle, Shield, Dumbbell, Timer } from 'lucide-react';
 
 interface SettingsFormProps {
   profile: UserProfile | null;
@@ -27,7 +27,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
     const localVal = localStorage.getItem('cybergym_auto_rest_timer');
     return localVal !== null ? localVal !== 'false' : true;
   });
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleToggleAutoTimer = async () => {
@@ -45,7 +45,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setStatus('');
+    setStatus(null);
 
     const res = await updateProfile({
       username,
@@ -58,9 +58,9 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
     });
 
     if (res.success) {
-      setStatus('Settings saved');
+      setStatus({ type: 'success', message: 'Settings saved' });
     } else {
-      setStatus('Failed to save settings: ' + res.error);
+      setStatus({ type: 'error', message: 'Failed to save settings: ' + (res.error || 'Unknown error') });
     }
     setLoading(false);
   };
@@ -280,9 +280,20 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
         </button>
 
         {status && (
-          <div className="p-3 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 shrink-0" />
-            <span>{status}</span>
+          <div
+            data-testid="settings-status-banner"
+            className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
+              status.type === 'error'
+                ? 'bg-rose-500/15 border border-rose-500/30 text-rose-300'
+                : 'bg-cyan-500/15 border border-cyan-500/30 text-cyan-300'
+            }`}
+          >
+            {status.type === 'error' ? (
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+            )}
+            <span>{status.message}</span>
           </div>
         )}
       </form>

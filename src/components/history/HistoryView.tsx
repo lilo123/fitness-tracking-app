@@ -14,6 +14,7 @@ import { Calendar, Dumbbell, Trophy, Search, Activity, Utensils, Trash2, AlertCi
 import { EditMealModal } from '../nutrition/EditMealModal';
 import { EditSetModal } from '../workout/EditSetModal';
 import { groupSessionSetsByExercise } from '../../utils/historyGrouping';
+import { formatCalories, formatMacro } from '../../utils/nutrition';
 
 const CATEGORIES = ['All', 'Chest', 'Back', 'Arms', 'Shoulders', 'Legs', 'Core'];
 
@@ -385,19 +386,19 @@ export const HistoryView: React.FC = () => {
                   {/* Daily Macro Summary Pills */}
                   <div className="flex items-center gap-1.5 flex-wrap font-mono text-xs font-bold">
                     <span className="bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2.5 py-1 rounded-xl">
-                      {day.totals.calories} kcal
+                      {formatCalories(day.totals.calories)} kcal
                     </span>
                     <span className="bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 px-2 py-1 rounded-xl text-[11px]">
-                      {day.totals.protein}g P
+                      {formatMacro(day.totals.protein)}g P
                     </span>
                     <span className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-1 rounded-xl text-[11px]">
-                      {day.totals.carbs}g C
+                      {formatMacro(day.totals.carbs)}g C
                     </span>
                     <span className="bg-violet-500/15 text-violet-400 border border-violet-500/30 px-2 py-1 rounded-xl text-[11px]">
-                      {day.totals.fat}g F
+                      {formatMacro(day.totals.fat)}g F
                     </span>
                     <span className="bg-teal-500/15 text-teal-400 border border-teal-500/30 px-2 py-1 rounded-xl text-[11px]">
-                      {day.totals.fiber}g Fib
+                      {formatMacro(day.totals.fiber)}g Fib
                     </span>
                   </div>
                 </div>
@@ -408,7 +409,7 @@ export const HistoryView: React.FC = () => {
                     <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-zinc-400 tracking-wider">
                       <span>Caloric Macro Distribution</span>
                       <span className="text-zinc-500 font-mono font-normal text-[10px]">
-                        {day.macroCalories.total} macro kcal
+                        {formatCalories(day.macroCalories.total)} macro kcal
                       </span>
                     </div>
 
@@ -476,15 +477,15 @@ export const HistoryView: React.FC = () => {
                           )}
                         </div>
                         <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] font-mono mt-1 text-zinc-400 flex-wrap">
-                          <span className="text-amber-400 font-bold">{meal.calories} kcal</span>
+                          <span className="text-amber-400 font-bold">{formatCalories(meal.calories)} kcal</span>
                           <span>•</span>
-                          <span>P: {meal.protein || 0}g</span>
+                          <span>P: {formatMacro(meal.protein)}g</span>
                           <span>•</span>
-                          <span>C: {meal.carbs || 0}g</span>
+                          <span>C: {formatMacro(meal.carbs)}g</span>
                           <span>•</span>
-                          <span>F: {meal.fat || 0}g</span>
+                          <span>F: {formatMacro(meal.fat)}g</span>
                           <span>•</span>
-                          <span className="text-teal-400">Fib: {meal.fiber || 0}g</span>
+                          <span className="text-teal-400">Fib: {formatMacro(meal.fiber)}g</span>
                         </div>
                       </div>
 

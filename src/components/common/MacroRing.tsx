@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatCalories, formatMacro } from '../../utils/nutrition';
 
 interface MacroRingProps {
   label: string;
@@ -24,6 +25,10 @@ export const MacroRing: React.FC<MacroRingProps> = ({
   const radius = 32;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (strokePercentage / 100) * circumference;
+
+  const isCalories = unit === 'kcal' || label.toLowerCase().includes('cal');
+  const formattedCurrent = isCalories ? formatCalories(current) : formatMacro(current);
+  const formattedTarget = isCalories ? formatCalories(target) : formatMacro(target);
 
   return (
     <div className="flex flex-col items-center p-2 sm:p-3 bg-zinc-900/90 border border-zinc-800/80 rounded-2xl shadow-xl flex-1 min-w-[56px] sm:min-w-[75px]">
@@ -55,10 +60,10 @@ export const MacroRing: React.FC<MacroRingProps> = ({
         </svg>
         <div className="absolute flex flex-col items-center justify-center text-center">
           <span className={`text-[10px] sm:text-xs font-black font-mono ${colorClass}`}>
-            {current}
+            {formattedCurrent}
           </span>
           <span className="text-[8px] sm:text-[9px] text-zinc-500 font-mono -mt-0.5">
-            /{target}
+            /{formattedTarget}
           </span>
         </div>
       </div>

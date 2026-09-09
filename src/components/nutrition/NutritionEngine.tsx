@@ -8,6 +8,7 @@ import { MacroRing } from '../common/MacroRing';
 import { normalizeDateStr } from '../../utils/ghostSets';
 import { getDishIcon } from '../../utils/dishIcons';
 import { EditMealModal } from './EditMealModal';
+import { formatCalories, formatMacro, calculateRemainingFuel } from '../../utils/nutrition';
 import {
   Sparkles,
   Utensils,
@@ -168,6 +169,16 @@ export const NutritionEngine: React.FC = () => {
       { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
     );
   }, [todayLogs]);
+
+  const remainingFuel = useMemo(() => {
+    return calculateRemainingFuel(dailyTotals, {
+      calories: targetCalories,
+      protein: targetProtein,
+      carbs: targetCarbs,
+      fat: targetFat,
+      fiber: targetFiber,
+    });
+  }, [dailyTotals, targetCalories, targetProtein, targetCarbs, targetFat, targetFiber]);
 
   // Insert mutation
   const mutation = useMutation({
@@ -760,17 +771,51 @@ export const NutritionEngine: React.FC = () => {
         <div className="mt-3 pt-3 border-t border-zinc-800/80 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono">
           <span className="text-zinc-500 uppercase text-[10px] font-bold tracking-wider">Remaining Fuel:</span>
           <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-            <span className={targetCalories - dailyTotals.calories >= 0 ? 'text-amber-400 font-bold' : 'text-rose-400 font-bold'}>
-              {Math.max(0, targetCalories - dailyTotals.calories)} kcal
+            <span
+              className={`px-2 py-0.5 rounded-lg border text-[11px] font-mono font-bold transition-all ${
+                remainingFuel.calories.isOver
+                  ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
+                  : 'bg-amber-500/10 border-amber-500/25 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.1)]'
+              }`}
+            >
+              {remainingFuel.calories.badgeLabel}
             </span>
-            <span className="text-zinc-700">•</span>
-            <span className="text-cyan-400 font-bold">{Math.max(0, targetProtein - dailyTotals.protein)}g P</span>
-            <span className="text-zinc-700">•</span>
-            <span className="text-emerald-400 font-bold">{Math.max(0, targetCarbs - dailyTotals.carbs)}g C</span>
-            <span className="text-zinc-700">•</span>
-            <span className="text-violet-400 font-bold">{Math.max(0, targetFat - dailyTotals.fat)}g F</span>
-            <span className="text-zinc-700">•</span>
-            <span className="text-teal-400 font-bold">{Math.max(0, targetFiber - dailyTotals.fiber)}g Fib</span>
+            <span
+              className={`px-2 py-0.5 rounded-lg border text-[11px] font-mono font-bold transition-all ${
+                remainingFuel.protein.isOver
+                  ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
+                  : 'bg-cyan-500/10 border-cyan-500/25 text-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.1)]'
+              }`}
+            >
+              {remainingFuel.protein.badgeLabel}
+            </span>
+            <span
+              className={`px-2 py-0.5 rounded-lg border text-[11px] font-mono font-bold transition-all ${
+                remainingFuel.carbs.isOver
+                  ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
+                  : 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.1)]'
+              }`}
+            >
+              {remainingFuel.carbs.badgeLabel}
+            </span>
+            <span
+              className={`px-2 py-0.5 rounded-lg border text-[11px] font-mono font-bold transition-all ${
+                remainingFuel.fat.isOver
+                  ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
+                  : 'bg-violet-500/10 border-violet-500/25 text-violet-400 shadow-[0_0_8px_rgba(139,92,246,0.1)]'
+              }`}
+            >
+              {remainingFuel.fat.badgeLabel}
+            </span>
+            <span
+              className={`px-2 py-0.5 rounded-lg border text-[11px] font-mono font-bold transition-all ${
+                remainingFuel.fiber.isOver
+                  ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
+                  : 'bg-teal-500/10 border-teal-500/25 text-teal-400 shadow-[0_0_8px_rgba(20,184,166,0.1)]'
+              }`}
+            >
+              {remainingFuel.fiber.badgeLabel}
+            </span>
           </div>
         </div>
       </div>
@@ -1337,15 +1382,15 @@ export const NutritionEngine: React.FC = () => {
                     )}
                   </div>
                   <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] font-mono mt-0.5 text-zinc-400 flex-wrap">
-                    <span className="text-amber-400 font-bold">{log.calories} kcal</span>
+                    <span className="text-amber-400 font-bold">{formatCalories(log.calories)} kcal</span>
                     <span>•</span>
-                    <span>P: {log.protein || 0}g</span>
+                    <span>P: {formatMacro(log.protein)}g</span>
                     <span>•</span>
-                    <span>C: {log.carbs || 0}g</span>
+                    <span>C: {formatMacro(log.carbs)}g</span>
                     <span>•</span>
-                    <span>F: {log.fat || 0}g</span>
+                    <span>F: {formatMacro(log.fat)}g</span>
                     <span>•</span>
-                    <span className="text-teal-400">Fib: {log.fiber || 0}g</span>
+                    <span className="text-teal-400">Fib: {formatMacro(log.fiber)}g</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">

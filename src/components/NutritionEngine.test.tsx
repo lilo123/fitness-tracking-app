@@ -1175,6 +1175,56 @@ Total Fiber: 1 g`;
       expect(screen.queryByTestId('edit-meal-modal')).toBeNull();
     });
   });
+
+  it('renders atomic remaining fuel badges with over-target badges when daily totals exceed targets', async () => {
+    const todayStr = normalizeDateStr(new Date().toISOString());
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'nutrition_logs') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({
+                data: [
+                  {
+                    id: 'over-meal-1',
+                    food_name: 'Massive Feast',
+                    calories: 2500, // exceeds 2200 default by 300
+                    protein: 180, // exceeds 160 default by 20
+                    carbs: 250, // exceeds 220 default by 30
+                    fat: 80, // exceeds 70 default by 10
+                    fiber: 35, // exceeds 30 default by 5
+                    logged_at: `${todayStr}T12:00:00Z`,
+                    meal_type: 'Lunch',
+                    serving_size: 1,
+                    serving_unit: 'serving',
+                  },
+                ],
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('+300 kcal over')).toBeDefined();
+      expect(screen.getByText('+20g P over')).toBeDefined();
+      expect(screen.getByText('+30g C over')).toBeDefined();
+      expect(screen.getByText('+10g F over')).toBeDefined();
+      expect(screen.getByText('+5g Fib over')).toBeDefined();
+    });
+  });
 });
 
 

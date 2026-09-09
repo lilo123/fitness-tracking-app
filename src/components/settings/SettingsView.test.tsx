@@ -162,4 +162,23 @@ describe('SettingsView', () => {
       );
     });
   });
+
+  it('renders error banner with alert styling when saving goals fails', async () => {
+    mockUpsert.mockReturnValueOnce({
+      eq: vi.fn().mockResolvedValue({ error: { message: 'Database write error' } }),
+    });
+
+    renderComponent();
+    await screen.findByDisplayValue('Coach Duy');
+
+    const saveBtn = screen.getByRole('button', { name: /Save Goals/i });
+    fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      const banner = screen.getByTestId('settings-status-banner');
+      expect(banner).toBeDefined();
+      expect(banner.className).toContain('text-rose-300');
+      expect(screen.getByText(/Failed to save settings: Database write error/i)).toBeDefined();
+    });
+  });
 });
