@@ -1887,7 +1887,7 @@ Deno.test("parse-nutrition performs universal multi-dish decomposition without r
         assertEquals(res.status, 200);
 
         // Verify systemInstruction contains universal multi-dish instructions and no regional bias like hardcoded Com Tam recipes
-        assertEquals(interceptedSystemInstruction.toLowerCase().includes("universal multi-dish decomposition"), true);
+        assertEquals(interceptedSystemInstruction.toLowerCase().includes("itemization & realistic decomposition"), true);
         assertEquals(interceptedSystemInstruction.toLowerCase().includes("broken rice"), false);
         assertEquals(interceptedSystemInstruction.toLowerCase().includes("sườn"), false);
 
@@ -2172,3 +2172,88 @@ Deno.test("parse-nutrition returns HTTP 422 when model returns is_food as string
 
 
 
+Deno.test("Photo only - Should not inject custom dishes", async () => {
+    Deno.env.set("SUPABASE_URL", "https://mock.supabase.co");
+    Deno.env.set("SUPABASE_ANON_KEY", "mock-anon-key");
+    Deno.env.set("GEMINI_API_KEY", "test-key");
+
+    let systemInstructionUsed = "";
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
+        const urlString = input.toString();
+        if (urlString.includes("/auth/v1/user")) {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        if (urlString.includes("generativelanguage.googleapis.com")) {
+            if (init?.body) {
+                const parsedBody = JSON.parse(init.body as string);
+                if (parsedBody.systemInstruction?.parts?.[0]?.text) {
+                    systemInstructionUsed = parsedBody.systemInstruction.parts[0].text;
+                }
+            }
+            return new Response(JSON.stringify({
+                candidates: [{ content: { parts: [{ text: JSON.stringify({ is_food: true, name: "Food", calories: 100, protein: 10, carbs: 10, fat: 10, fiber: 0, explanation: "exp", items: [] }) }] } }]
+            }), { status: 200 });
+        }
+        return originalFetch(input, init);
+    };
+
+    try {
+        const req = new Request("http://localhost/parse-nutrition", {
+            method: "POST",
+            headers: { "Authorization": "Bearer valid-jwt-token" },
+            body: JSON.stringify({
+                input: "", // Empty input!
+                image_base64: "dGVzdC1pbWFnZQ==",
+                custom_dishes: [{ name: "My Protein Shake", calories: 300 }]
+            })
+        });
+
+        const res = await app.fetch(req);
+        assertEquals(res.status, 200);
+
+        if (systemInstructionUsed.includes("User's Custom Dishes")) {
+            throw new Error("Custom dishes were injected even when input was empty!");
+        }
+        console.log("SUCCESS: Custom dishes NOT injected for photo-only scan.");
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+
+Deno.test("Text provided - Should inject custom dishes", async () => {
+    let systemInstructionUsed = "";
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
+        const urlString = input.toString();
+        if (urlString.includes("/auth/v1/user")) return new Response(JSON.stringify({}), { status: 200 });
+        if (urlString.includes("generativelanguage.googleapis.com")) {
+            if (init?.body) systemInstructionUsed = JSON.parse(init.body as string).systemInstruction?.parts?.[0]?.text;
+            return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ is_food: true, name: "Food", calories: 100, protein: 10, carbs: 10, fat: 10, fiber: 0, explanation: "exp", items: [] }) }] } }] }), { status: 200 });
+        }
+        return originalFetch(input, init);
+    };
+    try {
+        const req = new Request("http://localhost/parse-nutrition", {
+            method: "POST",
+            headers: { "Authorization": "Bearer valid-jwt-token" },
+            body: JSON.stringify({
+                input: "Protein shake", // Text present!
+                image_base64: "dGVzdC1pbWFnZQ==",
+                custom_dishes: [{ name: "My Protein Shake", calories: 300 }]
+            })
+        });
+        const res = await app.fetch(req);
+        assertEquals(res.status, 200);
+        if (!systemInstructionUsed.includes("User's Custom Dishes")) {
+            throw new Error("Custom dishes were NOT injected despite text being present!");
+        }
+        console.log("SUCCESS: Custom dishes WERE injected for text scan.");
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});

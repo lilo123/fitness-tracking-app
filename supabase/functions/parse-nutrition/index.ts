@@ -304,32 +304,35 @@ export default {
 
       const custom_dishes = Array.isArray(body.custom_dishes) ? body.custom_dishes.slice(0, 50) : [];
       let contextStr = "";
-      if (custom_dishes.length > 0) {
-        contextStr = ` Known custom dishes for this user: ${JSON.stringify(custom_dishes)}.`;
+      // Option B: Only inject custom dishes if there is accompanying text (input).
+      if (custom_dishes.length > 0 && input) {
+        contextStr = `\n\n   User's Custom Dishes:${JSON.stringify(custom_dishes)}`;
       }
 
       const systemInstruction = `You are an expert sports nutritionist, food data parser, and visual meal recognition engine.
 
 CORE RESPONSIBILITIES & GUIDELINES:
-1. FOOD RECOGNITION & GUARDRAILS:
-   - Determine if the provided input (text or image) represents food, drink, or nutrition-related items.
-   - If the input or photo does NOT contain food (e.g. random objects, electronics, scenery, animals, non-edible items, or irrelevant queries), set "is_food" to false and provide zero/empty values for nutrition.
-   - If the input does represent food or drink, set "is_food" to true.
 
-2. UNIVERSAL MULTI-DISH DECOMPOSITION:
-   - Accurately parse and decompose composite meals and multi-dish combinations across any global cuisine (e.g., proteins, starches, sides, sauces, toppings, garnishes).
-   - Elaborate individual components in the "items" list. Estimate realistic weights/portions (e.g. grams, cups, pieces) and compute corresponding macronutrients (calories, protein, carbs, fat, fiber).
-   - Only include ingredients that are explicitly mentioned or clearly visible; do not assume unlisted or invisible ingredients.
+1. DEFINITION OF VALID NUTRITION INPUT:
+   - Carefully determine if the input represents a valid item for dietary tracking.
+   - VALID (\`is_food: true\`): Meals, drinks, raw ingredients, dietary supplements (e.g., protein powders, creatine, vitamins), and packaged food labels/barcodes.
+   - INVALID (\`is_food: false\`): Unrelated objects (e.g., electronics, furniture, scenery, pets) or irrelevant text. If invalid, return zero/empty values for macros and an empty array for items.
 
-3. PRE-STRUCTURED / EXPLICIT MACROS:
-   - If explicit calorie or macronutrient numbers are supplied (e.g. nutrition facts labels, recipe logs, lines like 'X g | Y kcal | Z g P'), extract those exact numbers and names verbatim rather than re-estimating.
+2. HIERARCHY OF EVIDENCE (TEXT > VISUAL > CUSTOM DISHES):
+   - 1st Priority (Explicit Text): If the user provides manual labels, text overrides, or pre-calculated macros (e.g., '150g Chicken | 240 kcal | 46g P'), honor those exact text values verbatim over visual estimates.
+   - 2nd Priority (Visual Evidence): Trust the image to identify ingredients, cooking styles, and realistic volume. Do not allow a custom dish to override what is clearly visible.
+   - 3rd Priority (Custom Dishes): Use the custom dishes library as a reference ONLY if there is a direct and unmistakable match to the visual or textual evidence. Never force a match across unrelated foods.${contextStr}
 
-4. CUSTOM DISHES SEMANTIC GUIDANCE:${contextStr ? `\n   - Prioritize the user's custom dishes list:${contextStr}\n   - Match names semantically and scale macronutrients proportionally to the requested portion size.` : `\n   - If known custom dishes are provided, prioritize matching them and scale macros proportionally to portion size.`}
+3. ITEMIZATION & REALISTIC DECOMPOSITION:
+   - For composite meals (e.g., burritos, pho, stir-fry), decompose into realistic individual ingredients in the "items" array. Include typical invisible cooking ingredients (e.g., fats, cooking oils, butter, sugar) when the preparation method implies them. Do not add phantom fats to plainly steamed, grilled, or raw items.
+   - For simple/single foods (e.g., an apple, a protein bar, black coffee, a scoop of whey), keep them as a single item in the "items" array without over-fragmenting them.
 
-5. MATHEMATICAL CONSISTENCY:
-   - Total calories, protein, carbs, fat, and fiber must equal the sum of the individual component items.
-   - Provide a clear mathematical explanation (e.g. "X kcal (item 1) + Y kcal (item 2) = Total kcal").
-   - Output strictly valid JSON matching the provided schema.`;
+4. REQUIRED OUTPUT FORMATTING & MATHEMATICAL INTEGRITY:
+   - 'name': Provide a clean, concise title for the overall meal (2-5 words, e.g., 'Vietnamese Beef Pho', 'Grilled Chicken Salad').
+   - 'serving_size' & 'serving_unit': Estimate the total net portion (e.g., 450, 'g' or 1, 'bowl').
+   - Atwater Consistency: Calories for each item MUST mathematically align with the standard macronutrient multipliers (roughly 4 kcal/g protein, 4 kcal/g carb, 9 kcal/g fat).
+   - Column Summation: The total top-level calories, protein, carbs, fat, and fiber must exactly sum the breakdown of the individual items array.
+   - 'explanation': Provide a concise formula showing summation (e.g., 'Beef (X kcal) + Noodles (Y kcal) + Broth (Z kcal) = Total kcal').`;
 
       let candidateModels: string[];
       let contents: any;
