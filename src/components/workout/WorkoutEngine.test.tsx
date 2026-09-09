@@ -1839,7 +1839,7 @@ describe('WorkoutEngine', () => {
 
     it('preserves active workout date across midnight rollover via pointer architecture (Bug 6)', async () => {
       // Set system clock to 23:50 on 2026-09-08
-      vi.setSystemTime(new Date('2026-09-08T23:50:00Z'));
+      vi.setSystemTime(new Date(2026, 8, 8, 23, 50, 0));
 
       const { unmount } = renderComponent();
       const dateInput = screen.getByTestId('workout-date-input') as HTMLInputElement;
@@ -1852,7 +1852,7 @@ describe('WorkoutEngine', () => {
       unmount();
 
       // Clock rolls over past midnight
-      vi.setSystemTime(new Date('2026-09-09T00:10:00Z'));
+      vi.setSystemTime(new Date(2026, 8, 9, 0, 10, 0));
       expect(getLocalDateStr(new Date())).toBe('2026-09-09');
 
       // Remount

@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../context/AuthContext';
 import { CoachProvider } from '../context/CoachContext';
 import { supabase } from '../lib/supabase';
-import { normalizeDateStr } from '../utils/ghostSets';
+import { getLocalDateStr } from '../utils/date';
 
 const { mockSession } = vi.hoisted(() => ({
   mockSession: {
@@ -949,7 +949,7 @@ Total Fiber: 1 g`;
   });
 
   it('opens Edit Meal modal from today\'s meal timeline and updates meal in supabase', async () => {
-    const todayStr = normalizeDateStr(new Date().toISOString());
+    const todayStr = getLocalDateStr(new Date());
     const mockMeal = {
       id: 'today-log-1',
       user_id: 'test-user-id',
@@ -1046,7 +1046,7 @@ Total Fiber: 1 g`;
   });
 
   it('displays error notification in Edit Meal modal when meal update fails', async () => {
-    const todayStr = normalizeDateStr(new Date().toISOString());
+    const todayStr = getLocalDateStr(new Date());
     const mockMeal = {
       id: 'today-log-2',
       user_id: 'test-user-id',
@@ -1110,7 +1110,7 @@ Total Fiber: 1 g`;
   });
 
   it('validates meal name is required and cancels without mutation in NutritionEngine', async () => {
-    const todayStr = normalizeDateStr(new Date().toISOString());
+    const todayStr = getLocalDateStr(new Date());
     const mockMeal = {
       id: 'today-log-3',
       user_id: 'test-user-id',
@@ -1177,7 +1177,7 @@ Total Fiber: 1 g`;
   });
 
   it('renders atomic remaining fuel badges with over-target badges when daily totals exceed targets', async () => {
-    const todayStr = normalizeDateStr(new Date().toISOString());
+    const todayStr = getLocalDateStr(new Date());
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'nutrition_logs') {
         return {
@@ -1235,7 +1235,7 @@ Total Fiber: 1 g`;
   });
 
   it('renders atomic remaining fuel badges with semantic glow styles when under budget', async () => {
-    const todayStr = normalizeDateStr(new Date().toISOString());
+    const todayStr = getLocalDateStr(new Date());
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'nutrition_logs') {
         return {
@@ -1293,6 +1293,140 @@ Total Fiber: 1 g`;
       expect(fibBadge.textContent).toBe('20g Fib');
       expect(fibBadge.className).toContain('text-teal-400');
     });
+  });
+
+  it('initializes selectedDate to local solar date in evening hours without shifting to UTC tomorrow', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 8, 8, 20, 30, 0));
+
+    try {
+      renderComponent();
+      await waitFor(() => {
+        const dateInput = screen.getByTestId('nutrition-date-input') as HTMLInputElement;
+        expect(dateInput.value).toBe('2026-09-08');
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('anchors logged meal timestamp to selectedDate and local evening time without manual date alteration', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 8, 8, 20, 30, 0));
+
+    const mockInsert = vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) });
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'custom_dishes') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({
+              data: [{ id: 'dish-evening-1', name: 'Grilled Salmon Bowl', calories: 620, protein: 45, carbs: 50, fat: 20 }],
+              error: null,
+            }),
+          }),
+        };
+      }
+      if (table === 'nutrition_logs') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
+          insert: mockInsert,
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
+        }),
+      };
+    });
+
+    try {
+      renderComponent();
+
+      // Verify that without manual date alteration, selectedDate initializes to 2026-09-08 in evening hours
+      await waitFor(() => {
+        const dateInput = screen.getByTestId('nutrition-date-input') as HTMLInputElement;
+        expect(dateInput.value).toBe('2026-09-08');
+        expect(screen.getByText('Grilled Salmon Bowl')).toBeDefined();
+      });
+
+      const quickLogBtn = screen.getByTitle('1-Tap Log Meal');
+      fireEvent.click(quickLogBtn);
+
+      await waitFor(() => {
+        expect(mockInsert).toHaveBeenCalled();
+      });
+
+      const payload = mockInsert.mock.calls[0][0][0];
+      expect(payload.food_name).toBe('Grilled Salmon Bowl');
+      expect(payload.logged_at).toBe('2026-09-08T20:30:00Z');
+      expect(payload.logged_at.startsWith('2026-09-08')).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('anchors logged meal timestamp to user-selected date when backfilling past dates', async () => {
+    const mockInsert = vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) });
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'custom_dishes') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({
+              data: [{ id: 'dish-evening-2', name: 'Steak & Rice', calories: 750, protein: 55, carbs: 60, fat: 25 }],
+              error: null,
+            }),
+          }),
+        };
+      }
+      if (table === 'nutrition_logs') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
+          insert: mockInsert,
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+
+    // Select past date 2026-09-05
+    const dateInput = screen.getByTestId('nutrition-date-input') as HTMLInputElement;
+    fireEvent.change(dateInput, { target: { value: '2026-09-05' } });
+    expect(dateInput.value).toBe('2026-09-05');
+
+    await waitFor(() => {
+      expect(screen.getByText('Steak & Rice')).toBeDefined();
+    });
+
+    const quickLogBtn = screen.getByTitle('1-Tap Log Meal');
+    fireEvent.click(quickLogBtn);
+
+    await waitFor(() => {
+      expect(mockInsert).toHaveBeenCalled();
+    });
+
+    const payload = mockInsert.mock.calls[0][0][0];
+    expect(payload.food_name).toBe('Steak & Rice');
+    expect(payload.logged_at).toMatch(/^2026-09-05T\d{2}:\d{2}:\d{2}Z$/);
+    expect(payload.logged_at.startsWith('2026-09-05')).toBe(true);
   });
 });
 

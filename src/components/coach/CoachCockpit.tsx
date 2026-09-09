@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useCoach } from '../../hooks/useCoach';
 import type { Exercise, RoutineTemplate } from '../../types/database';
 import { DEFAULT_EXERCISES_LIST } from '../../utils/ghostSets';
+import { formatShortDate } from '../../utils/date';
 import {
   Users,
   Shield,
@@ -222,7 +223,7 @@ export const CoachCockpit: React.FC = () => {
                 className="bg-zinc-950 border border-zinc-800/60 rounded-xl p-2.5 flex items-center justify-between text-xs font-mono"
               >
                 <span className="font-bold text-white">{w.name || 'Workout'}</span>
-                <span className="text-cyan-400">{w.date}</span>
+                <span className="text-cyan-400">{formatShortDate(w.date)}</span>
               </div>
             ))}
           </div>

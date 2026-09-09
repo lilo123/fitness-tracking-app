@@ -5,7 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useCoach } from '../../hooks/useCoach';
 import type { NutritionLog, CustomDish } from '../../types/database';
 import { MacroRing } from '../common/MacroRing';
-import { normalizeDateStr } from '../../utils/ghostSets';
+import { normalizeDateStr, getLocalDateStr, formatLocalTimestamp } from '../../utils/date';
 import { getDishIcon } from '../../utils/dishIcons';
 import { EditMealModal } from './EditMealModal';
 import { formatCalories, formatMacro, calculateRemainingFuel } from '../../utils/nutrition';
@@ -99,7 +99,7 @@ export const NutritionEngine: React.FC = () => {
   const [dishModalIngredients, setDishModalIngredients] = useState('');
 
   const [selectedDate, setSelectedDate] = useState<string>(() => {
-    return normalizeDateStr(new Date().toISOString());
+    return getLocalDateStr(new Date());
   });
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -523,7 +523,7 @@ export const NutritionEngine: React.FC = () => {
       meal_type: stagedMeal.mealType,
       serving_size: Number(stagedMeal.servingSize) || 1,
       serving_unit: stagedMeal.servingUnit || 'serving',
-      logged_at: `${selectedDate}T${new Date().toTimeString().slice(0, 8)}Z`,
+      logged_at: formatLocalTimestamp(selectedDate),
     };
     mutation.mutate(payload);
   };
@@ -670,7 +670,7 @@ export const NutritionEngine: React.FC = () => {
       meal_type: 'Breakfast',
       serving_size: 1,
       serving_unit: 'serving',
-      logged_at: `${selectedDate}T${new Date().toTimeString().slice(0, 8)}Z`,
+      logged_at: formatLocalTimestamp(selectedDate),
     };
     mutation.mutate(payload);
   };
@@ -689,7 +689,7 @@ export const NutritionEngine: React.FC = () => {
       meal_type: manualMealType,
       serving_size: Number(manualServingSize) || 1,
       serving_unit: manualServingUnit,
-      logged_at: `${selectedDate}T${new Date().toTimeString().slice(0, 8)}Z`,
+      logged_at: formatLocalTimestamp(selectedDate),
     };
 
     mutation.mutate(payload);
@@ -708,6 +708,7 @@ export const NutritionEngine: React.FC = () => {
           </div>
           <input
             type="date"
+            data-testid="nutrition-date-input"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
             className="bg-zinc-950 border border-zinc-800 text-cyan-400 rounded-xl px-2.5 py-1.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none cursor-pointer"

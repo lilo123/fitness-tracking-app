@@ -13,7 +13,7 @@ describe('Ghost Sets Algorithm & Benchmarks', () => {
   it('normalizes date strings correctly', () => {
     expect(normalizeDateStr('2026-09-01T12:00:00Z')).toBe('2026-09-01');
     expect(normalizeDateStr('2026-09-01')).toBe('2026-09-01');
-    expect(normalizeDateStr(new Date('2026-09-01T00:00:00Z'))).toBe('2026-09-01');
+    expect(normalizeDateStr(new Date(2026, 8, 1, 12, 0, 0))).toBe('2026-09-01');
     expect(normalizeDateStr('')).toBe('');
   });
 

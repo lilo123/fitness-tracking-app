@@ -179,4 +179,52 @@ describe('CoachCockpit', () => {
       expect(mockInsert).toHaveBeenCalled();
     });
   });
+
+  it('renders athlete recent workouts with formatted short dates', async () => {
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'workouts') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({
+                data: [
+                  { id: 'w-1', name: 'Push Day Alpha', date: '2026-09-08T00:00:00+00:00' },
+                  { id: 'w-2', name: 'Pull Day Bravo', date: '2026-09-06' },
+                ],
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({
+              data: [{ id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' }],
+              error: null,
+            }),
+            order: vi.fn().mockResolvedValue({
+              data: [{ id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' }],
+              error: null,
+            }),
+            single: vi.fn().mockResolvedValue({
+              data: { id: 'coach-id', email: 'coach@cybergym.io', username: 'Coach Duy', role: 'coach' },
+              error: null,
+            }),
+          }),
+          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+        }),
+      };
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('Push Day Alpha')).toBeDefined();
+    });
+
+    expect(screen.getByText('Sep 8')).toBeDefined();
+    expect(screen.getByText('Sep 6')).toBeDefined();
+  });
 });
