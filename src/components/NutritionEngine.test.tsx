@@ -1218,11 +1218,80 @@ Total Fiber: 1 g`;
     renderComponent();
 
     await waitFor(() => {
-      expect(screen.getByText('+300 kcal over')).toBeDefined();
-      expect(screen.getByText('+20g P over')).toBeDefined();
-      expect(screen.getByText('+30g C over')).toBeDefined();
-      expect(screen.getByText('+10g F over')).toBeDefined();
-      expect(screen.getByText('+5g Fib over')).toBeDefined();
+      const calBadge = screen.getByTestId('remaining-fuel-calories');
+      const pBadge = screen.getByTestId('remaining-fuel-protein');
+      const cBadge = screen.getByTestId('remaining-fuel-carbs');
+      const fBadge = screen.getByTestId('remaining-fuel-fat');
+      const fibBadge = screen.getByTestId('remaining-fuel-fiber');
+
+      expect(calBadge.textContent).toBe('+300 kcal over');
+      expect(calBadge.className).toContain('text-rose-400');
+      expect(pBadge.textContent).toBe('+20g P over');
+      expect(pBadge.className).toContain('text-rose-400');
+      expect(cBadge.textContent).toBe('+30g C over');
+      expect(fBadge.textContent).toBe('+10g F over');
+      expect(fibBadge.textContent).toBe('+5g Fib over');
+    });
+  });
+
+  it('renders atomic remaining fuel badges with semantic glow styles when under budget', async () => {
+    const todayStr = normalizeDateStr(new Date().toISOString());
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'nutrition_logs') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({
+                data: [
+                  {
+                    id: 'under-meal-1',
+                    food_name: 'Light Snack',
+                    calories: 500, // 2200 default - 500 = 1700 remaining
+                    protein: 40, // 160 default - 40 = 120 remaining
+                    carbs: 60, // 220 default - 60 = 160 remaining
+                    fat: 20, // 70 default - 20 = 50 remaining
+                    fiber: 10, // 30 default - 10 = 20 remaining
+                    logged_at: `${todayStr}T12:00:00Z`,
+                    meal_type: 'Snack',
+                    serving_size: 1,
+                    serving_unit: 'serving',
+                  },
+                ],
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      const calBadge = screen.getByTestId('remaining-fuel-calories');
+      const pBadge = screen.getByTestId('remaining-fuel-protein');
+      const cBadge = screen.getByTestId('remaining-fuel-carbs');
+      const fBadge = screen.getByTestId('remaining-fuel-fat');
+      const fibBadge = screen.getByTestId('remaining-fuel-fiber');
+
+      expect(calBadge.textContent).toBe('1700 kcal');
+      expect(calBadge.className).toContain('text-amber-400');
+      expect(pBadge.textContent).toBe('120g P');
+      expect(pBadge.className).toContain('text-cyan-400');
+      expect(cBadge.textContent).toBe('160g C');
+      expect(cBadge.className).toContain('text-emerald-400');
+      expect(fBadge.textContent).toBe('50g F');
+      expect(fBadge.className).toContain('text-violet-400');
+      expect(fibBadge.textContent).toBe('20g Fib');
+      expect(fibBadge.className).toContain('text-teal-400');
     });
   });
 });

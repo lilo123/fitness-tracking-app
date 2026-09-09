@@ -39,13 +39,13 @@ export interface RemainingFuel {
 }
 
 /**
- * Formats calorie values to whole integers, safely handling null/undefined/NaN,
- * negative zero, and minor floating-point drift.
+ * Formats calorie values to whole integers, safely handling null/undefined/NaN/Infinity,
+ * negative zero, string values, and minor floating-point drift.
  */
-export function formatCalories(val: number | null | undefined): string {
+export function formatCalories(val: number | string | null | undefined): string {
   if (val == null) return '0';
   const num = Number(val);
-  if (isNaN(num) || Math.abs(num) < 0.5) return '0';
+  if (isNaN(num) || !isFinite(num) || Math.abs(num) < 0.5) return '0';
   const sign = num < 0 ? -1 : 1;
   const rounded = sign * Math.round(Math.abs(num));
   if (rounded === 0 || Object.is(rounded, -0)) {
@@ -56,12 +56,12 @@ export function formatCalories(val: number | null | undefined): string {
 
 /**
  * Formats macronutrient values to at most 1 decimal place with trailing zeros stripped.
- * Sanitizes negative zero and near-zero drift (< 0.05 -> '0').
+ * Sanitizes negative zero, string values, non-finite values, and near-zero drift (< 0.05 -> '0').
  */
-export function formatMacro(val: number | null | undefined): string {
+export function formatMacro(val: number | string | null | undefined): string {
   if (val == null) return '0';
   const num = Number(val);
-  if (isNaN(num) || Math.abs(num) < 0.05) {
+  if (isNaN(num) || !isFinite(num) || Math.abs(num) < 0.05) {
     return '0';
   }
   const sign = num < 0 ? -1 : 1;
@@ -74,7 +74,7 @@ export function formatMacro(val: number | null | undefined): string {
 
 /**
  * Calculates remaining fuel across all 5 macronutrients compared against daily targets.
- * Handles IEEE-754 floating point arithmetic drift and over-budget states.
+ * Handles IEEE-754 floating point arithmetic drift, over-budget states, and partial inputs.
  *
  * For each macro, returns:
  * - rawDiff: target - current (positive when remaining, negative when over)
@@ -83,15 +83,20 @@ export function formatMacro(val: number | null | undefined): string {
  * - badgeLabel: "+X kcal over" / "+Xg P over" when over; "X kcal" / "Xg P" when remaining
  */
 export function calculateRemainingFuel(
-  dailyTotals: DailyMacroTotals,
-  targets: MacroTargets
+  dailyTotals?: Partial<DailyMacroTotals> | null,
+  targets?: Partial<MacroTargets> | null
 ): RemainingFuel {
+  const safeTotals = dailyTotals ?? {};
+  const safeTargets = targets ?? {};
+
   // Calorie calculation
-  const targetCal = targets.calories ?? targets.target_calories ?? 0;
-  const currentCal = dailyTotals.calories ?? 0;
+  const targetCal = Number(safeTargets.calories ?? safeTargets.target_calories) || 0;
+  const currentCal = Number(safeTotals.calories) || 0;
   let rawCalDiff = targetCal - currentCal;
   if (Math.abs(rawCalDiff) < 0.5 || Object.is(rawCalDiff, -0)) {
     rawCalDiff = 0;
+  } else {
+    rawCalDiff = Math.round(rawCalDiff);
   }
   const calOver = rawCalDiff < 0;
   const calAbs = Math.abs(rawCalDiff);
@@ -100,11 +105,13 @@ export function calculateRemainingFuel(
 
   // Helper for gram-based macronutrients
   const computeMacroFuel = (
-    current: number,
-    target: number,
+    current: number | string | null | undefined,
+    target: number | string | null | undefined,
     unitSuffix: string
   ): FuelItem => {
-    let diff = target - current;
+    const c = Number(current) || 0;
+    const t = Number(target) || 0;
+    let diff = t - c;
     // Sanitize near-zero drift (< 0.05) and negative zero
     if (Math.abs(diff) < 0.05 || Object.is(diff, -0)) {
       diff = 0;
@@ -127,26 +134,26 @@ export function calculateRemainingFuel(
   };
 
   const protein = computeMacroFuel(
-    dailyTotals.protein ?? 0,
-    targets.protein ?? targets.target_protein ?? 0,
+    safeTotals.protein,
+    safeTargets.protein ?? safeTargets.target_protein,
     'P'
   );
 
   const carbs = computeMacroFuel(
-    dailyTotals.carbs ?? 0,
-    targets.carbs ?? targets.target_carbs ?? 0,
+    safeTotals.carbs,
+    safeTargets.carbs ?? safeTargets.target_carbs,
     'C'
   );
 
   const fat = computeMacroFuel(
-    dailyTotals.fat ?? 0,
-    targets.fat ?? targets.target_fat ?? 0,
+    safeTotals.fat,
+    safeTargets.fat ?? safeTargets.target_fat,
     'F'
   );
 
   const fiber = computeMacroFuel(
-    dailyTotals.fiber ?? 0,
-    targets.fiber ?? targets.target_fiber ?? 0,
+    safeTotals.fiber,
+    safeTargets.fiber ?? safeTargets.target_fiber,
     'Fib'
   );
 

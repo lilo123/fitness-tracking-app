@@ -419,21 +419,21 @@ export const HistoryView: React.FC = () => {
                         <div
                           style={{ width: `${day.percentages.protein}%` }}
                           className="bg-cyan-400 transition-all duration-500"
-                          title={`Protein: ${day.percentages.protein}% (${day.macroCalories.protein} kcal)`}
+                          title={`Protein: ${day.percentages.protein}% (${formatCalories(day.macroCalories.protein)} kcal)`}
                         />
                       )}
                       {day.percentages.carbs > 0 && (
                         <div
                           style={{ width: `${day.percentages.carbs}%` }}
                           className="bg-emerald-400 transition-all duration-500"
-                          title={`Carbs: ${day.percentages.carbs}% (${day.macroCalories.carbs} kcal)`}
+                          title={`Carbs: ${day.percentages.carbs}% (${formatCalories(day.macroCalories.carbs)} kcal)`}
                         />
                       )}
                       {day.percentages.fat > 0 && (
                         <div
                           style={{ width: `${day.percentages.fat}%` }}
                           className="bg-violet-400 transition-all duration-500"
-                          title={`Fat: ${day.percentages.fat}% (${day.macroCalories.fat} kcal)`}
+                          title={`Fat: ${day.percentages.fat}% (${formatCalories(day.macroCalories.fat)} kcal)`}
                         />
                       )}
                     </div>

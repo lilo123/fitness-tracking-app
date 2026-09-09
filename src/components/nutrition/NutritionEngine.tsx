@@ -768,10 +768,14 @@ export const NutritionEngine: React.FC = () => {
         </div>
 
         {/* Daily Remaining Fuel Indicator */}
-        <div className="mt-3 pt-3 border-t border-zinc-800/80 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono">
+        <div
+          data-testid="remaining-fuel-container"
+          className="mt-3 pt-3 border-t border-zinc-800/80 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono"
+        >
           <span className="text-zinc-500 uppercase text-[10px] font-bold tracking-wider">Remaining Fuel:</span>
           <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
             <span
+              data-testid="remaining-fuel-calories"
               className={`px-2 py-0.5 rounded-lg border text-[11px] font-mono font-bold transition-all ${
                 remainingFuel.calories.isOver
                   ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
@@ -781,6 +785,7 @@ export const NutritionEngine: React.FC = () => {
               {remainingFuel.calories.badgeLabel}
             </span>
             <span
+              data-testid="remaining-fuel-protein"
               className={`px-2 py-0.5 rounded-lg border text-[11px] font-mono font-bold transition-all ${
                 remainingFuel.protein.isOver
                   ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
@@ -790,6 +795,7 @@ export const NutritionEngine: React.FC = () => {
               {remainingFuel.protein.badgeLabel}
             </span>
             <span
+              data-testid="remaining-fuel-carbs"
               className={`px-2 py-0.5 rounded-lg border text-[11px] font-mono font-bold transition-all ${
                 remainingFuel.carbs.isOver
                   ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
@@ -799,6 +805,7 @@ export const NutritionEngine: React.FC = () => {
               {remainingFuel.carbs.badgeLabel}
             </span>
             <span
+              data-testid="remaining-fuel-fat"
               className={`px-2 py-0.5 rounded-lg border text-[11px] font-mono font-bold transition-all ${
                 remainingFuel.fat.isOver
                   ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
@@ -808,6 +815,7 @@ export const NutritionEngine: React.FC = () => {
               {remainingFuel.fat.badgeLabel}
             </span>
             <span
+              data-testid="remaining-fuel-fiber"
               className={`px-2 py-0.5 rounded-lg border text-[11px] font-mono font-bold transition-all ${
                 remainingFuel.fiber.isOver
                   ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
@@ -859,8 +867,8 @@ export const NutritionEngine: React.FC = () => {
                     {dish.name}
                   </div>
                   <div className="text-[10px] font-mono text-zinc-400">
-                    <span className="text-amber-400 font-bold">{dish.calories || 0} kcal</span>
-                    <span> • {dish.protein || 0}g P</span>
+                    <span className="text-amber-400 font-bold">{formatCalories(dish.calories)} kcal</span>
+                    <span> • {formatMacro(dish.protein)}g P</span>
                   </div>
                 </div>
                 <button
@@ -980,10 +988,10 @@ export const NutritionEngine: React.FC = () => {
                         </span>
                       </div>
                       <div className="text-[11px] font-mono text-zinc-400 mt-0.5">
-                        <span className="text-amber-400 font-bold">{item.calories} kcal</span>
-                        <span> • P: {item.protein}g</span>
-                        <span> • C: {item.carbs}g</span>
-                        <span> • F: {item.fat}g</span>
+                        <span className="text-amber-400 font-bold">{formatCalories(item.calories)} kcal</span>
+                        <span> • P: {formatMacro(item.protein)}g</span>
+                        <span> • C: {formatMacro(item.carbs)}g</span>
+                        <span> • F: {formatMacro(item.fat)}g</span>
                       </div>
                     </div>
 
@@ -1152,7 +1160,7 @@ export const NutritionEngine: React.FC = () => {
                 <span>
                   {mutation.isPending
                     ? 'Logging...'
-                    : `Log Meal (+${stagedMeal.calories} kcal)`}
+                    : `Log Meal (+${formatCalories(stagedMeal.calories)} kcal)`}
                 </span>
               </button>
 
@@ -1585,7 +1593,7 @@ export const NutritionEngine: React.FC = () => {
                           <span>{dish.name}</span>
                         </div>
                         <div className="text-[10px] font-mono text-zinc-400 mt-0.5">
-                          {dish.calories} kcal • P: {dish.protein}g • C: {dish.carbs}g • F: {dish.fat}g • Fib: {dish.fiber || 0}g
+                          {formatCalories(dish.calories)} kcal • P: {formatMacro(dish.protein)}g • C: {formatMacro(dish.carbs)}g • F: {formatMacro(dish.fat)}g • Fib: {formatMacro(dish.fiber)}g
                         </div>
                       </div>
                       <div className="flex items-center gap-1">

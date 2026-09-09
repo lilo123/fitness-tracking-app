@@ -336,15 +336,15 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
           <div className="bg-zinc-950 border border-zinc-800/80 rounded-xl p-2.5 flex items-center justify-between text-[11px] font-mono text-zinc-400">
             <span>Summary:</span>
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-amber-400 font-bold">{formatCalories(Number(calories) || 0)} kcal</span>
+              <span className="text-amber-400 font-bold">{formatCalories(calories)} kcal</span>
               <span>•</span>
-              <span className="text-cyan-400">{formatMacro(Number(protein) || 0)}g P</span>
+              <span className="text-cyan-400">{formatMacro(protein)}g P</span>
               <span>•</span>
-              <span className="text-emerald-400">{formatMacro(Number(carbs) || 0)}g C</span>
+              <span className="text-emerald-400">{formatMacro(carbs)}g C</span>
               <span>•</span>
-              <span className="text-violet-400">{formatMacro(Number(fat) || 0)}g F</span>
+              <span className="text-violet-400">{formatMacro(fat)}g F</span>
               <span>•</span>
-              <span className="text-teal-400">{formatMacro(Number(fiber) || 0)}g Fib</span>
+              <span className="text-teal-400">{formatMacro(fiber)}g Fib</span>
             </div>
           </div>
 

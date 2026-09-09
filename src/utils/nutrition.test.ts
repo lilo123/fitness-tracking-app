@@ -21,10 +21,20 @@ describe('nutrition utility', () => {
       expect(formatCalories(-0.4)).toBe('0');
     });
 
-    it('handles null, undefined, and NaN gracefully', () => {
+    it('handles null, undefined, NaN, and non-finite values gracefully', () => {
       expect(formatCalories(null)).toBe('0');
       expect(formatCalories(undefined)).toBe('0');
       expect(formatCalories(NaN)).toBe('0');
+      expect(formatCalories(Infinity)).toBe('0');
+      expect(formatCalories(-Infinity)).toBe('0');
+    });
+
+    it('handles string number inputs and invalid strings gracefully', () => {
+      expect(formatCalories('2200')).toBe('2200');
+      expect(formatCalories('2199.6')).toBe('2200');
+      expect(formatCalories(' 45 ')).toBe('45');
+      expect(formatCalories('')).toBe('0');
+      expect(formatCalories('invalid')).toBe('0');
     });
 
     it('formats negative calorie values correctly', () => {
@@ -69,10 +79,20 @@ describe('nutrition utility', () => {
       expect(formatMacro(-0.05)).toBe('-0.1');
     });
 
-    it('handles null, undefined, and NaN gracefully', () => {
+    it('handles null, undefined, NaN, and non-finite values gracefully', () => {
       expect(formatMacro(null)).toBe('0');
       expect(formatMacro(undefined)).toBe('0');
       expect(formatMacro(NaN)).toBe('0');
+      expect(formatMacro(Infinity)).toBe('0');
+      expect(formatMacro(-Infinity)).toBe('0');
+    });
+
+    it('handles string inputs and invalid strings gracefully', () => {
+      expect(formatMacro('160')).toBe('160');
+      expect(formatMacro('12.54')).toBe('12.5');
+      expect(formatMacro('12.0')).toBe('12');
+      expect(formatMacro('')).toBe('0');
+      expect(formatMacro('invalid')).toBe('0');
     });
 
     it('formats negative macro values correctly', () => {
@@ -242,6 +262,44 @@ describe('nutrition utility', () => {
       expect(result.carbs.badgeLabel).toBe('50g C');
       expect(result.fat.badgeLabel).toBe('15g F');
       expect(result.fiber.badgeLabel).toBe('8g Fib');
+    });
+
+    it('rounds raw calorie diff to integer without floating point fractional artifacts', () => {
+      const dailyTotals = {
+        calories: 1849.6, // 2000 - 1849.6 = 150.4 -> rounds to 150
+        protein: 100,
+        carbs: 150,
+        fat: 50,
+        fiber: 20,
+      };
+      const targets = {
+        calories: 2000,
+        protein: 150,
+        carbs: 200,
+        fat: 65,
+        fiber: 28,
+      };
+
+      const result = calculateRemainingFuel(dailyTotals, targets);
+      expect(result.calories.rawDiff).toBe(150);
+      expect(result.calories.formattedValue).toBe('150');
+      expect(result.calories.badgeLabel).toBe('150 kcal');
+    });
+
+    it('handles null, undefined, and partial inputs gracefully without throwing', () => {
+      const resultNull = calculateRemainingFuel(null, null);
+      expect(resultNull.calories.rawDiff).toBe(0);
+      expect(resultNull.calories.formattedValue).toBe('0');
+      expect(resultNull.calories.isOver).toBe(false);
+      expect(resultNull.calories.badgeLabel).toBe('0 kcal');
+      expect(resultNull.protein.badgeLabel).toBe('0g P');
+
+      const resultPartial = calculateRemainingFuel({}, {});
+      expect(resultPartial.calories.rawDiff).toBe(0);
+      expect(resultPartial.protein.rawDiff).toBe(0);
+      expect(resultPartial.carbs.rawDiff).toBe(0);
+      expect(resultPartial.fat.rawDiff).toBe(0);
+      expect(resultPartial.fiber.rawDiff).toBe(0);
     });
   });
 });
