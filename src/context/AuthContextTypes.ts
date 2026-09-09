@@ -7,12 +7,14 @@ export interface AuthContextType {
   profile: UserProfile | null;
   role: UserRole;
   viewMode: UserRole;
+  isCoachMode: boolean;
   loading: boolean;
   signIn: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   signUp: (email: string, password?: string, role?: UserRole) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<{ success: boolean; error?: string }>;
   switchRole: (newRole: UserRole) => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);

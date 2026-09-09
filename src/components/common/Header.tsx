@@ -1,32 +1,12 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { useCoach } from '../../hooks/useCoach';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
-import { Zap, Shield, Users, UserPlus, LogOut } from 'lucide-react';
+import { Zap, Shield, LogOut } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const { user, profile, role, signOut, switchRole } = useAuth();
-  const { isCoach, selectedAthleteId, switchAthlete, athletes, addAthlete } = useCoach();
   const isOnline = useOnlineStatus();
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newAthleteName, setNewAthleteName] = useState('');
-  const [newAthleteEmail, setNewAthleteEmail] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const handleAddAthlete = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newAthleteName.trim()) return;
-    setIsSubmitting(true);
-    try {
-      await addAthlete(newAthleteName, newAthleteEmail);
-      setNewAthleteName('');
-      setNewAthleteEmail('');
-      setShowAddModal(false);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const isVerifiedCoach = profile?.role === 'coach';
 
@@ -120,103 +100,6 @@ export const Header: React.FC = () => {
           )}
         </div>
       </div>
-
-      {/* Coach Athlete Selector */}
-      {isCoach && (
-        <div className="max-w-4xl mx-auto mt-2.5 pt-2.5 border-t border-zinc-800/80 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-1 shadow-inner">
-            <Users className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-              Athlete:
-            </span>
-            <select
-              value={selectedAthleteId}
-              onChange={(e) => switchAthlete(e.target.value)}
-              className="bg-transparent text-white text-base sm:text-xs font-extrabold outline-none cursor-pointer"
-              data-testid="coach-athlete-select"
-            >
-              {athletes.length === 0 ? (
-                <option value="" disabled className="bg-zinc-900 text-zinc-500">
-                  No athletes yet
-                </option>
-              ) : (
-                athletes.map((ath) => (
-                  <option key={ath.id} value={ath.id} className="bg-zinc-900 text-white">
-                    {ath.name}
-                  </option>
-                ))
-              )}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold px-3 py-1.5 min-h-[36px] rounded-xl transition flex items-center gap-1.5 border border-zinc-700"
-            >
-              <UserPlus className="w-3.5 h-3.5 text-cyan-400" />
-              <span>+ Athlete</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Add Athlete Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl">
-            <h3 className="text-base font-black text-white mb-2 flex items-center gap-2">
-              <UserPlus className="w-4 h-4 text-cyan-400" /> Add Athlete
-            </h3>
-            <p className="text-xs text-zinc-400 mb-4">
-              Add a new athlete to track their workouts and nutrition.
-            </p>
-            <form onSubmit={handleAddAthlete} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-zinc-400 uppercase mb-1">
-                  Athlete Name
-                </label>
-                <input
-                  type="text"
-                  value={newAthleteName}
-                  onChange={(e) => setNewAthleteName(e.target.value)}
-                  placeholder="e.g. Sarah Connor"
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-base sm:text-sm outline-none focus:border-cyan-500"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-zinc-400 uppercase mb-1">
-                  Athlete Email <span className="text-zinc-500 font-normal">(Optional)</span>
-                </label>
-                <input
-                  type="email"
-                  value={newAthleteEmail}
-                  onChange={(e) => setNewAthleteEmail(e.target.value)}
-                  placeholder="e.g. sarah@example.com"
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-base sm:text-sm outline-none focus:border-cyan-500"
-                />
-              </div>
-              <div className="flex gap-2 justify-end">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-bold text-zinc-400 hover:bg-zinc-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting || !newAthleteName.trim()}
-                  className="px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black shadow-neon-cyan font-black"
-                >
-                  {isSubmitting ? 'Creating...' : 'Create Athlete'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </header>
   );
 };

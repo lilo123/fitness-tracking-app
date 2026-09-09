@@ -11,7 +11,22 @@ export interface UserProfile {
   target_fat: number;
   target_fiber?: number;
   auto_rest_timer?: boolean;
+  is_coach_mode?: boolean;
+  coach_code?: string | null;
+  coach_tier?: 'free' | 'pro' | 'enterprise';
+  max_athletes?: number;
   created_at?: string;
+}
+
+export interface CoachAthleteLink {
+  id: string;
+  coach_id: string;
+  athlete_id: string;
+  status: 'active' | 'disconnected';
+  linked_at: string;
+  disconnected_at?: string | null;
+  coach?: UserProfile;
+  athlete?: UserProfile;
 }
 
 export interface Exercise {

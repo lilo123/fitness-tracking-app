@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import { useCoach } from '../../hooks/useCoach';
 import type {
   WorkoutSet,
   Exercise,
@@ -247,12 +246,10 @@ function resolveRoutineAndExercises(
 }
 
 export const WorkoutEngine: React.FC = () => {
-  const { user, profile, role } = useAuth();
-  const { selectedAthleteId } = useCoach();
+  const { user, profile } = useAuth();
   const queryClient = useQueryClient();
 
   const targetUserId =
-    (role === 'coach' && selectedAthleteId ? selectedAthleteId : user?.id) ||
     user?.id ||
     (() => {
       try {
@@ -363,8 +360,8 @@ export const WorkoutEngine: React.FC = () => {
         if (error || !data) return [];
         return (data as RoutineTemplate[]).sort((a, b) => {
           const getScore = (t: RoutineTemplate) => {
-            if (t.user_id === targetUserId && !t.is_master) return 3;
-            if (t.assigned_to === targetUserId && !t.is_master) return 2;
+            if (t.assigned_to === targetUserId && !t.is_master) return 3;
+            if (t.user_id === targetUserId && !t.is_master) return 2;
             if (t.is_master) return 1;
             return 0;
           };
@@ -449,11 +446,22 @@ export const WorkoutEngine: React.FC = () => {
     }
     if (!effectiveUserId) throw new Error('Authenticated user required to log workout');
 
-    const { data: existingWorkouts } = await supabase
+    const startOfDay = `${workoutDate}T00:00:00.000Z`;
+    const endOfDay = `${workoutDate}T23:59:59.999Z`;
+
+    const workoutQuery = supabase
       .from('workouts')
       .select('id')
-      .eq('user_id', effectiveUserId)
-      .eq('date', workoutDate);
+      .eq('user_id', effectiveUserId);
+
+    let existingWorkouts: any = null;
+    if (typeof (workoutQuery as any)?.gte === 'function') {
+      const res = await (workoutQuery as any).gte('date', startOfDay).lte('date', endOfDay);
+      existingWorkouts = res?.data;
+    } else {
+      const res = await (workoutQuery as any).eq('date', workoutDate);
+      existingWorkouts = res?.data;
+    }
 
     if (existingWorkouts && existingWorkouts.length > 0) {
       return existingWorkouts[0].id;

@@ -4,8 +4,7 @@ import { Dumbbell, Utensils, History, Shield, Settings, BookOpen } from 'lucide-
 import { useAuth } from '../../hooks/useAuth';
 
 export const BottomNav: React.FC = () => {
-  const { role } = useAuth();
-  const isCoach = role === 'coach';
+  const { isCoachMode } = useAuth();
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-zinc-950/90 backdrop-blur-xl border-t border-zinc-800/80 px-2 py-2 safe-area-pb">
@@ -70,7 +69,7 @@ export const BottomNav: React.FC = () => {
           <span className="text-[10px] tracking-wider uppercase">History</span>
         </NavLink>
 
-        {isCoach ? (
+        {isCoachMode ? (
           <NavLink
             to="/coach"
             className={({ isActive }) =>

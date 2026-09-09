@@ -7,8 +7,8 @@ const isValidUuid = (id: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
 export const CoachProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, profile, role } = useAuth();
-  const isCoach = role === 'coach';
+  const { user, profile, isCoachMode } = useAuth();
+  const isCoach = isCoachMode;
 
   const [athletes, setAthletes] = useState<AthleteInfo[]>(() => {
     const saved = localStorage.getItem('cybergym_athletes');
@@ -34,26 +34,36 @@ export const CoachProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
 
   const selectedAthleteId = isCoach
-    ? (coachSelectedAthleteId || athletes[0]?.id || user?.id || '')
+    ? (athletes.some((a) => a.id === coachSelectedAthleteId)
+        ? coachSelectedAthleteId
+        : (athletes[0]?.id || ''))
     : (user?.id || '');
 
+  const userId = user?.id;
+
   const refreshAthletes = useCallback(async () => {
+    if (!userId) return;
     try {
       const { data, error } = await supabase
-        .from('users')
-        .select('id, username, email, role, created_at')
-        .eq('role', 'athlete')
-        .order('created_at', { ascending: false });
+        .from('coach_athlete_links')
+        .select('athlete_id, status, linked_at, athlete:users!athlete_id(id, username, email, role, created_at)')
+        .eq('coach_id', userId)
+        .eq('status', 'active')
+        .order('linked_at', { ascending: false });
 
       if (data && !error && Array.isArray(data)) {
-        if (data.length > 0) {
-          const fetchedAthletes: AthleteInfo[] = data.map((u: any) => ({
-            id: u.id,
-            name: u.username || u.email?.split('@')[0] || 'Athlete',
-            email: u.email || '',
-            status: 'Active',
-            last_active: u.created_at,
-          }));
+        const validRows = data.filter((row: any) => Boolean(row.athlete));
+        if (validRows.length > 0) {
+          const fetchedAthletes: AthleteInfo[] = validRows.map((row: any) => {
+            const u = row.athlete;
+            return {
+              id: u.id,
+              name: u.username || u.email?.split('@')[0] || 'Athlete',
+              email: u.email || '',
+              status: 'Active',
+              last_active: row.linked_at || u.created_at,
+            };
+          });
           setAthletes(fetchedAthletes);
           localStorage.setItem('cybergym_athletes', JSON.stringify(fetchedAthletes));
 
@@ -73,53 +83,13 @@ export const CoachProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch {
       // Keep local list
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
-    let active = true;
-    if (isCoach) {
-      (async () => {
-        try {
-          const res = await supabase
-            .from('users')
-            .select('id, username, email, role, created_at')
-            .eq('role', 'athlete')
-            .order('created_at', { ascending: false });
-
-          if (active && res && res.data && !res.error && Array.isArray(res.data)) {
-            if (res.data.length > 0) {
-              const fetchedAthletes: AthleteInfo[] = res.data.map((u: any) => ({
-                id: u.id,
-                name: u.username || u.email?.split('@')[0] || 'Athlete',
-                email: u.email || '',
-                status: 'Active',
-                last_active: u.created_at,
-              }));
-              setAthletes(fetchedAthletes);
-              localStorage.setItem('cybergym_athletes', JSON.stringify(fetchedAthletes));
-
-              setCoachSelectedAthleteId((prev) => {
-                if (prev && fetchedAthletes.some((a) => a.id === prev)) return prev;
-                const firstId = fetchedAthletes[0]?.id || '';
-                if (firstId) localStorage.setItem('cybergym_selected_athlete', firstId);
-                return firstId;
-              });
-            } else {
-              setAthletes([]);
-              setCoachSelectedAthleteId('');
-              localStorage.removeItem('cybergym_athletes');
-              localStorage.removeItem('cybergym_selected_athlete');
-            }
-          }
-        } catch {
-          // Keep default list
-        }
-      })();
+    if (isCoach && userId) {
+      refreshAthletes();
     }
-    return () => {
-      active = false;
-    };
-  }, [isCoach]);
+  }, [isCoach, userId, refreshAthletes]);
 
   const switchAthlete = (athleteId: string) => {
     setCoachSelectedAthleteId(athleteId);

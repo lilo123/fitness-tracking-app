@@ -14,6 +14,8 @@ import {
   CheckCircle2,
   Calendar,
   Layers,
+  Target,
+  AlertCircle,
 } from 'lucide-react';
 
 export const CoachCockpit: React.FC = () => {
@@ -69,6 +71,7 @@ export const CoachCockpit: React.FC = () => {
   // Fetch athlete summary (recent workouts count)
   const { data: athleteWorkouts = [] } = useQuery({
     queryKey: ['athlete_workouts_summary', selectedAthleteId],
+    enabled: Boolean(selectedAthleteId) && selectedAthleteId.length > 0,
     queryFn: async () => {
       try {
         const { data, error } = await supabase
@@ -83,6 +86,68 @@ export const CoachCockpit: React.FC = () => {
       }
     },
   });
+
+  // Athlete Macro Targets State & Query
+  const [athleteCal, setAthleteCal] = useState<number | string>('');
+  const [athletePro, setAthletePro] = useState<number | string>('');
+  const [athleteCarb, setAthleteCarb] = useState<number | string>('');
+  const [athleteFat, setAthleteFat] = useState<number | string>('');
+  const [athleteFiber, setAthleteFiber] = useState<number | string>('');
+  const [macroStatus, setMacroStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [isUpdatingMacros, setIsUpdatingMacros] = useState(false);
+
+  const { data: athleteProfile, refetch: refetchAthleteProfile } = useQuery({
+    queryKey: ['athlete_profile', selectedAthleteId],
+    enabled: Boolean(selectedAthleteId) && selectedAthleteId.length > 0,
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('id, username, email, target_calories, target_protein, target_carbs, target_fat, target_fiber')
+          .eq('id', selectedAthleteId)
+          .single();
+        if (error || !data) return null;
+        return data;
+      } catch {
+        return null;
+      }
+    },
+  });
+
+  React.useEffect(() => {
+    if (athleteProfile) {
+      setAthleteCal(athleteProfile.target_calories ?? 2200);
+      setAthletePro(athleteProfile.target_protein ?? 160);
+      setAthleteCarb(athleteProfile.target_carbs ?? 220);
+      setAthleteFat(athleteProfile.target_fat ?? 70);
+      setAthleteFiber(athleteProfile.target_fiber ?? 30);
+    }
+  }, [athleteProfile]);
+
+  const handleUpdateAthleteMacros = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAthleteId) return;
+    setIsUpdatingMacros(true);
+    setMacroStatus(null);
+    try {
+      const { error } = await supabase.rpc('update_athlete_macros', {
+        p_athlete_id: selectedAthleteId,
+        p_calories: Number(athleteCal),
+        p_protein: Number(athletePro),
+        p_carbs: Number(athleteCarb),
+        p_fat: Number(athleteFat),
+        p_fiber: Number(athleteFiber),
+      });
+      if (error) throw error;
+      setMacroStatus({ type: 'success', message: 'Athlete nutrition targets updated!' });
+      refetchAthleteProfile();
+      queryClient.invalidateQueries({ queryKey: ['athlete_profile', selectedAthleteId] });
+    } catch (err: any) {
+      setMacroStatus({ type: 'error', message: err?.message || 'Failed to update targets' });
+    } finally {
+      setIsUpdatingMacros(false);
+    }
+  };
 
   // Create template mutation
   const createTemplateMutation = useMutation({
@@ -229,6 +294,132 @@ export const CoachCockpit: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Selected Athlete Nutrition Targets Card */}
+      {selectedAthleteId && (
+        <form
+          onSubmit={handleUpdateAthleteMacros}
+          className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-5 shadow-2xl space-y-4"
+        >
+          <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+            <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+              <Target className="w-4 h-4 text-cyan-400" />
+              Athlete Nutrition Targets: {selectedAthlete?.name}
+            </h3>
+            <span className="text-[10px] uppercase font-bold text-zinc-500">Coach Override</span>
+          </div>
+
+          <p className="text-xs text-zinc-400">
+            Set daily caloric and macronutrient goals for this athlete. Changes update their dashboard in real time.
+          </p>
+
+          <div className="grid grid-cols-5 gap-2 sm:gap-3">
+            <div>
+              <label className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">
+                Calories
+              </label>
+              <input
+                type="number"
+                inputMode="numeric"
+                min="0"
+                value={athleteCal}
+                onChange={(e) => setAthleteCal(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+                data-testid="athlete-macro-cal"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-1">
+                Protein (g)
+              </label>
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                value={athletePro}
+                onChange={(e) => setAthletePro(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+                data-testid="athlete-macro-pro"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">
+                Carbs (g)
+              </label>
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                value={athleteCarb}
+                onChange={(e) => setAthleteCarb(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+                data-testid="athlete-macro-carb"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-violet-400 uppercase tracking-wider mb-1">
+                Fat (g)
+              </label>
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                value={athleteFat}
+                onChange={(e) => setAthleteFat(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+                data-testid="athlete-macro-fat"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-teal-400 uppercase tracking-wider mb-1">
+                Fiber (g)
+              </label>
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                value={athleteFiber}
+                onChange={(e) => setAthleteFiber(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+                data-testid="athlete-macro-fiber"
+                required
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={isUpdatingMacros}
+            className="w-full bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 text-cyan-300 font-bold py-3 min-h-[44px] rounded-xl uppercase tracking-wider text-xs shadow-neon-cyan transition disabled:opacity-50 touch-manipulation flex items-center justify-center gap-2"
+            data-testid="update-athlete-macros-btn"
+          >
+            <Target className="w-4 h-4" />
+            {isUpdatingMacros ? 'Updating Targets...' : 'Update Athlete Targets'}
+          </button>
+
+          {macroStatus && (
+            <div
+              data-testid="athlete-macro-status"
+              className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
+                macroStatus.type === 'error'
+                  ? 'bg-rose-500/15 border border-rose-500/30 text-rose-300'
+                  : 'bg-cyan-500/15 border border-cyan-500/30 text-cyan-300'
+              }`}
+            >
+              {macroStatus.type === 'error' ? (
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+              )}
+              <span>{macroStatus.message}</span>
+            </div>
+          )}
+        </form>
+      )}
 
       {/* Routine Template Builder */}
       <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-5 shadow-2xl space-y-4">

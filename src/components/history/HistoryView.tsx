@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import { useCoach } from '../../hooks/useCoach';
 import type { WorkoutSet, Exercise, NutritionLog } from '../../types/database';
 import {
   normalizeDateStr,
@@ -20,10 +19,9 @@ const CATEGORIES = ['All', 'Chest', 'Back', 'Arms', 'Shoulders', 'Legs', 'Core']
 
 export const HistoryView: React.FC = () => {
   const { user } = useAuth();
-  const { selectedAthleteId } = useCoach();
   const queryClient = useQueryClient();
 
-  const targetUserId = selectedAthleteId || user?.id || '';
+  const targetUserId = user?.id || '';
 
   const [historyDomain, setHistoryDomain] = useState<'workouts' | 'nutrition'>('workouts');
   const [viewMode, setViewMode] = useState<'session' | 'exercise'>('session');

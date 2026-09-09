@@ -44,12 +44,12 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
 // Guard for Coach-only routes
 const CoachRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, role, loading } = useAuth();
+  const { user, isCoachMode, loading } = useAuth();
   if (loading) return null;
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-  if (role !== 'coach') {
+  if (!isCoachMode) {
     return <Navigate to="/workout" replace />;
   }
   return <>{children}</>;
@@ -57,10 +57,10 @@ const CoachRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 // Guard for Login route when already authenticated
 const PublicOnlyRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, role, loading } = useAuth();
+  const { user, isCoachMode, loading } = useAuth();
   if (loading) return null;
   if (user) {
-    return <Navigate to={role === 'coach' ? '/coach' : '/workout'} replace />;
+    return <Navigate to={isCoachMode ? '/coach' : '/workout'} replace />;
   }
   return <>{children}</>;
 };

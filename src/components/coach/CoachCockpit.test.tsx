@@ -15,6 +15,7 @@ const { mockSession } = vi.hoisted(() => ({
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: vi.fn(),
+    rpc: vi.fn().mockResolvedValue({ data: { success: true }, error: null }),
     auth: {
       getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'coach-id' } } }),
       getSession: vi.fn().mockResolvedValue({ data: { session: mockSession } }),
@@ -32,18 +33,44 @@ describe('CoachCockpit', () => {
     (supabase.auth.getSession as any).mockResolvedValue({ data: { session: mockSession } });
     (supabase.auth.onAuthStateChange as any).mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } });
 
+    const athleteLinksData = [
+      {
+        athlete_id: 'ath-1',
+        status: 'active',
+        linked_at: '2026-09-01T00:00:00Z',
+        athlete: { id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' },
+      },
+    ];
+
     const mockSelect = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue({
-          data: [{ id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' }],
-          error: null,
+        eq: vi.fn().mockReturnValue({
+          order: vi.fn().mockResolvedValue({
+            data: athleteLinksData,
+            error: null,
+          }),
+          single: vi.fn().mockResolvedValue({
+            data: athleteLinksData[0],
+            error: null,
+          }),
         }),
         order: vi.fn().mockResolvedValue({
           data: [{ id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' }],
           error: null,
         }),
         single: vi.fn().mockResolvedValue({
-          data: { id: 'coach-id', email: 'coach@cybergym.io', username: 'Coach Duy', role: 'coach' },
+          data: {
+            id: 'coach-id',
+            email: 'coach@cybergym.io',
+            username: 'Coach Duy',
+            role: 'coach',
+            is_coach_mode: true,
+            target_calories: 2200,
+            target_protein: 160,
+            target_carbs: 220,
+            target_fat: 70,
+            target_fiber: 30,
+          },
           error: null,
         }),
       }),
@@ -197,19 +224,27 @@ describe('CoachCockpit', () => {
           }),
         };
       }
+      const athleteLinksData = [
+        {
+          athlete_id: 'ath-1',
+          status: 'active',
+          linked_at: '2026-09-01T00:00:00Z',
+          athlete: { id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' },
+        },
+      ];
       return {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({
-              data: [{ id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' }],
-              error: null,
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: athleteLinksData, error: null }),
+              single: vi.fn().mockResolvedValue({ data: athleteLinksData[0], error: null }),
             }),
             order: vi.fn().mockResolvedValue({
               data: [{ id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' }],
               error: null,
             }),
             single: vi.fn().mockResolvedValue({
-              data: { id: 'coach-id', email: 'coach@cybergym.io', username: 'Coach Duy', role: 'coach' },
+              data: { id: 'coach-id', email: 'coach@cybergym.io', username: 'Coach Duy', role: 'coach', is_coach_mode: true },
               error: null,
             }),
           }),
@@ -226,5 +261,41 @@ describe('CoachCockpit', () => {
 
     expect(screen.getByText('Sep 8')).toBeDefined();
     expect(screen.getByText('Sep 6')).toBeDefined();
+  });
+
+  it('allows coach to view and update athlete macro targets via update_athlete_macros RPC', async () => {
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText(/Athlete Nutrition Targets: Alex Johnson/i)).toBeDefined();
+    });
+
+    const calInput = await screen.findByDisplayValue('2200');
+    const proInput = screen.getByTestId('athlete-macro-pro');
+    const carbInput = screen.getByTestId('athlete-macro-carb');
+    const fatInput = screen.getByTestId('athlete-macro-fat');
+    const fiberInput = screen.getByTestId('athlete-macro-fiber');
+
+    fireEvent.change(calInput, { target: { value: '2500' } });
+    fireEvent.change(proInput, { target: { value: '190' } });
+    fireEvent.change(carbInput, { target: { value: '250' } });
+    fireEvent.change(fatInput, { target: { value: '75' } });
+    fireEvent.change(fiberInput, { target: { value: '35' } });
+
+    const updateBtn = screen.getByTestId('update-athlete-macros-btn');
+    fireEvent.click(updateBtn);
+
+    await waitFor(() => {
+      expect(supabase.rpc).toHaveBeenCalledWith('update_athlete_macros', {
+        p_athlete_id: 'ath-1',
+        p_calories: 2500,
+        p_protein: 190,
+        p_carbs: 250,
+        p_fat: 75,
+        p_fiber: 35,
+      });
+    });
+
+    expect(await screen.findByText('Athlete nutrition targets updated!')).toBeDefined();
   });
 });

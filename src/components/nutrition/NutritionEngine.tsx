@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import { useCoach } from '../../hooks/useCoach';
 import type { NutritionLog, CustomDish } from '../../types/database';
 import { MacroRing } from '../common/MacroRing';
 import { normalizeDateStr, getLocalDateStr, formatLocalTimestamp } from '../../utils/date';
@@ -64,11 +63,10 @@ function generateItemId(): string {
 }
 
 export const NutritionEngine: React.FC = () => {
-  const { user, profile, role } = useAuth();
-  const { selectedAthleteId } = useCoach();
+  const { user, profile } = useAuth();
   const queryClient = useQueryClient();
 
-  const targetUserId = (role === 'coach' && selectedAthleteId ? selectedAthleteId : user?.id) || user?.id || '';
+  const targetUserId = user?.id || '';
 
   // Input & Staged State
   const [nlInput, setNlInput] = useState('');

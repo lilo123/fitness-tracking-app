@@ -33,7 +33,7 @@ export const ExercisesView: React.FC = () => {
   const { selectedAthleteId, isCoach } = useCoach();
   const queryClient = useQueryClient();
 
-  const targetUserId = selectedAthleteId || user?.id || '';
+  const targetUserId = user?.id || '';
 
   const [activeTab, setActiveTab] = useState<'exercises' | 'templates'>('exercises');
 
@@ -77,14 +77,14 @@ export const ExercisesView: React.FC = () => {
       if (error) throw error;
       if (!data) return [];
       // Deterministic precedence sort:
-      // Rank 3: User custom routines (user_id === targetUserId && !is_master)
-      // Rank 2: Coach-assigned routines (assigned_to === targetUserId && !is_master)
+      // Rank 3: Coach-assigned routines (assigned_to === targetUserId && !is_master)
+      // Rank 2: User custom routines (user_id === targetUserId && !is_master)
       // Rank 1: Master catalog routines (is_master === true)
       // Tie-breaker: newest created_at descending
       return (data as RoutineTemplate[]).sort((a, b) => {
         const getScore = (t: RoutineTemplate) => {
-          if (t.user_id === targetUserId && !t.is_master) return 3;
-          if (t.assigned_to === targetUserId && !t.is_master) return 2;
+          if (t.assigned_to === targetUserId && !t.is_master) return 3;
+          if (t.user_id === targetUserId && !t.is_master) return 2;
           if (t.is_master) return 1;
           return 0;
         };

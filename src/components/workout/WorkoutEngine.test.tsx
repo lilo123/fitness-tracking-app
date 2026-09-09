@@ -63,6 +63,9 @@ describe('WorkoutEngine', () => {
         eq: vi.fn().mockResolvedValue({ data: [], error: null }),
         order: vi.fn().mockResolvedValue({ data: [], error: null }),
         single: vi.fn().mockResolvedValue({ data: null, error: null }),
+        gte: vi.fn().mockReturnValue({
+          lte: vi.fn().mockResolvedValue({ data: [], error: null }),
+        }),
       }),
       order: vi.fn().mockResolvedValue({ data: [], error: null }),
       or: vi.fn().mockResolvedValue({ data: [], error: null }),
@@ -1865,13 +1868,13 @@ describe('WorkoutEngine', () => {
       });
     });
 
-    it('isolates session drafts strictly by target athlete in Coach mode (Bug 7)', async () => {
+    it('isolates personal workout session drafts strictly to authenticated user regardless of coach context athlete switching (Bug 7 reconciled)', async () => {
       const athleteAId = '11111111-1111-4111-8111-111111111111';
       const athleteBId = '22222222-2222-4222-8222-222222222222';
 
       localStorage.setItem(
         'cybergym_user',
-        JSON.stringify({ id: 'coach-id', email: 'coach@example.com', role: 'coach' })
+        JSON.stringify({ id: 'coach-id', email: 'coach@example.com', role: 'coach', is_coach_mode: true })
       );
       localStorage.setItem('cybergym_view_mode', 'coach');
       localStorage.setItem(
@@ -1895,23 +1898,37 @@ describe('WorkoutEngine', () => {
                 if (col === 'id') {
                   return {
                     single: vi.fn().mockResolvedValue({
-                      data: { id: 'coach-id', email: 'coach@example.com', role: 'coach', auto_rest_timer: true },
-                      error: null,
-                    }),
-                  };
-                }
-                if (col === 'role') {
-                  return {
-                    order: vi.fn().mockResolvedValue({
-                      data: [
-                        { id: athleteAId, username: 'Athlete A', email: 'a@example.com', role: 'athlete', created_at: '2026-09-01' },
-                        { id: athleteBId, username: 'Athlete B', email: 'b@example.com', role: 'athlete', created_at: '2026-09-01' },
-                      ],
+                      data: { id: 'coach-id', email: 'coach@example.com', role: 'coach', is_coach_mode: true, auto_rest_timer: true },
                       error: null,
                     }),
                   };
                 }
                 return { order: vi.fn().mockResolvedValue({ data: [], error: null }) };
+              }),
+            }),
+          };
+        }
+        if (table === 'coach_athlete_links') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  order: vi.fn().mockResolvedValue({
+                    data: [
+                      {
+                        athlete_id: athleteAId,
+                        status: 'active',
+                        athlete: { id: athleteAId, username: 'Athlete A', email: 'a@example.com', role: 'athlete', created_at: '2026-09-01' },
+                      },
+                      {
+                        athlete_id: athleteBId,
+                        status: 'active',
+                        athlete: { id: athleteBId, username: 'Athlete B', email: 'b@example.com', role: 'athlete', created_at: '2026-09-01' },
+                      },
+                    ],
+                    error: null,
+                  }),
+                }),
               }),
             }),
           };
@@ -1922,8 +1939,14 @@ describe('WorkoutEngine', () => {
             eq: vi.fn().mockReturnValue({
               order: vi.fn().mockResolvedValue({ data: [], error: null }),
               eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+              gte: vi.fn().mockReturnValue({
+                lte: vi.fn().mockResolvedValue({ data: [], error: null }),
+              }),
             }),
             in: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+            or: vi.fn().mockReturnValue({
               order: vi.fn().mockResolvedValue({ data: [], error: null }),
             }),
           }),
@@ -1961,7 +1984,7 @@ describe('WorkoutEngine', () => {
         expect(screen.getByTestId('current-selected-athlete')).toHaveTextContent(athleteAId);
       });
 
-      // Athlete A chooses Workout A and types draft 275 lbs x 8 reps
+      // Coach types personal draft 275 lbs x 8 reps
       await selectWorkoutA();
       const weightInputA = await screen.findByTestId('ghost-weight-0-0');
       const repsInputA = screen.getByTestId('ghost-reps-0-0');
@@ -1971,30 +1994,14 @@ describe('WorkoutEngine', () => {
       expect(weightInputA).toHaveValue('275');
       expect(repsInputA).toHaveValue('8');
 
-      // Coach switches to Athlete B
+      // Coach switches selected athlete in CoachContext to Athlete B
       fireEvent.click(screen.getByTestId('switch-to-b'));
 
       await waitFor(() => {
         expect(screen.getByTestId('current-selected-athlete')).toHaveTextContent(athleteBId);
       });
 
-      // Select Workout A for Athlete B
-      await selectWorkoutA();
-
-      // Athlete B's inputs must be clean and empty with zero leakage from Athlete A
-      const weightInputB = await screen.findByTestId('ghost-weight-0-0');
-      const repsInputB = screen.getByTestId('ghost-reps-0-0');
-      expect(weightInputB).toHaveValue('');
-      expect(repsInputB).toHaveValue('');
-
-      // Coach switches back to Athlete A
-      fireEvent.click(screen.getByTestId('switch-to-a'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('current-selected-athlete')).toHaveTextContent(athleteAId);
-      });
-
-      // Athlete A's draft must be preserved intact
+      // WorkoutEngine strictly maintains the coach's personal draft (isolated from athlete switcher)
       await waitFor(() => {
         expect(screen.getByTestId('ghost-weight-0-0')).toHaveValue('275');
         expect(screen.getByTestId('ghost-reps-0-0')).toHaveValue('8');
@@ -2575,6 +2582,91 @@ describe('WorkoutEngine', () => {
       expect(healedSession?.inputDrafts['Cable Face Pulls_1']).toEqual({ weight: '65', reps: '12' });
       expect(healedSession?.inputDrafts['Cable Lateral Raises_1']).toEqual({ weight: '30', reps: '15' });
       expect(healedSession?.inputDrafts[`${uuidUnknown}_1`]).toEqual({ weight: '100', reps: '8' });
+    });
+
+    it('prioritizes coach-assigned routines (Score 3) over personal custom routines (Score 2) for scheduled workout days', async () => {
+      // Wednesday: 2026-09-09
+      vi.setSystemTime(new Date('2026-09-09T10:00:00Z'));
+
+      const athleteId = 'test-user-id';
+      const coachId = 'coach-999';
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'routine_templates') {
+          return {
+            select: vi.fn().mockReturnValue({
+              or: vi.fn().mockResolvedValue({
+                data: [
+                  {
+                    id: 'tpl-personal',
+                    user_id: athleteId,
+                    assigned_to: null,
+                    is_master: false,
+                    name: 'Personal User Routine',
+                    days_of_week: ['Wed'],
+                    created_at: '2026-09-01T00:00:00Z',
+                    exercises: [
+                      {
+                        exercise_id: 'ex-1',
+                        exercise_name: 'Barbell Squat',
+                        target_sets: 3,
+                        target_reps: 10,
+                        order_index: 0,
+                      },
+                    ],
+                  },
+                  {
+                    id: 'tpl-coach-assigned',
+                    user_id: coachId,
+                    assigned_to: athleteId,
+                    is_master: false,
+                    name: 'Coach Assigned Priority Routine',
+                    days_of_week: ['Wed'],
+                    created_at: '2026-09-01T00:00:00Z',
+                    exercises: [
+                      {
+                        exercise_id: 'ex-2',
+                        exercise_name: 'Incline Dumbbell Press',
+                        target_sets: 4,
+                        target_reps: 8,
+                        order_index: 0,
+                      },
+                    ],
+                  },
+                ],
+                error: null,
+              }),
+            }),
+          };
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+              gte: vi.fn().mockReturnValue({
+                lte: vi.fn().mockResolvedValue({ data: [], error: null }),
+              }),
+            }),
+            in: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+            or: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
+        };
+      });
+
+      renderComponent();
+
+      // Assert that Coach Assigned Priority Routine resolves ahead of Personal User Routine
+      await waitFor(() => {
+        expect(screen.getByText('Coach Assigned Priority Routine')).toBeDefined();
+        expect(screen.getByText('Incline Dumbbell Press')).toBeDefined();
+        expect(screen.queryByText('Personal User Routine')).toBeNull();
+      });
     });
   });
 });

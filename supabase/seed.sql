@@ -54,3 +54,19 @@ INSERT INTO auth.users (
   '',
   ''
 ) ON CONFLICT (id) DO NOTHING;
+
+-- Seed Demo Coach metadata and link to Demo Athlete
+UPDATE public.users
+SET is_coach_mode = true,
+    coach_code = 'CYBER-DEMO01',
+    coach_tier = 'free',
+    max_athletes = 3
+WHERE id = 'a0000000-0000-0000-0000-000000000001';
+
+INSERT INTO public.coach_athlete_links (coach_id, athlete_id, status, linked_at)
+VALUES (
+  'a0000000-0000-0000-0000-000000000001',
+  'a0000000-0000-0000-0000-000000000002',
+  'active',
+  now()
+) ON CONFLICT (athlete_id) WHERE status = 'active' DO NOTHING;

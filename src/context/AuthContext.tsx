@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import type { UserProfile, UserRole } from '../types/database';
 import { AuthContext } from './AuthContextTypes';
+import { restTimerStore } from '../utils/restTimerStore';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -145,16 +146,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // ignore
     }
+    restTimerStore.stop();
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith('cybergym_')) {
+        localStorage.removeItem(key);
+      }
+    });
     setUser(null);
     setProfile(null);
-    localStorage.removeItem('cybergym_user');
     queryClient.clear();
   };
 
   const updateProfile = async (updates: Partial<UserProfile>) => {
     if (!profile) return { success: false, error: 'Not authenticated' };
-    // Strip role mutations: client cannot modify database role
-    const { role: _stripped, ...safeUpdates } = updates;
+    // Strip role, coach_tier, and max_athletes mutations: client cannot modify protected fields
+    const {
+      role: _strippedRole,
+      coach_tier: _strippedTier,
+      max_athletes: _strippedMax,
+      ...safeUpdates
+    } = updates;
     const updated = { ...profile, ...safeUpdates };
     setProfile(updated);
     localStorage.setItem('cybergym_user', JSON.stringify(updated));
@@ -181,7 +192,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('cybergym_view_mode', newRole);
   };
 
+  const refreshProfile = async () => {
+    if (user) {
+      await fetchProfile(user.id, user.email);
+    }
+  };
+
   const role: UserRole = profile?.role === 'coach' ? viewMode : 'athlete';
+  const isCoachMode = Boolean(profile?.is_coach_mode || profile?.role === 'coach' || role === 'coach');
 
   return (
     <AuthContext.Provider
@@ -190,12 +208,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         profile,
         role,
         viewMode,
+        isCoachMode,
         loading,
         signIn,
         signUp,
         signOut,
         updateProfile,
         switchRole,
+        refreshProfile,
       }}
     >
       {children}
