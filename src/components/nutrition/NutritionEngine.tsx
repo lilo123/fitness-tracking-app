@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
@@ -8,6 +8,13 @@ import { normalizeDateStr, getLocalDateStr, formatLocalTimestamp } from '../../u
 import { getDishIcon } from '../../utils/dishIcons';
 import { EditMealModal } from './EditMealModal';
 import { formatCalories, formatMacro, calculateRemainingFuel } from '../../utils/nutrition';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import {
+  compressImageBase64,
+  compressImageFile,
+  formatFileSize,
+  type CompressedImage,
+} from '../../utils/imageCompression';
 import {
   Sparkles,
   Utensils,
@@ -23,6 +30,8 @@ import {
   Calculator,
   ChevronDown,
   ChevronUp,
+  Camera as CameraIcon,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 export interface StagedItem {
@@ -54,6 +63,7 @@ export interface StagedMeal {
   fiber: number;
   servingSize: number;
   servingUnit: string;
+  photoUrl?: string;
 }
 
 let itemSequence = 0;
@@ -70,8 +80,68 @@ export const NutritionEngine: React.FC = () => {
 
   // Input & Staged State
   const [nlInput, setNlInput] = useState('');
+  const [selectedPhoto, setSelectedPhoto] = useState<CompressedImage | null>(null);
+  const [isRateLimited, setIsRateLimited] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [stagedMeal, setStagedMeal] = useState<StagedMeal | null>(null);
   const [showManualForm, setShowManualForm] = useState(false);
+
+  const handlePickPhoto = async (source: CameraSource) => {
+    try {
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source,
+      });
+
+      if (image.base64String) {
+        const mimeType = image.format ? `image/${image.format}` : 'image/jpeg';
+        const compressed = await compressImageBase64(image.base64String, mimeType);
+        if (compressed && compressed.base64) {
+          setSelectedPhoto(compressed);
+          setIsError(false);
+          setIsRateLimited(false);
+        } else {
+          setIsError(true);
+          setStatus('Could not process captured photo. Please try again.');
+        }
+      }
+    } catch (err: any) {
+      const msg = (err?.message || '').toLowerCase();
+      if (msg.includes('cancel')) {
+        return;
+      }
+      if (fileInputRef.current) {
+        fileInputRef.current.click();
+      }
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressed = await compressImageFile(file);
+      if (compressed && compressed.base64) {
+        setSelectedPhoto(compressed);
+        setIsError(false);
+        setIsRateLimited(false);
+      } else {
+        setIsError(true);
+        setStatus('Could not process selected image. Please select a valid photo.');
+      }
+    } catch (err) {
+      console.warn('Image compression failed:', err);
+      setIsError(true);
+      setStatus('Failed to process image.');
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleRemovePhoto = () => {
+    setSelectedPhoto(null);
+  };
 
   // Manual Form Fallback State (when no staged meal is active)
   const [manualDishName, setManualDishName] = useState('');
@@ -202,6 +272,9 @@ export const NutritionEngine: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['nutrition_logs', targetUserId] });
       // Reset state
       setStagedMeal(null);
+      setSelectedPhoto(null);
+      setShowManualForm(false);
+      setIsRateLimited(false);
       setNlInput('');
       setManualDishName('');
       setManualCalories('');
@@ -321,14 +394,15 @@ export const NutritionEngine: React.FC = () => {
   };
 
   const handleAnalyze = async () => {
-    if (!nlInput.trim()) return;
+    if (!nlInput.trim() && !selectedPhoto) return;
     setIsAnalyzing(true);
     setStatus('Analyzing...');
     setIsError(false);
+    setIsRateLimited(false);
 
     try {
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Edge function timeout after 25s')), 25000)
+        setTimeout(() => reject(new Error('Edge function timeout after 35s')), 35000)
       );
 
       const { data: sessionData } = await supabase.auth.getSession();
@@ -339,6 +413,8 @@ export const NutritionEngine: React.FC = () => {
         body: {
           input: nlInput,
           text: nlInput,
+          image_base64: selectedPhoto ? selectedPhoto.base64 : undefined,
+          imageMimeType: selectedPhoto ? selectedPhoto.mimeType : undefined,
           custom_dishes: customDishes.map((d) => ({
             name: d.name,
             calories: d.calories,
@@ -351,7 +427,31 @@ export const NutritionEngine: React.FC = () => {
       });
 
       const { data, error } = (await Promise.race([invokePromise, timeoutPromise])) as any;
-      if (error) throw error;
+      if (error) {
+        if (error?.context?.status === 429 || error?.status === 429) {
+          let retryAfter = 15;
+          let rateLimitMsg = 'Gemini rate limit exceeded (15 RPM). Please wait 15 seconds or switch to manual entry.';
+          try {
+            if (error.context?.headers) {
+              const headerRetry = error.context.headers.get?.('Retry-After') || error.context.headers.get?.('retry-after');
+              if (headerRetry && !isNaN(parseInt(headerRetry, 10))) {
+                retryAfter = parseInt(headerRetry, 10);
+              }
+            }
+            const ctxClone = typeof error.context?.clone === 'function' ? error.context.clone() : error.context;
+            const errData = await ctxClone?.json?.();
+            if (errData?.retryAfter) retryAfter = errData.retryAfter;
+            if (errData?.error) rateLimitMsg = errData.error;
+          } catch {
+            // ignore JSON unwrap error
+          }
+          const rateErr = new Error(rateLimitMsg);
+          (rateErr as any).is429 = true;
+          (rateErr as any).retryAfter = retryAfter;
+          throw rateErr;
+        }
+        throw error;
+      }
 
       const parsed = typeof data === 'string' ? JSON.parse(data) : data;
 
@@ -382,7 +482,7 @@ export const NutritionEngine: React.FC = () => {
           items = [
             {
               id: generateItemId(),
-              name: parsed.name || nlInput,
+              name: parsed.name || nlInput || (selectedPhoto ? 'Meal Photo' : 'Meal'),
               portion: '1 serving',
               portionMultiplier: 1,
               baseCalories: Number(parsed.calories) || 0,
@@ -406,7 +506,7 @@ export const NutritionEngine: React.FC = () => {
         const totalFib = parsed.fiber !== undefined && !isNaN(Number(parsed.fiber)) ? Number(parsed.fiber) : items.reduce((s, it) => s + it.fiber, 0);
 
         setStagedMeal({
-          name: parsed.name || nlInput,
+          name: parsed.name || nlInput || (selectedPhoto ? 'Meal Photo' : 'Meal'),
           mealType: 'Breakfast',
           explanation:
             parsed.explanation ||
@@ -419,21 +519,29 @@ export const NutritionEngine: React.FC = () => {
           fiber: totalFib,
           servingSize: Number(parsed.serving_size ?? parsed.servingSize) || 1,
           servingUnit: parsed.serving_unit || parsed.servingUnit || 'serving',
+          photoUrl: selectedPhoto?.dataUrl,
         });
 
         setShowManualForm(false);
+        setIsRateLimited(false);
         setStatus('Analyzed');
         return;
       }
       throw new Error('Invalid parsed response: missing nutrition data');
     } catch (error: any) {
       console.warn('AI Edge function failed:', error);
+      if (error?.is429 || error?.context?.status === 429 || error?.status === 429) {
+        setIsRateLimited(true);
+        setIsError(false);
+        setStatus('');
+        return;
+      }
       setIsError(true);
       const errorMsg = error?.message || (typeof error === 'string' ? error : 'Unknown error');
       setStatus(`AI service unavailable: ${errorMsg}`);
       setShowManualForm(true);
       if (!manualDishName.trim()) {
-        setManualDishName(nlInput.trim());
+        setManualDishName(nlInput.trim() || (selectedPhoto ? 'Meal Photo' : ''));
       }
       setStagedMeal(null);
     } finally {
@@ -903,27 +1011,127 @@ export const NutritionEngine: React.FC = () => {
           <button
             type="button"
             onClick={() => setShowManualForm((prev) => !prev)}
-            className="text-[11px] font-bold text-zinc-400 hover:text-white flex items-center gap-1 bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 min-h-[36px] rounded-xl transition border border-zinc-700"
+            className="text-[11px] font-bold text-zinc-400 hover:text-white flex items-center justify-center gap-1 bg-zinc-800 hover:bg-zinc-700 px-3 py-2 min-h-[44px] min-w-[44px] rounded-xl transition border border-zinc-700 touch-manipulation"
           >
             <span>{showManualForm ? 'Hide Manual' : 'Manual Entry'}</span>
             {showManualForm ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
           </button>
         </div>
 
-        <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-3 focus-within:border-cyan-500 transition">
+        <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-3 focus-within:border-cyan-500 transition space-y-2.5">
+          {selectedPhoto && (
+            <div data-testid="photo-preview-container" className="relative flex items-center justify-between p-2.5 bg-zinc-900 border border-zinc-750 rounded-xl">
+              <div className="flex items-center gap-3">
+                <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-cyan-500/40 shrink-0 bg-zinc-950 shadow-md">
+                  <img
+                    src={selectedPhoto.dataUrl}
+                    alt="Meal preview"
+                    data-testid="photo-preview"
+                    className="w-full h-full object-cover"
+                  />
+                  {!isAnalyzing && (
+                    <button
+                      type="button"
+                      data-testid="remove-photo-button"
+                      onClick={handleRemovePhoto}
+                      aria-label="Remove photo"
+                      className="absolute top-0 right-0 min-w-[44px] min-h-[44px] p-2 rounded-full bg-zinc-950/80 hover:bg-rose-600 text-white flex items-center justify-center transition border border-zinc-700 touch-manipulation"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {isAnalyzing && (
+                    <div
+                      data-testid="laser-scan-animation"
+                      className="absolute inset-0 bg-cyan-500/25 pointer-events-none flex flex-col justify-around overflow-hidden"
+                    >
+                      <div className="w-full h-1 bg-cyan-300 shadow-[0_0_10px_#22d3ee] animate-pulse" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      data-testid="photo-size-badge"
+                      className="px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-400 font-mono text-[10px] font-bold border border-cyan-500/30"
+                    >
+                      {formatFileSize(selectedPhoto.sizeBytes)}
+                    </span>
+                    <span className="text-[10px] text-zinc-500 font-mono">
+                      {selectedPhoto.width}×{selectedPhoto.height}
+                    </span>
+                  </div>
+                  <p className="text-[11px] font-bold text-zinc-300">Meal Photo Attached</p>
+                  <p className="text-[10px] text-zinc-500">Ready for multimodal analysis</p>
+                </div>
+              </div>
+
+              {!isAnalyzing && (
+                <button
+                  type="button"
+                  onClick={handleRemovePhoto}
+                  className="text-xs text-zinc-400 hover:text-rose-400 font-bold px-2 py-1 min-h-[44px] min-w-[44px] flex items-center justify-center transition touch-manipulation"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          )}
+
           <textarea
             value={nlInput}
             onChange={(e) => setNlInput(e.target.value)}
-            placeholder="Describe what you ate (e.g., 3 eggs, 2 slices sourdough, 1 tbsp butter)"
+            placeholder={
+              selectedPhoto
+                ? "Add notes or context (optional, e.g. 'dressing on the side', 'ate 2/3 of it')"
+                : "Describe what you ate (e.g., 3 eggs, 2 slices sourdough, 1 tbsp butter)"
+            }
             className="w-full bg-transparent text-white text-base sm:text-xs placeholder:text-zinc-600 outline-none resize-none"
             rows={3}
           />
-          <div className="flex justify-end pt-2 border-t border-zinc-850">
+          <div className="flex justify-between items-center pt-2 border-t border-zinc-850">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                data-testid="camera-trigger"
+                onClick={() => handlePickPhoto(CameraSource.Camera)}
+                disabled={isAnalyzing}
+                className="p-2.5 min-h-[44px] min-w-[44px] rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-cyan-400 border border-zinc-800 transition flex items-center justify-center gap-1.5 text-xs font-bold disabled:opacity-50 touch-manipulation"
+                title="Take Photo"
+              >
+                <CameraIcon className="w-4 h-4 text-cyan-400" />
+                <span className="hidden sm:inline">Camera</span>
+              </button>
+
+              <button
+                type="button"
+                data-testid="gallery-trigger"
+                onClick={() => handlePickPhoto(CameraSource.Photos)}
+                disabled={isAnalyzing}
+                className="p-2.5 min-h-[44px] min-w-[44px] rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-cyan-400 border border-zinc-800 transition flex items-center justify-center gap-1.5 text-xs font-bold disabled:opacity-50 touch-manipulation"
+                title="Photo Gallery"
+              >
+                <ImageIcon className="w-4 h-4 text-cyan-400" />
+                <span className="hidden sm:inline">Gallery</span>
+              </button>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                data-testid="hidden-file-input"
+                onChange={handleFileChange}
+              />
+            </div>
+
             <button
               type="button"
+              data-testid="analyze-meal-button"
               onClick={handleAnalyze}
-              disabled={isAnalyzing || !nlInput.trim()}
-              className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black text-xs px-4 py-2.5 min-h-[44px] rounded-xl shadow-neon-cyan active:scale-95 transition disabled:opacity-50 flex items-center gap-1.5"
+              disabled={isAnalyzing || (!nlInput.trim() && !selectedPhoto)}
+              className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black text-xs px-4 py-2.5 min-h-[44px] min-w-[44px] rounded-xl shadow-neon-cyan active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-1.5 touch-manipulation"
             >
               <Sparkles className="w-3.5 h-3.5" />
               <span>{isAnalyzing ? 'Analyzing...' : 'Analyze Meal'}</span>
@@ -931,21 +1139,69 @@ export const NutritionEngine: React.FC = () => {
           </div>
         </div>
 
+        {/* Rate Limit 429 Cooldown Warning Banner */}
+        {isRateLimited && (
+          <div
+            data-testid="rate-limit-banner"
+            className="bg-amber-500/15 border border-amber-500/40 rounded-2xl p-4 space-y-3 shadow-lg"
+          >
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <div className="space-y-1 flex-1">
+                <h4 className="text-xs font-black text-amber-400 uppercase tracking-wider">
+                  Rate Limit Exceeded (15 RPM)
+                </h4>
+                <p className="text-xs text-zinc-300">
+                  Gemini rate limit exceeded (15 RPM). Please wait 15 seconds or switch to manual entry.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-1 border-t border-amber-500/20">
+              <button
+                type="button"
+                data-testid="switch-to-manual-btn"
+                onClick={() => {
+                  setShowManualForm(true);
+                  setIsRateLimited(false);
+                  if (!manualDishName.trim()) {
+                    setManualDishName(nlInput.trim() || (selectedPhoto ? 'Meal Photo' : ''));
+                  }
+                }}
+                className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-black text-xs px-3.5 py-2.5 min-h-[44px] min-w-[44px] rounded-xl transition active:scale-95 flex items-center justify-center gap-1.5 shadow-sm touch-manipulation"
+              >
+                <Utensils className="w-3.5 h-3.5" />
+                <span>Switch to Manual Entry</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Staged Meal Card */}
         {stagedMeal && (
           <div data-testid="staged-meal-card" className="bg-gradient-to-b from-zinc-950 to-zinc-900 border-2 border-cyan-500/50 rounded-2xl p-4 space-y-4 shadow-xl">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 pb-3">
-              <div className="flex-1 min-w-[200px]">
-                <label className="block text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-1">
-                  Meal Name
-                </label>
-                <input
-                  type="text"
-                  data-testid="dish-name-input"
-                  value={stagedMeal.name}
-                  onChange={(e) => setStagedMeal({ ...stagedMeal, name: e.target.value })}
-                  className="w-full bg-zinc-900 border border-zinc-700 text-white font-black text-base sm:text-sm rounded-xl px-3 py-1.5 outline-none focus:border-cyan-500"
-                />
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+              <div className="flex items-center gap-3 flex-1 min-w-[200px]">
+                {stagedMeal.photoUrl && (
+                  <img
+                    src={stagedMeal.photoUrl}
+                    alt={stagedMeal.name}
+                    data-testid="staged-meal-photo-thumbnail"
+                    className="w-12 h-12 rounded-xl object-cover border border-cyan-500/40 shadow-sm shrink-0"
+                  />
+                )}
+                <div className="flex-1">
+                  <label className="block text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-1">
+                    Meal Name
+                  </label>
+                  <input
+                    type="text"
+                    data-testid="dish-name-input"
+                    value={stagedMeal.name}
+                    onChange={(e) => setStagedMeal({ ...stagedMeal, name: e.target.value })}
+                    className="w-full bg-zinc-900 border border-zinc-700 text-white font-black text-base sm:text-sm rounded-xl px-3 py-1.5 outline-none focus:border-cyan-500"
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
@@ -1187,6 +1443,34 @@ export const NutritionEngine: React.FC = () => {
         {/* Fallback Manual Review Form */}
         {!stagedMeal && showManualForm && (
           <form onSubmit={handleManualSave} className="space-y-3 pt-2 border-t border-zinc-800">
+            {selectedPhoto && (
+              <div data-testid="pinned-photo-in-manual" className="flex items-center gap-3 p-2.5 bg-zinc-950 border border-zinc-800 rounded-2xl">
+                <img
+                  src={selectedPhoto.dataUrl}
+                  alt="Pinned meal"
+                  className="w-12 h-12 rounded-xl object-cover border border-cyan-500/30 shrink-0 shadow-sm"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider">
+                      Pinned Meal Photo
+                    </span>
+                    <button
+                      type="button"
+                      data-testid="remove-pinned-photo-button"
+                      onClick={handleRemovePhoto}
+                      className="text-zinc-500 hover:text-rose-400 text-xs min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg transition touch-manipulation"
+                      title="Remove Photo"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-zinc-400 truncate">
+                    Refer to your meal photo while entering macronutrients manually
+                  </p>
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div>
                 <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
@@ -1334,7 +1618,7 @@ export const NutritionEngine: React.FC = () => {
           </form>
         )}
 
-        {status && (
+        {status && !isRateLimited && (
           <div
             data-testid="status-message"
             className={`p-3 rounded-xl text-xs flex items-center gap-2 ${

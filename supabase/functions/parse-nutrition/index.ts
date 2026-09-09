@@ -5,7 +5,35 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Expose-Headers': 'Retry-After',
+  'Access-Control-Max-Age': '86400',
 };
+
+function isRateLimitError(err: any): boolean {
+  if (!err) return false;
+  if (err.status === 429 || err.statusCode === 429 || err.code === 429) return true;
+  if (err.error?.code === 429 || err.error?.status === 429 || err.response?.status === 429) return true;
+  const msgParts: string[] = [
+    typeof err.message === 'string' ? err.message : '',
+    typeof err.error?.message === 'string' ? err.error.message : '',
+    typeof err.statusText === 'string' ? err.statusText : '',
+    typeof err.cause?.message === 'string' ? err.cause.message : '',
+    String(err),
+  ];
+  try {
+    msgParts.push(JSON.stringify(err));
+  } catch {
+    // ignore circular json error
+  }
+  const msg = msgParts.join(' ').toLowerCase();
+  return (
+    msg.includes('429') ||
+    msg.includes('resource_exhausted') ||
+    msg.includes('resource has been exhausted') ||
+    msg.includes('quota') ||
+    msg.includes('rate limit')
+  );
+}
 
 export default {
   async fetch(req: Request) {
@@ -42,13 +70,37 @@ export default {
         );
       }
 
-      const body = await req.json().catch(() => ({}));
+      let body: any;
+      try {
+        body = await req.json();
+      } catch (jsonErr: any) {
+        console.error("[parse-nutrition] Failed to parse request JSON:", jsonErr?.message || jsonErr);
+        return new Response(
+          JSON.stringify({ error: 'Malformed JSON or payload too large.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const rawImage = body.image_base64 || body.imageBase64 || body.image || "";
+      const rawMimeType = body.imageMimeType || body.image_mime_type || body.mimeType || body.mime_type || "";
+      const imageBase64 = typeof rawImage === 'string' ? rawImage.trim() : "";
+      const cleanBase64 = (imageBase64 === 'data:,' || imageBase64.startsWith('data:,'))
+        ? ""
+        : imageBase64
+            .replace(/^data:[^,]*;base64,/i, '')
+            .replace(/\s/g, '')
+            .trim();
+      const dataUriMatch = imageBase64.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9+.-]+)(?:;[^,]*)?;base64,/i);
+      const detectedMime = dataUriMatch ? dataUriMatch[1] : "";
+      const imageMimeType = (typeof rawMimeType === 'string' && rawMimeType.trim())
+        ? rawMimeType.trim()
+        : (detectedMime || "image/jpeg");
 
       const rawInput = body.input || body.prompt || body.text || "";
       const input = typeof rawInput === 'string' ? rawInput.trim().slice(0, 2000) : "";
-      if (!input) {
+      if (!input && !cleanBase64) {
         return new Response(
-          JSON.stringify({ error: 'Input text is required for nutrition parsing.' }),
+          JSON.stringify({ error: 'Input text or meal photo is required for nutrition parsing.' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -194,21 +246,41 @@ function parseStructuredNutritionText(input: string): StructuredNutritionResult 
   };
 }
 
-      // Use valid production model fallback chain
-      const configuredModel = Deno.env.get("GEMINI_MODEL_ID") || "gemini-3.6-flash";
-      const candidateModels = Array.from(new Set([
-        configuredModel,
-        "gemini-3.5-flash",
-        "gemini-3.1-flash-lite",
-      ]));
-
       const custom_dishes = Array.isArray(body.custom_dishes) ? body.custom_dishes.slice(0, 50) : [];
       let contextStr = "";
       if (custom_dishes.length > 0) {
         contextStr = ` Known custom dishes for this user: ${JSON.stringify(custom_dishes)}.`;
       }
 
-      const promptContent = `You are an expert sports nutritionist and food data parser.
+      let candidateModels: string[];
+      let contents: any;
+
+      if (cleanBase64) {
+        const userNotes = input ? `User notes: "${input}"` : "No additional text description provided.";
+        const multimodalPrompt = `You are an expert sports nutritionist, food data parser, and visual meal recognition engine.
+Analyze this meal photo:
+"""
+${userNotes}
+"""
+${contextStr}
+
+INSTRUCTIONS:
+1. PHOTO / VISUAL RECOGNITION: Carefully identify each food item, portion size, and ingredient visible in the photo. Estimate realistic weights/portions (e.g. grams, cups, pieces) and compute corresponding macronutrients (calories, protein, carbs, fat, fiber).
+2. PRE-STRUCTURED / EXPLICIT MACROS: If text or image already provides explicit calorie or macronutrient breakdowns (e.g. nutrition facts label, recipe logs, lines with 'X g | Y kcal | Z g P'), you MUST extract those exact ingredient names, portion sizes, and numbers directly rather than re-estimating. Preserve exact component items, portions, calories, and macros verbatim. Extract total portion size and serving unit if present.
+3. NATURAL LANGUAGE & MULTI-DISH LOGGING: If informal or conversational, compute accurate itemized estimates. If a meal or multi-dish combination is mentioned or seen (such as "Com Tam & Eggs", "Steak and Potatoes", "Pho with beef and tendon"), you MUST analyze ALL dishes and elaborate their individual components. Never omit or truncate dishes from a multi-dish meal.
+4. OUTPUT: Extract meal name, total calories, protein (g), carbs (g), fat (g), fiber (g), serving_size (number if present), serving_unit (string if present), itemized list of components, and mathematical explanation. Output strictly JSON.`;
+
+        contents = [
+          { inlineData: { data: cleanBase64, mimeType: imageMimeType } },
+          multimodalPrompt,
+        ];
+        candidateModels = Array.from(new Set([
+          Deno.env.get("GEMINI_VISION_MODEL_ID") || "gemini-3.8-flash",
+          "gemini-3.7-flash",
+          "gemini-3.5-flash",
+        ]));
+      } else {
+        const promptContent = `You are an expert sports nutritionist and food data parser.
 Analyze this meal input:
 """
 ${input}
@@ -219,6 +291,15 @@ INSTRUCTIONS:
 1. PRE-STRUCTURED / EXPLICIT MACROS: If the text already provides explicit calorie or macronutrient breakdowns (e.g. lines with 'X g | Y kcal | Z g P', 'Total Calories: N', nutrition facts labels, or recipe logs), you MUST extract those exact ingredient names, portion sizes, and numbers directly rather than re-estimating. Preserve exact component items, portions, calories, and macros verbatim. Extract total portion size and serving unit if present.
 2. NATURAL LANGUAGE & MULTI-DISH LOGGING: If informal or conversational, compute accurate itemized estimates. If a meal or multi-dish combination is mentioned (such as "Com Tam & Eggs", "Steak and Potatoes", "Pho with beef and tendon"), you MUST analyze ALL dishes and elaborate their individual components (for example, Com Tam typically includes broken rice, grilled pork chop, egg meatloaf/chả trứng or fried egg, pickled vegetables, and fish sauce dressing). Never omit or truncate dishes from a multi-dish meal.
 3. OUTPUT: Extract meal name, total calories, protein (g), carbs (g), fat (g), fiber (g), serving_size (number if present), serving_unit (string if present), itemized list of components, and mathematical explanation. Output strictly JSON.`;
+
+        contents = promptContent;
+        const configuredModel = Deno.env.get("GEMINI_MODEL_ID") || "gemini-3.6-flash";
+        candidateModels = Array.from(new Set([
+          configuredModel,
+          "gemini-3.5-flash",
+          "gemini-3.1-flash-lite",
+        ]));
+      }
 
       const responseSchema = {
         type: Type.OBJECT,
@@ -255,34 +336,73 @@ INSTRUCTIONS:
       const ai = new GoogleGenAI({ apiKey });
       let responseText = "";
       let lastAiError: any = null;
+      let rateLimitEncountered: any = null;
 
       for (const model of candidateModels) {
         try {
           const response = await ai.models.generateContent({
             model,
-            contents: promptContent,
+            contents,
             config: {
               responseMimeType: "application/json",
               responseSchema,
             },
           });
           if (response?.text) {
-            responseText = response.text;
+            let candidateText = response.text;
+            const fenceMatch = candidateText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+            if (fenceMatch) {
+              candidateText = fenceMatch[1].trim();
+            }
+            // Validate that response.text can be parsed as JSON and contains meal nutrition before breaking
+            const parsedCandidate = JSON.parse(candidateText);
+            if (!parsedCandidate || typeof parsedCandidate !== 'object') {
+              throw new Error("Candidate model returned non-object JSON");
+            }
+            if (
+              parsedCandidate.calories === undefined &&
+              (!Array.isArray(parsedCandidate.items) || parsedCandidate.items.length === 0)
+            ) {
+              throw new Error("Candidate model returned JSON missing both calories and items");
+            }
+            responseText = candidateText;
             break;
           }
         } catch (modelErr: any) {
           lastAiError = modelErr;
+          if (isRateLimitError(modelErr)) {
+            rateLimitEncountered = modelErr;
+          }
           console.warn(`[parse-nutrition] Model ${model} encountered error:`, modelErr?.message || modelErr);
         }
       }
 
       if (!responseText) {
         // If all AI models failed, attempt server-side structured text parse before throwing
-        const localStructured = parseStructuredNutritionText(input);
-        if (localStructured) {
-          return new Response(JSON.stringify(localStructured), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
+        if (input) {
+          const localStructured = parseStructuredNutritionText(input);
+          if (localStructured) {
+            return new Response(JSON.stringify(localStructured), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+        }
+        if (isRateLimitError(lastAiError) || rateLimitEncountered) {
+          return new Response(
+            JSON.stringify({
+              error: "Gemini rate limit exceeded (15 RPM). Please wait 15 seconds or switch to manual entry.",
+              code: "RATE_LIMITED",
+              retryAfter: 15,
+            }),
+            {
+              status: 429,
+              headers: {
+                ...corsHeaders,
+                'Content-Type': 'application/json',
+                'Retry-After': '15',
+              },
+            }
+          );
         }
         throw lastAiError || new Error("All AI models failed to generate content");
       }
@@ -296,7 +416,24 @@ INSTRUCTIONS:
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     } catch (error: any) {
-      console.error("[parse-nutrition error]:", error.message);
+      console.error("[parse-nutrition error]:", error?.message || error);
+      if (isRateLimitError(error)) {
+        return new Response(
+          JSON.stringify({
+            error: "Gemini rate limit exceeded (15 RPM). Please wait 15 seconds or switch to manual entry.",
+            code: "RATE_LIMITED",
+            retryAfter: 15,
+          }),
+          {
+            status: 429,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json',
+              'Retry-After': '15',
+            },
+          }
+        );
+      }
       return new Response(
         JSON.stringify({ error: "Failed to parse meal nutrition. Please check your connection or use manual entry." }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

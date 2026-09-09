@@ -15,6 +15,19 @@ const { mockSession } = vi.hoisted(() => ({
   },
 }));
 
+vi.mock('@capacitor/camera', () => ({
+  Camera: {
+    getPhoto: vi.fn(),
+  },
+  CameraResultType: {
+    Base64: 'base64',
+  },
+  CameraSource: {
+    Camera: 'CAMERA',
+    Photos: 'PHOTOS',
+  },
+}));
+
 vi.mock('../lib/supabase', () => ({
   supabase: {
     from: vi.fn(),
@@ -1427,6 +1440,474 @@ Total Fiber: 1 g`;
     expect(payload.food_name).toBe('Steak & Rice');
     expect(payload.logged_at).toMatch(/^2026-09-05T\d{2}:\d{2}:\d{2}Z$/);
     expect(payload.logged_at.startsWith('2026-09-05')).toBe(true);
+  });
+
+  it('renders camera and photo gallery triggers, and attaches a photo preview with size badge', async () => {
+    const { Camera } = await import('@capacitor/camera');
+    (Camera.getPhoto as any).mockResolvedValue({
+      base64String: 'dGVzdC1tZWFsLXBob3RvLWRhdGE=',
+      format: 'jpeg',
+    });
+
+    renderComponent();
+
+    const cameraBtn = screen.getByTestId('camera-trigger');
+    const galleryBtn = screen.getByTestId('gallery-trigger');
+    const analyzeBtn = screen.getByTestId('analyze-meal-button');
+
+    expect(cameraBtn).toBeDefined();
+    expect(galleryBtn).toBeDefined();
+    expect(analyzeBtn).toBeDisabled();
+
+    // Click camera trigger
+    fireEvent.click(cameraBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('photo-preview-container')).toBeDefined();
+    });
+
+    expect(screen.getByTestId('photo-preview')).toBeDefined();
+    expect(screen.getByTestId('photo-size-badge')).toBeDefined();
+
+    // Relaxed guard: Analyze button is enabled because photo is attached, even without text
+    expect(analyzeBtn).not.toBeDisabled();
+
+    // 1-tap remove button
+    const removeBtn = screen.getByTestId('remove-photo-button');
+    fireEvent.click(removeBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('photo-preview-container')).toBeNull();
+    });
+
+    // Disabled again after photo removed
+    expect(analyzeBtn).toBeDisabled();
+  });
+
+  it('unwraps HTTP 429 from error.context and renders 15 RPM cooldown warning banner with switch to manual entry button', async () => {
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: null,
+      error: {
+        context: {
+          status: 429,
+          clone: () => ({
+            json: async () => ({
+              code: 'RATE_LIMITED',
+              retryAfter: 15,
+              error: 'Gemini rate limit exceeded (15 RPM). Please wait 15 seconds or switch to manual entry.',
+            }),
+          }),
+          json: async () => ({
+            code: 'RATE_LIMITED',
+            retryAfter: 15,
+            error: 'Gemini rate limit exceeded (15 RPM). Please wait 15 seconds or switch to manual entry.',
+          }),
+        },
+      },
+    });
+
+    renderComponent();
+
+    const input = screen.getByPlaceholderText(
+      'Describe what you ate (e.g., 3 eggs, 2 slices sourdough, 1 tbsp butter)'
+    );
+    await userEvent.type(input, 'Chicken Salad');
+    fireEvent.click(screen.getByTestId('analyze-meal-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('rate-limit-banner')).toBeDefined();
+      expect(screen.getByText('Rate Limit Exceeded (15 RPM)')).toBeDefined();
+    });
+
+    const switchToManualBtn = screen.getByTestId('switch-to-manual-btn');
+    expect(switchToManualBtn).toBeDefined();
+
+    // Clicking switch to manual opens the manual form with dish name populated
+    fireEvent.click(switchToManualBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('dish-name-input')).toHaveValue('Chicken Salad');
+      expect(screen.getByTestId('calories-input')).toBeDefined();
+    });
+  });
+
+  it('submits multimodal meal photo payload to edge function, displays laser scan loading animation, and retains 48x48 thumbnail on staged meal card', async () => {
+    const { Camera } = await import('@capacitor/camera');
+    (Camera.getPhoto as any).mockResolvedValue({
+      base64String: 'dGVzdC1waG90by1iYXNlNjQ=',
+      format: 'jpeg',
+    });
+
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: {
+        name: 'Grilled Salmon Salad',
+        calories: 450,
+        protein: 40,
+        carbs: 15,
+        fat: 25,
+        fiber: 6,
+        explanation: '300 kcal (Salmon) + 150 kcal (Salad & Dressing) = 450 kcal',
+        items: [
+          { name: 'Salmon', portion: '1 fillet', calories: 300, protein: 35, carbs: 0, fat: 18, fiber: 0 },
+          { name: 'Salad & Dressing', portion: '1 bowl', calories: 150, protein: 5, carbs: 15, fat: 7, fiber: 6 },
+        ],
+      },
+      error: null,
+    });
+
+    renderComponent();
+
+    // Attach photo via gallery trigger
+    fireEvent.click(screen.getByTestId('gallery-trigger'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('photo-preview')).toBeDefined();
+    });
+
+    const analyzeBtn = screen.getByTestId('analyze-meal-button');
+    fireEvent.click(analyzeBtn);
+
+    // Verify edge function was invoked with multimodal base64 payload
+    await waitFor(() => {
+      expect(supabase.functions.invoke).toHaveBeenCalledWith(
+        'parse-nutrition',
+        expect.objectContaining({
+          body: expect.objectContaining({
+            image_base64: 'dGVzdC1waG90by1iYXNlNjQ=',
+            imageMimeType: 'image/jpeg',
+          }),
+        })
+      );
+    });
+
+    // Verify staged meal card retains 48x48 thumbnail
+    await waitFor(() => {
+      expect(screen.getByTestId('staged-meal-card')).toBeDefined();
+      expect(screen.getByTestId('staged-meal-photo-thumbnail')).toBeDefined();
+    });
+
+    expect(screen.getByTestId('dish-name-input')).toHaveValue('Grilled Salmon Salad');
+  });
+
+  it('keeps meal photo pinned at top when switching to manual entry', async () => {
+    const { Camera } = await import('@capacitor/camera');
+    (Camera.getPhoto as any).mockResolvedValue({
+      base64String: 'dGVzdC1waG90by1waW5uZWQ=',
+      format: 'jpeg',
+    });
+
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: null,
+      error: {
+        context: {
+          status: 429,
+          json: async () => ({
+            code: 'RATE_LIMITED',
+            retryAfter: 15,
+            error: 'Gemini rate limit exceeded (15 RPM). Please wait 15 seconds or switch to manual entry.',
+          }),
+        },
+      },
+    });
+
+    renderComponent();
+
+    // Attach photo
+    fireEvent.click(screen.getByTestId('camera-trigger'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('photo-preview')).toBeDefined();
+    });
+
+    // Trigger analysis which returns 429
+    fireEvent.click(screen.getByTestId('analyze-meal-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('rate-limit-banner')).toBeDefined();
+    });
+
+    // Click Switch to Manual Entry
+    fireEvent.click(screen.getByTestId('switch-to-manual-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('pinned-photo-in-manual')).toBeDefined();
+    });
+
+    // Verify no contradictory green success message is displayed
+    expect(screen.queryByTestId('status-message')).toBeNull();
+
+    // Verify 1-tap removal of pinned photo in manual form
+    const removePinnedBtn = screen.getByTestId('remove-pinned-photo-button');
+    fireEvent.click(removePinnedBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('pinned-photo-in-manual')).toBeNull();
+    });
+  });
+
+  it('pre-populates manual dish name with "Meal Photo" when switching to manual with photo and empty text', async () => {
+    const { Camera } = await import('@capacitor/camera');
+    (Camera.getPhoto as any).mockResolvedValue({
+      base64String: 'dGVzdC1waG90by1tYW51YWw=',
+      format: 'jpeg',
+    });
+
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: null,
+      error: {
+        context: {
+          status: 429,
+          json: async () => ({
+            code: 'RATE_LIMITED',
+            retryAfter: 15,
+            error: 'Gemini rate limit exceeded (15 RPM). Please wait 15 seconds or switch to manual entry.',
+          }),
+        },
+      },
+    });
+
+    renderComponent();
+
+    // Attach photo without typing text in nlInput
+    fireEvent.click(screen.getByTestId('camera-trigger'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('photo-preview')).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByTestId('analyze-meal-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('switch-to-manual-btn')).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByTestId('switch-to-manual-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('dish-name-input')).toHaveValue('Meal Photo');
+    });
+  });
+
+  it('resets selectedPhoto and closes staged state when a meal is logged to database', async () => {
+    const { Camera } = await import('@capacitor/camera');
+    (Camera.getPhoto as any).mockResolvedValue({
+      base64String: 'dGVzdC1waG90by1sb2dnZWQ=',
+      format: 'jpeg',
+    });
+
+    const mockInsert = vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) });
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'nutrition_logs') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
+          insert: mockInsert,
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
+        }),
+      };
+    });
+
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: {
+        name: 'Avocado Toast & Egg',
+        calories: 380,
+        protein: 14,
+        carbs: 30,
+        fat: 22,
+        fiber: 6,
+        explanation: 'Avocado toast with fried egg',
+        items: [
+          { name: 'Avocado Toast', portion: '1 slice', calories: 290, protein: 8, carbs: 30, fat: 15, fiber: 6 },
+          { name: 'Fried Egg', portion: '1 egg', calories: 90, protein: 6, carbs: 0, fat: 7, fiber: 0 },
+        ],
+      },
+      error: null,
+    });
+
+    renderComponent();
+
+    // Attach photo
+    fireEvent.click(screen.getByTestId('gallery-trigger'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('photo-preview-container')).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByTestId('analyze-meal-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('staged-meal-card')).toBeDefined();
+    });
+
+    // Click Log Meal
+    fireEvent.click(screen.getByText('Log Meal (+380 kcal)'));
+
+    await waitFor(() => {
+      expect(mockInsert).toHaveBeenCalled();
+    });
+
+    // Verify photo preview is cleared and state reset
+    await waitFor(() => {
+      expect(screen.queryByTestId('photo-preview-container')).toBeNull();
+      expect(screen.queryByTestId('staged-meal-card')).toBeNull();
+      expect(screen.getByTestId('analyze-meal-button')).toBeDisabled();
+    });
+  });
+
+  it('attaches a photo preview when an image is selected via the hidden file input', async () => {
+    renderComponent();
+
+    const hiddenFileInput = screen.getByTestId('hidden-file-input') as HTMLInputElement;
+    expect(hiddenFileInput).toBeDefined();
+
+    const file = new File(['mock-image-content'], 'meal.jpg', { type: 'image/jpeg' });
+    fireEvent.change(hiddenFileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('photo-preview-container')).toBeDefined();
+      expect(screen.getByTestId('photo-preview')).toBeDefined();
+    });
+
+    expect(screen.getByTestId('analyze-meal-button')).not.toBeDisabled();
+  });
+
+  it('handles user cancellation of camera or gallery picker gracefully without showing an error banner', async () => {
+    const { Camera } = await import('@capacitor/camera');
+    (Camera.getPhoto as any).mockRejectedValue(new Error('User cancelled photos app'));
+
+    renderComponent();
+
+    const cameraBtn = screen.getByTestId('camera-trigger');
+    fireEvent.click(cameraBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('status-message')).toBeNull();
+      expect(screen.queryByText(/AI service unavailable/i)).toBeNull();
+      expect(screen.queryByTestId('photo-preview-container')).toBeNull();
+    });
+  });
+
+  it('complies with WCAG 2.5.5 touch target size (minimum 44x44px) and touch-manipulation on camera, gallery, remove, and manual buttons', async () => {
+    const { Camera } = await import('@capacitor/camera');
+    (Camera.getPhoto as any).mockResolvedValue({
+      base64String: 'dGVzdC10b3VjaC10YXJnZXQ=',
+      format: 'jpeg',
+    });
+
+    renderComponent();
+
+    const cameraBtn = screen.getByTestId('camera-trigger');
+    const galleryBtn = screen.getByTestId('gallery-trigger');
+    const manualToggleBtn = screen.getByText('Manual Entry').closest('button');
+
+    expect(cameraBtn.className).toContain('min-h-[44px]');
+    expect(cameraBtn.className).toContain('min-w-[44px]');
+    expect(cameraBtn.className).toContain('touch-manipulation');
+
+    expect(galleryBtn.className).toContain('min-h-[44px]');
+    expect(galleryBtn.className).toContain('min-w-[44px]');
+    expect(galleryBtn.className).toContain('touch-manipulation');
+
+    expect(manualToggleBtn?.className).toContain('min-h-[44px]');
+    expect(manualToggleBtn?.className).toContain('min-w-[44px]');
+    expect(manualToggleBtn?.className).toContain('touch-manipulation');
+
+    // Attach photo to check remove-photo-button
+    fireEvent.click(cameraBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('remove-photo-button')).toBeDefined();
+    });
+
+    const removeBtn = screen.getByTestId('remove-photo-button');
+    expect(removeBtn.className).toContain('min-h-[44px]');
+    expect(removeBtn.className).toContain('min-w-[44px]');
+    expect(removeBtn.className).toContain('touch-manipulation');
+
+    const analyzeBtn = screen.getByTestId('analyze-meal-button');
+    expect(analyzeBtn.className).toContain('min-h-[44px]');
+    expect(analyzeBtn.className).toContain('min-w-[44px]');
+    expect(analyzeBtn.className).toContain('touch-manipulation');
+  });
+
+  it('handles Android single "l" cancellation ("User canceled") without error or triggering file input click', async () => {
+    const { Camera } = await import('@capacitor/camera');
+    (Camera.getPhoto as any).mockRejectedValue(new Error('User canceled'));
+
+    renderComponent();
+
+    const hiddenFileInput = screen.getByTestId('hidden-file-input') as HTMLInputElement;
+    const fileClickSpy = vi.spyOn(hiddenFileInput, 'click');
+
+    const cameraBtn = screen.getByTestId('camera-trigger');
+    fireEvent.click(cameraBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('status-message')).toBeNull();
+      expect(screen.queryByText(/AI service unavailable/i)).toBeNull();
+      expect(screen.queryByTestId('photo-preview-container')).toBeNull();
+      expect(fileClickSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  it('displays error status when file input receives an unreadable/invalid image rather than attaching broken preview', async () => {
+    renderComponent();
+
+    const hiddenFileInput = screen.getByTestId('hidden-file-input') as HTMLInputElement;
+    // An empty 0-byte file that resolves to empty base64
+    const emptyFile = new File([], 'empty.jpg', { type: 'image/jpeg' });
+    fireEvent.change(hiddenFileInput, { target: { files: [emptyFile] } });
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('photo-preview-container')).toBeNull();
+      expect(screen.getByTestId('status-message')).toBeDefined();
+      expect(screen.getByText(/Could not process selected image/i)).toBeDefined();
+    });
+  });
+
+  it('unwraps Retry-After directly from error.context.headers when response body is plain text or empty', async () => {
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: null,
+      error: {
+        context: {
+          status: 429,
+          headers: new Headers({ 'Retry-After': '30' }),
+          json: async () => {
+            throw new Error('Unexpected token in JSON');
+          },
+        },
+      },
+    });
+
+    renderComponent();
+
+    // Attach photo
+    const { Camera } = await import('@capacitor/camera');
+    (Camera.getPhoto as any).mockResolvedValue({
+      base64String: 'dGVzdC1waG90bw==',
+      format: 'jpeg',
+    });
+    fireEvent.click(screen.getByTestId('camera-trigger'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('photo-preview')).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByTestId('analyze-meal-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('rate-limit-banner')).toBeDefined();
+    });
   });
 });
 

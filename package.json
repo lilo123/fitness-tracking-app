@@ -17,6 +17,7 @@
     "migrate:historical": "python3 scripts/migrate-historical-data.py"
   },
   "dependencies": {
+    "@capacitor/camera": "^7.0.5",
     "@capacitor/core": "^7.6.8",
     "@kiwi-health/capacitor-health-connect": "^0.0.42",
     "@supabase/supabase-js": "^2.109.0",

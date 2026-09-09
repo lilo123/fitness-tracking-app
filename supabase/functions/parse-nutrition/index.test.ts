@@ -56,7 +56,7 @@ Deno.test("parse-nutrition should return 401 when token is invalid or rejected b
     }
 });
 
-Deno.test("parse-nutrition should return 400 when input text is empty", async () => {
+Deno.test("parse-nutrition should return 400 when input text and image are both empty", async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async (input: string | Request | URL): Promise<Response> => {
         const urlString = input.toString();
@@ -80,7 +80,108 @@ Deno.test("parse-nutrition should return 400 when input text is empty", async ()
         assertEquals(res.status, 400);
 
         const data = await res.json();
-        assertEquals(data.error, "Input text is required for nutrition parsing.");
+        assertEquals(data.error, "Input text or meal photo is required for nutrition parsing.");
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+
+Deno.test("parse-nutrition succeeds when input text is empty but image is present", async () => {
+    const originalKey = Deno.env.get("GEMINI_API_KEY");
+    Deno.env.set("GEMINI_API_KEY", "test-key");
+
+    const originalFetch = globalThis.fetch;
+    const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
+        const urlString = input.toString();
+        if (urlString.includes("/auth/v1/user")) {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        if (urlString.includes("generativelanguage.googleapis.com")) {
+            const mockResponse = {
+                candidates: [
+                    {
+                        content: {
+                            parts: [
+                                {
+                                    text: JSON.stringify({
+                                        name: "Avocado Toast",
+                                        calories: 320,
+                                        protein: 8,
+                                        carbs: 35,
+                                        fat: 18,
+                                        fiber: 7,
+                                        explanation: "1 slice avocado toast",
+                                        items: [
+                                            { name: "Avocado Toast", portion: "1 slice", calories: 320, protein: 8, carbs: 35, fat: 18, fiber: 7 }
+                                        ]
+                                    })
+                                }
+                            ]
+                        }
+                    }
+                ]
+            };
+            return new Response(JSON.stringify(mockResponse), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        return originalFetch(input, init);
+    };
+
+    globalThis.fetch = mockFetch;
+
+    try {
+        const req = new Request("http://localhost/parse-nutrition", {
+            method: "POST",
+            headers: { "Authorization": "Bearer valid-jwt-token" },
+            body: JSON.stringify({ input: "", image_base64: "iVBORw0KGgoAAAANSUhEUgAA" })
+        });
+
+        const res = await app.fetch(req);
+        assertEquals(res.status, 200);
+
+        const data = await res.json();
+        assertEquals(data.name, "Avocado Toast");
+        assertEquals(data.calories, 320);
+    } finally {
+        globalThis.fetch = originalFetch;
+        if (originalKey) {
+            Deno.env.set("GEMINI_API_KEY", originalKey);
+        } else {
+            Deno.env.delete("GEMINI_API_KEY");
+        }
+    }
+});
+
+Deno.test("parse-nutrition should return 400 when request body is malformed JSON", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input: string | Request | URL): Promise<Response> => {
+        const urlString = input.toString();
+        if (urlString.includes("/auth/v1/user")) {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        return originalFetch(input);
+    };
+
+    try {
+        const req = new Request("http://localhost/parse-nutrition", {
+            method: "POST",
+            headers: { "Authorization": "Bearer valid-jwt-token" },
+            body: "invalid-json{{{"
+        });
+
+        const res = await app.fetch(req);
+        assertEquals(res.status, 400);
+
+        const data = await res.json();
+        assertEquals(data.error, "Malformed JSON or payload too large.");
     } finally {
         globalThis.fetch = originalFetch;
     }
@@ -248,7 +349,7 @@ Deno.test("parse-nutrition should strip markdown code fences from Gemini respons
     }
 });
 
-Deno.test("parse-nutrition should return 500 when Gemini API encounters a rate limit or service error", async () => {
+Deno.test("parse-nutrition should return 429 with RATE_LIMITED code when Gemini API encounters rate limit", async () => {
     const originalKey = Deno.env.get("GEMINI_API_KEY");
     Deno.env.set("GEMINI_API_KEY", "test-key");
 
@@ -262,7 +363,7 @@ Deno.test("parse-nutrition should return 500 when Gemini API encounters a rate l
             });
         }
         if (urlString.includes("generativelanguage.googleapis.com")) {
-            return new Response(JSON.stringify({ error: { message: "Resource has been exhausted (rate limit 429)" } }), {
+            return new Response(JSON.stringify({ error: { code: 429, message: "Resource has been exhausted (rate limit 429)" } }), {
                 status: 429,
                 headers: { "Content-Type": "application/json" }
             });
@@ -280,10 +381,111 @@ Deno.test("parse-nutrition should return 500 when Gemini API encounters a rate l
         });
 
         const res = await app.fetch(req);
-        assertEquals(res.status, 500);
+        assertEquals(res.status, 429);
 
         const data = await res.json();
-        assertEquals(data.error, "Failed to parse meal nutrition. Please check your connection or use manual entry.");
+        assertEquals(data.code, "RATE_LIMITED");
+        assertEquals(data.retryAfter, 15);
+        assertExists(data.error);
+    } finally {
+        globalThis.fetch = originalFetch;
+        if (originalKey) {
+            Deno.env.set("GEMINI_API_KEY", originalKey);
+        } else {
+            Deno.env.delete("GEMINI_API_KEY");
+        }
+    }
+});
+
+Deno.test("parse-nutrition should structure multimodal payload with inlineData and route to gemini-3.8-flash", async () => {
+    const originalKey = Deno.env.get("GEMINI_API_KEY");
+    Deno.env.set("GEMINI_API_KEY", "test-key");
+
+    let interceptedUrl = "";
+    let interceptedBody: any = null;
+
+    const originalFetch = globalThis.fetch;
+    const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
+        const urlString = input.toString();
+        if (urlString.includes("/auth/v1/user")) {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        if (urlString.includes("generativelanguage.googleapis.com")) {
+            interceptedUrl = urlString;
+            if (init?.body) {
+                interceptedBody = JSON.parse(init.body as string);
+            }
+            const mockResponse = {
+                candidates: [
+                    {
+                        content: {
+                            parts: [
+                                {
+                                    text: JSON.stringify({
+                                        name: "Grilled Salmon Bowl",
+                                        calories: 520,
+                                        protein: 42,
+                                        carbs: 45,
+                                        fat: 18,
+                                        fiber: 5,
+                                        explanation: "Fresh salmon with brown rice and broccoli",
+                                        items: [
+                                            { name: "Salmon", portion: "1 fillet", calories: 280, protein: 34, carbs: 0, fat: 15, fiber: 0 },
+                                            { name: "Brown Rice", portion: "1 cup", calories: 200, protein: 5, carbs: 40, fat: 2, fiber: 3 },
+                                            { name: "Broccoli", portion: "1 cup", calories: 40, protein: 3, carbs: 5, fat: 1, fiber: 2 }
+                                        ]
+                                    })
+                                }
+                            ]
+                        }
+                    }
+                ]
+            };
+            return new Response(JSON.stringify(mockResponse), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        return originalFetch(input, init);
+    };
+
+    globalThis.fetch = mockFetch;
+
+    try {
+        const testBase64 = "data:image/jpeg;base64,dGVzdC1pbWFnZS1kYXRh";
+        const req = new Request("http://localhost/parse-nutrition", {
+            method: "POST",
+            headers: { "Authorization": "Bearer valid-jwt-token" },
+            body: JSON.stringify({
+                input: "Salmon bowl for lunch",
+                image_base64: testBase64,
+                imageMimeType: "image/jpeg"
+            })
+        });
+
+        const res = await app.fetch(req);
+        assertEquals(res.status, 200);
+
+        const data = await res.json();
+        assertEquals(data.name, "Grilled Salmon Bowl");
+        assertEquals(data.calories, 520);
+        assertEquals(data.protein, 42);
+
+        // Verify that gemini-3.8-flash was called as the primary vision model
+        assertEquals(interceptedUrl.includes("gemini-3.8-flash"), true);
+
+        // Verify that inlineData was properly constructed in the Gemini contents parts
+        assertExists(interceptedBody);
+        assertExists(interceptedBody.contents);
+        const parts = interceptedBody.contents[0].parts;
+        assertExists(parts);
+        const inlinePart = parts.find((p: any) => p.inlineData);
+        assertExists(inlinePart);
+        assertEquals(inlinePart.inlineData.mimeType, "image/jpeg");
+        assertEquals(inlinePart.inlineData.data, "dGVzdC1pbWFnZS1kYXRh");
     } finally {
         globalThis.fetch = originalFetch;
         if (originalKey) {
@@ -680,6 +882,636 @@ Total Fiber: 8 g
         }
     }
 });
+
+Deno.test("parse-nutrition detects image/png MIME type automatically from Data URI", async () => {
+    const originalKey = Deno.env.get("GEMINI_API_KEY");
+    Deno.env.set("GEMINI_API_KEY", "test-key");
+
+    let interceptedBody: any = null;
+
+    const originalFetch = globalThis.fetch;
+    const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
+        const urlString = input.toString();
+        if (urlString.includes("/auth/v1/user")) {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        if (urlString.includes("generativelanguage.googleapis.com")) {
+            if (init?.body) {
+                interceptedBody = JSON.parse(init.body as string);
+            }
+            const mockResponse = {
+                candidates: [
+                    {
+                        content: {
+                            parts: [
+                                {
+                                    text: JSON.stringify({
+                                        name: "Fruit Salad",
+                                        calories: 150,
+                                        protein: 2,
+                                        carbs: 38,
+                                        fat: 1,
+                                        fiber: 5,
+                                        explanation: "Mixed berries",
+                                        items: [{ name: "Berries", portion: "1 bowl", calories: 150, protein: 2, carbs: 38, fat: 1, fiber: 5 }]
+                                    })
+                                }
+                            ]
+                        }
+                    }
+                ]
+            };
+            return new Response(JSON.stringify(mockResponse), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        return originalFetch(input, init);
+    };
+
+    globalThis.fetch = mockFetch;
+
+    try {
+        const req = new Request("http://localhost/parse-nutrition", {
+            method: "POST",
+            headers: { "Authorization": "Bearer valid-jwt-token" },
+            body: JSON.stringify({
+                image_base64: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA"
+            })
+        });
+
+        const res = await app.fetch(req);
+        assertEquals(res.status, 200);
+
+        assertExists(interceptedBody);
+        const inlinePart = interceptedBody.contents[0].parts.find((p: any) => p.inlineData);
+        assertExists(inlinePart);
+        assertEquals(inlinePart.inlineData.mimeType, "image/png");
+        assertEquals(inlinePart.inlineData.data, "iVBORw0KGgoAAAANSUhEUgAA");
+    } finally {
+        globalThis.fetch = originalFetch;
+        if (originalKey) {
+            Deno.env.set("GEMINI_API_KEY", originalKey);
+        } else {
+            Deno.env.delete("GEMINI_API_KEY");
+        }
+    }
+});
+
+Deno.test("parse-nutrition preserves 429 status and Retry-After header even if fallback model returns 503", async () => {
+    const originalKey = Deno.env.get("GEMINI_API_KEY");
+    Deno.env.set("GEMINI_API_KEY", "test-key");
+
+    const originalFetch = globalThis.fetch;
+    const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
+        const urlString = input.toString();
+        if (urlString.includes("/auth/v1/user")) {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        if (urlString.includes("generativelanguage.googleapis.com")) {
+            if (urlString.includes("gemini-3.8-flash")) {
+                // Primary vision model encounters 429
+                return new Response(JSON.stringify({ error: { code: 429, message: "Resource exhausted" } }), {
+                    status: 429,
+                    headers: { "Content-Type": "application/json" }
+                });
+            }
+            // Fallback model encounters 503
+            return new Response(JSON.stringify({ error: { code: 503, message: "Service Unavailable" } }), {
+                status: 503,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        return originalFetch(input, init);
+    };
+
+    globalThis.fetch = mockFetch;
+
+    try {
+        const req = new Request("http://localhost/parse-nutrition", {
+            method: "POST",
+            headers: { "Authorization": "Bearer valid-jwt-token" },
+            body: JSON.stringify({
+                image_base64: "iVBORw0KGgoAAAANSUhEUgAA"
+            })
+        });
+
+        const res = await app.fetch(req);
+        assertEquals(res.status, 429);
+        assertEquals(res.headers.get("Retry-After"), "15");
+
+        const data = await res.json();
+        assertEquals(data.code, "RATE_LIMITED");
+        assertEquals(data.retryAfter, 15);
+    } finally {
+        globalThis.fetch = originalFetch;
+        if (originalKey) {
+            Deno.env.set("GEMINI_API_KEY", originalKey);
+        } else {
+            Deno.env.delete("GEMINI_API_KEY");
+        }
+    }
+});
+
+Deno.test("parse-nutrition accepts camelCase imageBase64 parameter", async () => {
+    const originalKey = Deno.env.get("GEMINI_API_KEY");
+    Deno.env.set("GEMINI_API_KEY", "test-key");
+
+    let interceptedBody: any = null;
+
+    const originalFetch = globalThis.fetch;
+    const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
+        const urlString = input.toString();
+        if (urlString.includes("/auth/v1/user")) {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        if (urlString.includes("generativelanguage.googleapis.com")) {
+            if (init?.body) {
+                interceptedBody = JSON.parse(init.body as string);
+            }
+            const mockResponse = {
+                candidates: [
+                    {
+                        content: {
+                            parts: [
+                                {
+                                    text: JSON.stringify({
+                                        name: "Greek Salad",
+                                        calories: 220,
+                                        protein: 6,
+                                        carbs: 12,
+                                        fat: 18,
+                                        fiber: 4,
+                                        explanation: "Feta, olives, cucumber",
+                                        items: [{ name: "Greek Salad", portion: "1 bowl", calories: 220, protein: 6, carbs: 12, fat: 18, fiber: 4 }]
+                                    })
+                                }
+                            ]
+                        }
+                    }
+                ]
+            };
+            return new Response(JSON.stringify(mockResponse), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        return originalFetch(input, init);
+    };
+
+    globalThis.fetch = mockFetch;
+
+    try {
+        const req = new Request("http://localhost/parse-nutrition", {
+            method: "POST",
+            headers: { "Authorization": "Bearer valid-jwt-token" },
+            body: JSON.stringify({
+                imageBase64: "dGVzdC1jYW1lbA=="
+            })
+        });
+
+        const res = await app.fetch(req);
+        assertEquals(res.status, 200);
+
+        assertExists(interceptedBody);
+        const inlinePart = interceptedBody.contents[0].parts.find((p: any) => p.inlineData);
+        assertExists(inlinePart);
+        assertEquals(inlinePart.inlineData.data, "dGVzdC1jYW1lbA==");
+    } finally {
+        globalThis.fetch = originalFetch;
+        if (originalKey) {
+            Deno.env.set("GEMINI_API_KEY", originalKey);
+        } else {
+            Deno.env.delete("GEMINI_API_KEY");
+        }
+    }
+});
+
+Deno.test("parse-nutrition exposes Retry-After in Access-Control-Expose-Headers for CORS clients", async () => {
+    const reqOptions = new Request("http://localhost/parse-nutrition", {
+        method: "OPTIONS",
+    });
+    const resOptions = await app.fetch(reqOptions);
+    assertEquals(resOptions.status, 200);
+    assertEquals(resOptions.headers.get("Access-Control-Expose-Headers"), "Retry-After");
+});
+
+Deno.test("parse-nutrition falls back to text-only mode when imageBase64 is an empty data URI but input text exists", async () => {
+    const originalKey = Deno.env.get("GEMINI_API_KEY");
+    Deno.env.set("GEMINI_API_KEY", "test-key");
+
+    let interceptedBody: any = null;
+
+    const originalFetch = globalThis.fetch;
+    const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
+        const urlString = input.toString();
+        if (urlString.includes("/auth/v1/user")) {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        if (urlString.includes("generativelanguage.googleapis.com")) {
+            if (init?.body) {
+                interceptedBody = JSON.parse(init.body as string);
+            }
+            const mockResponse = {
+                candidates: [
+                    {
+                        content: {
+                            parts: [
+                                {
+                                    text: JSON.stringify({
+                                        name: "2 Red Apples",
+                                        calories: 190,
+                                        protein: 1,
+                                        carbs: 50,
+                                        fat: 0,
+                                        fiber: 8,
+                                        explanation: "2 medium apples",
+                                        items: [{ name: "Red Apple", portion: "2 medium", calories: 190, protein: 1, carbs: 50, fat: 0, fiber: 8 }]
+                                    })
+                                }
+                            ]
+                        }
+                    }
+                ]
+            };
+            return new Response(JSON.stringify(mockResponse), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        return originalFetch(input, init);
+    };
+
+    globalThis.fetch = mockFetch;
+
+    try {
+        const req = new Request("http://localhost/parse-nutrition", {
+            method: "POST",
+            headers: { "Authorization": "Bearer valid-jwt-token" },
+            body: JSON.stringify({
+                input: "Had 2 red apples",
+                imageBase64: "data:image/jpeg;base64,"
+            })
+        });
+
+        const res = await app.fetch(req);
+        assertEquals(res.status, 200);
+
+        const data = await res.json();
+        assertEquals(data.name, "2 Red Apples");
+        assertEquals(data.calories, 190);
+
+        // Verify it routed to text-only mode without inlineData part
+        assertExists(interceptedBody);
+        const parts = interceptedBody.contents[0].parts;
+        const inlinePart = parts.find((p: any) => p.inlineData);
+        assertEquals(inlinePart, undefined);
+    } finally {
+        globalThis.fetch = originalFetch;
+        if (originalKey) {
+            Deno.env.set("GEMINI_API_KEY", originalKey);
+        } else {
+            Deno.env.delete("GEMINI_API_KEY");
+        }
+    }
+});
+
+Deno.test("parse-nutrition returns 400 when input is empty and imageBase64 is an empty data URI", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input: string | Request | URL): Promise<Response> => {
+        const urlString = input.toString();
+        if (urlString.includes("/auth/v1/user")) {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        return originalFetch(input);
+    };
+
+    try {
+        const req = new Request("http://localhost/parse-nutrition", {
+            method: "POST",
+            headers: { "Authorization": "Bearer valid-jwt-token" },
+            body: JSON.stringify({
+                input: "   ",
+                imageBase64: "data:image/jpeg;base64,"
+            })
+        });
+
+        const res = await app.fetch(req);
+        assertEquals(res.status, 400);
+
+        const data = await res.json();
+        assertEquals(data.error, "Input text or meal photo is required for nutrition parsing.");
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+
+Deno.test("parse-nutrition seamlessly falls back to secondary model when primary candidate returns truncated or invalid JSON", async () => {
+    const originalKey = Deno.env.get("GEMINI_API_KEY");
+    Deno.env.set("GEMINI_API_KEY", "test-key");
+
+    let callCount = 0;
+    const originalFetch = globalThis.fetch;
+    const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
+        const urlString = input.toString();
+        if (urlString.includes("/auth/v1/user")) {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        if (urlString.includes("generativelanguage.googleapis.com")) {
+            callCount += 1;
+            if (urlString.includes("gemini-3.6-flash")) {
+                // Primary model returns truncated/malformed JSON
+                return new Response(JSON.stringify({
+                    candidates: [
+                        {
+                            content: {
+                                parts: [
+                                    { text: "{\"name\": \"Truncated Bowl\", \"calories\": 400, \"items\": [" }
+                                ]
+                            }
+                        }
+                    ]
+                }), {
+                    status: 200,
+                    headers: { "Content-Type": "application/json" }
+                });
+            }
+            // Fallback model returns valid complete JSON
+            const mockResponse = {
+                candidates: [
+                    {
+                        content: {
+                            parts: [
+                                {
+                                    text: JSON.stringify({
+                                        name: "Healthy Bowl",
+                                        calories: 420,
+                                        protein: 30,
+                                        carbs: 45,
+                                        fat: 12,
+                                        fiber: 6,
+                                        explanation: "Balanced meal",
+                                        items: [{ name: "Bowl", portion: "1 bowl", calories: 420, protein: 30, carbs: 45, fat: 12, fiber: 6 }]
+                                    })
+                                }
+                            ]
+                        }
+                    }
+                ]
+            };
+            return new Response(JSON.stringify(mockResponse), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        return originalFetch(input, init);
+    };
+
+    globalThis.fetch = mockFetch;
+
+    try {
+        const req = new Request("http://localhost/parse-nutrition", {
+            method: "POST",
+            headers: { "Authorization": "Bearer valid-jwt-token" },
+            body: JSON.stringify({ input: "Healthy Bowl" })
+        });
+
+        const res = await app.fetch(req);
+        assertEquals(res.status, 200);
+
+        const data = await res.json();
+        assertEquals(data.name, "Healthy Bowl");
+        assertEquals(data.calories, 420);
+        assertEquals(callCount >= 2, true);
+    } finally {
+        globalThis.fetch = originalFetch;
+        if (originalKey) {
+            Deno.env.set("GEMINI_API_KEY", originalKey);
+        } else {
+            Deno.env.delete("GEMINI_API_KEY");
+        }
+    }
+});
+
+Deno.test("parse-nutrition falls back to secondary model when primary candidate returns JSON missing nutrition data", async () => {
+    const originalKey = Deno.env.get("GEMINI_API_KEY");
+    Deno.env.set("GEMINI_API_KEY", "test-key");
+
+    let callCount = 0;
+    const originalFetch = globalThis.fetch;
+    const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
+        const urlString = input.toString();
+        if (urlString.includes("/auth/v1/user")) {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        if (urlString.includes("generativelanguage.googleapis.com")) {
+            callCount += 1;
+            if (urlString.includes("gemini-3.6-flash")) {
+                // Primary model returns valid JSON but empty object missing calories/items
+                return new Response(JSON.stringify({
+                    candidates: [
+                        {
+                            content: {
+                                parts: [
+                                    { text: JSON.stringify({ name: "Incomplete Object" }) }
+                                ]
+                            }
+                        }
+                    ]
+                }), {
+                    status: 200,
+                    headers: { "Content-Type": "application/json" }
+                });
+            }
+            // Fallback model returns valid complete payload
+            const mockResponse = {
+                candidates: [
+                    {
+                        content: {
+                            parts: [
+                                {
+                                    text: JSON.stringify({
+                                        name: "Complete Salad",
+                                        calories: 250,
+                                        protein: 10,
+                                        carbs: 20,
+                                        fat: 14,
+                                        fiber: 5,
+                                        explanation: "Garden salad with dressing",
+                                        items: [{ name: "Salad", portion: "1 bowl", calories: 250, protein: 10, carbs: 20, fat: 14, fiber: 5 }]
+                                    })
+                                }
+                            ]
+                        }
+                    }
+                ]
+            };
+            return new Response(JSON.stringify(mockResponse), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        return originalFetch(input, init);
+    };
+
+    globalThis.fetch = mockFetch;
+
+    try {
+        const req = new Request("http://localhost/parse-nutrition", {
+            method: "POST",
+            headers: { "Authorization": "Bearer valid-jwt-token" },
+            body: JSON.stringify({ input: "Garden salad" })
+        });
+
+        const res = await app.fetch(req);
+        assertEquals(res.status, 200);
+
+        const data = await res.json();
+        assertEquals(data.name, "Complete Salad");
+        assertEquals(data.calories, 250);
+        assertEquals(callCount >= 2, true);
+    } finally {
+        globalThis.fetch = originalFetch;
+        if (originalKey) {
+            Deno.env.set("GEMINI_API_KEY", originalKey);
+        } else {
+            Deno.env.delete("GEMINI_API_KEY");
+        }
+    }
+});
+
+Deno.test("parse-nutrition handles data URIs with parameters like data:image/png;name=meal.png;base64,...", async () => {
+    const originalKey = Deno.env.get("GEMINI_API_KEY");
+    Deno.env.set("GEMINI_API_KEY", "test-key");
+
+    let interceptedBody: any = null;
+    const originalFetch = globalThis.fetch;
+    const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
+        const urlString = input.toString();
+        if (urlString.includes("/auth/v1/user")) {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        if (urlString.includes("generativelanguage.googleapis.com")) {
+            if (init?.body) {
+                interceptedBody = JSON.parse(init.body as string);
+            }
+            const mockResponse = {
+                candidates: [
+                    {
+                        content: {
+                            parts: [
+                                {
+                                    text: JSON.stringify({
+                                        name: "Protein Shake",
+                                        calories: 220,
+                                        protein: 30,
+                                        carbs: 10,
+                                        fat: 4,
+                                        fiber: 2,
+                                        explanation: "Whey protein shake",
+                                        items: [{ name: "Shake", portion: "1 scoop", calories: 220, protein: 30, carbs: 10, fat: 4, fiber: 2 }]
+                                    })
+                                }
+                            ]
+                        }
+                    }
+                ]
+            };
+            return new Response(JSON.stringify(mockResponse), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        return originalFetch(input, init);
+    };
+
+    globalThis.fetch = mockFetch;
+
+    try {
+        const req = new Request("http://localhost/parse-nutrition", {
+            method: "POST",
+            headers: { "Authorization": "Bearer valid-jwt-token" },
+            body: JSON.stringify({
+                imageBase64: "data:image/png;name=shake.png;base64,iVBORw0KGgoAAAANSUhEUgAA"
+            })
+        });
+
+        const res = await app.fetch(req);
+        assertEquals(res.status, 200);
+
+        assertExists(interceptedBody);
+        const parts = interceptedBody.contents[0].parts;
+        const inlinePart = parts.find((p: any) => p.inlineData);
+        assertExists(inlinePart);
+        assertEquals(inlinePart.inlineData.mimeType, "image/png");
+        assertEquals(inlinePart.inlineData.data, "iVBORw0KGgoAAAANSUhEUgAA");
+    } finally {
+        globalThis.fetch = originalFetch;
+        if (originalKey) {
+            Deno.env.set("GEMINI_API_KEY", originalKey);
+        } else {
+            Deno.env.delete("GEMINI_API_KEY");
+        }
+    }
+});
+
+Deno.test("parse-nutrition treats data:, as empty image and returns 400 when input is also empty", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input: string | Request | URL): Promise<Response> => {
+        const urlString = input.toString();
+        if (urlString.includes("/auth/v1/user")) {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        return originalFetch(input);
+    };
+
+    try {
+        const req = new Request("http://localhost/parse-nutrition", {
+            method: "POST",
+            headers: { "Authorization": "Bearer valid-jwt-token" },
+            body: JSON.stringify({
+                input: "",
+                imageBase64: "data:,"
+            })
+        });
+
+        const res = await app.fetch(req);
+        assertEquals(res.status, 400);
+
+        const data = await res.json();
+        assertEquals(data.error, "Input text or meal photo is required for nutrition parsing.");
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+
 
 
 
