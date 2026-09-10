@@ -336,7 +336,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
                 type="text"
                 value={customCoachCode}
                 onChange={(e) => setCustomCoachCode(e.target.value.toUpperCase())}
-                placeholder="Enter vanity code (e.g. COACH-DUY)"
+                placeholder="Enter vanity code (e.g. COACH-PRO)"
                 maxLength={20}
                 className="flex-1 bg-zinc-950 border border-zinc-800 text-white rounded-xl px-3 py-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none uppercase min-h-[44px]"
                 required
@@ -423,7 +423,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
                   type="text"
                   value={customCoachCode}
                   onChange={(e) => setCustomCoachCode(e.target.value.toUpperCase())}
-                  placeholder="e.g. COACH-DUY"
+                  placeholder="e.g. COACH-PRO"
                   maxLength={20}
                   className="flex-1 bg-zinc-950 border border-zinc-800 text-white rounded-xl px-3 py-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none uppercase min-h-[44px]"
                   data-testid="vanity-code-input"
