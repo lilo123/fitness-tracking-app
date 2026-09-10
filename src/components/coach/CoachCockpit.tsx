@@ -165,7 +165,7 @@ export const CoachCockpit: React.FC = () => {
       if (tplErr || !tplId) throw new Error(tplErr?.message || 'Failed to create template');
 
       // 2. Insert exercises
-      const actualTemplateId = tplId?.template_id || tplId;
+      const actualTemplateId = tplId?.template_id || tplId?.id || (typeof tplId === 'string' ? tplId : null);
       const exPayloads = selectedExercises.map((ex, idx) => {
         const matched = exercises.find((e) => e.name === ex.exerciseName || e.id === ex.exerciseId);
         const resolvedId = matched ? matched.id : ex.exerciseId;
@@ -181,7 +181,7 @@ export const CoachCockpit: React.FC = () => {
       const { error: exErr } = await supabase.from('template_exercises').insert(exPayloads);
       if (exErr) throw exErr;
 
-      return { id: tplId };
+      return { id: actualTemplateId };
     },
     onSuccess: () => {
       setStatus('Template saved');

@@ -15,7 +15,7 @@ const { mockSession } = vi.hoisted(() => ({
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: vi.fn(),
-    rpc: vi.fn().mockResolvedValue({ data: { success: true }, error: null }),
+    rpc: vi.fn().mockResolvedValue({ data: { success: true, template_id: 'tpl-1' }, error: null }),
     auth: {
       getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'coach-id' } } }),
       getSession: vi.fn().mockResolvedValue({ data: { session: mockSession } }),
