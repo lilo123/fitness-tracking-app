@@ -2257,3 +2257,76 @@ Deno.test("Text provided - Should inject custom dishes", async () => {
         globalThis.fetch = originalFetch;
     }
 });
+
+Deno.test("parse-nutrition successfully processes dietary supplements and barcodes as is_food: true", async () => {
+    const originalKey = Deno.env.get("GEMINI_API_KEY");
+    Deno.env.set("GEMINI_API_KEY", "test-key");
+
+    const originalFetch = globalThis.fetch;
+    const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
+        const urlString = input.toString();
+        if (urlString.includes("/auth/v1/user")) {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        if (urlString.includes("generativelanguage.googleapis.com")) {
+            const mockResponse = {
+                candidates: [
+                    {
+                        content: {
+                            parts: [
+                                {
+                                    text: JSON.stringify({
+                                        is_food: true,
+                                        name: "Whey Protein Supplement",
+                                        calories: 120,
+                                        protein: 24,
+                                        carbs: 3,
+                                        fat: 1.5,
+                                        fiber: 0,
+                                        explanation: "Dietary supplement",
+                                        items: [
+                                            { name: "Whey Protein", portion: "1 scoop", calories: 120, protein: 24, carbs: 3, fat: 1.5, fiber: 0 }
+                                        ]
+                                    })
+                                }
+                            ]
+                        }
+                    }
+                ]
+            };
+            return new Response(JSON.stringify(mockResponse), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+        return originalFetch(input, init);
+    };
+
+    globalThis.fetch = mockFetch;
+
+    try {
+        const req = new Request("http://localhost/parse-nutrition", {
+            method: "POST",
+            headers: { "Authorization": "Bearer valid-jwt-token" },
+            body: JSON.stringify({ input: "1 scoop whey protein" })
+        });
+
+        const res = await app.fetch(req);
+        assertEquals(res.status, 200);
+
+        const data = await res.json();
+        assertEquals(data.name, "Whey Protein Supplement");
+        assertEquals(data.calories, 120);
+        assertEquals(data.protein, 24);
+    } finally {
+        globalThis.fetch = originalFetch;
+        if (originalKey) {
+            Deno.env.set("GEMINI_API_KEY", originalKey);
+        } else {
+            Deno.env.delete("GEMINI_API_KEY");
+        }
+    }
+});

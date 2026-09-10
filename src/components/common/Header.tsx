@@ -49,40 +49,42 @@ export const Header: React.FC = () => {
           </div>
 
           {/* Role Pill Switcher (Interactive only for verified coaches) */}
-          {isVerifiedCoach ? (
-            <button
-              onClick={() => switchRole(role === 'coach' ? 'athlete' : 'coach')}
-              className={`text-xs font-bold px-3 py-1.5 min-h-[36px] sm:min-h-[28px] rounded-full border flex items-center gap-1.5 transition ${
-                role === 'coach'
-                  ? 'text-cyan-300 bg-cyan-500/15 border-cyan-500/40 shadow-[0_0_10px_rgba(6,182,212,0.2)]'
-                  : 'text-zinc-400 bg-zinc-800 border-zinc-700'
-              }`}
-              title="Click to toggle Coach/Athlete view mode"
-            >
-              {role === 'coach' ? (
-                <>
-                  <Shield className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Coach</span>
-                </>
-              ) : (
-                <>
-                  <Zap className="w-3.5 h-3.5 text-zinc-400" />
-                  <span>Athlete</span>
-                </>
-              )}
-            </button>
-          ) : (
-            <div
-              className="text-xs font-bold px-2.5 py-1 rounded-full border text-zinc-400 bg-zinc-800/80 border-zinc-700/80 flex items-center gap-1.5 select-none"
-              title="Athlete Account"
-            >
-              <Zap className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Athlete</span>
-            </div>
+          {user && (
+            isVerifiedCoach ? (
+              <button
+                onClick={() => switchRole(role === 'coach' ? 'athlete' : 'coach')}
+                className={`text-xs font-bold px-3 py-1.5 min-h-[36px] sm:min-h-[28px] rounded-full border flex items-center gap-1.5 transition ${
+                  role === 'coach'
+                    ? 'text-cyan-300 bg-cyan-500/15 border-cyan-500/40 shadow-[0_0_10px_rgba(6,182,212,0.2)]'
+                    : 'text-zinc-400 bg-zinc-800 border-zinc-700'
+                }`}
+                title="Click to toggle Coach/Athlete view mode"
+              >
+                {role === 'coach' ? (
+                  <>
+                    <Shield className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Coach</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-3.5 h-3.5 text-zinc-400" />
+                    <span>Athlete</span>
+                  </>
+                )}
+              </button>
+            ) : (
+              <div
+                className="text-xs font-bold px-2.5 py-1 rounded-full border text-zinc-400 bg-zinc-800/80 border-zinc-700/80 flex items-center gap-1.5 select-none"
+                title="Athlete Account"
+              >
+                <Zap className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Athlete</span>
+              </div>
+            )
           )}
 
           {/* User / Sign Out */}
-          {user ? (
+          {user && (
             <button
               onClick={() => signOut()}
               className="text-zinc-400 hover:text-rose-400 min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-lg hover:bg-rose-500/10 transition"
@@ -90,13 +92,6 @@ export const Header: React.FC = () => {
             >
               <LogOut className="w-4 h-4" />
             </button>
-          ) : (
-            <Link
-              to="/login"
-              className="text-xs font-bold text-cyan-400 bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 min-h-[36px] flex items-center rounded-full transition"
-            >
-              Login
-            </Link>
           )}
         </div>
       </div>

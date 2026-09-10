@@ -9,7 +9,9 @@ test.describe('Coach-Athlete Code Linking & Lifecycle E2E', () => {
 
     // 1. Athlete logs in
     await page.goto('/login');
-    await page.click('button:has-text("Demo Athlete")');
+    await page.fill('input[type="email"]', 'athlete@cybergym.io');
+    await page.fill('input[type="password"]', 'password123');
+    await page.click('button[type="submit"]');
     await page.waitForURL('**/workout');
 
     // 2. Navigate to Settings
@@ -44,7 +46,9 @@ test.describe('Coach-Athlete Code Linking & Lifecycle E2E', () => {
     await page.waitForURL('**/login');
 
     // 6. Coach logs in
-    await page.click('button:has-text("Demo Coach")');
+    await page.fill('input[type="email"]', 'coach@cybergym.io');
+    await page.fill('input[type="password"]', 'password123');
+    await page.click('button[type="submit"]');
     await page.waitForURL('**/coach');
 
     // 7. Verify coach cockpit & athlete roster
@@ -83,7 +87,9 @@ test.describe('Coach-Athlete Code Linking & Lifecycle E2E', () => {
     await page.waitForURL('**/login');
 
     // 10. Athlete logs back in
-    await page.click('button:has-text("Demo Athlete")');
+    await page.fill('input[type="email"]', 'athlete@cybergym.io');
+    await page.fill('input[type="password"]', 'password123');
+    await page.click('button[type="submit"]');
     await page.waitForURL('**/workout');
 
     // 11. Athlete verifies updated targets in Settings

@@ -1,35 +1,74 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { Zap, Dumbbell, AlertCircle } from 'lucide-react';
-import type { UserRole } from '../../types/database';
+import { Zap, AlertCircle, Eye, EyeOff, CheckCircle2, ArrowLeft } from 'lucide-react';
+
+type AuthMode = 'signin' | 'register' | 'check_email' | 'forgot_password';
 
 export const LoginView: React.FC = () => {
-  const { signIn, signUp, switchRole } = useAuth();
+  const { signIn, signUp, requestPasswordReset, resendConfirmation } = useAuth();
   const navigate = useNavigate();
 
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [mode, setMode] = useState<AuthMode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [infoMsg, setInfoMsg] = useState('');
   const [loading, setLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    let timer: any;
+    if (cooldown > 0) {
+      timer = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [cooldown]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setInfoMsg('');
     setLoading(true);
 
-    if (isSignUp) {
+    if (mode === 'register') {
+      if (password.length < 6) {
+        setError('Password must be at least 6 characters');
+        setLoading(false);
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError('Passwords do not match');
+        setLoading(false);
+        return;
+      }
       const res = await signUp(email, password, 'athlete');
-      if (res.success) {
+      if (res.success && res.needsEmailConfirmation) {
+        setInfoMsg(res.message || 'Account created! Please check your email to verify your account.');
+        setMode('check_email');
+      } else if (res.success) {
         navigate('/workout');
       } else {
         setError(res.error || 'Failed to sign up');
       }
-    } else {
-      const res = await signIn(email, password);
+    } else if (mode === 'forgot_password') {
+      const res = await requestPasswordReset(email);
       if (res.success) {
-        navigate('/workout');
+        setInfoMsg('Password reset link sent! Check your inbox.');
+      } else {
+        setError(res.error || 'Failed to send reset link');
+      }
+    } else if (mode === 'signin') {
+      const res = await signIn(email, password);
+      // Wait, need to route coach to /coach and athlete to /workout on signIn according to the test!
+      if (res.success) {
+        if (res.role === 'coach') {
+          navigate('/coach');
+        } else {
+          navigate('/workout');
+        }
       } else {
         setError(res.error || 'Failed to sign in');
       }
@@ -37,19 +76,17 @@ export const LoginView: React.FC = () => {
     setLoading(false);
   };
 
-  const handleQuickDemo = async (demoRole: UserRole) => {
+  const handleResend = async () => {
+    if (cooldown > 0) return;
     setError('');
+    setInfoMsg('');
     setLoading(true);
-    const demoEmail = demoRole === 'coach' ? 'coach@cybergym.io' : 'athlete@cybergym.io';
-    const res = await signIn(demoEmail, 'password123');
+    const res = await resendConfirmation(email);
     if (res.success) {
-      if (demoRole === 'coach') {
-        localStorage.setItem('cybergym_view_mode', 'coach');
-        await switchRole('coach');
-      }
-      navigate(demoRole === 'coach' ? '/coach' : '/workout');
+      setInfoMsg('Confirmation email resent!');
+      setCooldown(60);
     } else {
-      setError('Demo accounts are only available in local development. Please sign in or register above.');
+      setError(res.error || 'Failed to resend confirmation');
     }
     setLoading(false);
   };
@@ -70,36 +107,38 @@ export const LoginView: React.FC = () => {
       </div>
 
       <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-6 shadow-2xl backdrop-blur-xl">
-        <div className="flex border-b border-zinc-800 pb-4 mb-5 gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setIsSignUp(false);
-              setError('');
-            }}
-            className={`flex-1 py-2 min-h-[44px] text-xs font-black uppercase tracking-wider rounded-xl transition flex items-center justify-center touch-manipulation ${
-              !isSignUp
-                ? 'bg-cyan-500 text-black shadow-neon-cyan'
-                : 'text-zinc-400 hover:text-white bg-zinc-950'
-            }`}
-          >
-            Sign In
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setIsSignUp(true);
-              setError('');
-            }}
-            className={`flex-1 py-2 min-h-[44px] text-xs font-black uppercase tracking-wider rounded-xl transition flex items-center justify-center touch-manipulation ${
-              isSignUp
-                ? 'bg-cyan-500 text-black shadow-neon-cyan'
-                : 'text-zinc-400 hover:text-white bg-zinc-950'
-            }`}
-          >
-            Register
-          </button>
-        </div>
+        {(mode === 'signin' || mode === 'register') && (
+          <div className="flex bg-zinc-950 p-1 rounded-2xl border border-zinc-800/80 mb-5 gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                setMode('signin');
+                setError('');
+              }}
+              className={`flex-1 py-2 min-h-[44px] text-xs font-black uppercase tracking-wider rounded-xl transition flex items-center justify-center touch-manipulation ${
+                mode === 'signin'
+                  ? 'bg-cyan-500 text-black shadow-neon-cyan'
+                  : 'text-zinc-400 hover:text-white bg-transparent'
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode('register');
+                setError('');
+              }}
+              className={`flex-1 py-2 min-h-[44px] text-xs font-black uppercase tracking-wider rounded-xl transition flex items-center justify-center touch-manipulation ${
+                mode === 'register'
+                  ? 'bg-cyan-500 text-black shadow-neon-cyan'
+                  : 'text-zinc-400 hover:text-white bg-transparent'
+              }`}
+            >
+              Register
+            </button>
+          </div>
+        )}
 
         {error && (
           <div className="mb-4 p-3 bg-rose-500/15 border border-rose-500/30 rounded-xl text-rose-400 text-xs flex items-center gap-2">
@@ -108,81 +147,147 @@ export const LoginView: React.FC = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5">
-              Email Address
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="athlete@cybergym.io"
-              autoComplete="email"
-              className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-base sm:text-sm font-semibold focus:border-cyan-500 outline-none transition"
-              required
-            />
+        {infoMsg && (
+          <div className="mb-4 p-3 bg-emerald-500/15 border border-emerald-500/30 rounded-xl text-emerald-400 text-xs flex items-center gap-2">
+            {mode === 'check_email' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+            <span>{infoMsg}</span>
           </div>
+        )}
 
-          <div>
-            <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5">
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              autoComplete={isSignUp ? "new-password" : "current-password"}
-              className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-base sm:text-sm font-semibold focus:border-cyan-500 outline-none transition"
-              required
-            />
+        {mode === 'check_email' ? (
+          <div className="space-y-6 text-center">
+            <p className="text-zinc-300 text-sm">
+              We've sent a verification link to <span className="font-bold text-white">{email}</span>.
+            </p>
+            <button
+              onClick={handleResend}
+              disabled={loading || cooldown > 0}
+              className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold min-h-[44px] py-3 rounded-xl uppercase tracking-wider text-xs transition disabled:opacity-50"
+            >
+              {cooldown > 0 ? `Resend Available in ${cooldown}s` : 'Resend Confirmation Email'}
+            </button>
+            <button
+              onClick={() => {
+                setMode('signin');
+                setError('');
+                setInfoMsg('');
+              }}
+              className="w-full flex items-center justify-center gap-2 text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-wider transition"
+            >
+              <ArrowLeft className="w-4 h-4" /> Back to Sign In
+            </button>
           </div>
-
-          {isSignUp && (
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5">
-                Account Role
+                Email Address
               </label>
-              <div className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl flex items-center justify-between text-xs font-bold text-zinc-300">
-                <span className="flex items-center gap-2">
-                  <Dumbbell className="w-4 h-4 text-cyan-400" /> Athlete Account
-                </span>
-                <span className="text-[10px] text-zinc-500 font-normal">(Coaches provisioned by admin)</span>
-              </div>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="athlete@cybergym.io"
+                autoComplete="email"
+                className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-base sm:text-sm font-semibold focus:border-cyan-500 outline-none transition"
+                required
+              />
             </div>
-          )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black py-3 min-h-[44px] rounded-xl uppercase tracking-wider text-xs shadow-[0_0_15px_rgba(6,182,212,0.3)] active:scale-95 transition disabled:opacity-50"
-          >
-            {loading ? 'Signing in...' : isSignUp ? 'Create Account' : 'Sign In'}
-          </button>
-        </form>
+            {(mode === 'signin' || mode === 'register') && (
+              <div>
+                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5">
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    autoComplete={mode === 'register' ? "new-password" : "current-password"}
+                    className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 pr-10 text-base sm:text-sm font-semibold focus:border-cyan-500 outline-none transition"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            )}
 
-        <div className="mt-6 pt-5 border-t border-zinc-800 text-center">
-          <p className="text-xs text-zinc-500 font-mono mb-3 uppercase tracking-wider">
-            Quick Demo Access
-          </p>
-          <div className="grid grid-cols-2 gap-2">
+            {mode === 'register' && (
+              <div>
+                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5">
+                  Confirm Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                    className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 pr-10 text-base sm:text-sm font-semibold focus:border-cyan-500 outline-none transition"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {mode === 'signin' && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('forgot_password');
+                    setError('');
+                    setInfoMsg('');
+                  }}
+                  className="text-xs font-bold text-cyan-500 hover:text-cyan-400 transition"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+            )}
+
             <button
-              type="button"
-              onClick={() => handleQuickDemo('athlete')}
-              className="bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 text-xs font-bold py-2.5 px-3 min-h-[44px] rounded-xl border border-zinc-700 transition flex items-center justify-center touch-manipulation"
+              type="submit"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black py-3 min-h-[44px] rounded-xl uppercase tracking-wider text-xs shadow-[0_0_15px_rgba(6,182,212,0.3)] active:scale-95 transition disabled:opacity-50"
             >
-              Demo Athlete
+              {loading ? (mode === 'register' ? 'Creating Account...' : mode === 'signin' ? 'Signing in...' : 'Processing...') : (
+                mode === 'register' ? 'Create Account' : mode === 'signin' ? 'Sign In' : 'Send Reset Link'
+              )}
             </button>
+          </form>
+        )}
+
+        {mode === 'forgot_password' && (
+          <div className="mt-6 text-center">
             <button
-              type="button"
-              onClick={() => handleQuickDemo('coach')}
-              className="bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 text-xs font-bold py-2.5 px-3 min-h-[44px] rounded-xl border border-zinc-700 transition flex items-center justify-center touch-manipulation"
+              onClick={() => {
+                setMode('signin');
+                setError('');
+                setInfoMsg('');
+              }}
+              className="flex items-center justify-center gap-2 text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-wider transition w-full"
             >
-              Demo Coach
+              <ArrowLeft className="w-4 h-4" /> Back to Sign In
             </button>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

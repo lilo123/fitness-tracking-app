@@ -54,9 +54,13 @@ describe('NutritionEngine', () => {
     // Default mock implementation
     const mockSelect = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
-        order: vi.fn().mockResolvedValue({ data: [], error: null }),
-        single: vi.fn().mockResolvedValue({ data: null, error: null }),
-      }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              single: vi.fn().mockResolvedValue({ data: null, error: null })
+              })
+            })
+          }),
       order: vi.fn().mockResolvedValue({ data: [], error: null }),
     });
 
@@ -198,8 +202,12 @@ describe('NutritionEngine', () => {
         return {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null })
+              })
+            })
+          }),
           }),
           insert: mockInsert,
         };
@@ -207,8 +215,12 @@ describe('NutritionEngine', () => {
       return {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              single: vi.fn().mockResolvedValue({ data: null, error: null })
+              })
+            })
           }),
         }),
       };
@@ -269,8 +281,12 @@ describe('NutritionEngine', () => {
         return {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null })
+              })
+            })
+          }),
           }),
           insert: mockInsert,
         };
@@ -278,8 +294,12 @@ describe('NutritionEngine', () => {
       return {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              single: vi.fn().mockResolvedValue({ data: null, error: null })
+              })
+            })
           }),
         }),
       };
@@ -311,8 +331,12 @@ describe('NutritionEngine', () => {
         return {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null })
+              })
+            })
+          }),
           }),
           insert: mockInsert,
         };
@@ -320,8 +344,12 @@ describe('NutritionEngine', () => {
       return {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              single: vi.fn().mockResolvedValue({ data: null, error: null })
+              })
+            })
           }),
         }),
       };
@@ -364,8 +392,12 @@ describe('NutritionEngine', () => {
       return {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              single: vi.fn().mockResolvedValue({ data: null, error: null })
+              })
+            })
           }),
         }),
       };
@@ -550,8 +582,12 @@ describe('NutritionEngine', () => {
       return {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              single: vi.fn().mockResolvedValue({ data: null, error: null })
+              })
+            })
           }),
         }),
       };
@@ -589,8 +625,12 @@ describe('NutritionEngine', () => {
       return {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              single: vi.fn().mockResolvedValue({ data: null, error: null })
+              })
+            })
           }),
         }),
       };
@@ -832,8 +872,12 @@ Total Fiber: 8 g`;
         return {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null })
+              })
+            })
+          }),
           }),
           insert: mockInsert,
         };
@@ -841,8 +885,12 @@ Total Fiber: 8 g`;
       return {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              single: vi.fn().mockResolvedValue({ data: null, error: null })
+              })
+            })
           }),
         }),
       };
@@ -990,8 +1038,12 @@ Total Fiber: 1 g`;
         return {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [mockMeal], error: null }),
-            }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [mockMeal], error: null })
+              })
+            })
+          }),
           }),
           update: mockUpdate,
           delete: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
@@ -1000,8 +1052,12 @@ Total Fiber: 1 g`;
       return {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              single: vi.fn().mockResolvedValue({ data: null, error: null })
+              })
+            })
           }),
         }),
       };
@@ -1087,8 +1143,12 @@ Total Fiber: 1 g`;
         return {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [mockMeal], error: null }),
-            }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [mockMeal], error: null })
+              })
+            })
+          }),
           }),
           update: mockUpdate,
           delete: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
@@ -1097,8 +1157,12 @@ Total Fiber: 1 g`;
       return {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              single: vi.fn().mockResolvedValue({ data: null, error: null })
+              })
+            })
           }),
         }),
       };
@@ -1145,8 +1209,12 @@ Total Fiber: 1 g`;
         return {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [mockMeal], error: null }),
-            }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [mockMeal], error: null })
+              })
+            })
+          }),
           }),
           update: mockUpdate,
           delete: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
@@ -1155,8 +1223,12 @@ Total Fiber: 1 g`;
       return {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              single: vi.fn().mockResolvedValue({ data: null, error: null })
+              })
+            })
           }),
         }),
       };
@@ -1196,7 +1268,9 @@ Total Fiber: 1 g`;
         return {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({
                 data: [
                   {
                     id: 'over-meal-1',
@@ -1213,16 +1287,22 @@ Total Fiber: 1 g`;
                   },
                 ],
                 error: null,
-              }),
-            }),
+              })
+              })
+            })
+          }),
           }),
         };
       }
       return {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              single: vi.fn().mockResolvedValue({ data: null, error: null })
+              })
+            })
           }),
         }),
       };
@@ -1254,7 +1334,9 @@ Total Fiber: 1 g`;
         return {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({
                 data: [
                   {
                     id: 'under-meal-1',
@@ -1271,16 +1353,22 @@ Total Fiber: 1 g`;
                   },
                 ],
                 error: null,
-              }),
-            }),
+              })
+              })
+            })
+          }),
           }),
         };
       }
       return {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              single: vi.fn().mockResolvedValue({ data: null, error: null })
+              })
+            })
           }),
         }),
       };
@@ -1343,8 +1431,12 @@ Total Fiber: 1 g`;
         return {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null })
+              })
+            })
+          }),
           }),
           insert: mockInsert,
         };
@@ -1352,8 +1444,12 @@ Total Fiber: 1 g`;
       return {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              single: vi.fn().mockResolvedValue({ data: null, error: null })
+              })
+            })
           }),
         }),
       };
@@ -1402,8 +1498,12 @@ Total Fiber: 1 g`;
         return {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null })
+              })
+            })
+          }),
           }),
           insert: mockInsert,
         };
@@ -1411,8 +1511,12 @@ Total Fiber: 1 g`;
       return {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              single: vi.fn().mockResolvedValue({ data: null, error: null })
+              })
+            })
           }),
         }),
       };
@@ -1701,8 +1805,12 @@ Total Fiber: 1 g`;
         return {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null })
+              })
+            })
+          }),
           }),
           insert: mockInsert,
         };
@@ -1710,8 +1818,12 @@ Total Fiber: 1 g`;
       return {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              single: vi.fn().mockResolvedValue({ data: null, error: null })
+              })
+            })
           }),
         }),
       };

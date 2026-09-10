@@ -154,30 +154,23 @@ export const CoachCockpit: React.FC = () => {
     mutationFn: async () => {
       if (!templateName.trim()) throw new Error('Template name is required');
       if (!user?.id) throw new Error('Authenticated coach required');
-      const userId = user.id;
 
-      // 1. Insert template
-      const { data: tpl, error: tplErr } = await supabase
-        .from('routine_templates')
-        .insert([
-          {
-            user_id: userId,
-            name: templateName.trim(),
-            is_master: isMaster,
-            assigned_to: isMaster ? null : selectedAthleteId,
-          },
-        ])
-        .select()
-        .single();
+      // 1. Insert template via RPC
+      const { data: tplId, error: tplErr } = await supabase.rpc('save_routine_template', {
+        p_name: templateName.trim(),
+        p_is_master: isMaster,
+        p_assigned_to: isMaster || !selectedAthleteId ? null : selectedAthleteId,
+      });
 
-      if (tplErr || !tpl) throw new Error(tplErr?.message || 'Failed to create template');
+      if (tplErr || !tplId) throw new Error(tplErr?.message || 'Failed to create template');
 
       // 2. Insert exercises
+      const actualTemplateId = tplId?.template_id || tplId;
       const exPayloads = selectedExercises.map((ex, idx) => {
         const matched = exercises.find((e) => e.name === ex.exerciseName || e.id === ex.exerciseId);
         const resolvedId = matched ? matched.id : ex.exerciseId;
         return {
-          template_id: tpl.id,
+          template_id: actualTemplateId,
           exercise_id: resolvedId,
           order_index: idx,
           target_sets: ex.targetSets,
@@ -188,7 +181,7 @@ export const CoachCockpit: React.FC = () => {
       const { error: exErr } = await supabase.from('template_exercises').insert(exPayloads);
       if (exErr) throw exErr;
 
-      return tpl;
+      return { id: tplId };
     },
     onSuccess: () => {
       setStatus('Template saved');
@@ -254,12 +247,29 @@ export const CoachCockpit: React.FC = () => {
               onChange={(e) => switchAthlete(e.target.value)}
               className="bg-zinc-900 border border-zinc-700 text-white rounded-xl px-3 py-2 text-base sm:text-xs font-bold focus:border-cyan-500 outline-none cursor-pointer min-h-[44px]"
             >
+              <option value="">-- None --</option>
               {athletes.map((ath) => (
                 <option key={ath.id} value={ath.id}>
                   {ath.name} ({ath.email})
                 </option>
               ))}
             </select>
+            {selectedAthleteId && (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (confirm('Are you sure you want to disconnect this athlete?')) {
+                    await supabase.rpc('disconnect_coach', { target_athlete_id: selectedAthleteId });
+                    queryClient.invalidateQueries({ queryKey: ['coach_athletes'] });
+                    switchAthlete('');
+                  }
+                }}
+                className="text-xs font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-2 min-h-[44px] rounded-xl border border-rose-500/30 transition flex items-center justify-center"
+                title="Disconnect Athlete"
+              >
+                Disconnect
+              </button>
+            )}
           </div>
         </div>
       </div>

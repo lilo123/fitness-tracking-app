@@ -95,8 +95,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (email: string, password = 'password123') => {
     try {
+      const sanitizedEmail = email.trim().toLowerCase();
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: sanitizedEmail,
         password,
       });
       if (error) {
@@ -105,6 +106,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data?.user) {
         setUser(data.user);
         await fetchProfile(data.user.id, data.user.email);
+        
+        let userRole: UserRole = 'athlete';
+        const { data: pData } = await supabase.from('users').select('role').eq('id', data.user.id).single();
+        if (pData) {
+          userRole = pData.role;
+        }
+        return { success: true, role: userRole };
       }
       return { success: true };
     } catch (err: any) {
@@ -114,12 +122,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUp = async (email: string, password = 'password123', _role: UserRole = 'athlete') => {
     try {
+      const sanitizedEmail = email.trim().toLowerCase();
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: sanitizedEmail,
         password,
         options: {
           data: {
-            username: email.split('@')[0],
+            username: sanitizedEmail.split('@')[0],
           },
         },
       });
@@ -132,8 +141,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: true };
       }
       return {
-        success: false,
-        error: 'Account created! Please check your email to confirm your account before signing in, or disable email confirmation in Supabase Auth settings.',
+        success: true,
+        needsEmailConfirmation: true,
+        message: 'Account created! Please check your email to verify your account.',
       };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -198,6 +208,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const resendConfirmation = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email.trim().toLowerCase(),
+      });
+      if (error) return { success: false, error: error.message };
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const requestPasswordReset = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) return { success: false, error: error.message };
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const resetPassword = async (newPassword: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) return { success: false, error: error.message };
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
   const role: UserRole = profile?.role === 'coach' ? viewMode : 'athlete';
   const isCoachMode = Boolean(profile?.is_coach_mode || profile?.role === 'coach' || role === 'coach');
 
@@ -216,6 +261,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateProfile,
         switchRole,
         refreshProfile,
+        resendConfirmation,
+        requestPasswordReset,
+        resetPassword,
       }}
     >
       {children}

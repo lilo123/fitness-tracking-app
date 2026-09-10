@@ -202,7 +202,7 @@ export const NutritionEngine: React.FC = () => {
 
   // Fetch nutrition logs for target user
   const { data: nutritionLogs = [] } = useQuery({
-    queryKey: ['nutrition_logs', targetUserId],
+    queryKey: ['nutrition_logs', targetUserId, selectedDate],
     queryFn: async () => {
       if (!targetUserId) return [];
       try {
@@ -210,6 +210,8 @@ export const NutritionEngine: React.FC = () => {
           .from('nutrition_logs')
           .select('*')
           .eq('user_id', targetUserId)
+          .gte('logged_at', `${selectedDate}T00:00:00.000Z`)
+          .lte('logged_at', `${selectedDate}T23:59:59.999Z`)
           .order('logged_at', { ascending: false });
 
         if (error || !data) return [];
@@ -218,6 +220,7 @@ export const NutritionEngine: React.FC = () => {
         return [];
       }
     },
+    enabled: Boolean(targetUserId && selectedDate),
   });
 
   // Calculate daily totals
@@ -592,7 +595,11 @@ export const NutritionEngine: React.FC = () => {
       }
       setIsError(true);
       const errorMsg = error?.message || (typeof error === 'string' ? error : 'Unknown error');
-      setStatus(`AI service unavailable: ${errorMsg}`);
+      setStatus(
+        error?.code === 'NON_FOOD_DETECTED' || error?.status === 422 || error?.context?.status === 422
+          ? `Meal Analysis: ${errorMsg}`
+          : `AI service unavailable: ${errorMsg}`
+      );
       setShowManualForm(true);
       if (!manualDishName.trim()) {
         setManualDishName(nlInput.trim() || (selectedPhoto ? 'Meal Photo' : ''));
@@ -1138,7 +1145,9 @@ export const NutritionEngine: React.FC = () => {
             onChange={(e) => setNlInput(e.target.value)}
             placeholder={
               selectedPhoto
-                ? "Add notes or context (optional, e.g. 'dressing on the side', 'ate 2/3 of it')"
+                ? customDishes.length > 0
+                  ? "Add notes or dish name to match custom dishes (e.g., 'Mom's Shake')..."
+                  : "Add notes or context (optional, e.g. 'dressing on the side', 'ate 2/3 of it')"
                 : "Describe what you ate (e.g., 3 eggs, 2 slices sourdough, 1 tbsp butter)"
             }
             className="w-full bg-transparent text-white text-base sm:text-xs placeholder:text-zinc-600 outline-none resize-none"

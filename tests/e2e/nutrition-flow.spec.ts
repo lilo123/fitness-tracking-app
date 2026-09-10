@@ -95,7 +95,9 @@ test.describe('Nutrition Flow E2E', () => {
     });
 
     await page.goto('/login');
-    await page.click('button:has-text("Demo Athlete")');
+    await page.fill('input[type="email"]', 'athlete@cybergym.io');
+    await page.fill('input[type="password"]', 'password123');
+    await page.click('button[type="submit"]');
     await page.waitForURL('**/workout');
     await page.goto('/nutrition');
     await page.waitForSelector('text=Today\'s Nutrition');

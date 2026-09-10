@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import type { UserProfile, UserRole } from '../../types/database';
@@ -36,6 +36,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
   switchRole,
   refreshProfile,
 }) => {
+  const queryClient = useQueryClient();
   const [username, setUsername] = useState(profile?.username || '');
   const [targetCalories, setTargetCalories] = useState(profile?.target_calories || 2200);
   const [targetProtein, setTargetProtein] = useState(profile?.target_protein || 160);
@@ -153,6 +154,12 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
       }
       setLinkStatus({ type: 'success', message: 'Successfully linked to coach!' });
       setLinkCodeInput('');
+      
+      queryClient.invalidateQueries({ queryKey: ['my_coach_link'] });
+      queryClient.invalidateQueries({ queryKey: ['routine_templates'] });
+      queryClient.invalidateQueries({ queryKey: ['workouts'] });
+      queryClient.invalidateQueries({ queryKey: ['nutrition_logs'] });
+
       await refetchCoachLink();
       if (refreshProfile) await refreshProfile();
     } catch (err: any) {
@@ -172,6 +179,12 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
       const { error } = await supabase.rpc('disconnect_coach');
       if (error) throw error;
       setLinkStatus({ type: 'success', message: 'Successfully disconnected from coach.' });
+      
+      queryClient.invalidateQueries({ queryKey: ['my_coach_link'] });
+      queryClient.invalidateQueries({ queryKey: ['routine_templates'] });
+      queryClient.invalidateQueries({ queryKey: ['workouts'] });
+      queryClient.invalidateQueries({ queryKey: ['nutrition_logs'] });
+
       await refetchCoachLink();
       if (refreshProfile) await refreshProfile();
     } catch (err: any) {
@@ -304,6 +317,57 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
 
         </div>
       </div>
+
+      {/* Coach Mode Activation Card */}
+      {!hasCoachCapability && (
+        <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-5 shadow-2xl space-y-4">
+          <div className="flex items-center gap-2 border-b border-zinc-800 pb-3">
+            <Shield className="w-4 h-4 text-cyan-400" />
+            <h3 className="text-sm font-black text-white uppercase tracking-wider">
+              Coach Mode
+            </h3>
+          </div>
+          <p className="text-xs text-zinc-400">
+            Want to train athletes? Activate coach mode to generate your unique coach code.
+          </p>
+          <form onSubmit={handleSaveVanityCode} className="space-y-2">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={customCoachCode}
+                onChange={(e) => setCustomCoachCode(e.target.value.toUpperCase())}
+                placeholder="Enter vanity code (e.g. COACH-DUY)"
+                maxLength={20}
+                className="flex-1 bg-zinc-950 border border-zinc-800 text-white rounded-xl px-3 py-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none uppercase min-h-[44px]"
+                required
+              />
+              <button
+                type="submit"
+                disabled={isSavingCode || !customCoachCode.trim()}
+                className="bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 text-cyan-300 font-bold px-4 py-2 min-h-[44px] rounded-xl text-xs flex items-center gap-1.5 disabled:opacity-50 transition touch-manipulation"
+              >
+                {isSavingCode ? 'Activating...' : 'Activate Mode'}
+              </button>
+            </div>
+            {coachCodeStatus && (
+              <div
+                className={`p-2.5 rounded-xl text-xs flex items-center gap-2 ${
+                  coachCodeStatus.type === 'error'
+                    ? 'bg-rose-500/15 border border-rose-500/30 text-rose-300'
+                    : 'bg-cyan-500/15 border border-cyan-500/30 text-cyan-300'
+                }`}
+              >
+                {coachCodeStatus.type === 'error' ? (
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                )}
+                <span>{coachCodeStatus.message}</span>
+              </div>
+            )}
+          </form>
+        </div>
+      )}
 
       {/* Coach Mode Card */}
       {hasCoachCapability && (

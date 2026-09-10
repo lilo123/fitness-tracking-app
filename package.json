@@ -12,7 +12,7 @@
     "test:watch": "vitest",
     "test:db": "npx supabase test db",
     "test:deno": "PATH=\"$HOME/.deno/bin:$PATH\" deno test --config supabase/functions/parse-nutrition/deno.json --allow-net --allow-env supabase/functions/parse-nutrition/index.test.ts && PATH=\"$HOME/.deno/bin:$PATH\" deno test --config supabase/functions/create-athlete/deno.json --allow-net --allow-env supabase/functions/create-athlete/index.test.ts",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --workers=1",
     "test:all": "npm run test && npm run test:db && npm run test:deno && npm run test:e2e",
     "migrate:historical": "python3 scripts/migrate-historical-data.py"
   },

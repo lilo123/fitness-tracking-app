@@ -3,7 +3,9 @@ import { test, expect } from '@playwright/test';
 test.describe('Coach-Athlete Multi-Tenant Flow E2E', () => {
   test('coach logs in and accesses coach cockpit', async ({ page }) => {
     await page.goto('/login');
-    await page.click('button:has-text("Demo Coach")');
+    await page.fill('input[type="email"]', 'coach@cybergym.io');
+    await page.fill('input[type="password"]', 'password123');
+    await page.click('button[type="submit"]');
     await page.waitForURL('**/coach');
 
     // Assert coach cockpit elements
@@ -19,7 +21,9 @@ test.describe('Coach-Athlete Multi-Tenant Flow E2E', () => {
 
   test('coach builds and saves a workout routine template', async ({ page }) => {
     await page.goto('/login');
-    await page.click('button:has-text("Demo Coach")');
+    await page.fill('input[type="email"]', 'coach@cybergym.io');
+    await page.fill('input[type="password"]', 'password123');
+    await page.click('button[type="submit"]');
     await page.waitForURL('**/coach');
 
     // Enter template name

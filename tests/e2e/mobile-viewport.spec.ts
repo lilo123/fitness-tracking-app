@@ -13,7 +13,9 @@ test.describe('Mobile Viewport & Ergonomics', () => {
   test('prevents horizontal scroll overflow on mobile', async ({ page }) => {
     await page.goto('/login');
     // Quick login via demo athlete
-    await page.click('button:has-text("Demo Athlete")');
+    await page.fill('input[type="email"]', 'athlete@cybergym.io');
+    await page.fill('input[type="password"]', 'password123');
+    await page.click('button[type="submit"]');
     await page.waitForURL('**/workout');
 
     // Check no horizontal scrollbar on workout view
@@ -45,7 +47,9 @@ test.describe('Mobile Viewport & Ergonomics', () => {
     }
 
     // Login and check workout inputs
-    await page.click('button:has-text("Demo Athlete")');
+    await page.fill('input[type="email"]', 'athlete@cybergym.io');
+    await page.fill('input[type="password"]', 'password123');
+    await page.click('button[type="submit"]');
     await page.waitForURL('**/workout');
 
     // Check date input font size
