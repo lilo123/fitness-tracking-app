@@ -7,13 +7,43 @@ import { AuthContext } from './AuthContextTypes';
 import { restTimerStore } from '../utils/restTimerStore';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<UserProfile | null>(() => {
+    try {
+      const cached = localStorage.getItem('cybergym_user');
+      return cached ? (JSON.parse(cached) as UserProfile) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const cached = localStorage.getItem('cybergym_user');
+      if (cached) {
+        const parsed = JSON.parse(cached) as UserProfile;
+        if (parsed?.id) {
+          return {
+            id: parsed.id,
+            email: parsed.email,
+            app_metadata: {},
+            user_metadata: { username: parsed.username },
+            aud: 'authenticated',
+            created_at: '',
+          } as unknown as User;
+        }
+      }
+    } catch {
+      // Fall through to null
+    }
+    return null;
+  });
+  const [loading, setLoading] = useState<boolean>(() => {
+    return !localStorage.getItem('cybergym_user');
+  });
   const [viewMode, setViewMode] = useState<UserRole>(() => {
     return (localStorage.getItem('cybergym_view_mode') as UserRole) || 'coach';
   });
 
+  const signedOutRef = React.useRef(false);
   const queryClient = useQueryClient();
 
   const fetchProfile = async (userId: string, email?: string) => {
@@ -23,6 +53,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .select('*')
         .eq('id', userId)
         .single();
+
+      if (signedOutRef.current) return;
 
       if (data && !error) {
         setProfile(data as UserProfile);
@@ -61,12 +93,90 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    type SessionRaceResult =
+      | { kind: 'session'; session: any }
+      | { kind: 'timeout' };
+
+    const resolveSession = async () => {
+      try {
+        const result: SessionRaceResult = await Promise.race([
+          supabase.auth
+            .getSession()
+            .then(({ data: { session } }) => ({
+              kind: 'session' as const,
+              session,
+            }))
+            .catch((err) => {
+              console.warn('[AuthContext] getSession rejection:', err);
+              return { kind: 'timeout' as const };
+            }),
+          new Promise<SessionRaceResult>((resolve) =>
+            setTimeout(
+              () => resolve({ kind: 'timeout' as const }),
+              3000
+            )
+          ),
+        ]);
+
+        if (!mounted) return;
+
+        if (result.kind === 'session') {
+          if (result.session?.user) {
+            signedOutRef.current = false;
+            setUser(result.session.user);
+            setLoading(false);
+            fetchProfile(result.session.user.id, result.session.user.email).catch((err) => {
+              console.warn('[AuthContext] Background fetchProfile error:', err);
+            });
+            return;
+          } else {
+            // Explicitly unauthenticated
+            setUser(null);
+            setProfile(null);
+            localStorage.removeItem('cybergym_user');
+            setLoading(false);
+            return;
+          }
+        }
+
+        if (result.kind === 'timeout') {
+          console.warn(
+            '[AuthContext] getSession timed out after 3000ms. Utilizing cached credentials if available.'
+          );
+          try {
+            const cached = localStorage.getItem('cybergym_user');
+            const parsed = cached ? JSON.parse(cached) : null;
+            if (!parsed?.id) {
+              setUser(null);
+              setProfile(null);
+            }
+          } catch {
+            setUser(null);
+            setProfile(null);
+          }
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('[AuthContext] Unexpected session resolution error:', err);
+        if (!mounted) return;
+        setLoading(false);
+      }
+    };
+
+    resolveSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return;
       if (session?.user) {
+        signedOutRef.current = false;
         setUser(session.user);
-        await fetchProfile(session.user.id, session.user.email);
-      } else {
+        fetchProfile(session.user.id, session.user.email).catch((err) => {
+          console.warn('[AuthContext] Background fetchProfile error:', err);
+        });
+      } else if (_event === 'SIGNED_OUT') {
+        signedOutRef.current = true;
         setUser(null);
         setProfile(null);
         localStorage.removeItem('cybergym_user');
@@ -74,22 +184,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!mounted) return;
-      if (session?.user) {
-        setUser(session.user);
-        await fetchProfile(session.user.id, session.user.email);
-      } else if (_event === 'SIGNED_OUT') {
-        setUser(null);
-        setProfile(null);
-        localStorage.removeItem('cybergym_user');
+    const handleLifecycleResume = () => {
+      if (document.visibilityState === 'visible') {
+        supabase.auth
+          .getSession()
+          .then(({ data: { session } }) => {
+            if (!mounted) return;
+            if (session?.user) {
+              signedOutRef.current = false;
+              setUser(session.user);
+              fetchProfile(session.user.id, session.user.email).catch((err) => {
+                console.warn('[AuthContext] Background resume fetchProfile error:', err);
+              });
+            }
+          })
+          .catch((err) => {
+            console.warn('[AuthContext] Background resume revalidation error:', err);
+          });
       }
-      setLoading(false);
-    });
+    };
+
+    document.addEventListener('visibilitychange', handleLifecycleResume);
+    window.addEventListener('pageshow', handleLifecycleResume);
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
+      document.removeEventListener('visibilitychange', handleLifecycleResume);
+      window.removeEventListener('pageshow', handleLifecycleResume);
     };
   }, []);
 
@@ -104,6 +226,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: error.message };
       }
       if (data?.user) {
+        signedOutRef.current = false;
         setUser(data.user);
         await fetchProfile(data.user.id, data.user.email);
         
@@ -151,12 +274,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    signedOutRef.current = true;
     try {
       await supabase.auth.signOut();
     } catch {
       // ignore
     }
     restTimerStore.stop();
+    localStorage.removeItem('cybergym_user');
     Object.keys(localStorage).forEach((key) => {
       if (key.startsWith('cybergym_')) {
         localStorage.removeItem(key);
@@ -203,6 +328,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const refreshProfile = async () => {
+    signedOutRef.current = false;
     if (user) {
       await fetchProfile(user.id, user.email);
     }

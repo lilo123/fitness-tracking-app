@@ -298,4 +298,242 @@ describe('CoachCockpit', () => {
 
     expect(await screen.findByText('Athlete nutrition targets updated!')).toBeDefined();
   });
+
+  it('allows switching athlete and disconnecting athlete with confirmation', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('disconnect-athlete-btn')).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByTestId('disconnect-athlete-btn'));
+
+    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('Disconnect athlete'));
+    await waitFor(() => {
+      expect(supabase.rpc).toHaveBeenCalledWith('disconnect_coach', {
+        target_athlete_id: 'ath-1',
+      });
+    });
+
+    confirmSpy.mockRestore();
+  });
+
+  it('toggles mobile segmented tabs between activity, macros, and templates', async () => {
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('coach-tab-activity')).toBeDefined();
+    });
+
+    const actTab = screen.getByTestId('coach-tab-activity');
+    const macTab = screen.getByTestId('coach-tab-macros');
+    const tplTab = screen.getByTestId('coach-tab-templates');
+
+    // Default is activity
+    expect(actTab.className).toContain('text-cyan-300');
+
+    // Switch to macros
+    fireEvent.click(macTab);
+    expect(macTab.className).toContain('text-cyan-300');
+
+    // Switch to templates
+    fireEvent.click(tplTab);
+    expect(tplTab.className).toContain('text-cyan-300');
+  });
+
+  it('renders activity timeline with exercise volume drilldowns and nutrition compliance badges', async () => {
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'workouts') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({
+                data: [
+                  { id: 'w-1', name: 'Upper Body Blast', date: '2026-09-08T10:00:00Z' },
+                ],
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === 'sets') {
+        return {
+          select: vi.fn().mockReturnValue({
+            in: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({
+                data: [
+                  {
+                    id: 's-1',
+                    workout_id: 'w-1',
+                    exercise_id: 'ex-2',
+                    reps: 10,
+                    weight_lbs: 200,
+                    exercise: { id: 'ex-2', name: 'Incline Bench Press', body_part: 'Chest' },
+                  },
+                ],
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === 'nutrition_logs') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({
+                data: [
+                  {
+                    id: 'nl-1',
+                    user_id: 'ath-1',
+                    food_name: 'Salmon & Quinoa',
+                    calories: 2250,
+                    protein: 165,
+                    carbs: 215,
+                    fat: 70,
+                    fiber: 30,
+                    logged_at: '2026-09-08T18:00:00Z',
+                  },
+                ],
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      const athleteLinksData = [
+        {
+          athlete_id: 'ath-1',
+          status: 'active',
+          linked_at: '2026-09-01T00:00:00Z',
+          athlete: { id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' },
+        },
+      ];
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: athleteLinksData, error: null }),
+              single: vi.fn().mockResolvedValue({ data: athleteLinksData[0], error: null }),
+            }),
+            order: vi.fn().mockResolvedValue({
+              data: [{ id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' }],
+              error: null,
+            }),
+            single: vi.fn().mockResolvedValue({
+              data: {
+                id: 'ath-1',
+                email: 'alex@example.com',
+                username: 'Alex Johnson',
+                role: 'athlete',
+                target_calories: 2200,
+                target_protein: 160,
+                target_carbs: 220,
+                target_fat: 70,
+                target_fiber: 30,
+              },
+              error: null,
+            }),
+          }),
+          order: vi.fn().mockResolvedValue({
+            data: [
+              { id: 'ex-1', name: 'Leg Extension Machine', body_part: 'Legs', is_master: true },
+              { id: 'ex-2', name: 'Incline Bench Press', body_part: 'Chest', is_master: true },
+            ],
+            error: null,
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('Upper Body Blast')).toBeDefined();
+    });
+
+    // Check exercise drilldown volume
+    expect(screen.getByText('Incline Bench Press')).toBeDefined();
+    expect(screen.getByText('1 sets • 2,000 lbs')).toBeDefined();
+
+    // Verify expandable set-by-set drilldown
+    expect(screen.queryByTestId('exercise-sets-ex-2')).toBeNull();
+    fireEvent.click(screen.getByTestId('toggle-exercise-ex-2'));
+    expect(screen.getByTestId('exercise-sets-ex-2')).toBeDefined();
+    expect(screen.getByText(/10 reps × 200 lbs/i)).toBeDefined();
+
+    // Check nutrition item and On Target compliance badge (2250 kcal vs 2200 target is +2.2%, within 10%)
+    expect(screen.getByText('Salmon & Quinoa')).toBeDefined();
+    expect(screen.getByText('On Target')).toBeDefined();
+
+    // Verify Load Older Days button is rendered
+    expect(screen.getByTestId('load-older-days-btn')).toBeDefined();
+    fireEvent.click(screen.getByTestId('load-older-days-btn'));
+  });
+
+  it('renders Load Older Days button in activity timeline and triggers range expansion', async () => {
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'workouts') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({
+                data: [
+                  { id: 'w-1', name: 'Leg Day Alpha', date: '2026-09-02' },
+                ],
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      const athleteLinksData = [
+        {
+          athlete_id: 'ath-1',
+          status: 'active',
+          linked_at: '2026-09-01T00:00:00Z',
+          athlete: { id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' },
+        },
+      ];
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: athleteLinksData, error: null }),
+              single: vi.fn().mockResolvedValue({ data: athleteLinksData[0], error: null }),
+            }),
+            order: vi.fn().mockResolvedValue({
+              data: [{ id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' }],
+              error: null,
+            }),
+            single: vi.fn().mockResolvedValue({
+              data: {
+                id: 'ath-1',
+                email: 'alex@example.com',
+                username: 'Alex Johnson',
+                role: 'athlete',
+                target_calories: 2200,
+              },
+              error: null,
+            }),
+          }),
+          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+        }),
+      };
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('Leg Day Alpha')).toBeDefined();
+    });
+
+    const loadOlderBtn = screen.getByTestId('load-older-days-btn');
+    expect(loadOlderBtn).toBeDefined();
+    expect(loadOlderBtn.textContent).toContain('Load Older Days');
+    fireEvent.click(loadOlderBtn);
+  });
 });

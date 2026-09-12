@@ -9,20 +9,25 @@ import {
   DEFAULT_EXERCISES_LIST,
 } from '../../utils/ghostSets';
 import { getDishIcon } from '../../utils/dishIcons';
-import { Calendar, Dumbbell, Trophy, Search, Activity, Utensils, Trash2, AlertCircle, Edit2 } from 'lucide-react';
+import { Calendar, Dumbbell, Trophy, Search, Activity, Utensils, Trash2, AlertCircle, Edit2, Shield } from 'lucide-react';
 import { EditMealModal } from '../nutrition/EditMealModal';
 import { EditSetModal } from '../workout/EditSetModal';
 import { groupSessionSetsByExercise } from '../../utils/historyGrouping';
 import { formatCalories, formatMacro } from '../../utils/nutrition';
+import { CoachContext } from '../../context/CoachContextTypes';
 
 const CATEGORIES = ['All', 'Chest', 'Back', 'Arms', 'Shoulders', 'Legs', 'Core'];
 
 export const HistoryView: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isCoachMode } = useAuth();
+  const coachCtx = React.useContext(CoachContext);
+  const selectedAthleteId = coachCtx?.selectedAthleteId || '';
+  const selectedAthlete = coachCtx?.selectedAthlete || null;
   const queryClient = useQueryClient();
 
-  const targetUserId = user?.id || '';
-
+  const [inspectMode, setInspectMode] = useState<'athlete' | 'coach'>(() => {
+    return isCoachMode && selectedAthleteId ? 'athlete' : 'coach';
+  });
   const [historyDomain, setHistoryDomain] = useState<'workouts' | 'nutrition'>('workouts');
   const [viewMode, setViewMode] = useState<'session' | 'exercise'>('session');
   const [searchQuery, setSearchQuery] = useState('');
@@ -30,6 +35,18 @@ export const HistoryView: React.FC = () => {
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [editingMealLog, setEditingMealLog] = useState<NutritionLog | null>(null);
   const [editingSet, setEditingSet] = useState<(WorkoutSet & { workout_date?: string; workout_name?: string }) | null>(null);
+
+  /* oxlint-disable react/set-state-in-effect */
+  React.useEffect(() => {
+    if (isCoachMode && selectedAthleteId) {
+      setInspectMode('athlete');
+    }
+    setEditingMealLog(null);
+    setEditingSet(null);
+  }, [isCoachMode, selectedAthleteId]);
+
+  const isInspectingAthlete = Boolean(isCoachMode && inspectMode === 'athlete' && selectedAthleteId);
+  const targetUserId = isInspectingAthlete ? selectedAthleteId : (user?.id || '');
 
   // Fetch exercises
   const { data: exercises = DEFAULT_EXERCISES_LIST } = useQuery({
@@ -283,6 +300,43 @@ export const HistoryView: React.FC = () => {
         </div>
       )}
 
+      {isCoachMode && selectedAthleteId && (
+        <div
+          data-testid="coach-inspection-banner"
+          className="bg-cyan-500/10 border border-cyan-500/30 rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center shrink-0">
+              <Shield className="w-4 h-4 text-cyan-400" />
+            </div>
+            <div className="truncate min-w-0">
+              <div className="text-[10px] uppercase font-bold text-zinc-400">Coach Inspection Mode</div>
+              <div className="text-xs font-bold text-white truncate">
+                {inspectMode === 'athlete' ? (
+                  <>
+                    Viewing Athlete: <span className="text-cyan-300 font-extrabold">{selectedAthlete?.name}</span> (Read-Only)
+                  </>
+                ) : (
+                  <span className="text-zinc-400">Viewing My Personal History</span>
+                )}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setEditingMealLog(null);
+              setEditingSet(null);
+              setInspectMode((prev) => (prev === 'athlete' ? 'coach' : 'athlete'));
+            }}
+            data-testid="toggle-inspect-mode-btn"
+            className="px-4 py-2 min-h-[44px] rounded-xl text-xs font-bold bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 transition touch-manipulation flex items-center justify-center shrink-0"
+          >
+            {inspectMode === 'athlete' ? 'Switch to My History' : 'Switch to Athlete'}
+          </button>
+        </div>
+      )}
+
       {/* Header Banner & Dual Domain Switcher */}
       <div className="bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-transparent border border-cyan-500/20 rounded-3xl p-5 shadow-2xl space-y-4">
         <div className="flex items-center gap-2">
@@ -487,27 +541,29 @@ export const HistoryView: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => setEditingMealLog(meal)}
-                          className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-zinc-500 hover:text-cyan-400 hover:bg-cyan-500/10 transition touch-manipulation"
-                          title="Edit meal"
-                          data-testid={`edit-meal-${meal.id}`}
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        {/* 1-Tap Meal Deletion */}
-                        <button
-                          type="button"
-                          onClick={() => deleteMealMutation.mutate(meal.id)}
-                          className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition touch-manipulation"
-                          title="Delete meal"
-                          data-testid={`delete-meal-${meal.id}`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                      {!isInspectingAthlete && (
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setEditingMealLog(meal)}
+                            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-zinc-500 hover:text-cyan-400 hover:bg-cyan-500/10 transition touch-manipulation"
+                            title="Edit meal"
+                            data-testid={`edit-meal-${meal.id}`}
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          {/* 1-Tap Meal Deletion */}
+                          <button
+                            type="button"
+                            onClick={() => deleteMealMutation.mutate(meal.id)}
+                            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition touch-manipulation"
+                            title="Delete meal"
+                            data-testid={`delete-meal-${meal.id}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -589,16 +645,18 @@ export const HistoryView: React.FC = () => {
                                       <span className="text-zinc-500 ml-1 text-[10px]">@{set.rpe}</span>
                                     )}
                                   </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => setEditingSet(set)}
-                                    className="min-w-[44px] min-h-[44px] rounded-lg bg-zinc-800/70 hover:bg-cyan-500/20 text-zinc-400 hover:text-cyan-300 flex items-center justify-center transition active:scale-95 touch-manipulation"
-                                    title="Edit set"
-                                    aria-label={`Edit set ${setNumber} of ${group.exerciseName}`}
-                                    data-testid={`edit-set-btn-${set.id || sIdx}`}
-                                  >
-                                    <Edit2 className="w-3.5 h-3.5" />
-                                  </button>
+                                  {!isInspectingAthlete && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingSet(set)}
+                                      className="min-w-[44px] min-h-[44px] rounded-lg bg-zinc-800/70 hover:bg-cyan-500/20 text-zinc-400 hover:text-cyan-300 flex items-center justify-center transition active:scale-95 touch-manipulation"
+                                      title="Edit set"
+                                      aria-label={`Edit set ${setNumber} of ${group.exerciseName}`}
+                                      data-testid={`edit-set-btn-${set.id || sIdx}`}
+                                    >
+                                      <Edit2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             );
@@ -686,16 +744,18 @@ export const HistoryView: React.FC = () => {
                             <span className="text-cyan-300 font-bold">
                               {s.weight} lbs × {s.reps} reps
                             </span>
-                            <button
-                              type="button"
-                              onClick={() => setEditingSet(s)}
-                              className="min-w-[44px] min-h-[44px] rounded-lg bg-zinc-800/70 hover:bg-cyan-500/20 text-zinc-400 hover:text-cyan-300 flex items-center justify-center transition active:scale-95 touch-manipulation"
-                              title="Edit set"
-                              aria-label={`Edit recent set of ${stat.exercise.name}`}
-                              data-testid={`edit-recent-set-btn-${s.id || idx}`}
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
+                            {!isInspectingAthlete && (
+                              <button
+                                type="button"
+                                onClick={() => setEditingSet(s)}
+                                className="min-w-[44px] min-h-[44px] rounded-lg bg-zinc-800/70 hover:bg-cyan-500/20 text-zinc-400 hover:text-cyan-300 flex items-center justify-center transition active:scale-95 touch-manipulation"
+                                title="Edit set"
+                                aria-label={`Edit recent set of ${stat.exercise.name}`}
+                                data-testid={`edit-recent-set-btn-${s.id || idx}`}
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       ))}

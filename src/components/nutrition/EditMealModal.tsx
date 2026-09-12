@@ -142,7 +142,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
 
   return (
     <div
-      className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4"
       data-testid="edit-meal-modal"
       role="dialog"
       aria-modal="true"
@@ -153,7 +153,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
         }
       }}
     >
-      <div className="bg-zinc-900 border border-zinc-800 rounded-t-3xl sm:rounded-3xl p-5 max-w-md w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-t-3xl sm:rounded-3xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom,1.25rem))] max-w-md w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
           <h3 id="edit-meal-modal-title" className="text-base font-black text-white flex items-center gap-2">
             <Utensils className="w-4 h-4 text-cyan-400" />

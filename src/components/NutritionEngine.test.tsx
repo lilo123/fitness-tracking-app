@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NutritionEngine } from './nutrition/NutritionEngine';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -76,6 +76,10 @@ describe('NutritionEngine', () => {
         queries: { retry: false },
       },
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   const renderComponent = () =>
@@ -2044,10 +2048,9 @@ Total Fiber: 1 g`;
     fireEvent.click(screen.getByText('Analyze Meal'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('status-message')).toBeDefined();
+      expect(screen.getByText(/Input text or meal photo is required for nutrition parsing/i)).toBeDefined();
     });
 
-    expect(screen.getByText(/Input text or meal photo is required for nutrition parsing/i)).toBeDefined();
     expect(screen.queryByText(/non-2xx/i)).toBeNull();
   });
 
@@ -2076,10 +2079,8 @@ Total Fiber: 1 g`;
     fireEvent.click(screen.getByText('Analyze Meal'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('status-message')).toBeDefined();
+      expect(screen.getByText(/No food detected in input or image/i)).toBeDefined();
     });
-
-    expect(screen.getByText(/No food detected in input or image/i)).toBeDefined();
   });
 
   it('unwraps HTTP 503 capacity overload from error.context and displays capacity message', async () => {
@@ -2108,10 +2109,8 @@ Total Fiber: 1 g`;
     fireEvent.click(screen.getByText('Analyze Meal'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('status-message')).toBeDefined();
+      expect(screen.getByText(/AI model capacity is temporarily exhausted/i)).toBeDefined();
     });
-
-    expect(screen.getByText(/AI model capacity is temporarily exhausted/i)).toBeDefined();
   });
 
   it('enforces adaptive timeouts of 30s for text-only input', async () => {
@@ -2309,10 +2308,8 @@ Total Fiber: 1 g`;
     fireEvent.click(screen.getByText('Analyze Meal'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('status-message')).toBeDefined();
+      expect(screen.getByText(/Direct context error message without clone/i)).toBeDefined();
     });
-
-    expect(screen.getByText(/Direct context error message without clone/i)).toBeDefined();
   });
 
   it('parses edge function response containing markdown json code fences', async () => {
@@ -2334,6 +2331,332 @@ Total Fiber: 1 g`;
     });
 
     expect(screen.getByText(/Itemized Breakdown/i)).toBeDefined();
+  });
+
+  it('opens custom dish edit modal when edit pencil button on carousel card is clicked', async () => {
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'custom_dishes') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({
+                data: [
+                  { id: 'dish-edit-1', name: 'Macro Oats', calories: 350, protein: 30, carbs: 45, fat: 5, fiber: 6, ingredients: '' },
+                ],
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
+                single: vi.fn().mockResolvedValue({ data: null, error: null }),
+              }),
+            }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('edit-dish-btn-dish-edit-1')).toBeDefined();
+    });
+
+    const editBtn = screen.getByTestId('edit-dish-btn-dish-edit-1');
+    fireEvent.click(editBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('Edit Custom Dish')).toBeDefined();
+      expect(screen.getByDisplayValue('Macro Oats')).toBeDefined();
+      expect(screen.getByDisplayValue('350')).toBeDefined();
+    });
+  });
+
+  it('triggers deleteCustomDishMutation from inline Delete button inside edit modal and closes modal', async () => {
+    const mockDelete = vi.fn().mockReturnValue({
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    });
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'custom_dishes') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({
+                data: [
+                  { id: 'dish-del-1', name: 'Delete Me Dish', calories: 200, protein: 10, carbs: 20, fat: 2, fiber: 1 },
+                ],
+                error: null,
+              }),
+            }),
+          }),
+          delete: mockDelete,
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
+                single: vi.fn().mockResolvedValue({ data: null, error: null }),
+              }),
+            }),
+          }),
+        }),
+      };
+    });
+
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('edit-dish-btn-dish-del-1')).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByTestId('edit-dish-btn-dish-del-1'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('modal-delete-dish-btn')).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByTestId('modal-delete-dish-btn'));
+
+    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('Delete Me Dish'));
+    await waitFor(() => {
+      expect(mockDelete).toHaveBeenCalled();
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText('Edit Custom Dish')).toBeNull();
+    });
+
+    confirmSpy.mockRestore();
+  });
+
+  it('renders floating Quick-Log Toast widget when 1-tap quick log button is clicked', async () => {
+    const mockInsert = vi.fn().mockReturnValue({
+      select: vi.fn().mockResolvedValue({ data: [], error: null }),
+    });
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'custom_dishes') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({
+                data: [
+                  { id: 'dish-toast-1', name: 'Power Bowl', calories: 550, protein: 40, carbs: 60, fat: 12, fiber: 8 },
+                ],
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === 'nutrition_logs') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              gte: vi.fn().mockReturnValue({
+                lte: vi.fn().mockReturnValue({
+                  order: vi.fn().mockResolvedValue({ data: [], error: null }),
+                }),
+              }),
+            }),
+          }),
+          insert: mockInsert,
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
+                single: vi.fn().mockResolvedValue({ data: null, error: null }),
+              }),
+            }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('quick-log-btn-dish-toast-1')).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByTestId('quick-log-btn-dish-toast-1'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('quick-log-toast')).toBeDefined();
+    });
+
+    const toast = screen.getByTestId('quick-log-toast');
+    expect(toast.getAttribute('role')).toBe('status');
+    expect(toast.getAttribute('aria-live')).toBe('polite');
+    expect(within(toast).getByText('Power Bowl')).toBeDefined();
+    expect(within(toast).getByText('+550 kcal')).toBeDefined();
+  });
+
+  it('auto-dismisses floating Quick-Log Toast widget after 2.8s', async () => {
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'custom_dishes') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({
+                data: [
+                  { id: 'dish-toast-2', name: 'Greek Yogurt Parfait', calories: 280, protein: 22, carbs: 35, fat: 4, fiber: 3 },
+                ],
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === 'nutrition_logs') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              gte: vi.fn().mockReturnValue({
+                lte: vi.fn().mockReturnValue({
+                  order: vi.fn().mockResolvedValue({ data: [], error: null }),
+                }),
+              }),
+            }),
+          }),
+          insert: vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) }),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
+                single: vi.fn().mockResolvedValue({ data: null, error: null }),
+              }),
+            }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('quick-log-btn-dish-toast-2')).toBeDefined();
+    });
+
+    vi.useFakeTimers();
+
+    fireEvent.click(screen.getByTestId('quick-log-btn-dish-toast-2'));
+
+    expect(screen.getByTestId('quick-log-toast')).toBeDefined();
+
+    // Advance 2800ms
+    await act(async () => {
+      vi.advanceTimersByTime(2800);
+    });
+
+    expect(screen.queryByTestId('quick-log-toast')).toBeNull();
+  });
+
+  it('handles rapid multi-tap on quick-log button by updating toast content and resetting auto-dismiss timer', async () => {
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'custom_dishes') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({
+                data: [
+                  { id: 'dish-a', name: 'Meal A', calories: 400, protein: 30, carbs: 40, fat: 10, fiber: 5 },
+                  { id: 'dish-b', name: 'Meal B', calories: 250, protein: 20, carbs: 20, fat: 5, fiber: 2 },
+                ],
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === 'nutrition_logs') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              gte: vi.fn().mockReturnValue({
+                lte: vi.fn().mockReturnValue({
+                  order: vi.fn().mockResolvedValue({ data: [], error: null }),
+                }),
+              }),
+            }),
+          }),
+          insert: vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) }),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
+                single: vi.fn().mockResolvedValue({ data: null, error: null }),
+              }),
+            }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('quick-log-btn-dish-a')).toBeDefined();
+      expect(screen.getByTestId('quick-log-btn-dish-b')).toBeDefined();
+    });
+
+    vi.useFakeTimers();
+
+    // Click Dish A
+    fireEvent.click(screen.getByTestId('quick-log-btn-dish-a'));
+    expect(screen.getByTestId('quick-log-toast')).toBeDefined();
+    expect(within(screen.getByTestId('quick-log-toast')).getByText('Meal A')).toBeDefined();
+    expect(within(screen.getByTestId('quick-log-toast')).getByText('+400 kcal')).toBeDefined();
+
+    // Advance 1500ms
+    await act(async () => {
+      vi.advanceTimersByTime(1500);
+    });
+    expect(screen.getByTestId('quick-log-toast')).toBeDefined();
+
+    // Click Dish B before 2.8s timer finishes
+    fireEvent.click(screen.getByTestId('quick-log-btn-dish-b'));
+    expect(within(screen.getByTestId('quick-log-toast')).getByText('Meal B')).toBeDefined();
+    expect(within(screen.getByTestId('quick-log-toast')).getByText('+250 kcal')).toBeDefined();
+
+    // Advance 1500ms (total 3000ms from start, but only 1500ms since Dish B tap)
+    await act(async () => {
+      vi.advanceTimersByTime(1500);
+    });
+    // Toast must still be visible!
+    expect(screen.getByTestId('quick-log-toast')).toBeDefined();
+
+    // Advance remaining 1300ms (reaches 2800ms since Dish B tap)
+    await act(async () => {
+      vi.advanceTimersByTime(1300);
+    });
+    // Toast should now be dismissed
+    expect(screen.queryByTestId('quick-log-toast')).toBeNull();
   });
 });
 

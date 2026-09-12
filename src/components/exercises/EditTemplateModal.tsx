@@ -326,7 +326,7 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
   return (
     <div
       data-testid="edit-template-modal"
-      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col justify-end sm:items-center sm:justify-center animate-fade-in"
+      className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex flex-col justify-end sm:items-center sm:justify-center animate-fade-in"
       onClick={onClose}
     >
       <div

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { HistoryView } from './HistoryView';
 import { groupSessionSetsByExercise } from '../../utils/historyGrouping';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -859,6 +859,147 @@ describe('HistoryView', () => {
       await waitFor(() => {
         expect(mockDeleteEq).toHaveBeenCalledWith('id', 's1');
       });
+    });
+  });
+
+  describe('Coach Inspection Mode', () => {
+    it('renders inspection banner and enforces read-only mode for athlete records', async () => {
+      const coachSession = {
+        user: { id: 'coach-id', email: 'coach@cybergym.io' },
+      };
+
+      (supabase.auth.getUser as any).mockResolvedValue({ data: { user: coachSession.user } });
+      (supabase.auth.getSession as any).mockResolvedValue({ data: { session: coachSession } });
+
+      const athleteLinksData = [
+        {
+          athlete_id: 'ath-1',
+          status: 'active',
+          linked_at: '2026-09-01T00:00:00Z',
+          athlete: { id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' },
+        },
+      ];
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'coach_athlete_links') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  order: vi.fn().mockResolvedValue({ data: athleteLinksData, error: null }),
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === 'users') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: {
+                    id: 'coach-id',
+                    email: 'coach@cybergym.io',
+                    username: 'Coach Duy',
+                    role: 'coach',
+                    is_coach_mode: true,
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === 'workouts') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({
+                data: [{ id: 'w1', date: '2026-09-01', name: 'Athlete Chest Session' }],
+                error: null,
+              }),
+            }),
+          };
+        }
+        if (table === 'sets') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({
+                  data: [
+                    {
+                      id: 's1',
+                      workout_id: 'w1',
+                      exercise_id: 'Bench Press',
+                      weight: 225,
+                      reps: 8,
+                      created_at: '2026-09-01T10:00:00Z',
+                      workouts: { date: '2026-09-01', name: 'Athlete Chest Session' },
+                    },
+                  ],
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === 'nutrition_logs') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({
+                  data: [
+                    {
+                      id: 'log-1',
+                      user_id: 'ath-1',
+                      food_name: 'Athlete Chicken & Rice',
+                      meal_type: 'lunch',
+                      calories: 550,
+                      protein: 45,
+                      carbs: 60,
+                      fat: 10,
+                      fiber: 5,
+                      logged_at: '2026-09-01T12:00:00Z',
+                    },
+                  ],
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        };
+      });
+
+      renderComponent();
+
+      // Wait for banner to appear
+      await waitFor(() => {
+        expect(screen.getByTestId('coach-inspection-banner')).toBeDefined();
+      });
+
+      const banner = screen.getByTestId('coach-inspection-banner');
+      expect(within(banner).getByText(/Viewing Athlete:/i)).toBeDefined();
+      expect(within(banner).getByText('Alex Johnson')).toBeDefined();
+      expect(within(banner).getByText(/\(Read-Only\)/i)).toBeDefined();
+
+      // In read-only mode, edit and delete buttons on athlete records must be hidden
+      expect(screen.queryByTestId('edit-set-btn-s1')).toBeNull();
+
+      // Switch to Nutrition tab
+      fireEvent.click(screen.getByTestId('history-tab-nutrition'));
+      await waitFor(() => {
+        expect(screen.getByText('Athlete Chicken & Rice')).toBeDefined();
+      });
+      expect(screen.queryByTestId('edit-meal-log-1')).toBeNull();
+      expect(screen.queryByTestId('delete-meal-log-1')).toBeNull();
+
+      // Toggle inspection mode to personal history
+      fireEvent.click(screen.getByTestId('toggle-inspect-mode-btn'));
+      expect(await screen.findByText('Viewing My Personal History')).toBeDefined();
     });
   });
 });

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useSyncExternalStore } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
@@ -8,6 +8,7 @@ import { normalizeDateStr, getLocalDateStr, formatLocalTimestamp } from '../../u
 import { getDishIcon } from '../../utils/dishIcons';
 import { EditMealModal } from './EditMealModal';
 import { formatCalories, formatMacro, calculateRemainingFuel } from '../../utils/nutrition';
+import { restTimerStore } from '../../utils/restTimerStore';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import {
   compressImageBase64,
@@ -188,10 +189,16 @@ export const NutritionEngine: React.FC = () => {
     queryFn: async () => {
       if (!targetUserId) return [];
       try {
-        const { data, error } = await supabase
+        let query: any = supabase
           .from('custom_dishes')
           .select('*')
           .eq('user_id', targetUserId);
+
+        if (typeof query?.order === 'function') {
+          query = query.order('created_at', { ascending: false });
+        }
+
+        const { data, error } = await query;
         if (error || !data) return [];
         return data as CustomDish[];
       } catch {
@@ -339,13 +346,24 @@ export const NutritionEngine: React.FC = () => {
     },
   });
 
+  const editingDishRef = useRef(editingDish);
+  useEffect(() => {
+    editingDishRef.current = editingDish;
+  }, [editingDish]);
+
   const deleteCustomDishMutation = useMutation({
     mutationFn: async (dishId: string) => {
       const { error } = await supabase.from('custom_dishes').delete().eq('id', dishId);
       if (error) throw error;
+      return dishId;
     },
-    onSuccess: () => {
+    onSuccess: (deletedId) => {
       queryClient.invalidateQueries({ queryKey: ['custom_dishes', targetUserId] });
+      if (editingDish?.id === deletedId || editingDishRef.current?.id === deletedId) {
+        setEditingDish(null);
+        resetDishModalFields();
+        setShowDishModal(false);
+      }
       setStatus('Custom dish deleted');
       setIsError(false);
     },
@@ -354,6 +372,32 @@ export const NutritionEngine: React.FC = () => {
       setIsError(true);
     },
   });
+
+  const [activeToast, setActiveToast] = useState<{ id: string; name: string; calories: number } | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const dismissToast = () => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+    setActiveToast(null);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  const timerState = useSyncExternalStore(
+    restTimerStore.subscribe,
+    restTimerStore.getSnapshot,
+    restTimerStore.getServerSnapshot
+  );
+  const isTimerActive = timerState.isRunning || timerState.isPaused;
 
   const resetDishModalFields = () => {
     setDishModalName('');
@@ -366,12 +410,14 @@ export const NutritionEngine: React.FC = () => {
   };
 
   const handleOpenNewDishModal = () => {
+    dismissToast();
     setEditingDish(null);
     resetDishModalFields();
     setShowDishModal(true);
   };
 
   const handleOpenEditDishModal = (dish: CustomDish) => {
+    dismissToast();
     setEditingDish(dish);
     setDishModalName(dish.name);
     setDishModalCalories(dish.calories ?? '');
@@ -840,6 +886,19 @@ export const NutritionEngine: React.FC = () => {
       logged_at: formatLocalTimestamp(selectedDate),
     };
     mutation.mutate(payload);
+
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setActiveToast({
+      id: String(Date.now()),
+      name: dish.name,
+      calories: Number(dish.calories) || 0,
+    });
+    toastTimerRef.current = setTimeout(() => {
+      setActiveToast(null);
+      toastTimerRef.current = null;
+    }, 2800);
   };
 
   const handleManualSave = (e: React.FormEvent) => {
@@ -1005,14 +1064,33 @@ export const NutritionEngine: React.FC = () => {
               Quick Log Favorites
             </span>
           </div>
-          <button
-            type="button"
-            onClick={handleOpenNewDishModal}
-            className="text-[11px] font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 px-2.5 py-1 rounded-xl transition"
-          >
-            <Plus className="w-3 h-3" />
-            <span>New Dish</span>
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                dismissToast();
+                if (customDishes.length > 0) {
+                  handleOpenEditDishModal(customDishes[0]);
+                } else {
+                  handleOpenNewDishModal();
+                }
+              }}
+              data-testid="manage-dishes-btn"
+              className="text-[11px] font-bold text-zinc-400 hover:text-white flex items-center gap-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-2.5 py-1 rounded-xl transition touch-manipulation min-h-[36px]"
+            >
+              <Utensils className="w-3 h-3" />
+              <span>Manage Dishes</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleOpenNewDishModal}
+              data-testid="new-dish-btn"
+              className="text-[11px] font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 px-2.5 py-1 rounded-xl transition touch-manipulation min-h-[36px]"
+            >
+              <Plus className="w-3 h-3" />
+              <span>New Dish</span>
+            </button>
+          </div>
         </div>
 
         {customDishes.length === 0 ? (
@@ -1026,27 +1104,46 @@ export const NutritionEngine: React.FC = () => {
                 key={dish.id}
                 onClick={() => handleStageCustomDish(dish)}
                 className="bg-zinc-950 hover:bg-zinc-850 border border-zinc-800 hover:border-cyan-500/40 rounded-2xl p-2.5 shrink-0 flex items-center gap-2.5 cursor-pointer transition shadow-sm group select-none"
+                data-testid={`custom-dish-card-${dish.id}`}
               >
                 <div className="w-7 h-7 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0">
                   {getDishIcon(dish.name)}
                 </div>
-                <div className="text-left">
-                  <div className="text-xs font-bold text-white group-hover:text-cyan-300 transition truncate max-w-[130px]">
+                <div className="text-left min-w-0">
+                  <div className="text-xs font-bold text-white group-hover:text-cyan-300 transition truncate max-w-[110px] sm:max-w-[160px]">
                     {dish.name}
                   </div>
-                  <div className="text-[10px] font-mono text-zinc-400">
+                  <div className="text-[10px] font-mono text-zinc-400 whitespace-nowrap">
                     <span className="text-amber-400 font-bold">{formatCalories(dish.calories)} kcal</span>
                     <span> • {formatMacro(dish.protein)}g P</span>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={(e) => handleQuickLogCustomDishDirect(dish, e)}
-                  title="1-Tap Log Meal"
-                  className="min-w-[44px] min-h-[44px] rounded-xl bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30 flex items-center justify-center transition active:scale-95 shrink-0 touch-manipulation"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-1 shrink-0 ml-1">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      dismissToast();
+                      handleOpenEditDishModal(dish);
+                    }}
+                    title="Edit Custom Dish"
+                    aria-label={`Edit ${dish.name}`}
+                    data-testid={`edit-dish-btn-${dish.id}`}
+                    className="min-w-[36px] min-h-[36px] sm:min-w-[44px] sm:min-h-[44px] rounded-xl text-zinc-400 hover:text-cyan-300 hover:bg-zinc-800 transition flex items-center justify-center touch-manipulation"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => handleQuickLogCustomDishDirect(dish, e)}
+                    title="1-Tap Log Meal"
+                    aria-label={`Quick log ${dish.name}, ${dish.calories} calories`}
+                    data-testid={`quick-log-btn-${dish.id}`}
+                    className="min-w-[44px] min-h-[44px] rounded-xl bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30 flex items-center justify-center transition active:scale-95 touch-manipulation"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -1789,8 +1886,8 @@ export const NutritionEngine: React.FC = () => {
 
       {/* Custom Dishes Modal */}
       {showDishModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-t-3xl sm:rounded-3xl p-5 max-w-md w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-t-3xl sm:rounded-3xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom,1.25rem))] max-w-md w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
               <h3 className="text-base font-black text-white flex items-center gap-2">
                 <Star className="w-4 h-4 text-amber-400" />
@@ -1915,21 +2012,45 @@ export const NutritionEngine: React.FC = () => {
                 />
               </div>
 
-              <div className="flex gap-2 justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowDishModal(false)}
-                  className="px-4 py-2 min-h-[44px] rounded-xl text-xs font-bold text-zinc-400 hover:bg-zinc-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={saveCustomDishMutation.isPending}
-                  className="px-5 py-2 min-h-[44px] rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-black shadow-neon-cyan font-black disabled:opacity-50"
-                >
-                  {saveCustomDishMutation.isPending ? 'Saving...' : 'Save Dish'}
-                </button>
+              <div className="flex items-center justify-between pt-3 border-t border-zinc-800">
+                {editingDish ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(`Delete "${editingDish.name}" from your custom dishes?`)) {
+                        deleteCustomDishMutation.mutate(editingDish.id);
+                      }
+                    }}
+                    data-testid="modal-delete-dish-btn"
+                    disabled={deleteCustomDishMutation.isPending}
+                    className="px-4 py-2 min-h-[44px] rounded-xl text-xs font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition flex items-center gap-1.5 touch-manipulation disabled:opacity-50"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>{deleteCustomDishMutation.isPending ? 'Deleting...' : 'Delete Dish'}</span>
+                  </button>
+                ) : (
+                  <div />
+                )}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDishModal(false);
+                      setEditingDish(null);
+                      resetDishModalFields();
+                    }}
+                    className="px-4 py-2 min-h-[44px] rounded-xl text-xs font-bold text-zinc-400 hover:bg-zinc-800 transition touch-manipulation"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saveCustomDishMutation.isPending}
+                    className="px-5 py-2 min-h-[44px] rounded-xl text-xs font-black bg-cyan-500 hover:bg-cyan-400 text-black shadow-neon-cyan transition disabled:opacity-50 touch-manipulation"
+                  >
+                    {saveCustomDishMutation.isPending ? 'Saving...' : 'Save Dish'}
+                  </button>
+                </div>
               </div>
             </form>
 
@@ -1967,7 +2088,11 @@ export const NutritionEngine: React.FC = () => {
                         </button>
                         <button
                           type="button"
-                          onClick={() => deleteCustomDishMutation.mutate(dish.id)}
+                          onClick={() => {
+                            if (window.confirm(`Delete "${dish.name}" from your custom dishes?`)) {
+                              deleteCustomDishMutation.mutate(dish.id);
+                            }
+                          }}
                           className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition touch-manipulation"
                           title="Delete"
                         >
@@ -1979,6 +2104,35 @@ export const NutritionEngine: React.FC = () => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Floating Quick-Log Toast */}
+      {activeToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          data-testid="quick-log-toast"
+          onClick={dismissToast}
+          className={`fixed ${
+            isTimerActive
+              ? 'bottom-[calc(9.25rem+env(safe-area-inset-bottom,0px))]'
+              : 'bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))]'
+          } left-1/2 -translate-x-1/2 z-50 max-w-sm w-[calc(100%-2rem)] bg-zinc-900/95 border border-cyan-500/50 backdrop-blur-xl shadow-2xl shadow-cyan-500/20 rounded-2xl p-3.5 flex items-center justify-between gap-3 text-xs font-bold text-white transition-all duration-200 animate-in fade-in slide-in-from-bottom-3 cursor-pointer touch-manipulation select-none`}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+            </div>
+            <div className="truncate min-w-0">
+              <span className="text-zinc-400 font-medium">Logged: </span>
+              <span className="text-white font-bold">{activeToast.name}</span>
+            </div>
+          </div>
+          <div className="shrink-0 px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-400 font-mono text-[11px] font-black">
+            +{activeToast.calories} kcal
           </div>
         </div>
       )}

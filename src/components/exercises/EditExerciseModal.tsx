@@ -125,7 +125,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
   return (
     <div
       data-testid="edit-exercise-modal"
-      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col justify-end sm:items-center sm:justify-center animate-fade-in"
+      className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex flex-col justify-end sm:items-center sm:justify-center animate-fade-in"
       onClick={onClose}
     >
       <div

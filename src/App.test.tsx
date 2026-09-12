@@ -177,5 +177,28 @@ describe('App Shell & Navigation', () => {
       expect(screen.getByTestId('rest-timer-display')).toBeDefined();
     });
   });
+
+  it('renders Cyberpunk pulse spinner and retry button in ProtectedRoute when loading exceeds 2s', async () => {
+    vi.useFakeTimers();
+    (supabase.auth.getSession as any).mockImplementation(() => new Promise(() => {}));
+    localStorage.clear();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText('Connecting to CyberGym...')).toBeDefined();
+    expect(screen.queryByTestId('auth-retry-button')).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+
+    expect(screen.getByTestId('auth-retry-button')).toBeDefined();
+    expect(screen.getByText('Connecting to CyberGym... Tap to Retry')).toBeDefined();
+    vi.useRealTimers();
+  });
 });
 

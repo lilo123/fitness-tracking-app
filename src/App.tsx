@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './hooks/useAuth';
@@ -29,11 +29,37 @@ const LazyFallback: React.FC = () => (
 
 // Guard for authenticated routes
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading } = useAuth();
+  const { user, loading, refreshProfile } = useAuth();
+  const [showRetry, setShowRetry] = useState(false);
+
+  /* oxlint-disable react/set-state-in-effect */
+  useEffect(() => {
+    if (!loading) {
+      setShowRetry(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowRetry(true), 2000);
+    return () => clearTimeout(timer);
+  }, [loading]);
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-12 text-cyan-400 font-mono text-xs">
-        Loading...
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center space-y-4">
+        <div className="w-8 h-8 rounded-full border-2 border-cyan-500/20 border-t-cyan-400 animate-spin" />
+        <div className="text-cyan-400 font-mono text-xs tracking-wider">Connecting to CyberGym...</div>
+        {showRetry && (
+          <button
+            type="button"
+            onClick={() => {
+              setShowRetry(false);
+              refreshProfile();
+            }}
+            data-testid="auth-retry-button"
+            className="px-4 py-2 min-h-[44px] rounded-xl text-xs font-bold bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 transition shadow-neon-cyan active:scale-95 touch-manipulation flex items-center justify-center"
+          >
+            Connecting to CyberGym... Tap to Retry
+          </button>
+        )}
       </div>
     );
   }
@@ -72,7 +98,7 @@ function AppLayout() {
   return (
     <div className="min-h-[100dvh] flex flex-col bg-zinc-950 text-zinc-100 selection:bg-cyan-500/20 selection:text-cyan-300">
       <Header />
-      <main className={`flex-1 max-w-xl w-full mx-auto p-4 ${user ? 'pb-[calc(8.5rem+env(safe-area-inset-bottom,0px))]' : 'pb-8'}`}>
+      <main className={`flex-1 max-w-xl w-full mx-auto p-4 ${user ? 'pb-[calc(9.5rem+env(safe-area-inset-bottom,0px))]' : 'pb-8'}`}>
         <Routes>
           <Route path="/" element={<Navigate to="/workout" replace />} />
           <Route
