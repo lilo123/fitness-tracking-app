@@ -380,7 +380,7 @@ export const CoachCockpit: React.FC = () => {
               <button
                 type="button"
                 onClick={async () => {
-                  if (confirm(`Disconnect athlete "${selectedAthlete?.name || 'this athlete'}"?`)) {
+                  if (window.confirm(`Disconnect athlete "${selectedAthlete?.name || 'this athlete'}"?`)) {
                     try {
                       const { error } = await supabase.rpc('disconnect_coach', { target_athlete_id: selectedAthleteId });
                       if (error) throw error;
@@ -828,7 +828,7 @@ export const CoachCockpit: React.FC = () => {
       {/* Section 3: Routine Template Builder & Library */}
       <div className={`${coachTab === 'templates' ? 'block' : 'hidden'} sm:block space-y-6`}>
         {/* Routine Template Builder */}
-        <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-5 shadow-2xl space-y-4">
+        <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-4 sm:p-5 shadow-2xl space-y-4">
           <div className="flex items-center gap-2 border-b border-zinc-800 pb-3">
             <Layers className="w-4 h-4 text-cyan-400" />
             <h3 className="text-sm font-black text-white uppercase tracking-wider">
@@ -868,7 +868,7 @@ export const CoachCockpit: React.FC = () => {
               <select
                 value={exerciseToAdd}
                 onChange={(e) => setExerciseToAdd(e.target.value)}
-                className="flex-1 bg-zinc-950 border border-zinc-800 text-white rounded-xl px-3 py-2 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none min-h-[44px]"
+                className="flex-1 min-w-0 truncate cursor-pointer bg-zinc-950 border border-zinc-800 text-white rounded-xl px-3 py-2 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none min-h-[44px]"
                 data-testid="template-exercise-select"
               >
                 <option value="">-- Choose Exercise to Add --</option>
@@ -882,7 +882,7 @@ export const CoachCockpit: React.FC = () => {
                 type="button"
                 onClick={handleAddExerciseToTemplate}
                 disabled={!exerciseToAdd}
-                className="bg-zinc-800 hover:bg-zinc-700 text-cyan-300 font-bold px-4 py-2 min-h-[44px] rounded-xl text-xs flex items-center gap-1 border border-zinc-700 disabled:opacity-50 touch-manipulation"
+                className="bg-zinc-800 hover:bg-zinc-700 text-cyan-300 font-bold px-4 py-2 min-h-[44px] rounded-xl text-xs flex items-center gap-1 border border-zinc-700 disabled:opacity-50 touch-manipulation shrink-0"
                 data-testid="add-template-exercise-btn"
               >
                 <Plus className="w-4 h-4" />
@@ -901,13 +901,13 @@ export const CoachCockpit: React.FC = () => {
                     key={idx}
                     className="bg-zinc-950 border border-zinc-800/80 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0 flex-1 truncate">
                       <span className="w-5 h-5 rounded-md bg-zinc-800 text-cyan-400 text-xs font-mono font-bold flex items-center justify-center shrink-0">
                         {idx + 1}
                       </span>
                       <span className="text-xs font-bold text-white truncate">{ex.exerciseName}</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
                       <div className="flex items-center gap-1.5 text-xs text-zinc-400 font-mono">
                         <div className="flex items-center gap-1">
                           <input
@@ -984,7 +984,7 @@ export const CoachCockpit: React.FC = () => {
         </div>
 
         {/* Existing Routine Templates */}
-        <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-5 shadow-2xl space-y-3">
+        <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-4 sm:p-5 shadow-2xl space-y-3">
           <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
             <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
               <Layers className="w-4 h-4 text-cyan-400" />

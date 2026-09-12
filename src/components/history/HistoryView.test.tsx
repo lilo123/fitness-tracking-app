@@ -1001,6 +1001,158 @@ describe('HistoryView', () => {
       fireEvent.click(screen.getByTestId('toggle-inspect-mode-btn'));
       expect(await screen.findByText('Viewing My Personal History')).toBeDefined();
     });
+
+    it('resets editingMealLog and editingSet when switching athletes or toggling inspect mode', async () => {
+      const coachSession = {
+        user: { id: 'coach-id', email: 'coach@cybergym.io' },
+      };
+
+      (supabase.auth.getUser as any).mockResolvedValue({ data: { user: coachSession.user } });
+      (supabase.auth.getSession as any).mockResolvedValue({ data: { session: coachSession } });
+
+      const athleteLinksData = [
+        {
+          athlete_id: 'ath-1',
+          status: 'active',
+          linked_at: '2026-09-01T00:00:00Z',
+          athlete: { id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' },
+        },
+      ];
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'coach_athlete_links') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  order: vi.fn().mockResolvedValue({ data: athleteLinksData, error: null }),
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === 'users') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: {
+                    id: 'coach-id',
+                    email: 'coach@cybergym.io',
+                    username: 'Coach Duy',
+                    role: 'coach',
+                    is_coach_mode: true,
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === 'workouts') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({
+                data: [{ id: 'w-coach-1', date: '2026-09-01', name: 'Coach Personal Session' }],
+                error: null,
+              }),
+            }),
+          };
+        }
+        if (table === 'sets') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({
+                  data: [
+                    {
+                      id: 's-coach-1',
+                      workout_id: 'w-coach-1',
+                      exercise_id: 'Deadlift',
+                      weight: 405,
+                      reps: 5,
+                      created_at: '2026-09-01T10:00:00Z',
+                      workouts: { date: '2026-09-01', name: 'Coach Personal Session' },
+                    },
+                  ],
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === 'nutrition_logs') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({
+                  data: [
+                    {
+                      id: 'log-coach-1',
+                      user_id: 'coach-id',
+                      food_name: 'Coach Steak & Eggs',
+                      meal_type: 'breakfast',
+                      calories: 700,
+                      protein: 60,
+                      carbs: 10,
+                      fat: 45,
+                      fiber: 2,
+                      logged_at: '2026-09-01T08:00:00Z',
+                    },
+                  ],
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        };
+      });
+
+      render(
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <CoachProvider>
+              <HistoryView />
+            </CoachProvider>
+          </AuthProvider>
+        </QueryClientProvider>
+      );
+
+      // Wait for inspection banner to appear
+      await waitFor(() => {
+        expect(screen.getByTestId('coach-inspection-banner')).toBeDefined();
+      });
+
+      // Switch to personal history so edit controls are visible
+      fireEvent.click(screen.getByTestId('toggle-inspect-mode-btn'));
+      expect(await screen.findByText('Viewing My Personal History')).toBeDefined();
+
+      // Open Edit Set modal
+      const editSetBtn = await screen.findByTestId('edit-set-btn-s-coach-1');
+      fireEvent.click(editSetBtn);
+      expect(await screen.findByTestId('edit-set-modal')).toBeDefined();
+
+      // Now toggle inspect mode back to athlete -> edit modal must be dismissed
+      fireEvent.click(screen.getByTestId('toggle-inspect-mode-btn'));
+      expect(screen.queryByTestId('edit-set-modal')).toBeNull();
+
+      // Switch to personal history again
+      fireEvent.click(screen.getByTestId('toggle-inspect-mode-btn'));
+      // Switch to nutrition tab
+      fireEvent.click(screen.getByTestId('history-tab-nutrition'));
+      const editMealBtn = await screen.findByTestId('edit-meal-log-coach-1');
+      fireEvent.click(editMealBtn);
+      expect(await screen.findByTestId('edit-meal-modal')).toBeDefined();
+
+      // Toggle inspect mode back to athlete -> meal modal must be dismissed
+      fireEvent.click(screen.getByTestId('toggle-inspect-mode-btn'));
+      expect(screen.queryByTestId('edit-meal-modal')).toBeNull();
+    });
   });
 });
 

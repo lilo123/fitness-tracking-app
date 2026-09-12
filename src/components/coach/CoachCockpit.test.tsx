@@ -320,6 +320,55 @@ describe('CoachCockpit', () => {
     confirmSpy.mockRestore();
   });
 
+  it('does not disconnect athlete if confirmation is cancelled', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('disconnect-athlete-btn')).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByTestId('disconnect-athlete-btn'));
+
+    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('Disconnect athlete'));
+    expect(supabase.rpc).not.toHaveBeenCalledWith('disconnect_coach', expect.anything());
+
+    confirmSpy.mockRestore();
+  });
+
+  it('handles disconnect athlete RPC failure with alert and error logging', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    (supabase.rpc as any).mockResolvedValueOnce({
+      data: null,
+      error: { message: 'Database failure while disconnecting athlete' },
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('disconnect-athlete-btn')).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByTestId('disconnect-athlete-btn'));
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith('Database failure while disconnecting athlete');
+    });
+
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Failed to disconnect athlete:',
+      expect.objectContaining({ message: 'Database failure while disconnecting athlete' })
+    );
+
+    confirmSpy.mockRestore();
+    alertSpy.mockRestore();
+    consoleSpy.mockRestore();
+  });
+
   it('toggles mobile segmented tabs between activity, macros, and templates', async () => {
     renderComponent();
 
@@ -536,4 +585,39 @@ describe('CoachCockpit', () => {
     expect(loadOlderBtn.textContent).toContain('Load Older Days');
     fireEvent.click(loadOlderBtn);
   });
+
+  it('applies responsive flex overflow prevention classes to template builder exercise selector and sequence rows', async () => {
+    renderComponent();
+
+    await screen.findByText('Workout Template Builder');
+
+    const select = screen.getByTestId('template-exercise-select');
+    expect(select.className).toContain('min-w-0');
+    expect(select.className).toContain('truncate');
+    expect(select.className).toContain('cursor-pointer');
+
+    const addBtn = screen.getByTestId('add-template-exercise-btn');
+    expect(addBtn.className).toContain('shrink-0');
+
+    // Wait for exercise options to load in select
+    await waitFor(() => {
+      expect(screen.getByText(/Leg Extension Machine/)).toBeDefined();
+    });
+
+    // Add exercise to test sequence row classes
+    fireEvent.change(select, { target: { value: 'Leg Extension Machine' } });
+    fireEvent.click(addBtn);
+
+    const nameEl = await screen.findByText('Leg Extension Machine');
+    const nameContainer = nameEl.parentElement;
+    expect(nameContainer?.className).toContain('min-w-0');
+    expect(nameContainer?.className).toContain('flex-1');
+    expect(nameContainer?.className).toContain('truncate');
+
+    const setsInput = screen.getByTestId('template-target-sets-0');
+    const controlsContainer = setsInput.closest('.shrink-0');
+    expect(controlsContainer).not.toBeNull();
+    expect(controlsContainer?.className).toContain('flex-wrap');
+  });
 });
+
