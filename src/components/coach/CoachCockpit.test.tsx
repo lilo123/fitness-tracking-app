@@ -593,8 +593,13 @@ describe('CoachCockpit', () => {
 
     const select = screen.getByTestId('template-exercise-select');
     expect(select.className).toContain('min-w-0');
+    expect(select.className).toContain('max-w-full');
     expect(select.className).toContain('truncate');
     expect(select.className).toContain('cursor-pointer');
+
+    const selectorRow = select.parentElement;
+    expect(selectorRow?.className).toContain('w-full');
+    expect(selectorRow?.className).toContain('min-w-0');
 
     const addBtn = screen.getByTestId('add-template-exercise-btn');
     expect(addBtn.className).toContain('shrink-0');
@@ -609,15 +614,96 @@ describe('CoachCockpit', () => {
     fireEvent.click(addBtn);
 
     const nameEl = await screen.findByText('Leg Extension Machine');
+    expect(nameEl.className).toContain('truncate');
+    expect(nameEl.className).toContain('min-w-0');
+    expect(nameEl.className).toContain('flex-1');
+
     const nameContainer = nameEl.parentElement;
     expect(nameContainer?.className).toContain('min-w-0');
     expect(nameContainer?.className).toContain('flex-1');
     expect(nameContainer?.className).toContain('truncate');
 
     const setsInput = screen.getByTestId('template-target-sets-0');
-    const controlsContainer = setsInput.closest('.shrink-0');
+    const controlsContainer = setsInput.closest('.flex-wrap');
     expect(controlsContainer).not.toBeNull();
+    expect(controlsContainer?.className).toContain('shrink-0');
     expect(controlsContainer?.className).toContain('flex-wrap');
+
+    const removeBtn = screen.getByTestId('template-remove-ex-0');
+    expect(removeBtn.className).toContain('shrink-0');
+  });
+
+  it('applies flex overflow prevention classes to existing workout template cards', async () => {
+    const mockTemplates = [
+      {
+        id: 'tpl-long-1',
+        name: 'Hypertrophy Upper Body Specialization Program Phase 1 Extended Name',
+        is_master: true,
+        coach_id: 'coach-id',
+        exercises: [
+          { id: 'te-1', exercise_id: 'ex-1', target_sets: 4, target_reps: 10, exercises: { name: 'Leg Extension Machine' } },
+        ],
+      },
+    ];
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'routine_templates') {
+        const queryPromise = Promise.resolve({ data: mockTemplates, error: null });
+        return {
+          select: vi.fn().mockReturnValue(
+            Object.assign(queryPromise, {
+              order: vi.fn().mockResolvedValue({ data: mockTemplates, error: null }),
+            })
+          ),
+        };
+      }
+      const athleteLinksData = [
+        {
+          athlete_id: 'ath-1',
+          status: 'active',
+          linked_at: '2026-09-01T00:00:00Z',
+          athlete: { id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' },
+        },
+      ];
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: athleteLinksData, error: null }),
+              single: vi.fn().mockResolvedValue({ data: athleteLinksData[0], error: null }),
+            }),
+            order: vi.fn().mockResolvedValue({
+              data: [{ id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' }],
+              error: null,
+            }),
+            single: vi.fn().mockResolvedValue({
+              data: {
+                id: 'coach-id',
+                email: 'coach@cybergym.io',
+                username: 'Coach Duy',
+                role: 'coach',
+                is_coach_mode: true,
+              },
+              error: null,
+            }),
+          }),
+          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+        }),
+      };
+    });
+
+    renderComponent();
+
+    await screen.findByText('Workout Template Builder');
+
+    const templateTitle = await screen.findByText(/Hypertrophy Upper Body Specialization/);
+    expect(templateTitle.className).toContain('truncate');
+
+    const templateTextContainer = templateTitle.closest('.min-w-0');
+    expect(templateTextContainer).not.toBeNull();
+
+    const masterBadge = screen.getByText('Master');
+    expect(masterBadge.className).toContain('shrink-0');
   });
 });
 
