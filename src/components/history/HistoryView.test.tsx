@@ -7,6 +7,17 @@ import { AuthProvider } from '../../context/AuthContext';
 import { CoachProvider } from '../../context/CoachContext';
 import { supabase } from '../../lib/supabase';
 
+/**
+ * Edit and Delete now live behind a single overflow trigger (`meal-actions-<id>`)
+ * so the row fits a 320 px viewport. The action testids only exist while the
+ * menu is open, so a test has to open it first.
+ */
+function openMealAction(logId: string, action: 'edit' | 'delete') {
+  fireEvent.click(screen.getByTestId(`meal-actions-${logId}`));
+  fireEvent.click(screen.getByTestId(`${action}-meal-${logId}`));
+}
+
+
 const { mockSession } = vi.hoisted(() => ({
   mockSession: {
     user: { id: 'test-athlete-id', email: 'athlete@example.com' },
@@ -201,16 +212,81 @@ describe('HistoryView', () => {
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('delete-meal-log-1')).toBeDefined();
+      expect(screen.getByTestId('meal-actions-log-1')).toBeDefined();
     });
 
     // Click delete meal button
-    const deleteBtn = screen.getByTestId('delete-meal-log-1');
-    fireEvent.click(deleteBtn);
+    openMealAction('log-1', 'delete');
 
     await waitFor(() => {
       expect(mockDeleteEq).toHaveBeenCalledWith('id', 'log-1');
     });
+  });
+
+  it('rolls a rescale rejected by a database constraint back to the stored macros', async () => {
+    // Same wiring gate as NutritionEngine's: the row must be handed the write's
+    // promise (mutateAsync), or a rejected rescale leaves numbers on screen
+    // that the database refused.
+    const mealWithItems = {
+      id: 'log-items',
+      user_id: 'test-athlete-id',
+      food_name: 'Com Tam & Eggs',
+      meal_type: 'lunch',
+      calories: 560,
+      protein: 32,
+      carbs: 69,
+      fat: 16,
+      fiber: 1,
+      logged_at: '2026-09-01T12:00:00Z',
+      items: [
+        { id: 'i1', name: 'Broken Rice', quantity: 240, unit: 'g', calories: 300, protein: 6, carbs: 65, fat: 1, fiber: 1 },
+        { id: 'i2', name: 'Grilled Pork', quantity: 120, unit: 'g', calories: 260, protein: 26, carbs: 4, fat: 15, fiber: 0 },
+      ],
+    };
+    const rejectingEq = vi.fn().mockResolvedValue({
+      error: {
+        message:
+          'new row for relation "nutrition_logs" violates check constraint "chk_nl_parent_equals_items_sum"',
+      },
+    });
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'nutrition_logs') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [mealWithItems], error: null }),
+            }),
+          }),
+          delete: vi.fn().mockReturnValue({ eq: mockDeleteEq }),
+          update: vi.fn().mockReturnValue({ eq: rejectingEq }),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+    fireEvent.click(screen.getByTestId('history-tab-nutrition'));
+
+    const trigger = await screen.findByTestId('meal-log-accordion-trigger');
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByTestId('dish-scale-0.5'));
+
+    expect(screen.getByText(/280 kcal/)).toBeDefined();
+    await waitFor(() => expect(rejectingEq).toHaveBeenCalledWith('id', 'log-items'));
+
+    const alert = await screen.findByTestId('meal-log-error');
+    expect(alert.textContent).toMatch(/no longer match its components/);
+    // The day-total line repeats the figure, hence the plural queries.
+    expect(screen.getAllByText(/560 kcal/).length).toBeGreaterThan(0);
+    expect(screen.queryAllByText(/280 kcal/)).toHaveLength(0);
   });
 
   it('displays mutation error notification when meal deletion fails', async () => {
@@ -221,11 +297,10 @@ describe('HistoryView', () => {
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('delete-meal-log-1')).toBeDefined();
+      expect(screen.getByTestId('meal-actions-log-1')).toBeDefined();
     });
 
-    const deleteBtn = screen.getByTestId('delete-meal-log-1');
-    fireEvent.click(deleteBtn);
+    openMealAction('log-1', 'delete');
 
     await waitFor(() => {
       expect(screen.getByTestId('history-mutation-error')).toBeDefined();
@@ -239,11 +314,11 @@ describe('HistoryView', () => {
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('edit-meal-log-1')).toBeDefined();
+      expect(screen.getByTestId('meal-actions-log-1')).toBeDefined();
     });
 
     // Click edit button for log-1
-    fireEvent.click(screen.getByTestId('edit-meal-log-1'));
+    openMealAction('log-1', 'edit');
 
     // Modal opens
     expect(screen.getByTestId('edit-meal-modal')).toBeDefined();
@@ -265,10 +340,10 @@ describe('HistoryView', () => {
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('edit-meal-log-1')).toBeDefined();
+      expect(screen.getByTestId('meal-actions-log-1')).toBeDefined();
     });
 
-    fireEvent.click(screen.getByTestId('edit-meal-log-1'));
+    openMealAction('log-1', 'edit');
 
     // Modify values
     fireEvent.change(screen.getByTestId('edit-meal-name-input'), {
@@ -333,10 +408,10 @@ describe('HistoryView', () => {
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('edit-meal-log-1')).toBeDefined();
+      expect(screen.getByTestId('meal-actions-log-1')).toBeDefined();
     });
 
-    fireEvent.click(screen.getByTestId('edit-meal-log-1'));
+    openMealAction('log-1', 'edit');
 
     fireEvent.click(screen.getByTestId('save-edit-meal-btn'));
 
@@ -352,10 +427,10 @@ describe('HistoryView', () => {
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('edit-meal-log-1')).toBeDefined();
+      expect(screen.getByTestId('meal-actions-log-1')).toBeDefined();
     });
 
-    fireEvent.click(screen.getByTestId('edit-meal-log-1'));
+    openMealAction('log-1', 'edit');
 
     expect(screen.getByTestId('edit-meal-modal')).toBeDefined();
 
@@ -374,10 +449,10 @@ describe('HistoryView', () => {
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('edit-meal-log-1')).toBeDefined();
+      expect(screen.getByTestId('meal-actions-log-1')).toBeDefined();
     });
 
-    fireEvent.click(screen.getByTestId('edit-meal-log-1'));
+    openMealAction('log-1', 'edit');
 
     // Clear food name
     fireEvent.change(screen.getByTestId('edit-meal-name-input'), {
@@ -397,10 +472,10 @@ describe('HistoryView', () => {
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('edit-meal-log-1')).toBeDefined();
+      expect(screen.getByTestId('meal-actions-log-1')).toBeDefined();
     });
 
-    fireEvent.click(screen.getByTestId('edit-meal-log-1'));
+    openMealAction('log-1', 'edit');
 
     // Enter negative and invalid values
     fireEvent.change(screen.getByTestId('edit-meal-calories-input'), {
@@ -432,11 +507,11 @@ describe('HistoryView', () => {
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('edit-meal-log-1')).toBeDefined();
+      expect(screen.getByTestId('meal-actions-log-1')).toBeDefined();
     });
 
     // 1. Open and dismiss with Escape
-    fireEvent.click(screen.getByTestId('edit-meal-log-1'));
+    openMealAction('log-1', 'edit');
     expect(screen.getByTestId('edit-meal-modal')).toBeDefined();
 
     fireEvent.keyDown(window, { key: 'Escape' });
@@ -445,7 +520,7 @@ describe('HistoryView', () => {
     });
 
     // 2. Open and dismiss with backdrop click
-    fireEvent.click(screen.getByTestId('edit-meal-log-1'));
+    openMealAction('log-1', 'edit');
     const modalBackdrop = screen.getByTestId('edit-meal-modal');
     expect(modalBackdrop).toBeDefined();
 
@@ -994,6 +1069,9 @@ describe('HistoryView', () => {
       await waitFor(() => {
         expect(screen.getByText('Athlete Chicken & Rice')).toBeDefined();
       });
+      // The whole overflow control is gone, not merely its (unmounted) items —
+      // asserting only on the items would pass even if the menu were rendered.
+      expect(screen.queryByTestId('meal-actions-log-1')).toBeNull();
       expect(screen.queryByTestId('edit-meal-log-1')).toBeNull();
       expect(screen.queryByTestId('delete-meal-log-1')).toBeNull();
 
@@ -1145,8 +1223,8 @@ describe('HistoryView', () => {
       fireEvent.click(screen.getByTestId('toggle-inspect-mode-btn'));
       // Switch to nutrition tab
       fireEvent.click(screen.getByTestId('history-tab-nutrition'));
-      const editMealBtn = await screen.findByTestId('edit-meal-log-coach-1');
-      fireEvent.click(editMealBtn);
+      await screen.findByTestId('meal-actions-log-coach-1');
+      openMealAction('log-coach-1', 'edit');
       expect(await screen.findByTestId('edit-meal-modal')).toBeDefined();
 
       // Toggle inspect mode back to athlete -> meal modal must be dismissed

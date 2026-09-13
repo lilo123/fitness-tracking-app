@@ -24,6 +24,17 @@ export default defineConfig({
       name: 'Mobile Chrome',
       use: { ...devices['Pixel 7'] },
     },
+    // The two narrowest devices still in use. Everything above renders at
+    // >= 360 px, where the row overflow this feature fixes is invisible; these
+    // are the only projects that can catch it coming back.
+    {
+      name: 'Narrow Chrome (320px)',
+      use: { ...devices['Galaxy S9+'] },
+    },
+    {
+      name: 'Narrow Safari (320px)',
+      use: { ...devices['iPhone SE'] },
+    },
   ],
   webServer: {
     command: 'npm run dev',

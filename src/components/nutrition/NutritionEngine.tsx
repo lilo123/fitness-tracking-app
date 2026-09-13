@@ -35,12 +35,34 @@ import {
   Image as ImageIcon,
   RotateCcw,
 } from 'lucide-react';
+import { convertPortion, type CanonicalUnit } from '../../utils/unitConverter';
+import {
+  itemsForPersist,
+  itemsFromLegacyIngredients,
+  normalizeItems,
+  sumItems,
+  type NutritionItem,
+} from '../../utils/itemModel';
+import { ComponentRow } from './ComponentRow';
+import { MealLogRow } from './MealLogRow';
+import { CustomDishEditor } from './CustomDishEditor';
+import { useModalA11y } from '../../hooks/useModalA11y';
 
 export interface StagedItem {
   id: string;
   name: string;
+  /** The original free-text portion string, kept verbatim for provenance. */
   portion: string;
+  /**
+   * Retained only so that a saved custom dish written by an older client still
+   * round-trips. Quantity is the authoritative control now.
+   */
   portionMultiplier: number;
+  /** Canonical quantity in `unit`, derived from `portion` on first staging. */
+  quantity: number;
+  unit: CanonicalUnit;
+  /** The quantity at which base* below were measured. Scaling is relative to this. */
+  baseQuantity: number;
   baseCalories: number;
   baseProtein: number;
   baseCarbs: number;
@@ -51,6 +73,38 @@ export interface StagedItem {
   carbs: number;
   fat: number;
   fiber: number;
+}
+
+/** The staged component as the shared level-2 model sees it. */
+export function stagedToItem(it: StagedItem): NutritionItem {
+  return {
+    id: it.id,
+    name: it.name,
+    quantity: it.quantity,
+    unit: it.unit,
+    displayPortion: it.portion,
+    calories: it.calories,
+    protein: it.protein,
+    carbs: it.carbs,
+    fat: it.fat,
+    fiber: it.fiber,
+  };
+}
+
+/** The same component at its reference quantity, for drift-free rescaling. */
+export function stagedReference(it: StagedItem): NutritionItem {
+  return {
+    id: it.id,
+    name: it.name,
+    quantity: it.baseQuantity,
+    unit: it.unit,
+    displayPortion: it.portion,
+    calories: it.baseCalories,
+    protein: it.baseProtein,
+    carbs: it.baseCarbs,
+    fat: it.baseFat,
+    fiber: it.baseFiber,
+  };
 }
 
 export interface StagedMeal {
@@ -72,6 +126,81 @@ let itemSequence = 0;
 function generateItemId(): string {
   itemSequence += 1;
   return `item-${Date.now()}-${itemSequence}`;
+}
+
+function toNumber(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/**
+ * Build a staged component, deriving its canonical (quantity, unit) from the
+ * free-text portion string. The portion string itself is kept verbatim: it is
+ * the provenance escape hatch that makes any future re-interpretation possible.
+ */
+function buildStagedItem(raw: {
+  name: string;
+  portion?: string | null;
+  calories?: unknown;
+  protein?: unknown;
+  carbs?: unknown;
+  fat?: unknown;
+  fiber?: unknown;
+  /** Present only when re-staging something that was already scaled. */
+  base?: { calories: number; protein: number; carbs: number; fat: number; fiber: number };
+  quantity?: unknown;
+  unit?: unknown;
+  portionMultiplier?: unknown;
+}): StagedItem {
+  const portion = raw.portion || '1 serving';
+  const derived = convertPortion(portion);
+  const quantity =
+    raw.quantity !== undefined && raw.quantity !== null && Number.isFinite(Number(raw.quantity))
+      ? Math.max(0, Number(raw.quantity))
+      : derived.quantity;
+  const unit: CanonicalUnit =
+    raw.unit === 'g' || raw.unit === 'ml' || raw.unit === 'unit' ? raw.unit : derived.unit;
+
+  const current = {
+    calories: toNumber(raw.calories),
+    protein: toNumber(raw.protein),
+    carbs: toNumber(raw.carbs),
+    fat: toNumber(raw.fat),
+    fiber: toNumber(raw.fiber),
+  };
+  const base = raw.base ?? current;
+
+  return {
+    id: generateItemId(),
+    name: raw.name,
+    portion,
+    portionMultiplier: Number.isFinite(Number(raw.portionMultiplier)) ? Number(raw.portionMultiplier) : 1,
+    quantity,
+    unit,
+    // The reference quantity is the one the base macros were measured at. When
+    // the stored macros already differ from the base ones, the row was scaled,
+    // so the reference is the unscaled quantity.
+    baseQuantity: derived.quantity,
+    baseCalories: base.calories,
+    baseProtein: base.protein,
+    baseCarbs: base.carbs,
+    baseFat: base.fat,
+    baseFiber: base.fiber,
+    ...current,
+  };
+}
+
+/**
+ * Re-derive the staged parent from its components. Called after every component
+ * edit so `parent = SUM(items)` holds continuously rather than only at save
+ * time — which is also exactly what the database constraint checks.
+ */
+function recomputeStagedTotals(items: StagedItem[]) {
+  const totals = sumItems(items.map(stagedToItem));
+  const explanation =
+    items.map((it) => `${formatCalories(it.calories)} kcal (${it.name})`).join(' + ') +
+    ` = ${formatCalories(totals.calories)} kcal`;
+  return { ...totals, explanation };
 }
 
 export const NutritionEngine: React.FC = () => {
@@ -166,7 +295,12 @@ export const NutritionEngine: React.FC = () => {
   const [dishModalCarbs, setDishModalCarbs] = useState<number | ''>('');
   const [dishModalFat, setDishModalFat] = useState<number | ''>('');
   const [dishModalFiber, setDishModalFiber] = useState<number | ''>('');
-  const [dishModalIngredients, setDishModalIngredients] = useState('');
+  // R-01: the modal used to bind a raw `ingredients` text input straight to the
+  // column, so opening + saving a dish silently rewrote (or nulled) its
+  // breakdown. The modal now edits structured components and never writes
+  // `ingredients` at all.
+  const [dishModalItems, setDishModalItems] = useState<NutritionItem[]>([]);
+  const dishModalRef = useModalA11y(showDishModal, () => setShowDishModal(false));
 
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     return getLocalDateStr(new Date());
@@ -312,6 +446,34 @@ export const NutritionEngine: React.FC = () => {
     },
   });
 
+  // Whole-dish rescale from the expanded meal row. Parent macros and `items`
+  // must move together in a single UPDATE: the DB asserts parent = Σ(items),
+  // so writing either one alone is rejected.
+  const scaleLogMutation = useMutation({
+    mutationFn: async ({ log, items }: { log: NutritionLog; items: NutritionItem[] }) => {
+      const totals = sumItems(items);
+      const { error } = await supabase
+        .from('nutrition_logs')
+        .update({
+          items: itemsForPersist(items),
+          calories: Math.max(0, totals.calories),
+          protein: Math.max(0, totals.protein),
+          carbs: Math.max(0, totals.carbs),
+          fat: Math.max(0, totals.fat),
+          fiber: Math.max(0, totals.fiber),
+        })
+        .eq('id', log.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['nutrition_logs', targetUserId] });
+    },
+    onError: (err: any) => {
+      setStatus('Failed to rescale meal: ' + err.message);
+      setIsError(true);
+    },
+  });
+
   // Custom Dish CRUD mutations
   const saveCustomDishMutation = useMutation({
     mutationFn: async (dishPayload: Partial<CustomDish>) => {
@@ -406,7 +568,7 @@ export const NutritionEngine: React.FC = () => {
     setDishModalCarbs('');
     setDishModalFat('');
     setDishModalFiber('');
-    setDishModalIngredients('');
+    setDishModalItems([]);
   };
 
   const handleOpenNewDishModal = () => {
@@ -425,21 +587,39 @@ export const NutritionEngine: React.FC = () => {
     setDishModalCarbs(dish.carbs ?? '');
     setDishModalFat(dish.fat ?? '');
     setDishModalFiber(dish.fiber ?? '');
-    setDishModalIngredients(dish.ingredients ?? '');
+    // Prefer the structured column; fall back to parsing the legacy free-text
+    // one so pre-migration dishes still open with a breakdown.
+    setDishModalItems(
+      normalizeItems(dish.items) ??
+        itemsFromLegacyIngredients(dish.id, dish.name, dish.ingredients) ??
+        []
+    );
     setShowDishModal(true);
   };
 
   const handleSaveCustomDishModal = (e: React.FormEvent) => {
     e.preventDefault();
     if (!dishModalName.trim()) return;
+
+    // A single component is not a hierarchy; persisting it as one would make
+    // every trivial dish render an accordion with one child in it.
+    const persistItems = itemsForPersist(dishModalItems);
+    const totals = persistItems ? sumItems(persistItems) : null;
+
+    // R-30: the DB rejects negatives outright, and a constraint violation here
+    // reads as an opaque Postgres error, so clamp before we ever send it.
+    const clamp = (n: number) => Math.max(0, n);
+
     saveCustomDishMutation.mutate({
       name: dishModalName.trim(),
-      calories: Number(dishModalCalories) || 0,
-      protein: Number(dishModalProtein) || 0,
-      carbs: Number(dishModalCarbs) || 0,
-      fat: Number(dishModalFat) || 0,
-      fiber: Number(dishModalFiber) || 0,
-      ingredients: dishModalIngredients.trim() || null,
+      calories: clamp(totals ? totals.calories : Number(dishModalCalories) || 0),
+      protein: clamp(totals ? totals.protein : Number(dishModalProtein) || 0),
+      carbs: clamp(totals ? totals.carbs : Number(dishModalCarbs) || 0),
+      fat: clamp(totals ? totals.fat : Number(dishModalFat) || 0),
+      fiber: clamp(totals ? totals.fiber : Number(dishModalFiber) || 0),
+      items: persistItems,
+      // NOTE: `ingredients` is deliberately absent. It is deprecated and
+      // read-only from here on; writing it is what destroyed breakdowns before.
     });
   };
 
@@ -565,48 +745,49 @@ export const NutritionEngine: React.FC = () => {
       if (parsed && (parsed.calories !== undefined || (Array.isArray(parsed.items) && parsed.items.length > 0))) {
         let items: StagedItem[] = [];
         if (Array.isArray(parsed.items) && parsed.items.length > 0) {
-          items = parsed.items.map((it: any) => ({
-            id: generateItemId(),
-            name: it.name || 'Item',
-            portion: it.portion || '1 serving',
-            portionMultiplier: 1,
-            baseCalories: Number(it.calories) || 0,
-            baseProtein: Number(it.protein) || 0,
-            baseCarbs: Number(it.carbs) || 0,
-            baseFat: Number(it.fat) || 0,
-            baseFiber: Number(it.fiber) || 0,
-            calories: Number(it.calories) || 0,
-            protein: Number(it.protein) || 0,
-            carbs: Number(it.carbs) || 0,
-            fat: Number(it.fat) || 0,
-            fiber: Number(it.fiber) || 0,
-          }));
+          items = parsed.items.map((it: any) =>
+            buildStagedItem({
+              name: it.name || 'Item',
+              portion: it.portion,
+              quantity: it.quantity,
+              unit: it.unit,
+              calories: it.calories,
+              protein: it.protein,
+              carbs: it.carbs,
+              fat: it.fat,
+              fiber: it.fiber,
+            })
+          );
         } else {
           items = [
-            {
-              id: generateItemId(),
+            buildStagedItem({
               name: parsed.name || nlInput || (selectedPhoto ? 'Meal Photo' : 'Meal'),
               portion: '1 serving',
-              portionMultiplier: 1,
-              baseCalories: Number(parsed.calories) || 0,
-              baseProtein: Number(parsed.protein) || 0,
-              baseCarbs: Number(parsed.carbs) || 0,
-              baseFat: Number(parsed.fat) || 0,
-              baseFiber: Number(parsed.fiber) || 0,
-              calories: Number(parsed.calories) || 0,
-              protein: Number(parsed.protein) || 0,
-              carbs: Number(parsed.carbs) || 0,
-              fat: Number(parsed.fat) || 0,
-              fiber: Number(parsed.fiber) || 0,
-            },
+              calories: parsed.calories,
+              protein: parsed.protein,
+              carbs: parsed.carbs,
+              fat: parsed.fat,
+              fiber: parsed.fiber,
+            }),
           ];
         }
 
-        const totalCal = parsed.calories !== undefined && !isNaN(Number(parsed.calories)) ? Number(parsed.calories) : items.reduce((s, it) => s + it.calories, 0);
-        const totalP = parsed.protein !== undefined && !isNaN(Number(parsed.protein)) ? Number(parsed.protein) : items.reduce((s, it) => s + it.protein, 0);
-        const totalC = parsed.carbs !== undefined && !isNaN(Number(parsed.carbs)) ? Number(parsed.carbs) : items.reduce((s, it) => s + it.carbs, 0);
-        const totalF = parsed.fat !== undefined && !isNaN(Number(parsed.fat)) ? Number(parsed.fat) : items.reduce((s, it) => s + it.fat, 0);
-        const totalFib = parsed.fiber !== undefined && !isNaN(Number(parsed.fiber)) ? Number(parsed.fiber) : items.reduce((s, it) => s + it.fiber, 0);
+        // R-07 — items win.
+        //
+        // This previously preferred the model's top-level scalar and fell back
+        // to the item sum only when the scalar was missing. The edge-function
+        // prompt asks the model to make the two agree, but nothing enforced it,
+        // so whenever the model's arithmetic slipped the discrepancy was
+        // persisted verbatim. That is the entire origin of the one drift row in
+        // production: four macros bit-exact, fiber off by 0.5.
+        //
+        // Deriving from the items also makes the new `items` column satisfy the
+        // database's parent = SUM(items) constraint by construction.
+        const totalCal = items.reduce((s, it) => s + it.calories, 0);
+        const totalP = items.reduce((s, it) => s + it.protein, 0);
+        const totalC = items.reduce((s, it) => s + it.carbs, 0);
+        const totalF = items.reduce((s, it) => s + it.fat, 0);
+        const totalFib = items.reduce((s, it) => s + it.fiber, 0);
 
         setStagedMeal({
           name: parsed.name || nlInput || (selectedPhoto ? 'Meal Photo' : 'Meal'),
@@ -656,45 +837,40 @@ export const NutritionEngine: React.FC = () => {
     }
   };
 
-  const handleAdjustPortion = (itemId: string, deltaMultiplier: number) => {
+  /**
+   * Apply an edited component and re-derive the parent from the items.
+   *
+   * This replaces `handleAdjustPortion`, which had two defects that compounded
+   * each other:
+   *   R-02  it applied Math.round to all five macros on every tap, and that
+   *         rounded value was what got persisted. Roughly half of all
+   *         production macro values are fractional.
+   *   R-03  `Math.max(0.25, mult +/- 0.5)` produced the one-way ladder
+   *         1 -> 0.5 -> 0.25 -> 0.75 -> 1.25, from which x1 was unreachable.
+   *         A single stray tap was frequently unrecoverable, which is what made
+   *         R-02 bite in practice.
+   *
+   * Absolute quantities have no ladder and nothing here rounds.
+   */
+  const applyStagedItemChange = (itemId: string, next: NutritionItem) => {
     if (!stagedMeal) return;
-    const updatedItems = stagedMeal.items.map((it) => {
-      if (it.id !== itemId) return it;
-      const nextMult = Math.max(0.25, Math.round((it.portionMultiplier + deltaMultiplier) * 100) / 100);
-      return {
-        ...it,
-        portionMultiplier: nextMult,
-        calories: Math.round(it.baseCalories * nextMult),
-        protein: Math.round(it.baseProtein * nextMult),
-        carbs: Math.round(it.baseCarbs * nextMult),
-        fat: Math.round(it.baseFat * nextMult),
-        fiber: Math.round(it.baseFiber * nextMult),
-      };
-    });
-
-    const totalCal = updatedItems.reduce((s, it) => s + it.calories, 0);
-    const totalP = updatedItems.reduce((s, it) => s + it.protein, 0);
-    const totalC = updatedItems.reduce((s, it) => s + it.carbs, 0);
-    const totalF = updatedItems.reduce((s, it) => s + it.fat, 0);
-    const totalFib = updatedItems.reduce((s, it) => s + it.fiber, 0);
-    const explanation =
-      updatedItems
-        .map(
-          (it) =>
-            `${it.calories} kcal (${it.name}${it.portionMultiplier !== 1 ? ` ×${it.portionMultiplier}` : ''})`
-        )
-        .join(' + ') + ` = ${totalCal} kcal`;
-
-    setStagedMeal({
-      ...stagedMeal,
-      items: updatedItems,
-      calories: totalCal,
-      protein: totalP,
-      carbs: totalC,
-      fat: totalF,
-      fiber: totalFib,
-      explanation,
-    });
+    const updatedItems = stagedMeal.items.map((it) =>
+      it.id === itemId
+        ? {
+            ...it,
+            name: next.name,
+            quantity: next.quantity,
+            unit: next.unit,
+            calories: next.calories,
+            protein: next.protein,
+            carbs: next.carbs,
+            fat: next.fat,
+            fiber: next.fiber,
+            portionMultiplier: it.baseQuantity > 0 ? next.quantity / it.baseQuantity : 1,
+          }
+        : it
+    );
+    setStagedMeal({ ...stagedMeal, items: updatedItems, ...recomputeStagedTotals(updatedItems) });
   };
 
   const handleDeleteItem = (itemId: string) => {
@@ -704,39 +880,28 @@ export const NutritionEngine: React.FC = () => {
       setStagedMeal(null);
       return;
     }
-    const totalCal = updatedItems.reduce((s, it) => s + it.calories, 0);
-    const totalP = updatedItems.reduce((s, it) => s + it.protein, 0);
-    const totalC = updatedItems.reduce((s, it) => s + it.carbs, 0);
-    const totalF = updatedItems.reduce((s, it) => s + it.fat, 0);
-    const totalFib = updatedItems.reduce((s, it) => s + it.fiber, 0);
-    const explanation =
-      updatedItems.map((it) => `${it.calories} kcal (${it.name})`).join(' + ') + ` = ${totalCal} kcal`;
-
-    setStagedMeal({
-      ...stagedMeal,
-      items: updatedItems,
-      calories: totalCal,
-      protein: totalP,
-      carbs: totalC,
-      fat: totalF,
-      fiber: totalFib,
-      explanation,
-    });
+    setStagedMeal({ ...stagedMeal, items: updatedItems, ...recomputeStagedTotals(updatedItems) });
   };
 
   const handleLogStagedMeal = () => {
     if (!stagedMeal) return;
+    // items win: the parent is the sum, so the row satisfies the database's
+    // parent = SUM(items) constraint by construction. Nothing is rounded.
+    const items = stagedMeal.items.map(stagedToItem);
+    const totals = sumItems(items);
     const payload = {
       food_name: stagedMeal.name,
-      calories: Number(stagedMeal.calories) || 0,
-      protein: Number(stagedMeal.protein) || 0,
-      carbs: Number(stagedMeal.carbs) || 0,
-      fat: Number(stagedMeal.fat) || 0,
-      fiber: Number(stagedMeal.fiber) || 0,
+      calories: totals.calories,
+      protein: totals.protein,
+      carbs: totals.carbs,
+      fat: totals.fat,
+      fiber: totals.fiber,
       meal_type: stagedMeal.mealType,
       serving_size: Number(stagedMeal.servingSize) || 1,
       serving_unit: stagedMeal.servingUnit || 'serving',
       logged_at: formatLocalTimestamp(selectedDate),
+      // A single-component meal is a level-2 leaf; persist NULL, never [].
+      items: items.length > 1 ? itemsForPersist(items) : null,
     };
     mutation.mutate(payload);
   };
@@ -744,16 +909,21 @@ export const NutritionEngine: React.FC = () => {
   const handleSaveStagedAsCustomDish = async () => {
     if (!stagedMeal) return;
     try {
+      const items = stagedMeal.items.map(stagedToItem);
+      const totals = sumItems(items);
       const { error } = await supabase.from('custom_dishes').insert([
         {
           user_id: targetUserId,
           name: stagedMeal.name,
+          // `ingredients` is deprecated and still written here only so that an
+          // Android client that predates the `items` column keeps working.
           ingredients: JSON.stringify(stagedMeal.items),
-          calories: stagedMeal.calories,
-          protein: stagedMeal.protein,
-          carbs: stagedMeal.carbs,
-          fat: stagedMeal.fat,
-          fiber: stagedMeal.fiber,
+          items: items.length > 1 ? itemsForPersist(items) : null,
+          calories: totals.calories,
+          protein: totals.protein,
+          carbs: totals.carbs,
+          fat: totals.fat,
+          fiber: totals.fiber,
         },
       ]);
       if (error) throw error;
@@ -773,6 +943,8 @@ export const NutritionEngine: React.FC = () => {
           user_id: targetUserId,
           name: item.name,
           ingredients: JSON.stringify([item]),
+          // One component is a leaf, so no breakdown is stored.
+          items: null,
           calories: item.calories,
           protein: item.protein,
           carbs: item.carbs,
@@ -790,82 +962,50 @@ export const NutritionEngine: React.FC = () => {
     }
   };
 
-  const handleStageCustomDish = (dish: CustomDish) => {
-    const cal = Number(dish.calories) || 0;
-    const p = Number(dish.protein) || 0;
-    const c = Number(dish.carbs) || 0;
-    const f = Number(dish.fat) || 0;
-    const fib = Number(dish.fiber) || 0;
+  const handleStageCustomDish = (dish: CustomDish & { items?: unknown }) => {
+    // `items` is authoritative. `ingredients` is the deprecated legacy blob and
+    // is only consulted for a row that has not been backfilled, or one written
+    // by a client that predates the column.
+    const stored =
+      normalizeItems(dish.items) ?? itemsFromLegacyIngredients(dish.id, dish.name, dish.ingredients);
 
-    let items: StagedItem[] = [];
-    if (dish.ingredients) {
-      try {
-        const parsed = JSON.parse(dish.ingredients);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          items = parsed.map((it: any) => ({
-            id: generateItemId(),
-            name: it.name || dish.name,
-            portion: it.portion || '1 serving',
-            portionMultiplier: it.portionMultiplier ?? 1,
-            baseCalories: Number(it.baseCalories ?? it.calories) || 0,
-            baseProtein: Number(it.baseProtein ?? it.protein) || 0,
-            baseCarbs: Number(it.baseCarbs ?? it.carbs) || 0,
-            baseFat: Number(it.baseFat ?? it.fat) || 0,
-            baseFiber: Number(it.baseFiber ?? it.fiber) || 0,
-            calories: Number(it.calories) || 0,
-            protein: Number(it.protein) || 0,
-            carbs: Number(it.carbs) || 0,
-            fat: Number(it.fat) || 0,
-            fiber: Number(it.fiber) || 0,
-          }));
-        }
-      } catch {
-        // Plain text fallback
-      }
-    }
+    let items: StagedItem[] = (stored ?? []).map((it) =>
+      buildStagedItem({
+        name: it.name,
+        portion: it.displayPortion,
+        quantity: it.quantity,
+        unit: it.unit,
+        calories: it.calories,
+        protein: it.protein,
+        carbs: it.carbs,
+        fat: it.fat,
+        fiber: it.fiber,
+      })
+    );
 
     if (items.length === 0) {
       items = [
-        {
-          id: generateItemId(),
+        buildStagedItem({
           name: dish.name,
           portion: '1 serving',
-          portionMultiplier: 1,
-          baseCalories: cal,
-          baseProtein: p,
-          baseCarbs: c,
-          baseFat: f,
-          baseFiber: fib,
-          calories: cal,
-          protein: p,
-          carbs: c,
-          fat: f,
-          fiber: fib,
-        },
+          calories: dish.calories,
+          protein: dish.protein,
+          carbs: dish.carbs,
+          fat: dish.fat,
+          fiber: dish.fiber,
+        }),
       ];
     }
 
-    const totalCal = items.reduce((s, it) => s + it.calories, 0);
-    const totalP = items.reduce((s, it) => s + it.protein, 0);
-    const totalC = items.reduce((s, it) => s + it.carbs, 0);
-    const totalF = items.reduce((s, it) => s + it.fat, 0);
-    const totalFib = items.reduce((s, it) => s + it.fiber, 0);
-
-    const explanation =
-      items.length > 1
-        ? items.map((it) => `${it.calories} kcal (${it.name})`).join(' + ') + ` = ${totalCal} kcal`
-        : `${totalCal} kcal (${dish.name})`;
+    const { explanation, ...totals } = recomputeStagedTotals(items);
 
     setStagedMeal({
       name: dish.name,
       mealType: 'Breakfast',
-      explanation,
+      explanation:
+        items.length > 1 ? explanation : `${formatCalories(totals.calories)} kcal (${dish.name})`,
       items,
-      calories: totalCal,
-      protein: totalP,
-      carbs: totalC,
-      fat: totalF,
-      fiber: totalFib,
+      ...totals,
       servingSize: 1,
       servingUnit: 'serving',
     });
@@ -1391,70 +1531,14 @@ export const NutritionEngine: React.FC = () => {
 
               <div className="space-y-1.5">
                 {stagedMeal.items.map((item) => (
-                  <div
+                  <ComponentRow
                     key={item.id}
-                    className="bg-zinc-900/90 border border-zinc-800 rounded-xl p-2.5 flex flex-wrap items-center justify-between gap-2"
-                  >
-                    <div className="min-w-0 pr-2">
-                      <div className="font-bold text-white text-xs truncate flex items-center gap-1.5">
-                        <span>{item.name}</span>
-                        <span className="text-[10px] text-zinc-400 font-mono bg-zinc-800 px-1.5 py-0.5 rounded">
-                          {item.portion}
-                        </span>
-                      </div>
-                      <div className="text-[11px] font-mono text-zinc-400 mt-0.5">
-                        <span className="text-amber-400 font-bold">{formatCalories(item.calories)} kcal</span>
-                        <span> • P: {formatMacro(item.protein)}g</span>
-                        <span> • C: {formatMacro(item.carbs)}g</span>
-                        <span> • F: {formatMacro(item.fat)}g</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {/* Portion Multiplier Controls */}
-                      <div className="flex items-center gap-1 bg-zinc-950 border border-zinc-800 rounded-lg p-0.5">
-                        <button
-                          type="button"
-                          onClick={() => handleAdjustPortion(item.id, -0.5)}
-                          className="min-w-[44px] min-h-[44px] rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-sm flex items-center justify-center transition touch-manipulation"
-                          title="Decrease portion"
-                        >
-                          -
-                        </button>
-                        <span className="text-xs font-mono font-bold px-2 text-cyan-300">
-                          {item.portionMultiplier}x
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleAdjustPortion(item.id, 0.5)}
-                          className="min-w-[44px] min-h-[44px] rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-sm flex items-center justify-center transition touch-manipulation"
-                          title="Increase portion"
-                        >
-                          +
-                        </button>
-                      </div>
-
-                      {/* Save to Quick Log */}
-                      <button
-                        type="button"
-                        onClick={() => handleSaveItemAsCustomDish(item)}
-                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-zinc-500 hover:text-amber-400 hover:bg-amber-500/10 transition touch-manipulation"
-                        title="Save to quick log (custom dishes)"
-                      >
-                        <Star className="w-4 h-4" />
-                      </button>
-
-                      {/* 1-Tap Item Deletion */}
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteItem(item.id)}
-                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition touch-manipulation"
-                        title="Remove ingredient"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
+                    item={stagedToItem(item)}
+                    reference={stagedReference(item)}
+                    onChange={(next) => applyStagedItemChange(item.id, next)}
+                    onRemove={() => handleDeleteItem(item.id)}
+                    onSaveToQuickLog={() => handleSaveItemAsCustomDish(item)}
+                  />
                 ))}
               </div>
             </div>
@@ -1840,56 +1924,16 @@ export const NutritionEngine: React.FC = () => {
         ) : (
           <div className="space-y-2">
             {todayLogs.map((log) => (
-              <div
+              <MealLogRow
                 key={log.id}
-                data-testid="meal-log-item"
-                className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-3 flex items-center justify-between shadow-sm"
-              >
-                <div className="min-w-0 pr-2">
-                  <div className="font-extrabold text-white text-xs truncate flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0">
-                      {getDishIcon(log.food_name)}
-                    </div>
-                    <span>{log.food_name}</span>
-                    {log.meal_type && (
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-400 bg-zinc-900 border border-zinc-800 px-1.5 py-0.5 rounded-lg">
-                        {log.meal_type}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] font-mono mt-0.5 text-zinc-400 flex-wrap">
-                    <span className="text-amber-400 font-bold">{formatCalories(log.calories)} kcal</span>
-                    <span>•</span>
-                    <span>P: {formatMacro(log.protein)}g</span>
-                    <span>•</span>
-                    <span>C: {formatMacro(log.carbs)}g</span>
-                    <span>•</span>
-                    <span>F: {formatMacro(log.fat)}g</span>
-                    <span>•</span>
-                    <span className="text-teal-400">Fib: {formatMacro(log.fiber)}g</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setEditingMealLog(log)}
-                    className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-zinc-500 hover:text-cyan-400 hover:bg-cyan-500/10 transition touch-manipulation"
-                    title="Edit meal"
-                    data-testid={`edit-meal-${log.id}`}
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => deleteMutation.mutate(log.id)}
-                    className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition touch-manipulation"
-                    title="Delete meal"
-                    data-testid={`delete-meal-${log.id}`}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
+                log={log}
+                onEdit={setEditingMealLog}
+                onDelete={(l) => deleteMutation.mutate(l.id)}
+                // mutateAsync, not mutate: the row rolls its optimistic
+                // components back when this promise rejects. The rejection is
+                // handled there, so it never escapes as an unhandled one.
+                onItemsChange={(l, items) => scaleLogMutation.mutateAsync({ log: l, items })}
+              />
             ))}
           </div>
         )}
@@ -1898,15 +1942,23 @@ export const NutritionEngine: React.FC = () => {
       {/* Custom Dishes Modal */}
       {showDishModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-t-3xl sm:rounded-3xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom,1.25rem))] max-w-md w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+          <div
+            ref={dishModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dish-modal-title"
+            data-testid="custom-dish-modal"
+            className="bg-zinc-900 border border-zinc-800 rounded-t-3xl sm:rounded-3xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom,1.25rem))] max-w-md w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto"
+          >
             <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-              <h3 className="text-base font-black text-white flex items-center gap-2">
+              <h3 id="dish-modal-title" className="text-base font-black text-white flex items-center gap-2">
                 <Star className="w-4 h-4 text-amber-400" />
                 {editingDish ? 'Edit Custom Dish' : 'New Custom Dish'}
               </h3>
               <button
                 type="button"
                 onClick={() => setShowDishModal(false)}
+                aria-label="Close dialog"
                 className="text-zinc-400 hover:text-white min-w-[44px] min-h-[44px] flex items-center justify-center"
               >
                 <X className="w-5 h-5" />
@@ -1928,7 +1980,11 @@ export const NutritionEngine: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-6 sm:grid-cols-5 gap-2">
+              {/* Once a dish has a real breakdown its totals are Σ(components);
+                  showing editable parent macros would invite a value the DB
+                  sum constraint then rejects. */}
+              {dishModalItems.length <= 1 && (
+                <div className="grid grid-cols-6 sm:grid-cols-5 gap-2">
                 <div className="col-span-2 sm:col-span-1">
                   <label className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">
                     Calories
@@ -2013,20 +2069,10 @@ export const NutritionEngine: React.FC = () => {
                     className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
                   />
                 </div>
-              </div>
+                </div>
+              )}
 
-              <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                  Ingredients (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={dishModalIngredients}
-                  onChange={(e) => setDishModalIngredients(e.target.value)}
-                  placeholder="e.g. 1 cup oats, 1 scoop whey, 1 tbsp peanut butter"
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none"
-                />
-              </div>
+              <CustomDishEditor items={dishModalItems} onChange={setDishModalItems} />
 
               <div className="flex items-center justify-between pt-3 border-t border-zinc-800">
                 {editingDish ? (

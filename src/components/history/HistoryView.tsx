@@ -8,13 +8,14 @@ import {
   formatShortDate,
   DEFAULT_EXERCISES_LIST,
 } from '../../utils/ghostSets';
-import { getDishIcon } from '../../utils/dishIcons';
-import { Calendar, Dumbbell, Trophy, Search, Activity, Utensils, Trash2, AlertCircle, Edit2, Shield } from 'lucide-react';
+import { Calendar, Dumbbell, Trophy, Search, Activity, Utensils, AlertCircle, Edit2, Shield } from 'lucide-react';
 import { EditMealModal } from '../nutrition/EditMealModal';
 import { EditSetModal } from '../workout/EditSetModal';
 import { groupSessionSetsByExercise } from '../../utils/historyGrouping';
 import { formatCalories, formatMacro } from '../../utils/nutrition';
 import { CoachContext } from '../../context/CoachContextTypes';
+import { MealLogRow } from '../nutrition/MealLogRow';
+import { itemsForPersist, sumItems, type NutritionItem } from '../../utils/itemModel';
 
 const CATEGORIES = ['All', 'Chest', 'Back', 'Arms', 'Shoulders', 'Legs', 'Core'];
 
@@ -134,6 +135,32 @@ export const HistoryView: React.FC = () => {
     },
     onError: (err: any) => {
       setMutationError(err?.message || 'Failed to delete meal log. Please try again.');
+    },
+  });
+
+  // Whole-dish rescale. Parent macros and `items` must be written in the same
+  // UPDATE because the DB asserts parent = Σ(items).
+  const scaleMealMutation = useMutation({
+    mutationFn: async ({ log, items }: { log: NutritionLog; items: NutritionItem[] }) => {
+      const totals = sumItems(items);
+      const { error } = await supabase
+        .from('nutrition_logs')
+        .update({
+          items: itemsForPersist(items),
+          calories: Math.max(0, totals.calories),
+          protein: Math.max(0, totals.protein),
+          carbs: Math.max(0, totals.carbs),
+          fat: Math.max(0, totals.fat),
+          fiber: Math.max(0, totals.fiber),
+        })
+        .eq('id', log.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['nutrition_logs', targetUserId] });
+    },
+    onError: (err: any) => {
+      setMutationError(err?.message || 'Failed to rescale meal. Please try again.');
     },
   });
 
@@ -511,60 +538,24 @@ export const HistoryView: React.FC = () => {
                 {/* Meals timeline for this day */}
                 <div className="space-y-2 pt-1">
                   {day.meals.map((meal) => (
-                    <div
+                    <MealLogRow
                       key={meal.id}
-                      data-testid="meal-log-item"
-                      className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-3 flex items-center justify-between shadow-sm group"
-                    >
-                      <div className="min-w-0 pr-2">
-                        <div className="font-extrabold text-white text-xs truncate flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0">
-                            {getDishIcon(meal.food_name)}
-                          </div>
-                          <span>{meal.food_name}</span>
-                          {meal.meal_type && (
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-400 bg-zinc-900 border border-zinc-800 px-1.5 py-0.5 rounded-lg">
-                              {meal.meal_type}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] font-mono mt-1 text-zinc-400 flex-wrap">
-                          <span className="text-amber-400 font-bold">{formatCalories(meal.calories)} kcal</span>
-                          <span>•</span>
-                          <span>P: {formatMacro(meal.protein)}g</span>
-                          <span>•</span>
-                          <span>C: {formatMacro(meal.carbs)}g</span>
-                          <span>•</span>
-                          <span>F: {formatMacro(meal.fat)}g</span>
-                          <span>•</span>
-                          <span className="text-teal-400">Fib: {formatMacro(meal.fiber)}g</span>
-                        </div>
-                      </div>
-
-                      {!isInspectingAthlete && (
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => setEditingMealLog(meal)}
-                            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-zinc-500 hover:text-cyan-400 hover:bg-cyan-500/10 transition touch-manipulation"
-                            title="Edit meal"
-                            data-testid={`edit-meal-${meal.id}`}
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          {/* 1-Tap Meal Deletion */}
-                          <button
-                            type="button"
-                            onClick={() => deleteMealMutation.mutate(meal.id)}
-                            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition touch-manipulation"
-                            title="Delete meal"
-                            data-testid={`delete-meal-${meal.id}`}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                      log={meal}
+                      onEdit={setEditingMealLog}
+                      onDelete={(m) => deleteMealMutation.mutate(m.id)}
+                      // D-15/R-20: a coach inspecting an athlete may read the
+                      // breakdown (RLS permits SELECT) but every write is
+                      // rejected, so no mutating affordance is offered.
+                      readOnly={isInspectingAthlete}
+                      onItemsChange={
+                        isInspectingAthlete
+                          ? undefined
+                          // mutateAsync so a rejected write rolls the row's
+                          // optimistic components back instead of leaving a
+                          // quantity on screen that was never saved.
+                          : (m, items) => scaleMealMutation.mutateAsync({ log: m, items })
+                      }
+                    />
                   ))}
                 </div>
               </div>

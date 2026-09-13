@@ -147,6 +147,59 @@ export function parseStructuredNutritionText(input: string): StructuredNutrition
   };
 }
 
+const CANONICAL_UNITS = ['g', 'ml', 'unit'] as const;
+
+function finiteOrZero(v: unknown): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.max(0, n) : 0;
+}
+
+/**
+ * Force `parent = Σ(items)` and canonicalise each item's quantity/unit.
+ *
+ * Gemini is instructed to sum its own breakdown and mostly does, but "mostly"
+ * is not a constraint: the database has a CHECK that rejects the row outright,
+ * and the user would see a raw Postgres string. Rounding to 2 decimals keeps
+ * the written value inside the constraint's epsilon without inventing
+ * precision the model never had.
+ *
+ * Exported for testing. Accepts and returns the raw JSON text so a malformed
+ * response passes through untouched rather than becoming a 500.
+ */
+export function reconcileParentWithItems(responseText: string): string {
+  let parsed: any;
+  try {
+    parsed = JSON.parse(responseText);
+  } catch {
+    return responseText;
+  }
+  if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.items) || parsed.items.length === 0) {
+    return responseText;
+  }
+
+  const totals = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };
+
+  parsed.items = parsed.items.map((item: any) => {
+    const next = { ...item };
+    for (const key of Object.keys(totals) as (keyof typeof totals)[]) {
+      next[key] = finiteOrZero(next[key]);
+      totals[key] += next[key];
+    }
+    next.unit = CANONICAL_UNITS.includes(next.unit) ? next.unit : 'unit';
+    // A zero or missing quantity would make the component unscalable, so fall
+    // back to 1 of whatever unit it claims rather than to 0.
+    const q = Number(next.quantity);
+    next.quantity = Number.isFinite(q) && q > 0 ? q : 1;
+    return next;
+  });
+
+  for (const key of Object.keys(totals) as (keyof typeof totals)[]) {
+    parsed[key] = Math.round(totals[key] * 100) / 100;
+  }
+
+  return JSON.stringify(parsed);
+}
+
 function isRateLimitError(err: any): boolean {
   if (!err) return false;
   if (err.status === 429 || err.statusCode === 429 || err.code === 429) return true;
@@ -332,6 +385,7 @@ CORE RESPONSIBILITIES & GUIDELINES:
    - 'serving_size' & 'serving_unit': Estimate the total net portion (e.g., 450, 'g' or 1, 'bowl').
    - Atwater Consistency: Calories for each item MUST mathematically align with the standard macronutrient multipliers (roughly 4 kcal/g protein, 4 kcal/g carb, 9 kcal/g fat).
    - Column Summation: The total top-level calories, protein, carbs, fat, and fiber must exactly sum the breakdown of the individual items array.
+   - Per-item portion: 'portion' stays human readable (e.g. '1 cup cooked'), and 'quantity'/'unit' express that same amount numerically in one of exactly three canonical units: 'g' (solids by mass), 'ml' (liquids by volume) or 'unit' (countable things, and anything that is neither mass nor volume). Convert household measures yourself — '1 cup rolled oats' is quantity 80, unit 'g'; '1 tbsp olive oil' is quantity 14, unit 'g'; '2 large eggs' is quantity 2, unit 'unit'. Never emit a unit outside that set.
    - 'explanation': Provide a concise formula showing summation (e.g., 'Beef (X kcal) + Noodles (Y kcal) + Broth (Z kcal) = Total kcal').`;
 
       let candidateModels: string[];
@@ -386,13 +440,22 @@ CORE RESPONSIBILITIES & GUIDELINES:
               properties: {
                 name: { type: Type.STRING },
                 portion: { type: Type.STRING },
+                quantity: {
+                  type: Type.NUMBER,
+                  description: "The portion expressed as a single number in the canonical unit below (e.g. 150 for '150 g', 2 for '2 eggs').",
+                },
+                unit: {
+                  type: Type.STRING,
+                  enum: ["g", "ml", "unit"],
+                  description: "Canonical unit for `quantity`. Use 'g' for solids by mass, 'ml' for liquids by volume, and 'unit' for countable items and anything else.",
+                },
                 calories: { type: Type.NUMBER },
                 protein: { type: Type.NUMBER },
                 carbs: { type: Type.NUMBER },
                 fat: { type: Type.NUMBER },
                 fiber: { type: Type.NUMBER },
               },
-              required: ["name", "portion", "calories", "protein", "carbs", "fat", "fiber"],
+              required: ["name", "portion", "quantity", "unit", "calories", "protein", "carbs", "fat", "fiber"],
             },
           },
         },
@@ -535,6 +598,12 @@ CORE RESPONSIBILITIES & GUIDELINES:
       if (fenceMatch) {
         responseText = fenceMatch[1].trim();
       }
+
+      // The DB enforces parent = Σ(items) with a CHECK constraint. Letting a
+      // model-authored total through unchecked means the insert fails later
+      // with an opaque constraint error, so the invariant is established here,
+      // at the only point where both halves are in hand.
+      responseText = reconcileParentWithItems(responseText);
 
       return new Response(responseText, {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

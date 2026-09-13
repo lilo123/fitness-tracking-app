@@ -1,3 +1,5 @@
+import type { NutritionItem } from '../utils/itemModel';
+
 export type UserRole = 'coach' | 'athlete';
 
 export interface UserProfile {
@@ -90,12 +92,19 @@ export interface NutritionLog {
   healthConnectRecordId?: string | null;
   logged_at: string;
   created_at?: string;
+  /**
+   * Level-2 breakdown. NULL (not `[]`) when the log has no meaningful
+   * hierarchy — a one-component meal is not a hierarchy. When present, the
+   * five parent macros above are Σ(items) and the DB enforces it.
+   */
+  items?: NutritionItem[] | null;
 }
 
 export interface CustomDish {
   id: string;
   user_id: string;
   name: string;
+  /** @deprecated Legacy free-text breakdown. Read for backfill only; never write it. */
   ingredients: string | null;
   calories: number | null;
   protein: number | null;
@@ -103,6 +112,8 @@ export interface CustomDish {
   fat: number | null;
   fiber?: number | null;
   created_at?: string;
+  /** See {@link NutritionLog.items}. */
+  items?: NutritionItem[] | null;
 }
 
 export interface RoutineTemplate {

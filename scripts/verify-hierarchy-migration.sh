@@ -14,6 +14,18 @@
 # =============================================================================
 set -euo pipefail
 
+# Detach stdin for the whole script.
+#
+# Every `docker exec -i` below inherits the script's stdin. When the script is
+# launched from something that hands it a pipe and never closes it — a CI step,
+# an agent shell, `foo | scripts/verify-...` — the exec sessions that do not
+# redirect stdin themselves (the `-c` one-liners) sit waiting for an EOF that
+# never comes, and the run hangs forever instead of failing. This cost two
+# ten-minute timeouts. The per-command redirections and heredocs below override
+# this line, so the ones that do feed SQL over stdin are unaffected, and the
+# script itself never reads stdin.
+exec 0</dev/null
+
 CONTAINER=supabase_db_fitness-tracking
 SCRATCH=scratch_hier
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -38,7 +50,9 @@ fails=0
 pass() { printf '  \033[32mPASS\033[0m  %s\n' "$1"; }
 fail() { printf '  \033[31mFAIL\033[0m  %s\n' "$1"; fails=$((fails+1)); }
 psql_scratch() { docker exec -i "$CONTAINER" psql -U postgres -d "$SCRATCH" -v ON_ERROR_STOP=1 -q "$@"; }
-q()            { docker exec -i "$CONTAINER" psql -U postgres -d "$SCRATCH" -At -q -c "$1"; }
+# No -i on the `-c` helpers: they feed SQL as an argument, so an attached
+# stdin buys nothing and is the half of the hang described above.
+q()            { docker exec "$CONTAINER" psql -U postgres -d "$SCRATCH" -At -q -c "$1" </dev/null; }
 
 echo "snapshot data   : $SNAP_DATA"
 echo "snapshot schema : ${SNAP_SCHEMA:-<none>}"
@@ -47,9 +61,9 @@ echo
 
 # --- Step 1: restore the snapshot into a scratch database ---------------------
 echo "[1] restore snapshot -> $SCRATCH"
-docker exec -i "$CONTAINER" psql -U postgres -d postgres -q \
+docker exec "$CONTAINER" psql -U postgres -d postgres -q \
   -c "DROP DATABASE IF EXISTS $SCRATCH WITH (FORCE);" \
-  -c "CREATE DATABASE $SCRATCH;" >/dev/null
+  -c "CREATE DATABASE $SCRATCH;" </dev/null >/dev/null
 # The pre-hierarchy structure. A full-cluster schema dump is used rather than a
 # public-only one so that auth.users, the RLS helper functions and the FK
 # targets all exist; the data dump sets session_replication_role = replica, so
@@ -199,7 +213,7 @@ pass "Phase 5 re-applies cleanly"
 echo "[b] constraint behaviour"
 probe() {  # probe <label> <sql> <expect: OK|REJECT>
   local label="$1" sql="$2" expect="$3" out
-  out=$(docker exec -i "$CONTAINER" psql -U postgres -d "$SCRATCH" -At -q -c "BEGIN; $sql; ROLLBACK;" 2>&1 || true)
+  out=$(docker exec "$CONTAINER" psql -U postgres -d "$SCRATCH" -At -q -c "BEGIN; $sql; ROLLBACK;" </dev/null 2>&1 || true)
   if [[ "$expect" == OK ]]; then
     grep -qi 'ERROR' <<<"$out" && fail "$label (expected accept): $out" || pass "$label accepted"
   else
@@ -220,6 +234,11 @@ probe "empty array with zero parent"        "$(ins 0 0 0 0 0 "'[]'")" REJECT
 probe "51 items (ceiling)"                  "$(ins 51 0 0 0 0 "(select jsonb_agg(jsonb_build_object('calories',1)) from generate_series(1,51))")" REJECT
 probe "object instead of array"             "$(ins 0 0 0 0 0 "'{\"a\":1}'")" REJECT
 probe "per-item negative macro"             "$(ins 0 0 0 0 0 "'[{\"calories\":-10},{\"calories\":10}]'")" REJECT
+# ACCEPTED by design, and plan §12 now says so: items_macro_sum coerces a
+# non-number to 0 exactly as a missing key is coerced, and the Sigma
+# constraint then pins the parent to that coerced sum. Rejecting would mean
+# casting inside a CHECK, which is what raised `invalid input syntax for
+# type numeric: "lots"` on the first attempt.
 probe "non-numeric macro inside an item"    "$(ins 0 0 0 0 0 "'[{\"calories\":\"lots\"}]'")" OK
 probe "item missing a macro key"            "$(ins 10 0 0 0 0 "'[{\"calories\":10}]'")" OK
 probe "negative custom_dishes calories"     "INSERT INTO public.custom_dishes (user_id, name, calories) VALUES ($NLU, 'probe', -50)" REJECT

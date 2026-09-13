@@ -1,5 +1,5 @@
 import { assertEquals, assertExists } from "https://deno.land/std@0.168.0/testing/asserts.ts";
-import app from "./index.ts";
+import app, { reconcileParentWithItems } from "./index.ts";
 
 Deno.env.set("SUPABASE_URL", "https://mock.supabase.co");
 Deno.env.set("SUPABASE_ANON_KEY", "mock-anon-key");
@@ -2329,4 +2329,65 @@ Deno.test("parse-nutrition successfully processes dietary supplements and barcod
             Deno.env.delete("GEMINI_API_KEY");
         }
     }
+});
+
+// ---------------------------------------------------------------------------
+// reconcileParentWithItems — the last point before the client (and then the DB)
+// where the parent = Σ(items) invariant can still be established cheaply.
+// ---------------------------------------------------------------------------
+
+Deno.test("reconcileParentWithItems overwrites a drifting parent total with the component sum", () => {
+    const out = JSON.parse(reconcileParentWithItems(JSON.stringify({
+        name: "Breakkie",
+        calories: 318, protein: 40, carbs: 7, fat: 7, fiber: 0,
+        items: [
+            { name: "Egg white", portion: "180 g", quantity: 180, unit: "g", calories: 139, protein: 20, carbs: 1, fat: 5, fiber: 0 },
+            { name: "Turkey", portion: "60 g", quantity: 60, unit: "g", calories: 60, protein: 10, carbs: 1, fat: 1, fiber: 0 },
+            { name: "Yogurt", portion: "150 g", quantity: 150, unit: "g", calories: 90, protein: 15, carbs: 5, fat: 1, fiber: 0 },
+        ],
+    })));
+
+    assertEquals(out.calories, 289);
+    assertEquals(out.protein, 45);
+    assertEquals(out.carbs, 7);
+});
+
+Deno.test("reconcileParentWithItems coerces an out-of-vocabulary unit to 'unit'", () => {
+    const out = JSON.parse(reconcileParentWithItems(JSON.stringify({
+        calories: 0,
+        items: [{ name: "Oats", portion: "1 cup", quantity: 1, unit: "cup", calories: 300 }],
+    })));
+
+    assertEquals(out.items[0].unit, "unit");
+});
+
+Deno.test("reconcileParentWithItems replaces a zero or missing quantity with 1", () => {
+    const out = JSON.parse(reconcileParentWithItems(JSON.stringify({
+        calories: 0,
+        items: [
+            { name: "A", quantity: 0, unit: "g", calories: 10 },
+            { name: "B", unit: "g", calories: 10 },
+        ],
+    })));
+
+    // A zero quantity makes the row unscalable in the UI.
+    assertEquals(out.items[0].quantity, 1);
+    assertEquals(out.items[1].quantity, 1);
+});
+
+Deno.test("reconcileParentWithItems clamps a negative component macro to zero", () => {
+    const out = JSON.parse(reconcileParentWithItems(JSON.stringify({
+        calories: 0,
+        items: [{ name: "A", quantity: 1, unit: "g", calories: -50, protein: 5 }],
+    })));
+
+    assertEquals(out.items[0].calories, 0);
+    assertEquals(out.calories, 0);
+    assertEquals(out.protein, 5);
+});
+
+Deno.test("reconcileParentWithItems leaves malformed or item-less payloads untouched", () => {
+    assertEquals(reconcileParentWithItems("not json"), "not json");
+    assertEquals(reconcileParentWithItems('{"calories":100}'), '{"calories":100}');
+    assertEquals(reconcileParentWithItems('{"calories":100,"items":[]}'), '{"calories":100,"items":[]}');
 });

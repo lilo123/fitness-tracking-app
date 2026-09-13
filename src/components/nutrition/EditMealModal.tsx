@@ -4,6 +4,8 @@ import { supabase } from '../../lib/supabase';
 import type { NutritionLog } from '../../types/database';
 import { X, Utensils, AlertCircle } from 'lucide-react';
 import { formatCalories, formatMacro } from '../../utils/nutrition';
+import { isLevel1, normalizeItems, sumItems } from '../../utils/itemModel';
+import { friendlyError } from '../../utils/nutritionErrors';
 
 export interface EditMealModalProps {
   isOpen: boolean;
@@ -14,6 +16,11 @@ export interface EditMealModalProps {
 }
 
 const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Pre-Workout', 'Post-Workout'];
+
+// The message mapper moved to utils so MealLogRow can share it; re-exported
+// here because this module was its original home and both callers and tests
+// import it from this path.
+export { friendlyError };
 
 interface EditMealFormProps {
   meal: NutritionLog;
@@ -47,6 +54,14 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
   const [fat, setFat] = useState<number | string>(meal.fat ?? 0);
   const [fiber, setFiber] = useState<number | string>(meal.fiber ?? 0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // R-04: this modal used to issue a blind 9-field UPDATE of the parent macros.
+  // With a breakdown stored in `items`, that write violates the DB's
+  // parent = Σ(items) constraint, so when a breakdown exists the macros are
+  // derived here and the corresponding inputs are read-only.
+  const items = normalizeItems(meal.items);
+  const hasBreakdown = isLevel1(items);
+  const derived = hasBreakdown ? sumItems(items!) : null;
 
   // Close on Escape key
   useEffect(() => {
@@ -94,7 +109,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
       }
     },
     onError: (err: any) => {
-      setErrorMessage(err?.message || 'Failed to update meal log. Please try again.');
+      setErrorMessage(friendlyError(err));
     },
   });
 
@@ -132,11 +147,13 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
       meal_type: mealType,
       serving_size: validServing,
       serving_unit: servingUnit.trim() || 'serving',
-      calories: validCalories,
-      protein: validProtein,
-      carbs: validCarbs,
-      fat: validFat,
-      fiber: validFiber,
+      // When a breakdown exists the parent is not user-editable; sending Σ
+      // keeps the row consistent with `items`, which this modal never touches.
+      calories: derived ? Math.max(0, derived.calories) : validCalories,
+      protein: derived ? Math.max(0, derived.protein) : validProtein,
+      carbs: derived ? Math.max(0, derived.carbs) : validCarbs,
+      fat: derived ? Math.max(0, derived.fat) : validFat,
+      fiber: derived ? Math.max(0, derived.fiber) : validFiber,
     });
   };
 
@@ -249,6 +266,16 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
             </div>
           </div>
 
+          {hasBreakdown && (
+            <p
+              data-testid="edit-meal-derived-note"
+              className="text-[11px] text-zinc-400"
+            >
+              Totals are calculated from this meal&rsquo;s {items!.length} components and
+              cannot be edited here.
+            </p>
+          )}
+
           <div className="grid grid-cols-6 sm:grid-cols-5 gap-2">
             <div className="col-span-2 sm:col-span-1">
               <label className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">
@@ -259,11 +286,13 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
                 step="any"
                 min="0"
                 inputMode="numeric"
-                value={calories}
+                value={derived ? derived.calories : calories}
                 onChange={(e) => setCalories(e.target.value)}
+                readOnly={hasBreakdown}
+                aria-readonly={hasBreakdown}
                 placeholder="0"
                 data-testid="edit-meal-calories-input"
-                className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center min-h-[44px]"
+                className={`w-full border border-zinc-800 rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center min-h-[44px] ${hasBreakdown ? 'bg-zinc-900 text-zinc-400 cursor-not-allowed' : 'bg-zinc-950 text-white'}`}
                 required
               />
             </div>
@@ -276,11 +305,13 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
                 step="any"
                 min="0"
                 inputMode="decimal"
-                value={protein}
+                value={derived ? derived.protein : protein}
                 onChange={(e) => setProtein(e.target.value)}
+                readOnly={hasBreakdown}
+                aria-readonly={hasBreakdown}
                 placeholder="0"
                 data-testid="edit-meal-protein-input"
-                className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center min-h-[44px]"
+                className={`w-full border border-zinc-800 rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center min-h-[44px] ${hasBreakdown ? 'bg-zinc-900 text-zinc-400 cursor-not-allowed' : 'bg-zinc-950 text-white'}`}
               />
             </div>
             <div className="col-span-2 sm:col-span-1">
@@ -292,11 +323,13 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
                 step="any"
                 min="0"
                 inputMode="decimal"
-                value={carbs}
+                value={derived ? derived.carbs : carbs}
                 onChange={(e) => setCarbs(e.target.value)}
+                readOnly={hasBreakdown}
+                aria-readonly={hasBreakdown}
                 placeholder="0"
                 data-testid="edit-meal-carbs-input"
-                className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center min-h-[44px]"
+                className={`w-full border border-zinc-800 rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center min-h-[44px] ${hasBreakdown ? 'bg-zinc-900 text-zinc-400 cursor-not-allowed' : 'bg-zinc-950 text-white'}`}
               />
             </div>
             <div className="col-span-3 sm:col-span-1">
@@ -308,11 +341,13 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
                 step="any"
                 min="0"
                 inputMode="decimal"
-                value={fat}
+                value={derived ? derived.fat : fat}
                 onChange={(e) => setFat(e.target.value)}
+                readOnly={hasBreakdown}
+                aria-readonly={hasBreakdown}
                 placeholder="0"
                 data-testid="edit-meal-fat-input"
-                className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center min-h-[44px]"
+                className={`w-full border border-zinc-800 rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center min-h-[44px] ${hasBreakdown ? 'bg-zinc-900 text-zinc-400 cursor-not-allowed' : 'bg-zinc-950 text-white'}`}
               />
             </div>
             <div className="col-span-3 sm:col-span-1">
@@ -324,11 +359,13 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
                 step="any"
                 min="0"
                 inputMode="decimal"
-                value={fiber}
+                value={derived ? derived.fiber : fiber}
                 onChange={(e) => setFiber(e.target.value)}
+                readOnly={hasBreakdown}
+                aria-readonly={hasBreakdown}
                 placeholder="0"
                 data-testid="edit-meal-fiber-input"
-                className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center min-h-[44px]"
+                className={`w-full border border-zinc-800 rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center min-h-[44px] ${hasBreakdown ? 'bg-zinc-900 text-zinc-400 cursor-not-allowed' : 'bg-zinc-950 text-white'}`}
               />
             </div>
           </div>

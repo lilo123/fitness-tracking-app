@@ -8,6 +8,17 @@ import { CoachProvider } from '../context/CoachContext';
 import { supabase } from '../lib/supabase';
 import { getLocalDateStr } from '../utils/date';
 
+/**
+ * Edit and Delete now live behind a single overflow trigger (`meal-actions-<id>`)
+ * so the row fits a 320 px viewport. The action testids only exist while the
+ * menu is open, so a test has to open it first.
+ */
+function openMealAction(logId: string, action: 'edit' | 'delete') {
+  fireEvent.click(screen.getByTestId(`meal-actions-${logId}`));
+  fireEvent.click(screen.getByTestId(`${action}-meal-${logId}`));
+}
+
+
 const { mockSession } = vi.hoisted(() => ({
   mockSession: {
     user: { id: 'test-user-id', email: 'athlete@example.com' },
@@ -185,13 +196,25 @@ describe('NutritionEngine', () => {
       expect(screen.getByText(/Itemized Breakdown/i)).toBeDefined();
     });
 
-    // Adjust portion on first item (+)
-    const increaseBtns = screen.getAllByTitle('Increase portion');
-    fireEvent.click(increaseBtns[0]);
+    // Quantity is now a real amount in a canonical unit, not a x0.5 multiplier:
+    // "3 large" eggs becomes 3 units, and +1 makes it 4.
+    const quantities = () =>
+      screen.getAllByTestId('component-quantity-input') as HTMLInputElement[];
+    expect(quantities()[0].value).toBe('3');
 
-    // Delete second item
-    const removeBtns = screen.getAllByTitle('Remove ingredient');
-    fireEvent.click(removeBtns[1]);
+    fireEvent.click(screen.getByLabelText('Increase quantity of Eggs'));
+
+    await waitFor(() => {
+      expect(quantities()[0].value).toBe('4');
+    });
+    // Macros scale with the quantity: 210 kcal at 3 -> 280 kcal at 4.
+    expect(
+      within(screen.getAllByTestId('component-row')[0]).getByText(/280 kcal/)
+    ).toBeDefined();
+
+    // Remove the second component via its overflow menu.
+    fireEvent.click(screen.getAllByTestId('component-actions')[1]);
+    fireEvent.click(screen.getByTestId('component-remove'));
 
     // Verify Sourdough is removed and only Eggs remain
     await waitFor(() => {
@@ -656,7 +679,10 @@ describe('NutritionEngine', () => {
     await userEvent.type(numberInputs[3], '12');
     await userEvent.type(numberInputs[4], '4');
 
-    await userEvent.type(screen.getByPlaceholderText('e.g. 1 cup oats, 1 scoop whey, 1 tbsp peanut butter'), '6 oz salmon, 1 cup rice');
+    // The free-text ingredients input is gone: it wrote straight back to the
+    // deprecated column and destroyed breakdowns. A dish with no structured
+    // components still saves its hand-entered macros.
+    expect(screen.queryByPlaceholderText('e.g. 1 cup oats, 1 scoop whey, 1 tbsp peanut butter')).toBeNull();
 
     const saveDishBtn = screen.getByText('Save Dish');
     fireEvent.click(saveDishBtn);
@@ -670,7 +696,8 @@ describe('NutritionEngine', () => {
     expect(payload.calories).toBe(550);
     expect(payload.protein).toBe(42);
     expect(payload.fiber).toBe(4);
-    expect(payload.ingredients).toBe('6 oz salmon, 1 cup rice');
+    expect(payload.items).toBeNull();
+    expect('ingredients' in payload).toBe(false);
   });
 
   it('accurately parses pre-analyzed structured breakdown text with line items and totals', async () => {
@@ -714,7 +741,11 @@ Total Fiber: 0 g`;
     fireEvent.click(analyzeBtn);
 
     await waitFor(() => {
-      expect(screen.getByText('Log Meal (+318 kcal)')).toBeDefined();
+      // The fixture's own top-level total (318) contradicts its components
+      // (139 + 60 + 90 = 289). The staged total is now Σ(components), because
+      // that is the invariant the DB enforces; trusting the model's scalar is
+      // what let parent and children drift apart in the first place.
+      expect(screen.getByText('Log Meal (+289 kcal)')).toBeDefined();
     });
 
     expect(screen.getByText('Scrambled Egg White (with hot sauce & black pepper)')).toBeDefined();
@@ -1072,11 +1103,11 @@ Total Fiber: 1 g`;
     // Verify meal is rendered in today's timeline
     await waitFor(() => {
       expect(screen.getByText('Avocado Toast & Poached Egg')).toBeDefined();
-      expect(screen.getByTestId('edit-meal-today-log-1')).toBeDefined();
+      expect(screen.getByTestId('meal-actions-today-log-1')).toBeDefined();
     });
 
     // Click edit button
-    fireEvent.click(screen.getByTestId('edit-meal-today-log-1'));
+    openMealAction('today-log-1', 'edit');
 
     // Modal should be open with values pre-populated
     expect(screen.getByTestId('edit-meal-modal')).toBeDefined();
@@ -1175,10 +1206,10 @@ Total Fiber: 1 g`;
     renderComponent();
 
     await waitFor(() => {
-      expect(screen.getByTestId('edit-meal-today-log-2')).toBeDefined();
+      expect(screen.getByTestId('meal-actions-today-log-2')).toBeDefined();
     });
 
-    fireEvent.click(screen.getByTestId('edit-meal-today-log-2'));
+    openMealAction('today-log-2', 'edit');
 
     expect(screen.getByTestId('edit-meal-modal')).toBeDefined();
 
@@ -1241,11 +1272,11 @@ Total Fiber: 1 g`;
     renderComponent();
 
     await waitFor(() => {
-      expect(screen.getByTestId('edit-meal-today-log-3')).toBeDefined();
+      expect(screen.getByTestId('meal-actions-today-log-3')).toBeDefined();
       expect(screen.getByText('Breakfast')).toBeDefined();
     });
 
-    fireEvent.click(screen.getByTestId('edit-meal-today-log-3'));
+    openMealAction('today-log-3', 'edit');
     expect(screen.getByTestId('edit-meal-modal')).toBeDefined();
 
     // Clear name and save
@@ -2379,6 +2410,128 @@ Total Fiber: 1 g`;
     });
   });
 
+  // ==========================================================================
+  // R-01 — the single most important regression in this feature.
+  //
+  // The shipping modal loaded the raw `ingredients` JSON blob into a
+  // single-line <input type="text"> and wrote back whatever came out of it.
+  // Opening a dish and saving it with no changes was enough to mangle the
+  // breakdown; clearing the field nulled the column outright.
+  //
+  // The fixture is the real production dish: `Google Breakkie`, 8 components,
+  // owner nqnkat. Open it, save it untouched, and every component must survive
+  // byte-for-byte — and `ingredients` must not appear in the payload at all.
+  // ==========================================================================
+  it('R-01: opening and saving Google Breakkie unchanged preserves all 8 components and never writes ingredients', async () => {
+    const breakkieIngredients = [
+      { name: 'Scrambled Egg White', portion: '150 g', calories: 87, protein: 14, carbs: 1, fat: 3, fiber: 0 },
+      { name: 'Sliced Turkey Breast', portion: '60 g', calories: 80, protein: 10, carbs: 1, fat: 4, fiber: 0 },
+      { name: 'Smoked Salmon', portion: '50 g', calories: 68, protein: 8, carbs: 0, fat: 4, fiber: 0 },
+      { name: 'Chocolate Coconut Chia Pudding', portion: '150 g', calories: 227, protein: 5, carbs: 18, fat: 15, fiber: 8 },
+      { name: '2% Plain Greek Yogurt', portion: '100 g', calories: 88, protein: 9, carbs: 4, fat: 4, fiber: 0 },
+      { name: 'Blueberries', portion: '2 handfuls (100g)', calories: 57, protein: 0.7, carbs: 14.5, fat: 0.3, fiber: 2.4 },
+      { name: 'Almond Butter', portion: '1 tbsp', calories: 98, protein: 3.4, carbs: 3, fat: 8.9, fiber: 1.6 },
+      { name: 'Cucumber, Tomato, and Pickled Veggies', portion: '1 bowl', calories: 35, protein: 1.5, carbs: 7, fat: 0.2, fiber: 1.9 },
+    ];
+    const serialized = JSON.stringify(breakkieIngredients);
+    const expectedTotals = breakkieIngredients.reduce(
+      (acc, i) => ({
+        calories: acc.calories + i.calories,
+        protein: acc.protein + i.protein,
+        carbs: acc.carbs + i.carbs,
+        fat: acc.fat + i.fat,
+        fiber: acc.fiber + i.fiber,
+      }),
+      { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
+    );
+
+    const mockUpdateEqSelect = vi.fn().mockResolvedValue({ data: [], error: null });
+    const mockUpdate = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({ select: mockUpdateEqSelect }),
+    });
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'custom_dishes') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({
+                data: [
+                  {
+                    id: 'dish-breakkie',
+                    name: 'Google Breakkie',
+                    calories: expectedTotals.calories,
+                    protein: expectedTotals.protein,
+                    carbs: expectedTotals.carbs,
+                    fat: expectedTotals.fat,
+                    fiber: expectedTotals.fiber,
+                    // Un-backfilled: the legacy blob is the only breakdown.
+                    ingredients: serialized,
+                  },
+                ],
+                error: null,
+              }),
+            }),
+          }),
+          update: mockUpdate,
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
+                single: vi.fn().mockResolvedValue({ data: null, error: null }),
+              }),
+            }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('edit-dish-btn-dish-breakkie')).toBeDefined();
+    });
+    fireEvent.click(screen.getByTestId('edit-dish-btn-dish-breakkie'));
+
+    // All 8 rows must be visible and editable — not one text input holding JSON.
+    await waitFor(() => {
+      expect(screen.getAllByTestId('dish-item-row')).toHaveLength(8);
+    });
+    expect(screen.queryByPlaceholderText('e.g. 1 cup oats, 1 scoop whey, 1 tbsp peanut butter')).toBeNull();
+
+    // Save with no changes at all.
+    fireEvent.click(screen.getByText('Save Dish'));
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalled());
+    const payload = mockUpdate.mock.calls[0][0] as any;
+
+    // 1. The breakdown survives, in order, with every macro intact.
+    expect(payload.items).toHaveLength(8);
+    expect(payload.items.map((i: any) => i.name)).toEqual(breakkieIngredients.map((i) => i.name));
+    for (let i = 0; i < 8; i++) {
+      expect(payload.items[i].calories).toBe(breakkieIngredients[i].calories);
+      expect(payload.items[i].protein).toBe(breakkieIngredients[i].protein);
+      expect(payload.items[i].carbs).toBe(breakkieIngredients[i].carbs);
+      expect(payload.items[i].fat).toBe(breakkieIngredients[i].fat);
+      expect(payload.items[i].fiber).toBe(breakkieIngredients[i].fiber);
+      // Provenance: the original free-text portion is preserved verbatim.
+      expect(payload.items[i].displayPortion).toBe(breakkieIngredients[i].portion);
+    }
+
+    // 2. The legacy column is never written. This is the whole of R-01.
+    expect('ingredients' in payload).toBe(false);
+
+    // 3. The parent equals the sum, which is what the DB constraint checks.
+    expect(payload.calories).toBeCloseTo(expectedTotals.calories, 6);
+    expect(payload.protein).toBeCloseTo(expectedTotals.protein, 6);
+    expect(payload.fiber).toBeCloseTo(expectedTotals.fiber, 6);
+  });
+
+
   it('triggers deleteCustomDishMutation from inline Delete button inside edit modal and closes modal', async () => {
     const mockDelete = vi.fn().mockReturnValue({
       eq: vi.fn().mockResolvedValue({ error: null }),
@@ -2658,7 +2811,113 @@ Total Fiber: 1 g`;
     // Toast should now be dismissed
     expect(screen.queryByTestId('quick-log-toast')).toBeNull();
   });
+
+  it('rolls a rescale rejected by a database constraint back to the stored macros', async () => {
+    // The row's own rollback is unit-tested; what this pins is the wiring. The
+    // timeline has to hand the row the write's *promise* (mutateAsync, not
+    // mutate) or the row never learns the write failed and keeps a quantity on
+    // screen that Postgres refused.
+    const todayStr = getLocalDateStr(new Date());
+    const mockMeal = {
+      id: 'today-log-scale',
+      user_id: 'test-user-id',
+      food_name: 'Com Tam & Eggs',
+      meal_type: 'Lunch',
+      calories: 560,
+      protein: 32,
+      carbs: 69,
+      fat: 16,
+      fiber: 1,
+      logged_at: `${todayStr}T12:00:00Z`,
+      items: [
+        {
+          id: 'i1',
+          name: 'Broken Rice',
+          quantity: 240,
+          unit: 'g',
+          displayPortion: '1.5 cups (240g)',
+          calories: 300,
+          protein: 6,
+          carbs: 65,
+          fat: 1,
+          fiber: 1,
+        },
+        {
+          id: 'i2',
+          name: 'Grilled Pork Chop',
+          quantity: 120,
+          unit: 'g',
+          displayPortion: '1 chop (120g)',
+          calories: 260,
+          protein: 26,
+          carbs: 4,
+          fat: 15,
+          fiber: 0,
+        },
+      ],
+    };
+
+    // Exactly what Phase 5 returns when the parent no longer matches Σ(items).
+    const mockUpdateEq = vi.fn().mockResolvedValue({
+      error: {
+        message:
+          'new row for relation "nutrition_logs" violates check constraint "chk_nl_parent_equals_items_sum"',
+      },
+    });
+    const mockUpdate = vi.fn().mockReturnValue({ eq: mockUpdateEq });
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'nutrition_logs') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              gte: vi.fn().mockReturnValue({
+                lte: vi.fn().mockReturnValue({
+                  order: vi.fn().mockResolvedValue({ data: [mockMeal], error: null }),
+                }),
+              }),
+            }),
+          }),
+          update: mockUpdate,
+          delete: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
+                single: vi.fn().mockResolvedValue({ data: null, error: null }),
+              }),
+            }),
+          }),
+        }),
+      };
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('meal-log-accordion-trigger')).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByTestId('meal-log-accordion-trigger'));
+    fireEvent.click(screen.getByTestId('dish-scale-0.5'));
+
+    // Optimistic: half of 560 is on screen before the write lands.
+    expect(screen.getByText(/280 kcal/)).toBeDefined();
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+
+    // Rejected: the row must return to the stored totals and say why in the
+    // mapped wording, not in raw Postgres.
+    const alert = await screen.findByTestId('meal-log-error');
+    expect(alert.textContent).toMatch(/no longer match its components/);
+    expect(screen.getByText(/560 kcal/)).toBeDefined();
+    expect(screen.queryByText(/280 kcal/)).toBeNull();
+  });
 });
+
 
 
 

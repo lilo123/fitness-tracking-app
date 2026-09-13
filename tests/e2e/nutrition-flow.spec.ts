@@ -1,4 +1,39 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+/**
+ * Remove one meal row with this name through the UI and assert it is gone.
+ *
+ * Every test that commits a meal must call this. These specs run in five
+ * projects on every invocation and used to leave every row behind: the fixture
+ * account had accumulated 345 rows, and rendering that timeline was slow enough
+ * to time Mobile Safari out for real. Deleting also proves the destructive
+ * action works rather than merely that its label is present.
+ *
+ * Identified by the row's log id, not by a row count. `count()` then
+ * `toHaveCount(count - 1)` races the refetch that follows the commit: if the
+ * just-logged row renders *after* the count is taken, the target is one too low
+ * and never arrives. That is not hypothetical — it failed in three of the five
+ * projects, on a timeline that already held a dozen identically named rows.
+ */
+async function deleteMealRow(page: Page, name: string) {
+  const row = page.locator('[data-testid="meal-log-item"]').filter({ hasText: name }).first();
+  await expect(row).toBeVisible();
+
+  // `meal-actions-<log id>` on the trigger, `delete-meal-<log id>` on the item.
+  const trigger = row.locator('button[aria-haspopup="menu"]');
+  await expect(trigger).toBeVisible();
+  const testId = await trigger.getAttribute('data-testid');
+  const id = (testId ?? '').replace('meal-actions-', '');
+  expect(id).not.toBe('');
+
+  await trigger.click();
+  const deleteItem = row.locator('[role="menuitem"]').filter({ hasText: 'Delete meal' });
+  await expect(deleteItem).toBeVisible();
+  await deleteItem.click();
+
+  // That exact row, not "one fewer row than a moment ago".
+  await expect(page.locator(`[data-testid="meal-actions-${id}"]`)).toHaveCount(0);
+}
 
 test.describe('Nutrition Flow E2E', () => {
   test.describe.configure({ mode: 'serial' });
@@ -155,14 +190,45 @@ test.describe('Nutrition Flow E2E', () => {
     // Verify meal is displayed in today's meals timeline
     await expect(page.locator('text=Playwright Test Chicken & Rice').first()).toBeVisible();
 
-    // Verify touch target for delete button
-    const deleteBtn = page.locator('button[title="Delete meal"]').first();
-    await expect(deleteBtn).toBeVisible();
-    const box = await deleteBtn.boundingBox();
+    // Edit and Delete now live behind one overflow trigger so the row fits a
+    // 320 px viewport. The trigger carries the touch-target guarantee that the
+    // two icon buttons used to.
+    // `.first()` is load-bearing, not defensive: this test seeds a meal with a
+    // fixed name on every run, and the fixture account still carries the
+    // backlog of copies left behind before the test was made self-cleaning
+    // (below). Without it the locator resolves to all of them and Playwright's
+    // strict mode throws before asserting anything.
+    const row = page
+      .locator('[data-testid="meal-log-item"]')
+      .filter({ hasText: 'Playwright Test Chicken & Rice' })
+      .first();
+    const actionsBtn = row.locator('button[aria-haspopup="menu"]');
+    await expect(actionsBtn).toBeVisible();
+    const box = await actionsBtn.boundingBox();
     if (box) {
       expect(box.width).toBeGreaterThanOrEqual(40);
       expect(box.height).toBeGreaterThanOrEqual(40);
     }
+
+    // The destructive action must still be reachable, not merely relabelled.
+    const id = ((await actionsBtn.getAttribute('data-testid')) ?? '').replace('meal-actions-', '');
+    expect(id).not.toBe('');
+    await actionsBtn.click();
+    const deleteItem = row.locator('[role="menuitem"]').filter({ hasText: 'Delete meal' });
+    await expect(deleteItem).toBeVisible();
+
+    // Actually delete instead of pressing Escape. This test seeds a row on every
+    // run in every project and used to leave it behind forever; the backlog had
+    // reached 96 copies, and rendering that timeline was slow enough to make the
+    // assertions above time out intermittently on WebKit. Deleting keeps the
+    // fixture net-neutral and proves the action works rather than merely that
+    // its label is present.
+    //
+    // Asserted by id, not by "one fewer than before": a count taken while the
+    // timeline is still settling after the commit makes `before - 1` a target
+    // that never arrives.
+    await deleteItem.click();
+    await expect(page.locator(`[data-testid="meal-actions-${id}"]`)).toHaveCount(0);
   });
 
   test('submits conversational meal prompt, interacts with staged card and quick log', async ({ page }) => {
@@ -180,14 +246,17 @@ test.describe('Nutrition Flow E2E', () => {
     await expect(page.locator('text=Itemized Breakdown')).toBeVisible();
     await expect(page.locator('text=Eggs').first()).toBeVisible();
 
-    // Verify portion adjuster buttons exist (touch target check >= 40px)
-    const portionAdjusters = page.locator('button[title*="portion"]');
-    if ((await portionAdjusters.count()) > 0) {
-      const box = await portionAdjusters.first().boundingBox();
-      if (box) {
-        expect(box.width).toBeGreaterThanOrEqual(40);
-        expect(box.height).toBeGreaterThanOrEqual(40);
-      }
+    // The x0.5 stepper is gone: the quantity is a real amount in a canonical
+    // unit. This used to be `button[title*="portion"]`, which after the change
+    // matched nothing and — being guarded by `count() > 0` — asserted nothing.
+    const quantityInput = page.locator('[data-testid="component-quantity-input"]').first();
+    await expect(quantityInput).toBeVisible();
+    const increaseBtn = page.getByLabel(/^Increase quantity of /).first();
+    await expect(increaseBtn).toBeVisible();
+    const stepperBox = await increaseBtn.boundingBox();
+    if (stepperBox) {
+      expect(stepperBox.width).toBeGreaterThanOrEqual(40);
+      expect(stepperBox.height).toBeGreaterThanOrEqual(40);
     }
 
     // Verify Log Meal button is visible on staged card and commit
@@ -197,6 +266,10 @@ test.describe('Nutrition Flow E2E', () => {
 
     // Staged card should clear
     await expect(stagedCard).not.toBeVisible();
+    await expect(page.locator('[data-testid="meal-log-item"]').filter({ hasText: 'Eggs, Toast & Butter' }).first()).toBeVisible();
+
+    // Net-neutral: remove the row this test just committed.
+    await deleteMealRow(page, 'Eggs, Toast & Butter');
   });
 
   test('analyzes multi-dish conversational meal "I ate Com Tam & Eggs" and elaborates all component items', async ({ page }) => {
@@ -225,6 +298,9 @@ test.describe('Nutrition Flow E2E', () => {
     // Verify meal is logged
     await expect(stagedCard).not.toBeVisible();
     await expect(page.locator('text=Com Tam & Eggs').first()).toBeVisible();
+
+    // Net-neutral: remove the row this test just committed.
+    await deleteMealRow(page, 'Com Tam & Eggs');
   });
 
   test('preserves exact pre-analyzed structured breakdown text verbatim with exact totals', async ({ page }) => {
@@ -277,6 +353,10 @@ Total Fiber: 8 g`;
     await commitBtn.click();
 
     await expect(stagedCard).not.toBeVisible();
+    await expect(page.locator('[data-testid="meal-log-item"]').filter({ hasText: 'High-Protein Breakfast Plate' }).first()).toBeVisible();
+
+    // Net-neutral: remove the row this test just committed.
+    await deleteMealRow(page, 'High-Protein Breakfast Plate & Chia Pudding Bowl (Friday Menu Grounded)');
   });
 
   test('allows editing a logged meal in today timeline and history view with updated macros', async ({ page }) => {
@@ -313,17 +393,21 @@ Total Fiber: 8 g`;
     const originalRow = page.locator('[data-testid="meal-log-item"]').filter({ hasText: originalMealName });
     await expect(originalRow).toBeVisible();
 
-    // 2. Click Edit button on the specific row
-    const editBtn = originalRow.locator('button[title="Edit meal"]');
-    await expect(editBtn).toBeVisible();
+    // 2. Open the row's overflow menu, then pick Edit. Edit and Delete were
+    //    collapsed into one control so the row fits a 320px viewport.
+    const actionsBtn = originalRow.locator('button[aria-haspopup="menu"]');
+    await expect(actionsBtn).toBeVisible();
 
-    // Verify touch target for edit button >= 40px
-    const editBox = await editBtn.boundingBox();
+    // Verify touch target for the overflow trigger >= 40px
+    const editBox = await actionsBtn.boundingBox();
     if (editBox) {
       expect(editBox.width).toBeGreaterThanOrEqual(40);
       expect(editBox.height).toBeGreaterThanOrEqual(40);
     }
 
+    await actionsBtn.click();
+    const editBtn = originalRow.locator('[role="menuitem"]', { hasText: 'Edit meal' });
+    await expect(editBtn).toBeVisible();
     await editBtn.click();
 
     // Verify Edit Meal modal appears
@@ -384,8 +468,9 @@ Total Fiber: 8 g`;
     const historyRow = page.locator('[data-testid="meal-log-item"]').filter({ hasText: editedMealName });
     await expect(historyRow).toBeVisible();
 
-    // Click edit button on the exact history row
-    const historyEditBtn = historyRow.locator('button[title="Edit meal"]');
+    // Open the row's overflow menu, then pick Edit.
+    await historyRow.locator('button[aria-haspopup="menu"]').click();
+    const historyEditBtn = historyRow.locator('[role="menuitem"]', { hasText: 'Edit meal' });
     await expect(historyEditBtn).toBeVisible();
     await historyEditBtn.click();
 
@@ -398,6 +483,11 @@ Total Fiber: 8 g`;
 
     await expect(modal).not.toBeVisible();
     await expect(page.locator('text=' + historyMealName).first()).toBeVisible();
+
+    // Net-neutral: the name is unique per run, so this row would otherwise be
+    // one more permanent addition per project per run. Deleting it here also
+    // exercises delete from the history view, which nothing else covers.
+    await deleteMealRow(page, historyMealName);
   });
 });
 
