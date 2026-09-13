@@ -1477,6 +1477,7 @@ export const NutritionEngine: React.FC = () => {
                 </label>
                 <input
                   type="number"
+                  step="any"
                   inputMode="numeric"
                   data-testid="calories-input"
                   value={stagedMeal.calories}
@@ -1495,6 +1496,7 @@ export const NutritionEngine: React.FC = () => {
                 </label>
                 <input
                   type="number"
+                  step="any"
                   inputMode="decimal"
                   data-testid="protein-input"
                   value={stagedMeal.protein}
@@ -1513,6 +1515,7 @@ export const NutritionEngine: React.FC = () => {
                 </label>
                 <input
                   type="number"
+                  step="any"
                   inputMode="decimal"
                   data-testid="carbs-input"
                   value={stagedMeal.carbs}
@@ -1531,6 +1534,7 @@ export const NutritionEngine: React.FC = () => {
                 </label>
                 <input
                   type="number"
+                  step="any"
                   inputMode="decimal"
                   data-testid="fat-input"
                   value={stagedMeal.fat}
@@ -1549,6 +1553,7 @@ export const NutritionEngine: React.FC = () => {
                 </label>
                 <input
                   type="number"
+                  step="any"
                   inputMode="decimal"
                   data-testid="fiber-input"
                   value={stagedMeal.fiber}
@@ -1672,6 +1677,7 @@ export const NutritionEngine: React.FC = () => {
                 </label>
                 <input
                   type="number"
+                  step="any"
                   inputMode="numeric"
                   data-testid="calories-input"
                   value={manualCalories}
@@ -1687,6 +1693,7 @@ export const NutritionEngine: React.FC = () => {
                 </label>
                 <input
                   type="number"
+                  step="any"
                   inputMode="decimal"
                   data-testid="protein-input"
                   value={manualProtein}
@@ -1702,6 +1709,7 @@ export const NutritionEngine: React.FC = () => {
                 </label>
                 <input
                   type="number"
+                  step="any"
                   inputMode="decimal"
                   data-testid="carbs-input"
                   value={manualCarbs}
@@ -1717,6 +1725,7 @@ export const NutritionEngine: React.FC = () => {
                 </label>
                 <input
                   type="number"
+                  step="any"
                   inputMode="decimal"
                   data-testid="fat-input"
                   value={manualFat}
@@ -1732,6 +1741,7 @@ export const NutritionEngine: React.FC = () => {
                 </label>
                 <input
                   type="number"
+                  step="any"
                   inputMode="decimal"
                   data-testid="fiber-input"
                   value={manualFiber}
@@ -1749,6 +1759,7 @@ export const NutritionEngine: React.FC = () => {
                 </label>
                 <input
                   type="number"
+                  step="any"
                   inputMode="decimal"
                   value={manualServingSize}
                   onChange={(e) => setManualServingSize(e.target.value === '' ? '' : Number(e.target.value))}
@@ -1924,6 +1935,7 @@ export const NutritionEngine: React.FC = () => {
                   </label>
                   <input
                     type="number"
+                    step="any"
                     inputMode="numeric"
                     value={dishModalCalories}
                     onChange={(e) =>
@@ -1940,6 +1952,7 @@ export const NutritionEngine: React.FC = () => {
                   </label>
                   <input
                     type="number"
+                    step="any"
                     inputMode="decimal"
                     value={dishModalProtein}
                     onChange={(e) =>
@@ -1956,6 +1969,7 @@ export const NutritionEngine: React.FC = () => {
                   </label>
                   <input
                     type="number"
+                    step="any"
                     inputMode="decimal"
                     value={dishModalCarbs}
                     onChange={(e) =>
@@ -1972,6 +1986,7 @@ export const NutritionEngine: React.FC = () => {
                   </label>
                   <input
                     type="number"
+                    step="any"
                     inputMode="decimal"
                     value={dishModalFat}
                     onChange={(e) =>
@@ -1988,6 +2003,7 @@ export const NutritionEngine: React.FC = () => {
                   </label>
                   <input
                     type="number"
+                    step="any"
                     inputMode="decimal"
                     value={dishModalFiber}
                     onChange={(e) =>
