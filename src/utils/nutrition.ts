@@ -188,3 +188,34 @@ export function calculateRemainingFuel(
     fiber,
   };
 }
+
+/**
+ * Formats a ratio as an adaptive percentage string.
+ * Non-zero contributions strictly less than 1% are formatted as `<1%`.
+ * Zero, negative, non-finite, or zero-total values format as `0%`.
+ * Other values format as rounded whole percentages, e.g. `45%`.
+ */
+export function formatPercentage(
+  val: number | string | null | undefined,
+  total: number | string | null | undefined
+): string {
+  if (val == null || total == null) return '0%';
+  const numVal = Number(val);
+  const numTotal = Number(total);
+  if (
+    !Number.isFinite(numVal) ||
+    !Number.isFinite(numTotal) ||
+    numTotal <= 0 ||
+    numVal <= 0
+  ) {
+    return '0%';
+  }
+  const pct = (numVal / numTotal) * 100;
+  if (pct >= 0.005 && pct < 1) {
+    return '<1%';
+  }
+  if (pct < 0.005) {
+    return '0%';
+  }
+  return `${Math.round(pct)}%`;
+}

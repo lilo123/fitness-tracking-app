@@ -234,4 +234,41 @@ test.describe('Nutrition hierarchy at 320px', () => {
     );
     expect(overflowing).toBe(false);
   });
+
+  test('interactive nutrient breakdown popup opens at 320px, meets touch targets, and never overflows', async ({ page }) => {
+    // Click Calories MacroRing
+    const ring = page.locator('[data-testid="macro-ring-calories"]');
+    await ring.click();
+
+    const modal = page.locator('[data-testid="nutrient-breakdown-modal"]');
+    await expect(modal).toBeVisible();
+
+    // Verify modal does not cause document horizontal overflow
+    const overflowing = await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth
+    );
+    expect(overflowing).toBe(false);
+
+    // Verify worst overflow of modal card is <= 1px
+    expect(await worstOverflow(modal)).toBeLessThanOrEqual(1);
+
+    // Verify segmented pill switcher controls meet 44px touch targets
+    const pills = modal.locator('[role="tab"]');
+    const count = await pills.count();
+    expect(count).toBe(5);
+    for (let i = 0; i < count; i++) {
+      const box = await pills.nth(i).boundingBox();
+      if (box) {
+        expect(box.height).toBeGreaterThanOrEqual(44);
+      }
+    }
+
+    // Switch tabs to protein
+    await modal.locator('[data-testid="nutrient-pill-protein"]').click();
+    await expect(modal.locator('[data-testid="nutrient-pill-protein"]')).toHaveAttribute('aria-selected', 'true');
+
+    // Close modal via close button
+    await modal.locator('[data-testid="close-breakdown-modal-btn"]').click();
+    await expect(modal).not.toBeVisible();
+  });
 });

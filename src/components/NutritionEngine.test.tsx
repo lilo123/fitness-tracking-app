@@ -2916,6 +2916,218 @@ Total Fiber: 1 g`;
     expect(screen.getByText(/560 kcal/)).toBeDefined();
     expect(screen.queryByText(/280 kcal/)).toBeNull();
   });
+
+  describe('interactive nutrient breakdown popup', () => {
+    it('opens breakdown modal when MacroRing cards are clicked and updates active tab', async () => {
+      renderComponent();
+      await screen.findByText("Today's Nutrition");
+
+      const calRing = screen.getByTestId('macro-ring-calories');
+      const proteinRing = screen.getByTestId('macro-ring-protein');
+      const carbsRing = screen.getByTestId('macro-ring-carbs');
+      const fatRing = screen.getByTestId('macro-ring-fat');
+      const fiberRing = screen.getByTestId('macro-ring-fiber');
+
+      // Click Calories ring
+      fireEvent.click(calRing);
+      expect(screen.getByTestId('nutrient-breakdown-modal')).toBeDefined();
+      expect(screen.getByTestId('nutrient-pill-calories').getAttribute('aria-selected')).toBe('true');
+
+      // Close modal
+      fireEvent.click(screen.getByTestId('close-breakdown-modal-btn'));
+      expect(screen.queryByTestId('nutrient-breakdown-modal')).toBeNull();
+
+      // Click Protein ring
+      fireEvent.click(proteinRing);
+      expect(screen.getByTestId('nutrient-breakdown-modal')).toBeDefined();
+      expect(screen.getByTestId('nutrient-pill-protein').getAttribute('aria-selected')).toBe('true');
+
+      // Switch to Carbs via segmented pill switcher inside modal
+      fireEvent.click(screen.getByTestId('nutrient-pill-carbs'));
+      expect(screen.getByTestId('nutrient-pill-carbs').getAttribute('aria-selected')).toBe('true');
+
+      // Close modal
+      fireEvent.click(screen.getByTestId('close-breakdown-modal-btn'));
+      expect(screen.queryByTestId('nutrient-breakdown-modal')).toBeNull();
+
+      // Click Carbs ring
+      fireEvent.click(carbsRing);
+      expect(screen.getByTestId('nutrient-pill-carbs').getAttribute('aria-selected')).toBe('true');
+      fireEvent.click(screen.getByTestId('close-breakdown-modal-btn'));
+
+      // Click Fat ring
+      fireEvent.click(fatRing);
+      expect(screen.getByTestId('nutrient-pill-fat').getAttribute('aria-selected')).toBe('true');
+      fireEvent.click(screen.getByTestId('close-breakdown-modal-btn'));
+
+      // Click Fiber ring
+      fireEvent.click(fiberRing);
+      expect(screen.getByTestId('nutrient-pill-fiber').getAttribute('aria-selected')).toBe('true');
+      fireEvent.click(screen.getByTestId('close-breakdown-modal-btn'));
+    });
+
+    it('opens breakdown modal when Remaining Fuel chips are clicked', async () => {
+      renderComponent();
+      await screen.findByText("Today's Nutrition");
+
+      // Click Remaining Fuel calories chip
+      fireEvent.click(screen.getByTestId('remaining-fuel-calories'));
+      expect(screen.getByTestId('nutrient-breakdown-modal')).toBeDefined();
+      expect(screen.getByTestId('nutrient-pill-calories').getAttribute('aria-selected')).toBe('true');
+      fireEvent.click(screen.getByTestId('close-breakdown-modal-btn'));
+
+      // Click Remaining Fuel protein chip
+      fireEvent.click(screen.getByTestId('remaining-fuel-protein'));
+      expect(screen.getByTestId('nutrient-breakdown-modal')).toBeDefined();
+      expect(screen.getByTestId('nutrient-pill-protein').getAttribute('aria-selected')).toBe('true');
+      fireEvent.click(screen.getByTestId('close-breakdown-modal-btn'));
+
+      // Click Remaining Fuel carbs chip
+      fireEvent.click(screen.getByTestId('remaining-fuel-carbs'));
+      expect(screen.getByTestId('nutrient-pill-carbs').getAttribute('aria-selected')).toBe('true');
+      fireEvent.click(screen.getByTestId('close-breakdown-modal-btn'));
+
+      // Click Remaining Fuel fat chip
+      fireEvent.click(screen.getByTestId('remaining-fuel-fat'));
+      expect(screen.getByTestId('nutrient-pill-fat').getAttribute('aria-selected')).toBe('true');
+      fireEvent.click(screen.getByTestId('close-breakdown-modal-btn'));
+
+      // Click Remaining Fuel fiber chip
+      fireEvent.click(screen.getByTestId('remaining-fuel-fiber'));
+      expect(screen.getByTestId('nutrient-pill-fiber').getAttribute('aria-selected')).toBe('true');
+      fireEvent.click(screen.getByTestId('close-breakdown-modal-btn'));
+    });
+
+    it('displays Level 1 composite meals with accordion and Level 2 leaf meals in breakdown modal', async () => {
+      const todayStr = getLocalDateStr(new Date());
+      const mockLogs = [
+        {
+          id: 'log-composite-plate',
+          user_id: 'test-user-id',
+          food_name: 'Steamed Egg Meatloaf Plate',
+          calories: 452,
+          protein: 25.5,
+          carbs: 31.2,
+          fat: 24.6,
+          fiber: 3.1,
+          logged_at: `${todayStr}T12:00:00.000Z`,
+          items: [
+            {
+              id: 'child-1',
+              name: 'Steamed Egg Meatloaf',
+              quantity: 150,
+              unit: 'g',
+              displayPortion: '1 slice (150g)',
+              calories: 182,
+              protein: 12.5,
+              carbs: 3.2,
+              fat: 13.1,
+              fiber: 1.2,
+            },
+            {
+              id: 'child-2',
+              name: 'Cooking Oil',
+              quantity: 15,
+              unit: 'g',
+              displayPortion: '1 tbsp (15g)',
+              calories: 215,
+              protein: 0.1,
+              carbs: 21.0,
+              fat: 11.3,
+              fiber: 0,
+            },
+            {
+              id: 'child-3',
+              name: 'Cucumber & Tomato Pickles',
+              quantity: 1,
+              unit: 'unit',
+              displayPortion: '1 bowl',
+              calories: 55,
+              protein: 12.9,
+              carbs: 7.0,
+              fat: 0.2,
+              fiber: 1.9,
+            },
+          ],
+        },
+        {
+          id: 'log-leaf-apple',
+          user_id: 'test-user-id',
+          food_name: 'Honeycrisp Apple',
+          calories: 95,
+          protein: 0.5,
+          carbs: 25.0,
+          fat: 0.3,
+          fiber: 4.4,
+          serving_size: 1,
+          serving_unit: 'medium',
+          logged_at: `${todayStr}T15:00:00.000Z`,
+          items: null,
+        },
+      ];
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'nutrition_logs') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                gte: vi.fn().mockReturnValue({
+                  lte: vi.fn().mockReturnValue({
+                    order: vi.fn().mockResolvedValue({ data: mockLogs, error: null }),
+                  }),
+                }),
+              }),
+            }),
+            insert: vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) }),
+            update: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) }) }),
+            delete: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
+          };
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              gte: vi.fn().mockReturnValue({
+                lte: vi.fn().mockReturnValue({
+                  order: vi.fn().mockResolvedValue({ data: [], error: null }),
+                  single: vi.fn().mockResolvedValue({ data: null, error: null }),
+                }),
+              }),
+            }),
+          }),
+        };
+      });
+
+      renderComponent();
+
+      // Wait for logs to load and appear in DOM
+      await screen.findByText('Steamed Egg Meatloaf Plate');
+
+      // Open breakdown modal via calories ring
+      fireEvent.click(screen.getByTestId('macro-ring-calories'));
+      expect(screen.getByTestId('nutrient-breakdown-modal')).toBeDefined();
+
+      // Composite meal has accordion trigger and count badge '3'
+      const trigger = await screen.findByTestId('breakdown-accordion-trigger-log-composite-plate');
+      expect(trigger).toBeDefined();
+      expect(screen.getByTestId('breakdown-count-badge-log-composite-plate').textContent).toBe('3');
+
+      // Leaf meal has no accordion trigger or count badge
+      expect(screen.getByTestId('breakdown-leaf-row-log-leaf-apple')).toBeDefined();
+      expect(screen.queryByTestId('breakdown-accordion-trigger-log-leaf-apple')).toBeNull();
+      expect(screen.queryByTestId('breakdown-count-badge-log-leaf-apple')).toBeNull();
+
+      // Expand composite meal
+      fireEvent.click(trigger);
+      expect(screen.getByTestId('breakdown-accordion-panel-log-composite-plate')).toBeDefined();
+
+      // Child rows exist
+      const childRows = screen.getAllByTestId('breakdown-child-row');
+      expect(childRows.length).toBe(3);
+      expect(screen.getByText('Steamed Egg Meatloaf')).toBeDefined();
+      expect(screen.getByText('Cooking Oil')).toBeDefined();
+      expect(screen.getByText('Cucumber & Tomato Pickles')).toBeDefined();
+    });
+  });
 });
 
 

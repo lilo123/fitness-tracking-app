@@ -4,6 +4,7 @@ import {
   formatMacro,
   roundTo1Decimal,
   calculateRemainingFuel,
+  formatPercentage,
 } from './nutrition';
 
 describe('nutrition utility', () => {
@@ -338,6 +339,45 @@ describe('nutrition utility', () => {
       expect(resultPartial.carbs.rawDiff).toBe(0);
       expect(resultPartial.fat.rawDiff).toBe(0);
       expect(resultPartial.fiber.rawDiff).toBe(0);
+    });
+  });
+
+  describe('formatPercentage', () => {
+    it('formats standard percentages rounded to whole numbers', () => {
+      expect(formatPercentage(50, 100)).toBe('50%');
+      expect(formatPercentage(25.4, 100)).toBe('25%');
+      expect(formatPercentage(25.6, 100)).toBe('26%');
+      expect(formatPercentage(100, 100)).toBe('100%');
+      expect(formatPercentage(1, 100)).toBe('1%');
+    });
+
+    it('formats non-zero percentages strictly below 1% as <1%', () => {
+      expect(formatPercentage(0.5, 100)).toBe('<1%');
+      expect(formatPercentage(0.1, 100)).toBe('<1%');
+      expect(formatPercentage(0.01, 100)).toBe('<1%');
+      expect(formatPercentage(0.99, 100)).toBe('<1%');
+    });
+
+    it('formats zero or negative values as 0%', () => {
+      expect(formatPercentage(0, 100)).toBe('0%');
+      expect(formatPercentage(-5, 100)).toBe('0%');
+      expect(formatPercentage(0, 0)).toBe('0%');
+      expect(formatPercentage(50, 0)).toBe('0%');
+      expect(formatPercentage(50, -100)).toBe('0%');
+      expect(formatPercentage(1e-15, 100)).toBe('0%');
+      expect(formatPercentage(0.00001, 100)).toBe('0%');
+    });
+
+    it('handles null, undefined, NaN, and string values gracefully', () => {
+      expect(formatPercentage(null, 100)).toBe('0%');
+      expect(formatPercentage(undefined, 100)).toBe('0%');
+      expect(formatPercentage(50, null)).toBe('0%');
+      expect(formatPercentage(50, undefined)).toBe('0%');
+      expect(formatPercentage(NaN, 100)).toBe('0%');
+      expect(formatPercentage(50, NaN)).toBe('0%');
+      expect(formatPercentage('25', '100')).toBe('25%');
+      expect(formatPercentage('0.5', '100')).toBe('<1%');
+      expect(formatPercentage('invalid', '100')).toBe('0%');
     });
   });
 });

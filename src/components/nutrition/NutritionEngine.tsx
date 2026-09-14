@@ -46,6 +46,7 @@ import {
 import { ComponentRow } from './ComponentRow';
 import { MealLogRow } from './MealLogRow';
 import { CustomDishEditor } from './CustomDishEditor';
+import { NutrientBreakdownModal, type BreakdownNutrient } from './NutrientBreakdownModal';
 import { useModalA11y } from '../../hooks/useModalA11y';
 
 export interface StagedItem {
@@ -231,6 +232,7 @@ export const NutritionEngine: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [stagedMeal, setStagedMeal] = useState<StagedMeal | null>(null);
   const [showManualForm, setShowManualForm] = useState(false);
+  const [breakdownNutrient, setBreakdownNutrient] = useState<BreakdownNutrient | null>(null);
 
   const handlePickPhoto = async (source: CameraSource) => {
     try {
@@ -1116,6 +1118,8 @@ export const NutritionEngine: React.FC = () => {
               unit="kcal"
               colorClass="text-amber-400"
               strokeColor="#f59e0b"
+              onClick={() => setBreakdownNutrient('calories')}
+              testId="macro-ring-calories"
             />
           </div>
           <div className="col-span-2 sm:col-span-1">
@@ -1126,6 +1130,8 @@ export const NutritionEngine: React.FC = () => {
               unit="g"
               colorClass="text-cyan-400"
               strokeColor="#06b6d4"
+              onClick={() => setBreakdownNutrient('protein')}
+              testId="macro-ring-protein"
             />
           </div>
           <div className="col-span-2 sm:col-span-1">
@@ -1136,6 +1142,8 @@ export const NutritionEngine: React.FC = () => {
               unit="g"
               colorClass="text-emerald-400"
               strokeColor="#10b981"
+              onClick={() => setBreakdownNutrient('carbs')}
+              testId="macro-ring-carbs"
             />
           </div>
           <div className="col-span-3 sm:col-span-1">
@@ -1146,6 +1154,8 @@ export const NutritionEngine: React.FC = () => {
               unit="g"
               colorClass="text-violet-400"
               strokeColor="#8b5cf6"
+              onClick={() => setBreakdownNutrient('fat')}
+              testId="macro-ring-fat"
             />
           </div>
           <div className="col-span-3 sm:col-span-1">
@@ -1156,6 +1166,8 @@ export const NutritionEngine: React.FC = () => {
               unit="g"
               colorClass="text-teal-400"
               strokeColor="#14b8a6"
+              onClick={() => setBreakdownNutrient('fiber')}
+              testId="macro-ring-fiber"
             />
           </div>
         </div>
@@ -1167,56 +1179,81 @@ export const NutritionEngine: React.FC = () => {
         >
           <span className="text-zinc-500 uppercase text-[10px] font-bold tracking-wider">Remaining Fuel:</span>
           <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-            <span
+            <button
+              type="button"
+              onClick={(e) => {
+                e.currentTarget.focus();
+                setBreakdownNutrient('calories');
+              }}
               data-testid="remaining-fuel-calories"
-              className={`px-2 py-0.5 rounded-lg border text-[11px] font-mono font-bold transition-all ${
+              className={`px-2 py-0.5 min-h-[44px] inline-flex items-center justify-center rounded-lg border text-[11px] font-mono font-bold transition-all cursor-pointer touch-manipulation hover:brightness-110 active:scale-95 ${
                 remainingFuel.calories.isOver
                   ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
                   : 'bg-amber-500/10 border-amber-500/25 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.1)]'
               }`}
             >
               {remainingFuel.calories.badgeLabel}
-            </span>
-            <span
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.currentTarget.focus();
+                setBreakdownNutrient('protein');
+              }}
               data-testid="remaining-fuel-protein"
-              className={`px-2 py-0.5 rounded-lg border text-[11px] font-mono font-bold transition-all ${
+              className={`px-2 py-0.5 min-h-[44px] inline-flex items-center justify-center rounded-lg border text-[11px] font-mono font-bold transition-all cursor-pointer touch-manipulation hover:brightness-110 active:scale-95 ${
                 remainingFuel.protein.isOver
                   ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
                   : 'bg-cyan-500/10 border-cyan-500/25 text-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.1)]'
               }`}
             >
               {remainingFuel.protein.badgeLabel}
-            </span>
-            <span
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.currentTarget.focus();
+                setBreakdownNutrient('carbs');
+              }}
               data-testid="remaining-fuel-carbs"
-              className={`px-2 py-0.5 rounded-lg border text-[11px] font-mono font-bold transition-all ${
+              className={`px-2 py-0.5 min-h-[44px] inline-flex items-center justify-center rounded-lg border text-[11px] font-mono font-bold transition-all cursor-pointer touch-manipulation hover:brightness-110 active:scale-95 ${
                 remainingFuel.carbs.isOver
                   ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
                   : 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.1)]'
               }`}
             >
               {remainingFuel.carbs.badgeLabel}
-            </span>
-            <span
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.currentTarget.focus();
+                setBreakdownNutrient('fat');
+              }}
               data-testid="remaining-fuel-fat"
-              className={`px-2 py-0.5 rounded-lg border text-[11px] font-mono font-bold transition-all ${
+              className={`px-2 py-0.5 min-h-[44px] inline-flex items-center justify-center rounded-lg border text-[11px] font-mono font-bold transition-all cursor-pointer touch-manipulation hover:brightness-110 active:scale-95 ${
                 remainingFuel.fat.isOver
                   ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
                   : 'bg-violet-500/10 border-violet-500/25 text-violet-400 shadow-[0_0_8px_rgba(139,92,246,0.1)]'
               }`}
             >
               {remainingFuel.fat.badgeLabel}
-            </span>
-            <span
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.currentTarget.focus();
+                setBreakdownNutrient('fiber');
+              }}
               data-testid="remaining-fuel-fiber"
-              className={`px-2 py-0.5 rounded-lg border text-[11px] font-mono font-bold transition-all ${
+              className={`px-2 py-0.5 min-h-[44px] inline-flex items-center justify-center rounded-lg border text-[11px] font-mono font-bold transition-all cursor-pointer touch-manipulation hover:brightness-110 active:scale-95 ${
                 remainingFuel.fiber.isOver
                   ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
                   : 'bg-teal-500/10 border-teal-500/25 text-teal-400 shadow-[0_0_8px_rgba(20,184,166,0.1)]'
               }`}
             >
               {remainingFuel.fiber.badgeLabel}
-            </span>
+            </button>
           </div>
         </div>
       </div>
@@ -2243,6 +2280,23 @@ export const NutritionEngine: React.FC = () => {
         onSuccess={() => {
           setStatus('Meal updated successfully');
           setIsError(false);
+        }}
+      />
+
+      {/* Nutrient Breakdown Modal */}
+      <NutrientBreakdownModal
+        isOpen={breakdownNutrient !== null}
+        onClose={() => setBreakdownNutrient(null)}
+        selectedNutrient={breakdownNutrient ?? 'calories'}
+        onSelectNutrient={setBreakdownNutrient}
+        logs={todayLogs}
+        dailyTotals={dailyTotals}
+        targets={{
+          calories: targetCalories,
+          protein: targetProtein,
+          carbs: targetCarbs,
+          fat: targetFat,
+          fiber: targetFiber,
         }}
       />
     </div>
