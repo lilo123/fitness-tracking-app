@@ -10,7 +10,7 @@ test.describe('Coach-Athlete Multi-Tenant Flow E2E', () => {
 
     // Assert coach cockpit elements
     await expect(page.locator('text=Coach Dashboard')).toBeVisible();
-    await expect(page.locator('text=Selected Athlete')).toBeVisible();
+    await expect(page.locator('text=Active Athlete')).toBeVisible();
 
     // Verify athlete switcher select
     const athleteSelect = page.locator('select').first();
@@ -25,6 +25,13 @@ test.describe('Coach-Athlete Multi-Tenant Flow E2E', () => {
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/coach');
+    await expect(page.locator('text=Coach Dashboard')).toBeVisible();
+
+    // Switch to templates tab if on mobile viewport
+    const templatesTab = page.locator('[data-testid="coach-tab-templates"]');
+    if (await templatesTab.isVisible()) {
+      await templatesTab.click();
+    }
 
     // Enter template name
     const templateInput = page.locator('input[placeholder*="Hypertrophy Upper Body A"]');

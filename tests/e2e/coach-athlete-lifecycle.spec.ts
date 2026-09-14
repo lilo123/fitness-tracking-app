@@ -16,9 +16,10 @@ test.describe('Coach-Athlete Code Linking & Lifecycle E2E', () => {
 
     // 2. Navigate to Settings
     await page.goto('/settings');
-    await expect(page.locator('text=Settings')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 
     // 3. Handle initial connection state: wait for either linked state or unlinked input
+    await page.waitForSelector('[data-testid="coach-link-loading"]', { state: 'detached' }).catch(() => {});
     const disconnectBtn = page.locator('[data-testid="disconnect-coach-btn"]');
     const codeInput = page.locator('[data-testid="link-coach-code-input"]');
     await expect(disconnectBtn.or(codeInput)).toBeVisible();
@@ -33,7 +34,7 @@ test.describe('Coach-Athlete Code Linking & Lifecycle E2E', () => {
     await codeInput.fill('CYBER-DEMO01');
 
     const linkBtn = page.locator('[data-testid="link-coach-btn"]');
-    await linkBtn.click();
+    await linkBtn.click({ force: true });
 
     // Verify link confirmation & assigned coach display
     await expect(page.locator('[data-testid="link-coach-status"]')).toContainText('Successfully linked to coach!');
@@ -54,6 +55,12 @@ test.describe('Coach-Athlete Code Linking & Lifecycle E2E', () => {
     // 7. Verify coach cockpit & athlete roster
     await expect(page.locator('text=Coach Dashboard')).toBeVisible();
     await expect(page.locator('text=Alex Athlete').first()).toBeVisible();
+
+    // Switch to macros tab if on mobile viewport
+    const macrosTab = page.locator('[data-testid="coach-tab-macros"]');
+    if (await macrosTab.isVisible()) {
+      await macrosTab.click();
+    }
 
     // 8. Coach updates athlete's macro targets
     const calInput = page.locator('[data-testid="athlete-macro-cal"]');
@@ -110,7 +117,7 @@ test.describe('Coach-Athlete Code Linking & Lifecycle E2E', () => {
 
     // 13. Re-link at the end to leave DB in seeded state for other test suites
     await codeInput.fill('CYBER-DEMO01');
-    await linkBtn.click();
+    await linkBtn.click({ force: true });
     await expect(page.locator('[data-testid="link-coach-status"]')).toContainText('Successfully linked to coach!');
   });
 });

@@ -476,7 +476,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
           )}
         </div>
 
-        {isCoachLinkLoading ? (
+        {!profile?.id || isCoachLinkLoading ? (
           <div className="p-4 text-center text-xs text-zinc-500 font-mono" data-testid="coach-link-loading">
             Loading coaching status...
           </div>
@@ -712,7 +712,7 @@ export const SettingsView: React.FC = () => {
 
   return (
     <SettingsForm
-      key={profile?.id || 'default'}
+      key={`${profile?.id || 'default'}-${profile?.target_calories}-${profile?.target_protein}-${profile?.target_carbs}-${profile?.target_fat}-${profile?.target_fiber}`}
       profile={profile}
       role={role}
       isCoachMode={isCoachMode}
