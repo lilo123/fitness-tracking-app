@@ -12,7 +12,7 @@ import { Calendar, Dumbbell, Trophy, Search, Activity, Utensils, AlertCircle, Ed
 import { EditMealModal } from '../nutrition/EditMealModal';
 import { EditSetModal } from '../workout/EditSetModal';
 import { groupSessionSetsByExercise } from '../../utils/historyGrouping';
-import { formatCalories, formatMacro } from '../../utils/nutrition';
+import { formatCalories, formatMacro, roundTo1Decimal } from '../../utils/nutrition';
 import { CoachContext } from '../../context/CoachContextTypes';
 import { MealLogRow } from '../nutrition/MealLogRow';
 import { itemsForPersist, sumItems, type NutritionItem } from '../../utils/itemModel';
@@ -147,11 +147,11 @@ export const HistoryView: React.FC = () => {
         .from('nutrition_logs')
         .update({
           items: itemsForPersist(items),
-          calories: Math.max(0, totals.calories),
-          protein: Math.max(0, totals.protein),
-          carbs: Math.max(0, totals.carbs),
-          fat: Math.max(0, totals.fat),
-          fiber: Math.max(0, totals.fiber),
+          calories: Math.max(0, roundTo1Decimal(totals.calories)),
+          protein: Math.max(0, roundTo1Decimal(totals.protein)),
+          carbs: Math.max(0, roundTo1Decimal(totals.carbs)),
+          fat: Math.max(0, roundTo1Decimal(totals.fat)),
+          fiber: Math.max(0, roundTo1Decimal(totals.fiber)),
         })
         .eq('id', log.id);
       if (error) throw error;

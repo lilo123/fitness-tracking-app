@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   formatCalories,
   formatMacro,
+  roundTo1Decimal,
   calculateRemainingFuel,
 } from './nutrition';
 
@@ -98,6 +99,43 @@ describe('nutrition utility', () => {
     it('formats negative macro values correctly', () => {
       expect(formatMacro(-5)).toBe('-5');
       expect(formatMacro(-5.2)).toBe('-5.2');
+    });
+  });
+
+  describe('roundTo1Decimal', () => {
+    it('rounds numbers to at most 1 decimal place', () => {
+      expect(roundTo1Decimal(140.0024)).toBe(140);
+      expect(roundTo1Decimal(24.0075)).toBe(24);
+      expect(roundTo1Decimal(1.979999)).toBe(2);
+      expect(roundTo1Decimal(3.465)).toBe(3.5);
+      expect(roundTo1Decimal(140.002499999999)).toBe(140);
+      expect(roundTo1Decimal(1.97999999999999)).toBe(2);
+      expect(roundTo1Decimal(12.54)).toBe(12.5);
+      expect(roundTo1Decimal(12.56)).toBe(12.6);
+    });
+
+    it('sanitizes zero, negative zero, and near-zero values (< 0.05)', () => {
+      expect(roundTo1Decimal(0)).toBe(0);
+      expect(roundTo1Decimal(-0)).toBe(0);
+      expect(roundTo1Decimal(0.04)).toBe(0);
+      expect(roundTo1Decimal(-0.04)).toBe(0);
+      expect(roundTo1Decimal(0.05)).toBe(0.1);
+      expect(roundTo1Decimal(-0.05)).toBe(-0.1);
+    });
+
+    it('handles null, undefined, NaN, and non-finite values gracefully', () => {
+      expect(roundTo1Decimal(null)).toBe(0);
+      expect(roundTo1Decimal(undefined)).toBe(0);
+      expect(roundTo1Decimal(NaN)).toBe(0);
+      expect(roundTo1Decimal(Infinity)).toBe(0);
+      expect(roundTo1Decimal(-Infinity)).toBe(0);
+    });
+
+    it('handles string numbers and invalid strings gracefully', () => {
+      expect(roundTo1Decimal('140.0024')).toBe(140);
+      expect(roundTo1Decimal('3.465')).toBe(3.5);
+      expect(roundTo1Decimal('')).toBe(0);
+      expect(roundTo1Decimal('invalid')).toBe(0);
     });
   });
 

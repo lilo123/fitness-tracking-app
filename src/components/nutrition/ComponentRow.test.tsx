@@ -128,4 +128,61 @@ describe('ComponentRow', () => {
     fireEvent.click(screen.getByTestId('component-save-quick-log'));
     expect(onSave).toHaveBeenCalledTimes(1);
   });
+
+  it('renders colored macro badges and an elegant constrained quantity stepper', () => {
+    const item = component();
+    render(<ComponentRow item={item} reference={item} onChange={() => {}} />);
+
+    // Macro color classes
+    expect(screen.getByText(/182 kcal/).className).toContain('text-amber-400');
+    expect(screen.getByText(/P 12.5/).className).toContain('text-cyan-400');
+    expect(screen.getByText(/C 3.2/).className).toContain('text-emerald-400');
+    expect(screen.getByText(/F 13.1/).className).toContain('text-violet-400');
+    expect(screen.getByText(/Fib 1.2/).className).toContain('text-teal-400');
+
+    // Stepper input should be elegantly constrained rather than stretching full-width
+    const input = screen.getByTestId('component-quantity-input');
+    expect(input.className).toContain('w-16');
+    expect(input.className).not.toContain('w-full');
+    // text-base on mobile prevents iOS Safari auto-zoom on input focus
+    expect(input.className).toContain('text-base');
+  });
+
+  it('formats floating point quantity drift to 1 decimal place', () => {
+    const item = component({ quantity: 40.00000000001 });
+    render(<ComponentRow item={item} reference={item} onChange={() => {}} />);
+
+    const input = screen.getByTestId('component-quantity-input') as HTMLInputElement;
+    expect(input.value).toBe('40');
+  });
+
+  it('rounds scaled macros to 1 decimal place on commit', () => {
+    // 33g reference with fractional macros
+    const ref = component({
+      quantity: 33,
+      calories: 115.5,
+      protein: 19.806,
+      carbs: 1.633,
+      fat: 2.858,
+      fiber: 0,
+    });
+    const onChange = vi.fn();
+    render(<ComponentRow item={ref} reference={ref} onChange={onChange} />);
+
+    const input = screen.getByTestId('component-quantity-input');
+    fireEvent.change(input, { target: { value: '40' } });
+    fireEvent.blur(input);
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const scaled = onChange.mock.calls[0][0] as NutritionItem;
+    // 40 / 33 * 115.5 = 140.0025 -> 140
+    expect(scaled.calories).toBe(140);
+    // 40 / 33 * 19.806 = 24.0072 -> 24
+    expect(scaled.protein).toBe(24);
+    // 40 / 33 * 1.633 = 1.979 -> 2
+    expect(scaled.carbs).toBe(2);
+    // 40 / 33 * 2.858 = 3.464 -> 3.5
+    expect(scaled.fat).toBe(3.5);
+    expect(scaled.fiber).toBe(0);
+  });
 });

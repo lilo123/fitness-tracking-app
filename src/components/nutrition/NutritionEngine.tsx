@@ -7,7 +7,7 @@ import { MacroRing } from '../common/MacroRing';
 import { normalizeDateStr, getLocalDateStr, formatLocalTimestamp } from '../../utils/date';
 import { getDishIcon } from '../../utils/dishIcons';
 import { EditMealModal } from './EditMealModal';
-import { formatCalories, formatMacro, calculateRemainingFuel } from '../../utils/nutrition';
+import { formatCalories, formatMacro, roundTo1Decimal, calculateRemainingFuel } from '../../utils/nutrition';
 import { restTimerStore } from '../../utils/restTimerStore';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import {
@@ -162,25 +162,33 @@ function buildStagedItem(raw: {
     raw.unit === 'g' || raw.unit === 'ml' || raw.unit === 'unit' ? raw.unit : derived.unit;
 
   const current = {
-    calories: toNumber(raw.calories),
-    protein: toNumber(raw.protein),
-    carbs: toNumber(raw.carbs),
-    fat: toNumber(raw.fat),
-    fiber: toNumber(raw.fiber),
+    calories: roundTo1Decimal(toNumber(raw.calories)),
+    protein: roundTo1Decimal(toNumber(raw.protein)),
+    carbs: roundTo1Decimal(toNumber(raw.carbs)),
+    fat: roundTo1Decimal(toNumber(raw.fat)),
+    fiber: roundTo1Decimal(toNumber(raw.fiber)),
   };
-  const base = raw.base ?? current;
+  const base = raw.base
+    ? {
+        calories: roundTo1Decimal(raw.base.calories),
+        protein: roundTo1Decimal(raw.base.protein),
+        carbs: roundTo1Decimal(raw.base.carbs),
+        fat: roundTo1Decimal(raw.base.fat),
+        fiber: roundTo1Decimal(raw.base.fiber),
+      }
+    : current;
 
   return {
     id: generateItemId(),
     name: raw.name,
     portion,
     portionMultiplier: Number.isFinite(Number(raw.portionMultiplier)) ? Number(raw.portionMultiplier) : 1,
-    quantity,
+    quantity: roundTo1Decimal(quantity),
     unit,
     // The reference quantity is the one the base macros were measured at. When
     // the stored macros already differ from the base ones, the row was scaled,
     // so the reference is the unscaled quantity.
-    baseQuantity: derived.quantity,
+    baseQuantity: roundTo1Decimal(derived.quantity),
     baseCalories: base.calories,
     baseProtein: base.protein,
     baseCarbs: base.carbs,
@@ -200,7 +208,14 @@ function recomputeStagedTotals(items: StagedItem[]) {
   const explanation =
     items.map((it) => `${formatCalories(it.calories)} kcal (${it.name})`).join(' + ') +
     ` = ${formatCalories(totals.calories)} kcal`;
-  return { ...totals, explanation };
+  return {
+    calories: roundTo1Decimal(totals.calories),
+    protein: roundTo1Decimal(totals.protein),
+    carbs: roundTo1Decimal(totals.carbs),
+    fat: roundTo1Decimal(totals.fat),
+    fiber: roundTo1Decimal(totals.fiber),
+    explanation,
+  };
 }
 
 export const NutritionEngine: React.FC = () => {
@@ -456,11 +471,11 @@ export const NutritionEngine: React.FC = () => {
         .from('nutrition_logs')
         .update({
           items: itemsForPersist(items),
-          calories: Math.max(0, totals.calories),
-          protein: Math.max(0, totals.protein),
-          carbs: Math.max(0, totals.carbs),
-          fat: Math.max(0, totals.fat),
-          fiber: Math.max(0, totals.fiber),
+          calories: Math.max(0, roundTo1Decimal(totals.calories)),
+          protein: Math.max(0, roundTo1Decimal(totals.protein)),
+          carbs: Math.max(0, roundTo1Decimal(totals.carbs)),
+          fat: Math.max(0, roundTo1Decimal(totals.fat)),
+          fiber: Math.max(0, roundTo1Decimal(totals.fiber)),
         })
         .eq('id', log.id);
       if (error) throw error;
@@ -582,17 +597,27 @@ export const NutritionEngine: React.FC = () => {
     dismissToast();
     setEditingDish(dish);
     setDishModalName(dish.name);
-    setDishModalCalories(dish.calories ?? '');
-    setDishModalProtein(dish.protein ?? '');
-    setDishModalCarbs(dish.carbs ?? '');
-    setDishModalFat(dish.fat ?? '');
-    setDishModalFiber(dish.fiber ?? '');
+    setDishModalCalories(dish.calories != null ? roundTo1Decimal(dish.calories) : '');
+    setDishModalProtein(dish.protein != null ? roundTo1Decimal(dish.protein) : '');
+    setDishModalCarbs(dish.carbs != null ? roundTo1Decimal(dish.carbs) : '');
+    setDishModalFat(dish.fat != null ? roundTo1Decimal(dish.fat) : '');
+    setDishModalFiber(dish.fiber != null ? roundTo1Decimal(dish.fiber) : '');
     // Prefer the structured column; fall back to parsing the legacy free-text
     // one so pre-migration dishes still open with a breakdown.
-    setDishModalItems(
+    const rawItems =
       normalizeItems(dish.items) ??
-        itemsFromLegacyIngredients(dish.id, dish.name, dish.ingredients) ??
-        []
+      itemsFromLegacyIngredients(dish.id, dish.name, dish.ingredients) ??
+      [];
+    setDishModalItems(
+      rawItems.map((it) => ({
+        ...it,
+        quantity: roundTo1Decimal(it.quantity),
+        calories: roundTo1Decimal(it.calories),
+        protein: roundTo1Decimal(it.protein),
+        carbs: roundTo1Decimal(it.carbs),
+        fat: roundTo1Decimal(it.fat),
+        fiber: roundTo1Decimal(it.fiber),
+      }))
     );
     setShowDishModal(true);
   };
@@ -608,7 +633,7 @@ export const NutritionEngine: React.FC = () => {
 
     // R-30: the DB rejects negatives outright, and a constraint violation here
     // reads as an opaque Postgres error, so clamp before we ever send it.
-    const clamp = (n: number) => Math.max(0, n);
+    const clamp = (n: number) => Math.max(0, roundTo1Decimal(n));
 
     saveCustomDishMutation.mutate({
       name: dishModalName.trim(),
@@ -783,18 +808,18 @@ export const NutritionEngine: React.FC = () => {
         //
         // Deriving from the items also makes the new `items` column satisfy the
         // database's parent = SUM(items) constraint by construction.
-        const totalCal = items.reduce((s, it) => s + it.calories, 0);
-        const totalP = items.reduce((s, it) => s + it.protein, 0);
-        const totalC = items.reduce((s, it) => s + it.carbs, 0);
-        const totalF = items.reduce((s, it) => s + it.fat, 0);
-        const totalFib = items.reduce((s, it) => s + it.fiber, 0);
+        const totalCal = roundTo1Decimal(items.reduce((s, it) => s + it.calories, 0));
+        const totalP = roundTo1Decimal(items.reduce((s, it) => s + it.protein, 0));
+        const totalC = roundTo1Decimal(items.reduce((s, it) => s + it.carbs, 0));
+        const totalF = roundTo1Decimal(items.reduce((s, it) => s + it.fat, 0));
+        const totalFib = roundTo1Decimal(items.reduce((s, it) => s + it.fiber, 0));
 
         setStagedMeal({
           name: parsed.name || nlInput || (selectedPhoto ? 'Meal Photo' : 'Meal'),
           mealType: 'Breakfast',
           explanation:
             parsed.explanation ||
-            items.map((it) => `${it.calories} kcal (${it.name})`).join(' + ') + ` = ${totalCal} kcal`,
+            items.map((it) => `${formatCalories(it.calories)} kcal (${it.name})`).join(' + ') + ` = ${formatCalories(totalCal)} kcal`,
           items,
           calories: totalCal,
           protein: totalP,
@@ -859,13 +884,13 @@ export const NutritionEngine: React.FC = () => {
         ? {
             ...it,
             name: next.name,
-            quantity: next.quantity,
+            quantity: roundTo1Decimal(next.quantity),
             unit: next.unit,
-            calories: next.calories,
-            protein: next.protein,
-            carbs: next.carbs,
-            fat: next.fat,
-            fiber: next.fiber,
+            calories: roundTo1Decimal(next.calories),
+            protein: roundTo1Decimal(next.protein),
+            carbs: roundTo1Decimal(next.carbs),
+            fat: roundTo1Decimal(next.fat),
+            fiber: roundTo1Decimal(next.fiber),
             portionMultiplier: it.baseQuantity > 0 ? next.quantity / it.baseQuantity : 1,
           }
         : it
@@ -889,13 +914,14 @@ export const NutritionEngine: React.FC = () => {
     // parent = SUM(items) constraint by construction. Nothing is rounded.
     const items = stagedMeal.items.map(stagedToItem);
     const totals = sumItems(items);
+    const isSingle = items.length <= 1;
     const payload = {
       food_name: stagedMeal.name,
-      calories: totals.calories,
-      protein: totals.protein,
-      carbs: totals.carbs,
-      fat: totals.fat,
-      fiber: totals.fiber,
+      calories: isSingle ? roundTo1Decimal(stagedMeal.calories) : roundTo1Decimal(totals.calories),
+      protein: isSingle ? roundTo1Decimal(stagedMeal.protein) : roundTo1Decimal(totals.protein),
+      carbs: isSingle ? roundTo1Decimal(stagedMeal.carbs) : roundTo1Decimal(totals.carbs),
+      fat: isSingle ? roundTo1Decimal(stagedMeal.fat) : roundTo1Decimal(totals.fat),
+      fiber: isSingle ? roundTo1Decimal(stagedMeal.fiber) : roundTo1Decimal(totals.fiber),
       meal_type: stagedMeal.mealType,
       serving_size: Number(stagedMeal.servingSize) || 1,
       serving_unit: stagedMeal.servingUnit || 'serving',
@@ -919,11 +945,11 @@ export const NutritionEngine: React.FC = () => {
           // Android client that predates the `items` column keeps working.
           ingredients: JSON.stringify(stagedMeal.items),
           items: items.length > 1 ? itemsForPersist(items) : null,
-          calories: totals.calories,
-          protein: totals.protein,
-          carbs: totals.carbs,
-          fat: totals.fat,
-          fiber: totals.fiber,
+          calories: roundTo1Decimal(totals.calories),
+          protein: roundTo1Decimal(totals.protein),
+          carbs: roundTo1Decimal(totals.carbs),
+          fat: roundTo1Decimal(totals.fat),
+          fiber: roundTo1Decimal(totals.fiber),
         },
       ]);
       if (error) throw error;
@@ -945,11 +971,11 @@ export const NutritionEngine: React.FC = () => {
           ingredients: JSON.stringify([item]),
           // One component is a leaf, so no breakdown is stored.
           items: null,
-          calories: item.calories,
-          protein: item.protein,
-          carbs: item.carbs,
-          fat: item.fat,
-          fiber: item.fiber,
+          calories: roundTo1Decimal(item.calories),
+          protein: roundTo1Decimal(item.protein),
+          carbs: roundTo1Decimal(item.carbs),
+          fat: roundTo1Decimal(item.fat),
+          fiber: roundTo1Decimal(item.fiber),
         },
       ]);
       if (error) throw error;
@@ -1015,11 +1041,11 @@ export const NutritionEngine: React.FC = () => {
     e.stopPropagation();
     const payload = {
       food_name: dish.name,
-      calories: Number(dish.calories) || 0,
-      protein: Number(dish.protein) || 0,
-      carbs: Number(dish.carbs) || 0,
-      fat: Number(dish.fat) || 0,
-      fiber: Number(dish.fiber) || 0,
+      calories: roundTo1Decimal(dish.calories),
+      protein: roundTo1Decimal(dish.protein),
+      carbs: roundTo1Decimal(dish.carbs),
+      fat: roundTo1Decimal(dish.fat),
+      fiber: roundTo1Decimal(dish.fiber),
       meal_type: 'Breakfast',
       serving_size: 1,
       serving_unit: 'serving',
@@ -1033,7 +1059,7 @@ export const NutritionEngine: React.FC = () => {
     setActiveToast({
       id: String(Date.now()),
       name: dish.name,
-      calories: Number(dish.calories) || 0,
+      calories: roundTo1Decimal(dish.calories),
     });
     toastTimerRef.current = setTimeout(() => {
       setActiveToast(null);
@@ -1047,11 +1073,11 @@ export const NutritionEngine: React.FC = () => {
 
     const payload = {
       food_name: manualDishName,
-      calories: Number(manualCalories) || 0,
-      protein: Number(manualProtein) || 0,
-      carbs: Number(manualCarbs) || 0,
-      fat: Number(manualFat) || 0,
-      fiber: Number(manualFiber) || 0,
+      calories: roundTo1Decimal(manualCalories),
+      protein: roundTo1Decimal(manualProtein),
+      carbs: roundTo1Decimal(manualCarbs),
+      fat: roundTo1Decimal(manualFat),
+      fiber: roundTo1Decimal(manualFiber),
       meal_type: manualMealType,
       serving_size: Number(manualServingSize) || 1,
       serving_unit: manualServingUnit,
@@ -1255,7 +1281,8 @@ export const NutritionEngine: React.FC = () => {
                   </div>
                   <div className="text-[10px] font-mono text-zinc-400 whitespace-nowrap">
                     <span className="text-amber-400 font-bold">{formatCalories(dish.calories)} kcal</span>
-                    <span> • {formatMacro(dish.protein)}g P</span>
+                    <span> • </span>
+                    <span className="text-cyan-400 font-semibold">{formatMacro(dish.protein)}g P</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0 ml-1">
@@ -1564,11 +1591,11 @@ export const NutritionEngine: React.FC = () => {
                   step="any"
                   inputMode="numeric"
                   data-testid="calories-input"
-                  value={stagedMeal.calories}
+                  value={roundTo1Decimal(stagedMeal.calories)}
                   onChange={(e) =>
                     setStagedMeal({
                       ...stagedMeal,
-                      calories: e.target.value === '' ? 0 : Number(e.target.value),
+                      calories: e.target.value === '' ? 0 : roundTo1Decimal(Number(e.target.value)),
                     })
                   }
                   className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
@@ -1583,11 +1610,11 @@ export const NutritionEngine: React.FC = () => {
                   step="any"
                   inputMode="decimal"
                   data-testid="protein-input"
-                  value={stagedMeal.protein}
+                  value={roundTo1Decimal(stagedMeal.protein)}
                   onChange={(e) =>
                     setStagedMeal({
                       ...stagedMeal,
-                      protein: e.target.value === '' ? 0 : Number(e.target.value),
+                      protein: e.target.value === '' ? 0 : roundTo1Decimal(Number(e.target.value)),
                     })
                   }
                   className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
@@ -1602,11 +1629,11 @@ export const NutritionEngine: React.FC = () => {
                   step="any"
                   inputMode="decimal"
                   data-testid="carbs-input"
-                  value={stagedMeal.carbs}
+                  value={roundTo1Decimal(stagedMeal.carbs)}
                   onChange={(e) =>
                     setStagedMeal({
                       ...stagedMeal,
-                      carbs: e.target.value === '' ? 0 : Number(e.target.value),
+                      carbs: e.target.value === '' ? 0 : roundTo1Decimal(Number(e.target.value)),
                     })
                   }
                   className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
@@ -1621,11 +1648,11 @@ export const NutritionEngine: React.FC = () => {
                   step="any"
                   inputMode="decimal"
                   data-testid="fat-input"
-                  value={stagedMeal.fat}
+                  value={roundTo1Decimal(stagedMeal.fat)}
                   onChange={(e) =>
                     setStagedMeal({
                       ...stagedMeal,
-                      fat: e.target.value === '' ? 0 : Number(e.target.value),
+                      fat: e.target.value === '' ? 0 : roundTo1Decimal(Number(e.target.value)),
                     })
                   }
                   className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
@@ -1640,11 +1667,11 @@ export const NutritionEngine: React.FC = () => {
                   step="any"
                   inputMode="decimal"
                   data-testid="fiber-input"
-                  value={stagedMeal.fiber}
+                  value={roundTo1Decimal(stagedMeal.fiber)}
                   onChange={(e) =>
                     setStagedMeal({
                       ...stagedMeal,
-                      fiber: e.target.value === '' ? 0 : Number(e.target.value),
+                      fiber: e.target.value === '' ? 0 : roundTo1Decimal(Number(e.target.value)),
                     })
                   }
                   className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
@@ -1993,9 +2020,9 @@ export const NutritionEngine: React.FC = () => {
                     type="number"
                     step="any"
                     inputMode="numeric"
-                    value={dishModalCalories}
+                    value={dishModalCalories === '' ? '' : roundTo1Decimal(dishModalCalories)}
                     onChange={(e) =>
-                      setDishModalCalories(e.target.value === '' ? '' : Number(e.target.value))
+                      setDishModalCalories(e.target.value === '' ? '' : roundTo1Decimal(Number(e.target.value)))
                     }
                     placeholder="0"
                     className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
@@ -2010,9 +2037,9 @@ export const NutritionEngine: React.FC = () => {
                     type="number"
                     step="any"
                     inputMode="decimal"
-                    value={dishModalProtein}
+                    value={dishModalProtein === '' ? '' : roundTo1Decimal(dishModalProtein)}
                     onChange={(e) =>
-                      setDishModalProtein(e.target.value === '' ? '' : Number(e.target.value))
+                      setDishModalProtein(e.target.value === '' ? '' : roundTo1Decimal(Number(e.target.value)))
                     }
                     placeholder="0"
                     className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
@@ -2027,9 +2054,9 @@ export const NutritionEngine: React.FC = () => {
                     type="number"
                     step="any"
                     inputMode="decimal"
-                    value={dishModalCarbs}
+                    value={dishModalCarbs === '' ? '' : roundTo1Decimal(dishModalCarbs)}
                     onChange={(e) =>
-                      setDishModalCarbs(e.target.value === '' ? '' : Number(e.target.value))
+                      setDishModalCarbs(e.target.value === '' ? '' : roundTo1Decimal(Number(e.target.value)))
                     }
                     placeholder="0"
                     className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
@@ -2044,9 +2071,9 @@ export const NutritionEngine: React.FC = () => {
                     type="number"
                     step="any"
                     inputMode="decimal"
-                    value={dishModalFat}
+                    value={dishModalFat === '' ? '' : roundTo1Decimal(dishModalFat)}
                     onChange={(e) =>
-                      setDishModalFat(e.target.value === '' ? '' : Number(e.target.value))
+                      setDishModalFat(e.target.value === '' ? '' : roundTo1Decimal(Number(e.target.value)))
                     }
                     placeholder="0"
                     className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
@@ -2061,9 +2088,9 @@ export const NutritionEngine: React.FC = () => {
                     type="number"
                     step="any"
                     inputMode="decimal"
-                    value={dishModalFiber}
+                    value={dishModalFiber === '' ? '' : roundTo1Decimal(dishModalFiber)}
                     onChange={(e) =>
-                      setDishModalFiber(e.target.value === '' ? '' : Number(e.target.value))
+                      setDishModalFiber(e.target.value === '' ? '' : roundTo1Decimal(Number(e.target.value)))
                     }
                     placeholder="0"
                     className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
@@ -2136,7 +2163,15 @@ export const NutritionEngine: React.FC = () => {
                           <span>{dish.name}</span>
                         </div>
                         <div className="text-[10px] font-mono text-zinc-400 mt-0.5">
-                          {formatCalories(dish.calories)} kcal • P: {formatMacro(dish.protein)}g • C: {formatMacro(dish.carbs)}g • F: {formatMacro(dish.fat)}g • Fib: {formatMacro(dish.fiber)}g
+                          <span className="text-amber-400 font-bold">{formatCalories(dish.calories)} kcal</span>
+                          <span> • </span>
+                          <span className="text-cyan-400">P: {formatMacro(dish.protein)}g</span>
+                          <span> • </span>
+                          <span className="text-emerald-400">C: {formatMacro(dish.carbs)}g</span>
+                          <span> • </span>
+                          <span className="text-violet-400">F: {formatMacro(dish.fat)}g</span>
+                          <span> • </span>
+                          <span className="text-teal-400">Fib: {formatMacro(dish.fiber)}g</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-1">

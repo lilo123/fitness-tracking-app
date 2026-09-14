@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { formatCalories, formatMacro } from '../../utils/nutrition';
+import { formatCalories, formatMacro, roundTo1Decimal } from '../../utils/nutrition';
 import { parseQuantityInput } from '../../utils/unitConverter';
 import { scaleItemToQuantity, type NutritionItem } from '../../utils/itemModel';
 import { OverflowMenu, type OverflowMenuItem } from '../common/OverflowMenu';
@@ -45,7 +45,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
   // The input is free text so an in-progress value like "" or "12." is not
   // clobbered by the controlled numeric round trip.
   const [draft, setDraft] = useState<string | null>(null);
-  const shown = draft ?? String(item.quantity);
+  const shown = draft ?? String(roundTo1Decimal(item.quantity));
 
   const editable = !readOnly && Boolean(onChange);
 
@@ -56,17 +56,35 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
       setDraft(null);
       return;
     }
-    const scaled = scaleItemToQuantity(reference, parsed);
-    onChange({ ...scaled, unit: item.unit });
+    const scaled = scaleItemToQuantity(reference, roundTo1Decimal(parsed));
+    onChange({
+      ...scaled,
+      quantity: roundTo1Decimal(scaled.quantity),
+      calories: roundTo1Decimal(scaled.calories),
+      protein: roundTo1Decimal(scaled.protein),
+      carbs: roundTo1Decimal(scaled.carbs),
+      fat: roundTo1Decimal(scaled.fat),
+      fiber: roundTo1Decimal(scaled.fiber),
+      unit: item.unit,
+    });
     setDraft(null);
   };
 
   const step = (delta: number) => {
     if (!onChange) return;
     const base = parseQuantityInput(shown) ?? item.quantity;
-    const next = Math.max(0, base + delta);
+    const next = Math.max(0, roundTo1Decimal(base + delta));
     const scaled = scaleItemToQuantity(reference, next);
-    onChange({ ...scaled, unit: item.unit });
+    onChange({
+      ...scaled,
+      quantity: roundTo1Decimal(scaled.quantity),
+      calories: roundTo1Decimal(scaled.calories),
+      protein: roundTo1Decimal(scaled.protein),
+      carbs: roundTo1Decimal(scaled.carbs),
+      fat: roundTo1Decimal(scaled.fat),
+      fiber: roundTo1Decimal(scaled.fiber),
+      unit: item.unit,
+    });
     setDraft(null);
   };
 
@@ -117,21 +135,21 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
         <span className="whitespace-nowrap font-bold text-amber-400">
           {formatCalories(item.calories)} kcal
         </span>
-        <span className="whitespace-nowrap">P {formatMacro(item.protein)}</span>
-        <span className="whitespace-nowrap">C {formatMacro(item.carbs)}</span>
-        <span className="whitespace-nowrap">F {formatMacro(item.fat)}</span>
+        <span className="whitespace-nowrap text-cyan-400">P {formatMacro(item.protein)}</span>
+        <span className="whitespace-nowrap text-emerald-400">C {formatMacro(item.carbs)}</span>
+        <span className="whitespace-nowrap text-violet-400">F {formatMacro(item.fat)}</span>
         <span className="whitespace-nowrap text-teal-400">Fib {formatMacro(item.fiber)}</span>
       </div>
 
       {/* Zone 3 — quantity pill + unit chip */}
       {editable && (
         <div className="flex items-center gap-1.5">
-          <div className="flex min-w-0 flex-1 items-center gap-0.5 rounded-lg border border-zinc-800 bg-zinc-950 p-0.5">
+          <div className="inline-flex items-center gap-0.5 rounded-xl border border-zinc-800 bg-zinc-950 p-0.5">
             <button
               type="button"
               aria-label={`Decrease quantity of ${item.name}`}
               onClick={() => step(-1)}
-              className="min-h-[44px] min-w-[44px] shrink-0 rounded bg-zinc-800 text-sm font-bold text-zinc-300 transition hover:bg-zinc-700 touch-manipulation"
+              className="min-h-[44px] min-w-[44px] shrink-0 rounded-lg bg-zinc-800 text-sm font-bold text-zinc-300 transition hover:bg-zinc-700 touch-manipulation flex items-center justify-center"
             >
               -
             </button>
@@ -151,13 +169,13 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
                   commit((e.target as HTMLInputElement).value);
                 }
               }}
-              className="min-h-[44px] w-full min-w-0 flex-1 bg-transparent text-center text-base font-mono font-bold text-white outline-none sm:text-xs"
+              className="min-h-[44px] w-12 sm:w-16 min-w-0 bg-transparent text-center text-base sm:text-xs font-mono font-bold text-white outline-none px-0.5"
             />
             <button
               type="button"
               aria-label={`Increase quantity of ${item.name}`}
               onClick={() => step(1)}
-              className="min-h-[44px] min-w-[44px] shrink-0 rounded bg-zinc-800 text-sm font-bold text-zinc-300 transition hover:bg-zinc-700 touch-manipulation"
+              className="min-h-[44px] min-w-[44px] shrink-0 rounded-lg bg-zinc-800 text-sm font-bold text-zinc-300 transition hover:bg-zinc-700 touch-manipulation flex items-center justify-center"
             >
               +
             </button>

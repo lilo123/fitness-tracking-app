@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import type { NutritionLog } from '../../types/database';
 import { X, Utensils, AlertCircle } from 'lucide-react';
-import { formatCalories, formatMacro } from '../../utils/nutrition';
+import { formatCalories, formatMacro, roundTo1Decimal } from '../../utils/nutrition';
 import { isLevel1, normalizeItems, sumItems } from '../../utils/itemModel';
 import { friendlyError } from '../../utils/nutritionErrors';
 
@@ -48,11 +48,11 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
   const [mealType, setMealType] = useState(initialMealType);
   const [servingSize, setServingSize] = useState<number | string>(meal.serving_size ?? 1);
   const [servingUnit, setServingUnit] = useState(meal.serving_unit || 'serving');
-  const [calories, setCalories] = useState<number | string>(meal.calories ?? 0);
-  const [protein, setProtein] = useState<number | string>(meal.protein ?? 0);
-  const [carbs, setCarbs] = useState<number | string>(meal.carbs ?? 0);
-  const [fat, setFat] = useState<number | string>(meal.fat ?? 0);
-  const [fiber, setFiber] = useState<number | string>(meal.fiber ?? 0);
+  const [calories, setCalories] = useState<number | string>(meal.calories != null ? roundTo1Decimal(meal.calories) : 0);
+  const [protein, setProtein] = useState<number | string>(meal.protein != null ? roundTo1Decimal(meal.protein) : 0);
+  const [carbs, setCarbs] = useState<number | string>(meal.carbs != null ? roundTo1Decimal(meal.carbs) : 0);
+  const [fat, setFat] = useState<number | string>(meal.fat != null ? roundTo1Decimal(meal.fat) : 0);
+  const [fiber, setFiber] = useState<number | string>(meal.fiber != null ? roundTo1Decimal(meal.fiber) : 0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // R-04: this modal used to issue a blind 9-field UPDATE of the parent macros.
@@ -149,11 +149,11 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
       serving_unit: servingUnit.trim() || 'serving',
       // When a breakdown exists the parent is not user-editable; sending Σ
       // keeps the row consistent with `items`, which this modal never touches.
-      calories: derived ? Math.max(0, derived.calories) : validCalories,
-      protein: derived ? Math.max(0, derived.protein) : validProtein,
-      carbs: derived ? Math.max(0, derived.carbs) : validCarbs,
-      fat: derived ? Math.max(0, derived.fat) : validFat,
-      fiber: derived ? Math.max(0, derived.fiber) : validFiber,
+      calories: derived ? Math.max(0, roundTo1Decimal(derived.calories)) : roundTo1Decimal(validCalories),
+      protein: derived ? Math.max(0, roundTo1Decimal(derived.protein)) : roundTo1Decimal(validProtein),
+      carbs: derived ? Math.max(0, roundTo1Decimal(derived.carbs)) : roundTo1Decimal(validCarbs),
+      fat: derived ? Math.max(0, roundTo1Decimal(derived.fat)) : roundTo1Decimal(validFat),
+      fiber: derived ? Math.max(0, roundTo1Decimal(derived.fiber)) : roundTo1Decimal(validFiber),
     });
   };
 
@@ -286,7 +286,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
                 step="any"
                 min="0"
                 inputMode="numeric"
-                value={derived ? derived.calories : calories}
+                value={derived ? roundTo1Decimal(derived.calories) : calories}
                 onChange={(e) => setCalories(e.target.value)}
                 readOnly={hasBreakdown}
                 aria-readonly={hasBreakdown}
@@ -305,7 +305,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
                 step="any"
                 min="0"
                 inputMode="decimal"
-                value={derived ? derived.protein : protein}
+                value={derived ? roundTo1Decimal(derived.protein) : protein}
                 onChange={(e) => setProtein(e.target.value)}
                 readOnly={hasBreakdown}
                 aria-readonly={hasBreakdown}
@@ -323,7 +323,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
                 step="any"
                 min="0"
                 inputMode="decimal"
-                value={derived ? derived.carbs : carbs}
+                value={derived ? roundTo1Decimal(derived.carbs) : carbs}
                 onChange={(e) => setCarbs(e.target.value)}
                 readOnly={hasBreakdown}
                 aria-readonly={hasBreakdown}
@@ -341,7 +341,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
                 step="any"
                 min="0"
                 inputMode="decimal"
-                value={derived ? derived.fat : fat}
+                value={derived ? roundTo1Decimal(derived.fat) : fat}
                 onChange={(e) => setFat(e.target.value)}
                 readOnly={hasBreakdown}
                 aria-readonly={hasBreakdown}
@@ -359,7 +359,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
                 step="any"
                 min="0"
                 inputMode="decimal"
-                value={derived ? derived.fiber : fiber}
+                value={derived ? roundTo1Decimal(derived.fiber) : fiber}
                 onChange={(e) => setFiber(e.target.value)}
                 readOnly={hasBreakdown}
                 aria-readonly={hasBreakdown}
@@ -373,15 +373,15 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
           <div className="bg-zinc-950 border border-zinc-800/80 rounded-xl p-2.5 flex items-center justify-between text-[11px] font-mono text-zinc-400">
             <span>Summary:</span>
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-amber-400 font-bold">{formatCalories(calories)} kcal</span>
+              <span className="text-amber-400 font-bold">{formatCalories(derived ? derived.calories : calories)} kcal</span>
               <span>•</span>
-              <span className="text-cyan-400">{formatMacro(protein)}g P</span>
+              <span className="text-cyan-400">{formatMacro(derived ? derived.protein : protein)}g P</span>
               <span>•</span>
-              <span className="text-emerald-400">{formatMacro(carbs)}g C</span>
+              <span className="text-emerald-400">{formatMacro(derived ? derived.carbs : carbs)}g C</span>
               <span>•</span>
-              <span className="text-violet-400">{formatMacro(fat)}g F</span>
+              <span className="text-violet-400">{formatMacro(derived ? derived.fat : fat)}g F</span>
               <span>•</span>
-              <span className="text-teal-400">{formatMacro(fiber)}g Fib</span>
+              <span className="text-teal-400">{formatMacro(derived ? derived.fiber : fiber)}g Fib</span>
             </div>
           </div>
 

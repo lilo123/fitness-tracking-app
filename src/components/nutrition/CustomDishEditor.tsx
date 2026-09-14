@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import { formatCalories, formatMacro } from '../../utils/nutrition';
+import { formatCalories, formatMacro, roundTo1Decimal } from '../../utils/nutrition';
 import { parseQuantityInput, shortUnitLabel, type CanonicalUnit } from '../../utils/unitConverter';
 import { sumItems, MAX_ITEMS, type NutritionItem } from '../../utils/itemModel';
 import { UnitChip } from './UnitChip';
@@ -17,11 +17,11 @@ function newItemId(): string {
 }
 
 const MACRO_FIELDS = [
-  { key: 'calories', label: 'kcal', tone: 'text-amber-400', mode: 'numeric' },
-  { key: 'protein', label: 'P', tone: 'text-cyan-400', mode: 'decimal' },
-  { key: 'carbs', label: 'C', tone: 'text-emerald-400', mode: 'decimal' },
-  { key: 'fat', label: 'F', tone: 'text-violet-400', mode: 'decimal' },
-  { key: 'fiber', label: 'Fib', tone: 'text-teal-400', mode: 'decimal' },
+  { key: 'calories', label: 'Calories', tone: 'text-amber-400', mode: 'numeric' },
+  { key: 'protein', label: 'Protein (g)', tone: 'text-cyan-400', mode: 'decimal' },
+  { key: 'carbs', label: 'Carbs (g)', tone: 'text-emerald-400', mode: 'decimal' },
+  { key: 'fat', label: 'Fat (g)', tone: 'text-violet-400', mode: 'decimal' },
+  { key: 'fiber', label: 'Fiber (g)', tone: 'text-teal-400', mode: 'decimal' },
 ] as const;
 
 /**
@@ -48,10 +48,9 @@ export const CustomDishEditor: React.FC<CustomDishEditorProps> = ({ items, onCha
   };
 
   const patchMacro = (index: number, key: (typeof MACRO_FIELDS)[number]['key'], raw: string) => {
-    // Never round, and never let a hostile value through as NaN. An unusable
-    // entry clears to 0 rather than poisoning the parent sum.
+    // Round to at most 1 decimal place. An unusable entry clears to 0 rather than poisoning the parent sum.
     const n = Number(raw);
-    patch(index, { [key]: raw === '' ? 0 : Number.isFinite(n) ? Math.max(0, n) : 0 } as Partial<NutritionItem>);
+    patch(index, { [key]: raw === '' ? 0 : Number.isFinite(n) ? Math.max(0, roundTo1Decimal(n)) : 0 } as Partial<NutritionItem>);
   };
 
   const remove = (index: number) => {
@@ -144,10 +143,10 @@ export const CustomDishEditor: React.FC<CustomDishEditorProps> = ({ items, onCha
                   inputMode="decimal"
                   data-testid="dish-item-quantity"
                   aria-label={`Component ${index + 1} quantity`}
-                  value={item.quantity}
+                  value={roundTo1Decimal(item.quantity)}
                   onChange={(e) => {
                     const parsed = parseQuantityInput(e.target.value);
-                    patch(index, { quantity: parsed ?? 0 });
+                    patch(index, { quantity: parsed != null ? roundTo1Decimal(parsed) : 0 });
                   }}
                   className="min-h-[44px] w-full rounded-lg border border-zinc-800 bg-zinc-900 p-1 text-center text-base font-mono font-bold text-white outline-none focus:border-cyan-500 sm:text-xs"
                 />
@@ -178,7 +177,7 @@ export const CustomDishEditor: React.FC<CustomDishEditorProps> = ({ items, onCha
                     inputMode={field.mode}
                     data-testid={`dish-item-${field.key}`}
                     aria-label={`Component ${index + 1} ${field.label}`}
-                    value={item[field.key]}
+                    value={roundTo1Decimal(item[field.key])}
                     onChange={(e) => patchMacro(index, field.key, e.target.value)}
                     className="min-h-[44px] w-full rounded-lg border border-zinc-800 bg-zinc-900 p-1 text-center text-base font-mono font-bold text-white outline-none focus:border-cyan-500 sm:text-xs"
                   />
@@ -188,7 +187,7 @@ export const CustomDishEditor: React.FC<CustomDishEditorProps> = ({ items, onCha
 
             {item.displayPortion && (
               <span className="block font-mono text-[10px] text-zinc-500">
-                was &ldquo;{item.displayPortion}&rdquo; &middot; {item.quantity}{' '}
+                was &ldquo;{item.displayPortion}&rdquo; &middot; {roundTo1Decimal(item.quantity)}{' '}
                 {shortUnitLabel(item.unit)}
               </span>
             )}
@@ -203,9 +202,9 @@ export const CustomDishEditor: React.FC<CustomDishEditorProps> = ({ items, onCha
         >
           <span className="font-bold uppercase tracking-wider text-zinc-500">Dish total</span>
           <span className="font-bold text-amber-400">{formatCalories(totals.calories)} kcal</span>
-          <span>P {formatMacro(totals.protein)}</span>
-          <span>C {formatMacro(totals.carbs)}</span>
-          <span>F {formatMacro(totals.fat)}</span>
+          <span className="text-cyan-400">P {formatMacro(totals.protein)}</span>
+          <span className="text-emerald-400">C {formatMacro(totals.carbs)}</span>
+          <span className="text-violet-400">F {formatMacro(totals.fat)}</span>
           <span className="text-teal-400">Fib {formatMacro(totals.fiber)}</span>
         </div>
       )}

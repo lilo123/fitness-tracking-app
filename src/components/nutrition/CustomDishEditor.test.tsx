@@ -97,4 +97,69 @@ describe('CustomDishEditor', () => {
     render(<CustomDishEditor items={[]} onChange={() => {}} />);
     expect(screen.queryByTestId('dish-derived-totals')).toBeNull();
   });
+
+  it('renders spelled out macro labels with matching color classes and 1-decimal values', () => {
+    render(
+      <CustomDishEditor
+        items={[
+          item({
+            calories: 140.002499999999,
+            protein: 24.0075,
+            carbs: 1.97999999999999,
+            fat: 3.465,
+            fiber: 0,
+          }),
+        ]}
+        onChange={() => {}}
+      />
+    );
+
+    expect(screen.getByText('Calories')).toBeDefined();
+    expect(screen.getByText('Protein (g)')).toBeDefined();
+    expect(screen.getByText('Carbs (g)')).toBeDefined();
+    expect(screen.getByText('Fat (g)')).toBeDefined();
+    expect(screen.getByText('Fiber (g)')).toBeDefined();
+
+    // Inputs should format to at most 1 decimal
+    expect((screen.getByTestId('dish-item-calories') as HTMLInputElement).value).toBe('140');
+    expect((screen.getByTestId('dish-item-protein') as HTMLInputElement).value).toBe('24');
+    expect((screen.getByTestId('dish-item-carbs') as HTMLInputElement).value).toBe('2');
+    expect((screen.getByTestId('dish-item-fat') as HTMLInputElement).value).toBe('3.5');
+    expect((screen.getByTestId('dish-item-fiber') as HTMLInputElement).value).toBe('0');
+
+    // Dish total should color P, C, F, and Fib
+    const totals = screen.getByTestId('dish-derived-totals');
+    const pSpan = totals.querySelector('.text-cyan-400');
+    const cSpan = totals.querySelector('.text-emerald-400');
+    const fSpan = totals.querySelector('.text-violet-400');
+    const fibSpan = totals.querySelector('.text-teal-400');
+    expect(pSpan?.textContent).toBe('P 24');
+    expect(cSpan?.textContent).toBe('C 2');
+    expect(fSpan?.textContent).toBe('F 3.5');
+    expect(fibSpan?.textContent).toBe('Fib 0');
+  });
+
+  it('formats fractional quantities to 1 decimal place in input and display portion text', () => {
+    const onChange = vi.fn();
+    render(
+      <CustomDishEditor
+        items={[
+          item({
+            quantity: 33.333333333333336,
+            displayPortion: '1/3 portion',
+          }),
+        ]}
+        onChange={onChange}
+      />
+    );
+
+    const qtyInput = screen.getByTestId('dish-item-quantity') as HTMLInputElement;
+    expect(qtyInput.value).toBe('33.3');
+    expect(screen.getByText(/was “1\/3 portion” · 33.3 g/)).toBeDefined();
+
+    fireEvent.change(qtyInput, { target: { value: '45.67' } });
+    expect(onChange).toHaveBeenCalled();
+    const updated = onChange.mock.calls[0][0] as NutritionItem[];
+    expect(updated[0].quantity).toBe(45.7);
+  });
 });

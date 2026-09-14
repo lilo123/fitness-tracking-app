@@ -73,6 +73,24 @@ export function formatMacro(val: number | string | null | undefined): string {
 }
 
 /**
+ * Rounds a number to at most 1 decimal place, returning a clean numeric float/integer.
+ * Sanitizes negative zero, non-finite values, string numbers, and near-zero drift (< 0.05 -> 0).
+ */
+export function roundTo1Decimal(val: number | string | null | undefined): number {
+  if (val == null) return 0;
+  const num = Number(val);
+  if (isNaN(num) || !isFinite(num) || Math.abs(num) < 0.05) {
+    return 0;
+  }
+  const sign = num < 0 ? -1 : 1;
+  const rounded = (sign * Math.round(Math.abs(num) * 10)) / 10;
+  if (rounded === 0 || Object.is(rounded, -0) || Math.abs(rounded) < 0.05) {
+    return 0;
+  }
+  return rounded;
+}
+
+/**
  * Calculates remaining fuel across all 5 macronutrients compared against daily targets.
  * Handles IEEE-754 floating point arithmetic drift, over-budget states, and partial inputs.
  *

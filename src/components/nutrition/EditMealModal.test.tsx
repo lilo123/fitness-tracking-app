@@ -122,6 +122,26 @@ describe('EditMealModal with a stored breakdown', () => {
     renderModal(meal([component()]));
     expect((screen.getByTestId('edit-meal-calories-input') as HTMLInputElement).readOnly).toBe(false);
   });
+
+  it('rounds multi-decimal floating macros to 1 decimal in inputs and updates summary bar with derived values', () => {
+    const rawMeal = {
+      ...meal(items),
+      calories: 140.0024,
+      protein: 24.0075,
+      carbs: 1.979999,
+      fat: 3.465,
+      fiber: 0,
+    };
+    renderModal(rawMeal);
+
+    // Derived values should be displayed (300 + 120 = 420, 10 + 25 = 35)
+    expect((screen.getByTestId('edit-meal-calories-input') as HTMLInputElement).value).toBe('420');
+    expect((screen.getByTestId('edit-meal-protein-input') as HTMLInputElement).value).toBe('35');
+
+    // Summary bar should display derived values and colored text
+    expect(screen.getByText(/420 kcal/)).toBeDefined();
+    expect(screen.getByText(/35g P/)).toBeDefined();
+  });
 });
 
 describe('friendlyError', () => {

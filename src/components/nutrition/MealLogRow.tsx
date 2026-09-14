@@ -2,7 +2,7 @@ import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { NutritionLog } from '../../types/database';
 import { getDishIcon } from '../../utils/dishIcons';
-import { formatCalories, formatMacro } from '../../utils/nutrition';
+import { formatCalories, formatMacro, roundTo1Decimal } from '../../utils/nutrition';
 import {
   normalizeItems,
   scaleItems,
@@ -204,7 +204,17 @@ export const MealLogRow: React.FC<MealLogRowProps> = ({
 
   const applyScale = (factor: number) => {
     if (!anchor) return;
-    persist(scaleItems(anchor, factor));
+    persist(
+      scaleItems(anchor, factor).map((it) => ({
+        ...it,
+        quantity: roundTo1Decimal(it.quantity),
+        calories: roundTo1Decimal(it.calories),
+        protein: roundTo1Decimal(it.protein),
+        carbs: roundTo1Decimal(it.carbs),
+        fat: roundTo1Decimal(it.fat),
+        fiber: roundTo1Decimal(it.fiber),
+      }))
+    );
   };
 
   // A single component edited to an absolute quantity. The whole-dish bar only
@@ -278,9 +288,9 @@ export const MealLogRow: React.FC<MealLogRowProps> = ({
           <span className="whitespace-nowrap font-bold text-amber-400">
             {formatCalories(shown.calories)} kcal
           </span>
-          <span className="whitespace-nowrap">P {formatMacro(shown.protein)}</span>
-          <span className="whitespace-nowrap">C {formatMacro(shown.carbs)}</span>
-          <span className="whitespace-nowrap">F {formatMacro(shown.fat)}</span>
+          <span className="whitespace-nowrap text-cyan-400">P {formatMacro(shown.protein)}</span>
+          <span className="whitespace-nowrap text-emerald-400">C {formatMacro(shown.carbs)}</span>
+          <span className="whitespace-nowrap text-violet-400">F {formatMacro(shown.fat)}</span>
           <span className="whitespace-nowrap text-teal-400">Fib {formatMacro(shown.fiber)}</span>
         </div>
         {!readOnly && (
