@@ -96,6 +96,21 @@ export interface NutrientBreakdownModalProps {
   };
 }
 
+function getMealRawNutrientValue(log: NutritionLog, nutrient: BreakdownNutrient): number {
+  const items = normalizeItems(log.items);
+  if (items && items.length > 0) {
+    const raw = sumItems(items)[nutrient];
+    return Number.isFinite(raw) ? Math.max(0, raw) : 0;
+  }
+  const raw = Number(log[nutrient]);
+  return Number.isFinite(raw) ? Math.max(0, raw) : 0;
+}
+
+function getMealNutrientValue(log: NutritionLog, nutrient: BreakdownNutrient): number {
+  const rawVal = getMealRawNutrientValue(log, nutrient);
+  return nutrient === 'calories' ? Math.round(rawVal) : roundTo1Decimal(rawVal);
+}
+
 interface MealBreakdownRowProps {
   log: NutritionLog;
   selectedNutrient: BreakdownNutrient;
@@ -115,21 +130,10 @@ const MealBreakdownRow: React.FC<MealBreakdownRowProps> = ({
   const items = useMemo(() => normalizeItems(log.items), [log.items]);
   const composite = isLevel1(items);
 
-  const mealTotals = useMemo(() => {
-    if (items && items.length > 0) {
-      return sumItems(items);
-    }
-    return null;
-  }, [items]);
-
-  const rawMealNutrientVal = mealTotals
-    ? mealTotals[selectedNutrient]
-    : Number(log[selectedNutrient]) || 0;
-
-  const mealNutrientVal =
-    selectedNutrient === 'calories'
-      ? Math.round(rawMealNutrientVal)
-      : roundTo1Decimal(rawMealNutrientVal);
+  const mealNutrientVal = useMemo(
+    () => getMealNutrientValue(log, selectedNutrient),
+    [log, selectedNutrient]
+  );
 
   const formattedMealVal =
     selectedNutrient === 'calories'
@@ -137,6 +141,26 @@ const MealBreakdownRow: React.FC<MealBreakdownRowProps> = ({
       : `${formatMacro(mealNutrientVal)}g`;
 
   const mealPct = formatPercentage(mealNutrientVal, dailyTotal);
+
+  const sortedItems = useMemo(() => {
+    if (!items || items.length === 0) return [];
+    return [...items].sort((a, b) => {
+      const rawA = Number.isFinite(Number(a[selectedNutrient]))
+        ? Math.max(0, Number(a[selectedNutrient]))
+        : 0;
+      const rawB = Number.isFinite(Number(b[selectedNutrient]))
+        ? Math.max(0, Number(b[selectedNutrient]))
+        : 0;
+      const valA =
+        selectedNutrient === 'calories' ? Math.round(rawA) : roundTo1Decimal(rawA);
+      const valB =
+        selectedNutrient === 'calories' ? Math.round(rawB) : roundTo1Decimal(rawB);
+      if (valB !== valA) {
+        return valB - valA;
+      }
+      return rawB - rawA;
+    });
+  }, [items, selectedNutrient]);
 
   if (composite && items) {
     return (
@@ -195,8 +219,10 @@ const MealBreakdownRow: React.FC<MealBreakdownRowProps> = ({
             data-testid={`breakdown-accordion-panel-${log.id}`}
             className="mt-2 pt-2 border-t border-zinc-800/60 space-y-1.5 pl-2 sm:pl-3"
           >
-            {items.map((child: NutritionItem) => {
-              const childRawVal = child[selectedNutrient];
+            {sortedItems.map((child: NutritionItem) => {
+              const childRawVal = Number.isFinite(Number(child[selectedNutrient]))
+                ? Math.max(0, Number(child[selectedNutrient]))
+                : 0;
               const childVal =
                 selectedNutrient === 'calories'
                   ? Math.round(childRawVal)
@@ -312,15 +338,29 @@ export const NutrientBreakdownModal: React.FC<NutrientBreakdownModalProps> = ({
         ? Math.round(dailyTotals.calories)
         : roundTo1Decimal(dailyTotals[selectedNutrient]);
     }
-    const rawTotal = logs.reduce((acc, l) => {
-      const items = normalizeItems(l.items);
-      if (items && items.length > 0) {
-        return acc + (sumItems(items)[selectedNutrient] || 0);
-      }
-      return acc + (Number(l[selectedNutrient]) || 0);
-    }, 0);
+    const rawTotal = logs.reduce(
+      (acc, l) => acc + getMealRawNutrientValue(l, selectedNutrient),
+      0
+    );
     return selectedNutrient === 'calories' ? Math.round(rawTotal) : roundTo1Decimal(rawTotal);
   }, [dailyTotals, logs, selectedNutrient]);
+
+  const contributingLogs = useMemo(() => {
+    return logs
+      .map((log) => ({
+        log,
+        value: getMealNutrientValue(log, selectedNutrient),
+        rawValue: getMealRawNutrientValue(log, selectedNutrient),
+      }))
+      .filter((item) => item.value > 0)
+      .sort((a, b) => {
+        if (b.value !== a.value) {
+          return b.value - a.value;
+        }
+        return b.rawValue - a.rawValue;
+      })
+      .map((item) => item.log);
+  }, [logs, selectedNutrient]);
 
   const targetVal = targets ? targets[selectedNutrient] : undefined;
 
@@ -439,15 +479,17 @@ export const NutrientBreakdownModal: React.FC<NutrientBreakdownModalProps> = ({
           aria-label={`${config.label} breakdown`}
           className="flex-1 overflow-y-auto space-y-2 pr-0.5 min-h-0"
         >
-          {logs.length === 0 ? (
+          {contributingLogs.length === 0 ? (
             <div
               data-testid="breakdown-empty-state"
               className="py-8 text-center text-zinc-500 text-xs font-medium"
             >
-              No meals logged for this date.
+              {logs.length === 0
+                ? 'No meals logged for this date.'
+                : `No meals with ${config.label.toLowerCase()} logged for this date.`}
             </div>
           ) : (
-            logs.map((log) => (
+            contributingLogs.map((log) => (
               <MealBreakdownRow
                 key={log.id}
                 log={log}
