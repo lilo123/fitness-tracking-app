@@ -8,8 +8,24 @@ export function isAllowedOrigin(origin: string | null | undefined): boolean {
   if (!trimmed || trimmed === 'null') return false;
 
   const lower = trimmed.toLowerCase();
-  if (lower === 'https://cybergym.app' || lower === 'capacitor://localhost') {
+  if (
+    lower === 'https://cybergym.app' ||
+    lower === 'capacitor://localhost' ||
+    lower === 'https://fitness-tracking-app-silk.vercel.app' ||
+    /^https:\/\/fitness-tracking-app[a-z0-9-]*\.vercel\.app$/i.test(trimmed)
+  ) {
     return true;
+  }
+
+  const allowedOriginsEnv = Deno.env.get('ALLOWED_ORIGINS');
+  if (allowedOriginsEnv) {
+    const extraOrigins = allowedOriginsEnv
+      .split(',')
+      .map((o) => o.trim().replace(/\/+$/, '').toLowerCase())
+      .filter(Boolean);
+    if (extraOrigins.includes(lower)) {
+      return true;
+    }
   }
 
   const denoEnv = Deno.env.get('DENO_ENV');
