@@ -35,10 +35,23 @@ async function deleteMealRow(page: Page, name: string) {
   await expect(page.locator(`[data-testid="meal-actions-${id}"]`)).toHaveCount(0);
 }
 
+async function safeGoto(page: Page, url: string) {
+  try {
+    await page.goto(url);
+  } catch {
+    await page.goto(url);
+  }
+}
+
 test.describe('Nutrition Flow E2E', () => {
   test.describe.configure({ mode: 'serial' });
 
   test.beforeEach(async ({ page }) => {
+    // Automatically accept window.confirm dialogs (e.g. meal deletion confirmation)
+    page.on('dialog', async (dialog) => {
+      await dialog.accept().catch(() => {});
+    });
+
     // Intercept Supabase Edge Function to provide deterministic AI parsing without local Gemini runtime dependency
     await page.route('**/functions/v1/parse-nutrition', async (route) => {
       if (route.request().method() === 'OPTIONS') {
@@ -129,12 +142,12 @@ test.describe('Nutrition Flow E2E', () => {
       });
     });
 
-    await page.goto('/login');
+    await safeGoto(page, '/login');
     await page.fill('input[type="email"]', 'athlete@cybergym.io');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/workout');
-    await page.goto('/nutrition');
+    await safeGoto(page, '/nutrition');
     await page.waitForSelector('text=Today\'s Nutrition');
   });
 
@@ -457,7 +470,7 @@ Total Fiber: 8 g`;
     await expect(editedRow.locator('text=480 kcal')).toBeVisible();
 
     // 3. Navigate to /history, switch to Nutrition, and verify edit works there as well
-    await page.goto('/history');
+    await safeGoto(page, '/history');
     await expect(page.locator('text=Workout History')).toBeVisible();
 
     const nutritionTab = page.locator('[data-testid="history-tab-nutrition"]');

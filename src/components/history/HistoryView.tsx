@@ -1,23 +1,16 @@
 import React, { useState, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabase';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth';
-import type { WorkoutSet, Exercise, NutritionLog } from '../../types/database';
-import {
-  normalizeDateStr,
-  formatShortDate,
-  DEFAULT_EXERCISES_LIST,
-} from '../../utils/ghostSets';
-import { Calendar, Dumbbell, Trophy, Search, Activity, Utensils, AlertCircle, Edit2, Shield } from 'lucide-react';
+import type { WorkoutSet, NutritionLog } from '../../types/database';
+import { normalizeDateStr } from '../../utils/ghostSets';
+import { Calendar, Dumbbell, Activity, Utensils, AlertCircle, Shield, RotateCcw } from 'lucide-react';
 import { EditMealModal } from '../nutrition/EditMealModal';
 import { EditSetModal } from '../workout/EditSetModal';
-import { groupSessionSetsByExercise } from '../../utils/historyGrouping';
-import { formatCalories, formatMacro, roundTo1Decimal } from '../../utils/nutrition';
 import { CoachContext } from '../../context/CoachContextTypes';
-import { MealLogRow } from '../nutrition/MealLogRow';
-import { itemsForPersist, sumItems, type NutritionItem } from '../../utils/itemModel';
-
-const CATEGORIES = ['All', 'Chest', 'Back', 'Arms', 'Shoulders', 'Legs', 'Core'];
+import { NutritionHistoryTimeline, type NutritionDaySummary } from './NutritionHistoryTimeline';
+import { WorkoutSessionHistory } from './WorkoutSessionHistory';
+import { WorkoutExerciseHistory, type ExerciseStat } from './WorkoutExerciseHistory';
+import { useHistoryData, useExerciseStats, fetchSessionSets, type HistorySet } from './useHistoryData';
 
 export const HistoryView: React.FC = () => {
   const { user, isCoachMode } = useAuth();
@@ -36,6 +29,12 @@ export const HistoryView: React.FC = () => {
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [editingMealLog, setEditingMealLog] = useState<NutritionLog | null>(null);
   const [editingSet, setEditingSet] = useState<(WorkoutSet & { workout_date?: string; workout_name?: string }) | null>(null);
+  const [timeRange, setTimeRange] = useState<'all' | '90d' | '30d' | '1y'>('all');
+
+  const [expandedSessionIds, setExpandedSessionIds] = useState<Set<string>>(new Set());
+  const [loadingSessionIds, setLoadingSessionIds] = useState<Set<string>>(new Set());
+  const [sessionSetsMap, setSessionSetsMap] = useState<Record<string, HistorySet[]>>({});
+  const hasAutoExpandedRef = React.useRef(false);
 
   /* oxlint-disable react/set-state-in-effect */
   React.useEffect(() => {
@@ -49,178 +48,170 @@ export const HistoryView: React.FC = () => {
   const isInspectingAthlete = Boolean(isCoachMode && inspectMode === 'athlete' && selectedAthleteId);
   const targetUserId = isInspectingAthlete ? selectedAthleteId : (user?.id || '');
 
-  // Fetch exercises
-  const { data: exercises = DEFAULT_EXERCISES_LIST } = useQuery({
-    queryKey: ['exercises'],
-    queryFn: async () => {
-      try {
-        const { data, error } = await supabase.from('exercises').select('*').order('name');
-        if (error || !data || data.length === 0) return DEFAULT_EXERCISES_LIST;
-        return data as Exercise[];
-      } catch {
-        return DEFAULT_EXERCISES_LIST;
+  const {
+    exercises, sessions, nutritionLogs, deleteMealMutation, scaleMealMutation,
+    hasMoreWorkouts, loadMoreWorkouts, isLoadingMore, isWorkoutsError,
+    workoutsError, refetchWorkouts, isNutritionLogsError, nutritionLogsError,
+    refetchNutritionLogs, refetchExercises,
+  } = useHistoryData(targetUserId, setMutationError);
+
+  const isExerciseView = historyDomain === 'workouts' && viewMode === 'exercise';
+  const {
+    data: rawExerciseStats = [],
+    isError: isExerciseStatsError,
+    error: exerciseStatsError,
+    refetch: refetchExerciseStats,
+  } = useExerciseStats(targetUserId, isExerciseView);
+
+  const isReadError =
+    historyDomain === 'nutrition'
+      ? isNutritionLogsError
+      : isExerciseView
+      ? (isWorkoutsError || isExerciseStatsError)
+      : isWorkoutsError;
+
+  const readErrorMessage =
+    (historyDomain === 'nutrition'
+      ? nutritionLogsError
+      : isExerciseView
+      ? (workoutsError || exerciseStatsError)
+      : workoutsError) instanceof Error
+      ? (historyDomain === 'nutrition'
+          ? nutritionLogsError
+          : isExerciseView
+          ? (workoutsError || exerciseStatsError)
+          : workoutsError)?.message
+      : 'Unable to load history data. Please try again.';
+
+  const handleRetryHistory = () => {
+    if (historyDomain === 'nutrition') {
+      void refetchNutritionLogs();
+    } else {
+      void refetchWorkouts();
+      void refetchExercises();
+      if (isExerciseView) {
+        void refetchExerciseStats();
       }
-    },
-    staleTime: 5 * 60 * 1000,
-  });
+    }
+  };
 
-  // Fetch all sets for user
-  const { data: allSets = [] } = useQuery({
-    queryKey: ['workout_sets', targetUserId],
-    enabled: Boolean(targetUserId),
-    queryFn: async () => {
-      if (!targetUserId) return [];
-      try {
-        const { data: workoutsData, error: wError } = await supabase
-          .from('workouts')
-          .select('id, date, name')
-          .eq('user_id', targetUserId);
+  const loadSetsForSession = React.useCallback(async (sessionId: string) => {
+    if (sessionSetsMap[sessionId]) return;
 
-        if (wError || !workoutsData || workoutsData.length === 0) return [];
-        const workoutIds = workoutsData.map((w: any) => w.id);
-
-        const { data: setsData, error: sError } = await supabase
-          .from('sets')
-          .select('*, workouts(date, name), exercise:exercises(id, name, body_part)')
-          .in('workout_id', workoutIds)
-          .order('created_at', { ascending: true });
-
-        if (sError || !setsData) return [];
-
-        return setsData.map((s: any) => ({
+    setLoadingSessionIds((prev) => new Set(prev).add(sessionId));
+    try {
+      const sets = await queryClient.fetchQuery({
+        queryKey: ['session_sets', sessionId],
+        queryFn: () => fetchSessionSets(sessionId),
+        staleTime: 1000 * 60 * 5,
+      });
+      const session = sessions.find((s) => s.id === sessionId);
+      const enrichedSets: HistorySet[] = sets.map((s) => {
+        let exName = s.exercise_name || (s as any).exercise?.name;
+        if (!exName && s.exercise_id && targetUserId) {
+          const ninetySets = queryClient.getQueryData<any[]>(['workout_sets', targetUserId, '90d']);
+          const cached = ninetySets?.find((c) => c.exercise_id === s.exercise_id || c.id === s.id);
+          if (cached?.exercise_name) {
+            exName = cached.exercise_name;
+          }
+        }
+        return {
           ...s,
-          workout_date: normalizeDateStr(s.workouts?.date || s.created_at),
-          workout_name: s.workouts?.name || 'Workout Session',
-          exercise_name:
-            s.exercise?.name ||
-            DEFAULT_EXERCISES_LIST.find((e) => e.id === s.exercise_id || e.name === s.exercise_id)?.name ||
-            s.exercise_name ||
-            s.exercise_id,
-        })) as (WorkoutSet & { workout_date: string; workout_name: string })[];
-      } catch {
-        return [];
+          exercise_name: exName,
+          workout_date: session?.date || '',
+          workout_name: session?.name || 'Workout Session',
+        };
+      });
+      setSessionSetsMap((prev) => ({ ...prev, [sessionId]: enrichedSets }));
+    } catch (err) {
+      console.error('Failed to load sets for session:', err);
+    } finally {
+      setLoadingSessionIds((prev) => {
+        const next = new Set(prev);
+        next.delete(sessionId);
+        return next;
+      });
+    }
+  }, [queryClient, sessionSetsMap, sessions, targetUserId]);
+
+  const handleToggleExpand = React.useCallback((sessionId: string) => {
+    const willExpand = !expandedSessionIds.has(sessionId);
+    setExpandedSessionIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(sessionId)) {
+        next.delete(sessionId);
+      } else {
+        next.add(sessionId);
       }
-    },
-  });
-
-  // Fetch nutrition logs for target user
-  const { data: nutritionLogs = [] } = useQuery({
-    queryKey: ['nutrition_logs', targetUserId],
-    enabled: Boolean(targetUserId),
-    queryFn: async () => {
-      if (!targetUserId) return [];
-      try {
-        const { data, error } = await supabase
-          .from('nutrition_logs')
-          .select('*')
-          .eq('user_id', targetUserId)
-          .order('logged_at', { ascending: false });
-
-        if (error || !data) return [];
-        return data as NutritionLog[];
-      } catch {
-        return [];
-      }
-    },
-  });
-
-  // Delete nutrition log mutation
-  const deleteMealMutation = useMutation({
-    mutationFn: async (logId: string) => {
-      const { error } = await supabase.from('nutrition_logs').delete().eq('id', logId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['nutrition_logs', targetUserId] });
-    },
-    onError: (err: any) => {
-      setMutationError(err?.message || 'Failed to delete meal log. Please try again.');
-    },
-  });
-
-  // Whole-dish rescale. Parent macros and `items` must be written in the same
-  // UPDATE because the DB asserts parent = Σ(items).
-  const scaleMealMutation = useMutation({
-    mutationFn: async ({ log, items }: { log: NutritionLog; items: NutritionItem[] }) => {
-      const totals = sumItems(items);
-      const { error } = await supabase
-        .from('nutrition_logs')
-        .update({
-          items: itemsForPersist(items),
-          calories: Math.max(0, roundTo1Decimal(totals.calories)),
-          protein: Math.max(0, roundTo1Decimal(totals.protein)),
-          carbs: Math.max(0, roundTo1Decimal(totals.carbs)),
-          fat: Math.max(0, roundTo1Decimal(totals.fat)),
-          fiber: Math.max(0, roundTo1Decimal(totals.fiber)),
-        })
-        .eq('id', log.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['nutrition_logs', targetUserId] });
-    },
-    onError: (err: any) => {
-      setMutationError(err?.message || 'Failed to rescale meal. Please try again.');
-    },
-  });
-
-  // Group by session (workout_id, fallback to date) for workouts
-  const sessions = useMemo(() => {
-    const map = new Map<
-      string,
-      { id: string; date: string; name: string; sets: (WorkoutSet & { workout_date: string; workout_name: string })[] }
-    >();
-
-    allSets.forEach((set) => {
-      const date = normalizeDateStr(set.workout_date);
-      if (!date) return;
-      const sessionKey = set.workout_id || date;
-      if (!map.has(sessionKey)) {
-        map.set(sessionKey, {
-          id: sessionKey,
-          date,
-          name: set.workout_name,
-          sets: [],
-        });
-      }
-      map.get(sessionKey)!.sets.push(set);
+      return next;
     });
+    if (willExpand) {
+      void loadSetsForSession(sessionId);
+    }
+  }, [expandedSessionIds, loadSetsForSession]);
 
-    return Array.from(map.values()).sort((a, b) => b.date.localeCompare(a.date));
-  }, [allSets]);
+  // Auto-expand budget logic (HD-1):
+  // Walk sessions from newest backwards, auto-expand while sessions <= 2 AND running sets <= 100
+  React.useEffect(() => {
+    if (hasAutoExpandedRef.current || !sessions || sessions.length === 0) return;
+    hasAutoExpandedRef.current = true;
 
-  // Group by exercise for workouts
-  const exerciseStats = useMemo(() => {
-    const stats: Record<string, { exercise: Exercise; sets: any[]; maxWeight: number; prReps: number }> = {};
+    const toExpand: string[] = [];
+    let accumulatedSets = 0;
 
+    for (const session of sessions) {
+      if (toExpand.length >= 2) break;
+      const count = session.set_count ?? session.sets?.length ?? 0;
+      if (accumulatedSets + count <= 100) {
+        toExpand.push(session.id);
+        accumulatedSets += count;
+      } else {
+        break;
+      }
+    }
+
+    if (toExpand.length > 0) {
+      setExpandedSessionIds(new Set(toExpand));
+      toExpand.forEach((sessionId) => {
+        void loadSetsForSession(sessionId);
+      });
+    }
+  }, [sessions, loadSetsForSession]);
+
+  // Group by exercise for workouts using RPC + catalog merge (Ruling 5)
+  const exerciseStats = useMemo<ExerciseStat[]>(() => {
+    const stats: Record<string, ExerciseStat> = {};
+
+    // Seed from exercises catalog so unperformed exercises stay visible (Ruling 5)
     exercises.forEach((ex) => {
-      stats[ex.name] = {
+      stats[ex.id] = {
         exercise: ex,
         sets: [],
         maxWeight: 0,
         prReps: 0,
+        setCount: 0,
       };
     });
 
-    allSets.forEach((s) => {
-      const ex = exercises.find((e) => e.id === s.exercise_id || e.name === s.exercise_id);
-      const exName = ex ? ex.name : s.exercise_id;
-
-      if (!stats[exName]) {
-        stats[exName] = {
-          exercise: { id: s.exercise_id, name: exName, body_part: 'Other' },
-          sets: [],
-          maxWeight: 0,
-          prReps: 0,
-        };
+    // Merge RPC rows onto the exercises catalog
+    rawExerciseStats.forEach((row) => {
+      let match: ExerciseStat | undefined = stats[row.exercise_id];
+      if (!match) {
+        match = Object.values(stats).find((s) => s.exercise.name === row.exercise_id);
       }
-
-      stats[exName].sets.push(s);
-      const w = Number(s.weight) || 0;
-      const r = Number(s.reps) || 0;
-      if (w > stats[exName].maxWeight || (w === stats[exName].maxWeight && r > stats[exName].prReps)) {
-        stats[exName].maxWeight = w;
-        stats[exName].prReps = r;
+      if (match) {
+        match.setCount = Number(row.set_count) || 0;
+        match.maxWeight = Number(row.max_weight) || 0;
+        match.prReps = Number(row.pr_reps) || 0;
+        match.sets = Array.isArray(row.recent_sets) ? row.recent_sets : [];
+      } else {
+        stats[row.exercise_id] = {
+          exercise: { id: row.exercise_id, name: row.exercise_id, body_part: 'Other' },
+          sets: Array.isArray(row.recent_sets) ? row.recent_sets : [],
+          maxWeight: Number(row.max_weight) || 0,
+          prReps: Number(row.pr_reps) || 0,
+          setCount: Number(row.set_count) || 0,
+        };
       }
     });
 
@@ -234,19 +225,13 @@ export const HistoryView: React.FC = () => {
       }
       return true;
     });
-  }, [exercises, allSets, selectedCategory, searchQuery]);
+  }, [exercises, rawExerciseStats, selectedCategory, searchQuery]);
 
   // Group nutrition logs by date with macro distributions
-  const nutritionDays = useMemo(() => {
+  const nutritionDays = useMemo<NutritionDaySummary[]>(() => {
     const map = new Map<
       string,
-      {
-        date: string;
-        meals: NutritionLog[];
-        totals: { calories: number; protein: number; carbs: number; fat: number; fiber: number };
-        macroCalories: { protein: number; carbs: number; fat: number; total: number };
-        percentages: { protein: number; carbs: number; fat: number };
-      }
+      NutritionDaySummary
     >();
 
     nutritionLogs.forEach((log) => {
@@ -304,6 +289,34 @@ export const HistoryView: React.FC = () => {
 
     return Array.from(map.values()).sort((a, b) => b.date.localeCompare(a.date));
   }, [nutritionLogs]);
+
+  // Bounded window & pagination navigation for HistoryView (DIR-B1)
+  const filteredSessions = useMemo(() => {
+    if (timeRange === 'all') return sessions;
+    const now = new Date();
+    const days = timeRange === '30d' ? 30 : timeRange === '90d' ? 90 : 365;
+    const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    const cutoffStr = normalizeDateStr(cutoff);
+    return sessions.filter((s) => s.date >= cutoffStr);
+  }, [sessions, timeRange]);
+
+  const displayedSessions = filteredSessions;
+
+  const displayedSessionsWithSets = useMemo(() => {
+    return displayedSessions.map((s) => ({
+      ...s,
+      sets: sessionSetsMap[s.id] || s.sets || [],
+    }));
+  }, [displayedSessions, sessionSetsMap]);
+
+  const filteredNutritionDays = useMemo(() => {
+    if (timeRange === 'all') return nutritionDays;
+    const now = new Date();
+    const days = timeRange === '30d' ? 30 : timeRange === '90d' ? 90 : 365;
+    const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    const cutoffStr = normalizeDateStr(cutoff);
+    return nutritionDays.filter((d) => d.date >= cutoffStr);
+  }, [nutritionDays, timeRange]);
 
   return (
     <div className="space-y-5">
@@ -435,328 +448,119 @@ export const HistoryView: React.FC = () => {
             </button>
           </div>
         )}
+
+        {/* Time Window Range Navigation (DIR-B1: allows navigating full history beyond 90 days) */}
+        <div className="bg-zinc-950/70 p-1 rounded-2xl border border-zinc-800/80 flex gap-1 overflow-x-auto text-[11px]">
+          <button
+            type="button"
+            onClick={() => setTimeRange('all')}
+            data-testid="history-range-all"
+            className={`flex-1 py-1.5 px-3 min-h-[38px] rounded-xl font-bold transition whitespace-nowrap ${
+              timeRange === 'all'
+                ? 'bg-zinc-800 text-cyan-300 border border-zinc-700 shadow-sm'
+                : 'text-zinc-400 hover:text-white bg-transparent'
+            }`}
+          >
+            All History
+          </button>
+          <button
+            type="button"
+            onClick={() => setTimeRange('90d')}
+            data-testid="history-range-90d"
+            className={`flex-1 py-1.5 px-3 min-h-[38px] rounded-xl font-bold transition whitespace-nowrap ${
+              timeRange === '90d'
+                ? 'bg-zinc-800 text-cyan-300 border border-zinc-700 shadow-sm'
+                : 'text-zinc-400 hover:text-white bg-transparent'
+            }`}
+          >
+            Past 90 Days
+          </button>
+          <button
+            type="button"
+            onClick={() => setTimeRange('30d')}
+            data-testid="history-range-30d"
+            className={`flex-1 py-1.5 px-3 min-h-[38px] rounded-xl font-bold transition whitespace-nowrap ${
+              timeRange === '30d'
+                ? 'bg-zinc-800 text-cyan-300 border border-zinc-700 shadow-sm'
+                : 'text-zinc-400 hover:text-white bg-transparent'
+            }`}
+          >
+            Past 30 Days
+          </button>
+          <button
+            type="button"
+            onClick={() => setTimeRange('1y')}
+            data-testid="history-range-1y"
+            className={`flex-1 py-1.5 px-3 min-h-[38px] rounded-xl font-bold transition whitespace-nowrap ${
+              timeRange === '1y'
+                ? 'bg-zinc-800 text-cyan-300 border border-zinc-700 shadow-sm'
+                : 'text-zinc-400 hover:text-white bg-transparent'
+            }`}
+          >
+            Past Year
+          </button>
+        </div>
       </div>
 
       {/* History Domain Content */}
-      {historyDomain === 'nutrition' ? (
-        <div className="space-y-4">
-          {nutritionDays.length === 0 ? (
-            <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-8 text-center text-zinc-500 text-xs">
-              No nutrition logs recorded yet.
-            </div>
-          ) : (
-            nutritionDays.map((day) => (
-              <div
-                key={day.date}
-                className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-5 shadow-2xl space-y-4"
-              >
-                {/* Date Header & Macro Summary Pills */}
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 pb-3">
-                  <div>
-                    <h3 className="text-sm font-black text-white flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-emerald-400" />
-                      <span>{formatShortDate(day.date)}</span>
-                    </h3>
-                    <div className="text-[11px] font-mono text-zinc-500 mt-0.5">
-                      {day.date} • {day.meals.length} {day.meals.length === 1 ? 'meal' : 'meals'} logged
-                    </div>
-                  </div>
-
-                  {/* Daily Macro Summary Pills */}
-                  <div className="flex items-center gap-1.5 flex-wrap font-mono text-xs font-bold">
-                    <span className="bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2.5 py-1 rounded-xl">
-                      {formatCalories(day.totals.calories)} kcal
-                    </span>
-                    <span className="bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 px-2 py-1 rounded-xl text-[11px]">
-                      {formatMacro(day.totals.protein)}g P
-                    </span>
-                    <span className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-1 rounded-xl text-[11px]">
-                      {formatMacro(day.totals.carbs)}g C
-                    </span>
-                    <span className="bg-violet-500/15 text-violet-400 border border-violet-500/30 px-2 py-1 rounded-xl text-[11px]">
-                      {formatMacro(day.totals.fat)}g F
-                    </span>
-                    <span className="bg-teal-500/15 text-teal-400 border border-teal-500/30 px-2 py-1 rounded-xl text-[11px]">
-                      {formatMacro(day.totals.fiber)}g Fib
-                    </span>
-                  </div>
-                </div>
-
-                {/* Proportional Caloric Macro Distribution Bar */}
-                {day.macroCalories.total > 0 && (
-                  <div className="bg-zinc-950/80 border border-zinc-800/80 rounded-2xl p-3 space-y-2">
-                    <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-zinc-400 tracking-wider">
-                      <span>Caloric Macro Distribution</span>
-                      <span className="text-zinc-500 font-mono font-normal text-[10px]">
-                        {formatCalories(day.macroCalories.total)} macro kcal
-                      </span>
-                    </div>
-
-                    {/* Multi-segment ratio bar */}
-                    <div className="h-2.5 rounded-full bg-zinc-900 border border-zinc-800 overflow-hidden flex shadow-inner">
-                      {day.percentages.protein > 0 && (
-                        <div
-                          style={{ width: `${day.percentages.protein}%` }}
-                          className="bg-cyan-400 transition-all duration-500"
-                          title={`Protein: ${day.percentages.protein}% (${formatCalories(day.macroCalories.protein)} kcal)`}
-                        />
-                      )}
-                      {day.percentages.carbs > 0 && (
-                        <div
-                          style={{ width: `${day.percentages.carbs}%` }}
-                          className="bg-emerald-400 transition-all duration-500"
-                          title={`Carbs: ${day.percentages.carbs}% (${formatCalories(day.macroCalories.carbs)} kcal)`}
-                        />
-                      )}
-                      {day.percentages.fat > 0 && (
-                        <div
-                          style={{ width: `${day.percentages.fat}%` }}
-                          className="bg-violet-400 transition-all duration-500"
-                          title={`Fat: ${day.percentages.fat}% (${formatCalories(day.macroCalories.fat)} kcal)`}
-                        />
-                      )}
-                    </div>
-
-                    {/* Legend */}
-                    <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400 pt-0.5">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-cyan-400 inline-block"></span>
-                        <span className="text-cyan-300 font-bold">{day.percentages.protein}% P</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
-                        <span className="text-emerald-300 font-bold">{day.percentages.carbs}% C</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-violet-400 inline-block"></span>
-                        <span className="text-violet-300 font-bold">{day.percentages.fat}% F</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Meals timeline for this day */}
-                <div className="space-y-2 pt-1">
-                  {day.meals.map((meal) => (
-                    <MealLogRow
-                      key={meal.id}
-                      log={meal}
-                      onEdit={setEditingMealLog}
-                      onDelete={(m) => deleteMealMutation.mutate(m.id)}
-                      // D-15/R-20: a coach inspecting an athlete may read the
-                      // breakdown (RLS permits SELECT) but every write is
-                      // rejected, so no mutating affordance is offered.
-                      readOnly={isInspectingAthlete}
-                      onItemsChange={
-                        isInspectingAthlete
-                          ? undefined
-                          // mutateAsync so a rejected write rolls the row's
-                          // optimistic components back instead of leaving a
-                          // quantity on screen that was never saved.
-                          : (m, items) => scaleMealMutation.mutateAsync({ log: m, items })
-                      }
-                    />
-                  ))}
-                </div>
+      {isReadError ? (
+        <div
+          data-testid="history-read-error"
+          className="bg-rose-500/15 border border-rose-500/40 text-rose-300 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-lg mb-4"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <AlertCircle className="w-5 h-5 shrink-0 text-rose-400" />
+            <div className="min-w-0">
+              <div className="font-bold text-white text-sm">Failed to load history data</div>
+              <div className="text-rose-300/90 text-xs">
+                {readErrorMessage}
               </div>
-            ))
-          )}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleRetryHistory}
+            data-testid="retry-history-btn"
+            className="flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-rose-200 bg-rose-500/20 hover:bg-rose-500/30 active:scale-95 border border-rose-500/40 rounded-xl transition touch-manipulation min-h-[44px] min-w-[44px] shrink-0 cursor-pointer"
+          >
+            <RotateCcw className="w-4 h-4 shrink-0" />
+            <span>Retry</span>
+          </button>
         </div>
+      ) : historyDomain === 'nutrition' ? (
+        <NutritionHistoryTimeline
+          filteredNutritionDays={filteredNutritionDays}
+          timeRange={timeRange}
+          isInspectingAthlete={isInspectingAthlete}
+          onEditMeal={setEditingMealLog}
+          onDeleteMeal={(id) => deleteMealMutation.mutate(id)}
+          onScaleMeal={(m, items) => scaleMealMutation.mutateAsync({ log: m, items })}
+        />
       ) : viewMode === 'session' ? (
-        <div className="space-y-4">
-          {sessions.length === 0 ? (
-            <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-8 text-center text-zinc-500 text-xs">
-              No workout sessions recorded yet.
-            </div>
-          ) : (
-            sessions.map((session) => {
-              const totalVolume = session.sets.reduce(
-                (sum, s) => sum + (Number(s.weight) || 0) * (Number(s.reps) || 0),
-                0
-              );
-
-              return (
-                <div
-                  key={session.id}
-                  className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-5 shadow-2xl space-y-3"
-                >
-                  <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-                    <div>
-                      <h3 className="text-sm font-black text-white">{session.name || 'Workout Session'}</h3>
-                      <div className="text-[11px] font-mono text-cyan-400 mt-0.5">
-                        {formatShortDate(session.date)} ({session.date})
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xs font-mono font-bold text-amber-400">
-                        {totalVolume > 0 ? `${totalVolume.toLocaleString()} lbs volume` : '0 lbs (BW)'}
-                      </div>
-                      <div className="text-[10px] text-zinc-500 font-mono">
-                        {session.sets.length} sets completed
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 pt-1">
-                    {groupSessionSetsByExercise(session.sets, exercises).map((group) => (
-                      <div
-                        key={group.exerciseName}
-                        className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-3 space-y-2"
-                      >
-                        <div className="flex items-center justify-between border-b border-zinc-800/60 pb-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Dumbbell className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                            <span className="font-extrabold text-white text-xs truncate">
-                              {group.exerciseName}
-                            </span>
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-zinc-800/90 text-zinc-300 border border-zinc-700/60 shrink-0">
-                              {group.bodyPart}
-                            </span>
-                          </div>
-                          <div className="text-[11px] font-mono font-bold text-amber-400/90 shrink-0 ml-2">
-                            {group.totalVolume > 0 ? `${group.totalVolume.toLocaleString()} lbs` : '0 lbs (BW)'}
-                          </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          {group.sets.map((set, sIdx) => {
-                            const setNumber = (set.set_index != null && set.set_index > 0) ? set.set_index : (sIdx + 1);
-                            return (
-                              <div
-                                key={set.id || sIdx}
-                                className="bg-zinc-900/90 border border-zinc-800/60 rounded-xl px-2.5 py-1.5 flex items-center justify-between text-xs"
-                              >
-                                <div className="font-mono text-[11px] text-zinc-400 font-bold">
-                                  SET {setNumber}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <div className="font-mono font-bold text-cyan-300">
-                                    {set.weight} lbs × {set.reps} reps
-                                    {set.rpe != null && (
-                                      <span className="text-zinc-500 ml-1 text-[10px]">@{set.rpe}</span>
-                                    )}
-                                  </div>
-                                  {!isInspectingAthlete && (
-                                    <button
-                                      type="button"
-                                      onClick={() => setEditingSet(set)}
-                                      className="min-w-[44px] min-h-[44px] rounded-lg bg-zinc-800/70 hover:bg-cyan-500/20 text-zinc-400 hover:text-cyan-300 flex items-center justify-center transition active:scale-95 touch-manipulation"
-                                      title="Edit set"
-                                      aria-label={`Edit set ${setNumber} of ${group.exerciseName}`}
-                                      data-testid={`edit-set-btn-${set.id || sIdx}`}
-                                    >
-                                      <Edit2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
+        <WorkoutSessionHistory
+          displayedSessions={displayedSessionsWithSets}
+          filteredSessionsCount={filteredSessions.length}
+          exercises={exercises}
+          timeRange={timeRange}
+          isInspectingAthlete={isInspectingAthlete}
+          onEditSet={setEditingSet}
+          onLoadMore={loadMoreWorkouts}
+          hasMore={hasMoreWorkouts}
+          isLoadingMore={isLoadingMore}
+          expandedSessionIds={expandedSessionIds}
+          onToggleExpand={handleToggleExpand}
+          loadingSessionIds={loadingSessionIds}
+        />
       ) : (
-        <div className="space-y-4">
-          {/* Exercise Filter Bar */}
-          <div className="space-y-2">
-            <div className="relative">
-              <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search exercise library..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-2xl pl-10 pr-4 py-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none"
-              />
-            </div>
-
-            <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-              {CATEGORIES.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`text-[11px] font-bold px-3 py-1.5 min-h-[36px] flex items-center justify-center rounded-full whitespace-nowrap transition touch-manipulation ${
-                    selectedCategory === cat
-                      ? 'bg-cyan-500 text-black shadow-neon-cyan'
-                      : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Exercise Cards */}
-          <div className="space-y-3">
-            {exerciseStats.map((stat) => (
-              <div
-                key={stat.exercise.name}
-                className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-5 shadow-2xl space-y-3"
-              >
-                <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-                  <div>
-                    <h3 className="text-sm font-black text-white">{stat.exercise.name}</h3>
-                    <span className="text-[10px] bg-zinc-800 text-cyan-400 font-bold px-2 py-0.5 rounded-full mt-1 inline-block">
-                      {stat.exercise.body_part || 'Full Body'}
-                    </span>
-                  </div>
-                  {stat.sets.length > 0 ? (
-                    <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-2xl text-amber-400 text-xs font-black font-mono">
-                      <Trophy className="w-3.5 h-3.5" />
-                      <span>
-                        PR: {stat.maxWeight > 0 ? `${stat.maxWeight} lbs` : 'Bodyweight'} × {stat.prReps}
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-[10px] text-zinc-500 font-mono">No logs yet</span>
-                  )}
-                </div>
-
-                {stat.sets.length > 0 && (
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-extrabold uppercase text-zinc-500 tracking-wider block mb-1">
-                      Recent Activity ({stat.sets.length} sets):
-                    </span>
-                    <div className="space-y-1">
-                      {stat.sets.slice(-3).map((s, idx) => (
-                        <div
-                          key={s.id || idx}
-                          className="bg-zinc-950 border border-zinc-800/60 rounded-xl px-3 py-2 flex items-center justify-between text-xs font-mono"
-                        >
-                          <span className="text-zinc-400">{formatShortDate(s.workout_date)}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-cyan-300 font-bold">
-                              {s.weight} lbs × {s.reps} reps
-                            </span>
-                            {!isInspectingAthlete && (
-                              <button
-                                type="button"
-                                onClick={() => setEditingSet(s)}
-                                className="min-w-[44px] min-h-[44px] rounded-lg bg-zinc-800/70 hover:bg-cyan-500/20 text-zinc-400 hover:text-cyan-300 flex items-center justify-center transition active:scale-95 touch-manipulation"
-                                title="Edit set"
-                                aria-label={`Edit recent set of ${stat.exercise.name}`}
-                                data-testid={`edit-recent-set-btn-${s.id || idx}`}
-                              >
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+        <WorkoutExerciseHistory
+          exerciseStats={exerciseStats}
+          searchQuery={searchQuery}
+          onSearchQueryChange={setSearchQuery}
+          selectedCategory={selectedCategory}
+          onSelectedCategoryChange={setSelectedCategory}
+          isInspectingAthlete={isInspectingAthlete}
+          onEditSet={setEditingSet}
+        />
       )}
 
       {/* Edit Meal Modal */}
@@ -772,7 +576,17 @@ export const HistoryView: React.FC = () => {
         isOpen={!!editingSet}
         set={editingSet}
         exercises={exercises}
-        onClose={() => setEditingSet(null)}
+        onClose={() => {
+          const workoutId = editingSet?.workout_id;
+          if (workoutId) {
+            setSessionSetsMap((prev) => {
+              const next = { ...prev };
+              delete next[workoutId];
+              return next;
+            });
+          }
+          setEditingSet(null);
+        }}
         targetUserId={targetUserId}
       />
     </div>

@@ -1,0 +1,19 @@
+=========================================================
+PAYLOAD PROJECTION GATE (Gate A / P1-0)
+=========================================================
+ANNOTATED ESCAPES (6 detail-fetch, 4 accepted-list):
+  detail-fetch:
+    src/components/history/useHistoryData.ts:277  nutrition_logs  items  — refetch-before-write inside scaleMealMutation
+    src/components/nutrition/MealLogRow.tsx:138  nutrition_logs  items  — loaded on demand only on user expand or scale action
+    src/components/nutrition/useNutritionData.ts:11  custom_dishes  items, ingredients  — user opens the dish editor or stages a dish
+    src/components/nutrition/useNutritionData.ts:224  nutrition_logs  items  — refetch-before-write inside scaleLogMutation
+    src/components/workout/RoutinePickerModal.tsx:48  routine_templates  template_exercises(  — user opens the routine picker
+    src/components/workout/useWorkoutQueries.ts:88  routine_templates  template_exercises(  — template exercises and targets for resolved routine
+  accepted-list:
+    src/components/coach/CoachCockpit.tsx:83  routine_templates  template_exercises(  — standing watch item W-1, measured 54223 B on /coach
+    src/components/coach/CoachCockpit.tsx:108  workouts  sets(  — athlete workout detail in cockpit, measured 682 B on /coach (source: docs/evidence/perf-trace-results.json, route /coach, the workouts query). Cite that retained path, never a runId — this file is in scripts/perf-payload-sources.json, so editing this comment retires the run whose id was written here. W-10 CAPPED: the sets embed is bounded per workout by COACH_SETS_PER_WORKOUT_LIMIT with a truncation warning. PostgREST applies an embedded limit per parent row, so a generous cap is inert: measured against the bench-athlete fixture, caps of 500 and 2000 return byte-identical responses to no cap at all (119,655 B embed, /coach 176,395 B, OVER the 153,600 B ceiling), while cap 200 gives 62,475 B and /coach 119,215 B. See the cap table in useWorkoutQueries.ts. W-10b OPEN: this bounds the tail, not the worst case; the structural fix is lazy-loading sets on expand like /history. Do not insert lines between this comment and the query: Gate A resolves annotations by proximity, and this file is at its 600-line budget.
+    src/components/exercises/ExercisesView.tsx:96  routine_templates  template_exercises(  — routine template catalog, measured 0 B on /exercises (unmeasured route)
+    src/components/workout/useWorkoutQueries.ts:171  workouts  sets(  — today workout session and sets, measured 95311 B on /workout (500-set stress session; bounded to a single day; sets embed capped at SETS_PAGE_LIMIT). Source: docs/evidence/perf-trace-results.json (route /workout, the workouts+sets query), reproduced identically across every run. Cite that retained path, never a runId: this file is in scripts/perf-payload-sources.json, so editing this comment changes the fingerprint and retires the run whose id was written here — a runId citation can never converge. Was 122311 B before W-5 dropped the redundant workout_id from the embed.
+---------------------------------------------------------
+---------------------------------------------------------
+VERDICT: PASS — zero unannotated heavy projections and zero unresolved projections.

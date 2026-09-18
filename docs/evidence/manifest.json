@@ -1,0 +1,237 @@
+{
+  "generatedAt": "2026-09-17T20:08:53.182Z",
+  "gitCommit": "9d2a01cbc5de20591782afbc33afe7be10b90653",
+  "dirty": true,
+  "totalGates": 15,
+  "artifacts": {
+    "tsc.txt": {
+      "gateId": "tsc",
+      "command": "npx tsc -b --force",
+      "exitCode": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "timestamp": "2026-09-17T20:06:28.412Z"
+    },
+    "lint.txt": {
+      "gateId": "lint",
+      "command": "npm run lint",
+      "exitCode": 0,
+      "sha256": "a7570bdc443e2752498cd197bac528b4e928c336d2fb7b3b21844b687d251b60",
+      "timestamp": "2026-09-17T20:06:28.889Z"
+    },
+    "vitest.txt": {
+      "gateId": "vitest",
+      "command": "npx vitest run",
+      "exitCode": 0,
+      "sha256": "147adcaba5f40483b7c9634cdc8d546d43547f2791797fa95fce4f1407906457",
+      "timestamp": "2026-09-17T20:06:49.634Z"
+    },
+    "check-query-bounds.txt": {
+      "gateId": "check-query-bounds",
+      "command": "node scripts/check-query-bounds.js",
+      "exitCode": 0,
+      "sha256": "dc33a321bfceda37b594294ab25f65891d91b401edaf0510e594dec792ea2dcb",
+      "timestamp": "2026-09-17T20:06:50.616Z"
+    },
+    "check-cache-collisions.txt": {
+      "gateId": "check-cache-collisions",
+      "command": "node scripts/check-cache-collisions.js",
+      "exitCode": 0,
+      "sha256": "aa650583c8dfab3bc10d0fdcdaad853cc812d73cce28d72c136c9cba9c551505",
+      "timestamp": "2026-09-17T20:06:50.745Z"
+    },
+    "check-mock-fidelity.txt": {
+      "gateId": "check-mock-fidelity",
+      "command": "node scripts/check-mock-fidelity.js",
+      "exitCode": 0,
+      "sha256": "1e6d541426f3bfbe5299c230d787e34142466baa26a2707b644655b00d5a99ae",
+      "timestamp": "2026-09-17T20:06:50.891Z"
+    },
+    "check-payload-projections.txt": {
+      "gateId": "check-payload-projections",
+      "command": "node scripts/check-payload-projections.js",
+      "exitCode": 0,
+      "sha256": "70ded6690e8aa6812d79900f45db011918f77f0dd250b0d5a511d85e08bab627",
+      "timestamp": "2026-09-17T20:06:52.112Z"
+    },
+    "check-csp.txt": {
+      "gateId": "check-csp",
+      "command": "node scripts/check-csp.js",
+      "exitCode": 0,
+      "sha256": "51fa5f067a9f7f54973aab801d6bfb0632ee8ffa030f64b9300badab56825638",
+      "timestamp": "2026-09-17T20:06:52.224Z"
+    },
+    "check-query-plan-doc.txt": {
+      "gateId": "check-query-plan-doc",
+      "command": "node scripts/check-query-plan-doc.js",
+      "exitCode": 0,
+      "sha256": "0ac11fe2de835d70970ecb2245b259d2ae355bd47e5db927f52859b8c12e8331",
+      "timestamp": "2026-09-17T20:06:52.570Z"
+    },
+    "verify-perf-budget.txt": {
+      "gateId": "verify-perf-budget",
+      "command": "node scripts/verify-perf-budget.js",
+      "exitCode": 0,
+      "sha256": "d9ec4155145254e4382563a572bcf85fee1d7b6cfc69cf49a55507b7ab874dec",
+      "timestamp": "2026-09-17T20:06:52.727Z"
+    },
+    "verify-perf-artifact.txt": {
+      "gateId": "verify-perf-artifact",
+      "command": "node scripts/verify-perf-artifact.js",
+      "exitCode": 0,
+      "sha256": "7828a04bd6b424d12ede1f057428e49af9df2e9b8c2346761493b3ab2d004747",
+      "timestamp": "2026-09-17T20:06:52.877Z"
+    },
+    "perf-trace-results.json": {
+      "gateId": "perf-trace-results",
+      "command": "cp docs/perf-trace-results.json docs/evidence/perf-trace-results.json",
+      "exitCode": 0,
+      "sha256": "b04eb99d25448a9340c0d8d370434805c458defc5e749da97b67dd62187e8c6a",
+      "timestamp": "2026-09-17T20:06:52.934Z",
+      "runId": "30cb47fc-0d3d-4823-9c0b-0e30335d3c2b",
+      "sourceFingerprint": "6c7ce52415fe4974fa217c79709672e3"
+    },
+    "db-reset.txt": {
+      "gateId": "db-reset",
+      "command": "npx supabase db reset",
+      "exitCode": 0,
+      "sha256": "b5e9f60af7d9844f61f0b55952ccc0df16abd805635d9e0b452a99b7b867083b",
+      "timestamp": "2026-09-17T20:07:38.294Z"
+    },
+    "e2e-desktop-chrome.txt": {
+      "gateId": "e2e-desktop-chrome",
+      "command": "npx playwright test tests/e2e --project=\"Desktop Chrome\" --workers=1",
+      "exitCode": 0,
+      "sha256": "f1d1308072d671f5156c4bb3e349793c845186791fdbb1fa09760da411e7846f",
+      "timestamp": "2026-09-17T20:08:52.800Z"
+    },
+    "db-snapshot.txt": {
+      "gateId": "db-snapshot",
+      "command": "node scripts/db-snapshot.js after --assert-equal",
+      "exitCode": 0,
+      "sha256": "200ed9f4f98b160a2a2f29cc6a8f2942b7ae21208fac2982ac61863624db183a",
+      "timestamp": "2026-09-17T20:08:53.133Z"
+    }
+  },
+  "gates": [
+    {
+      "gateId": "tsc",
+      "outputFile": "tsc.txt",
+      "command": "npx tsc -b --force",
+      "exitCode": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "timestamp": "2026-09-17T20:06:28.412Z"
+    },
+    {
+      "gateId": "lint",
+      "outputFile": "lint.txt",
+      "command": "npm run lint",
+      "exitCode": 0,
+      "sha256": "a7570bdc443e2752498cd197bac528b4e928c336d2fb7b3b21844b687d251b60",
+      "timestamp": "2026-09-17T20:06:28.889Z"
+    },
+    {
+      "gateId": "vitest",
+      "outputFile": "vitest.txt",
+      "command": "npx vitest run",
+      "exitCode": 0,
+      "sha256": "147adcaba5f40483b7c9634cdc8d546d43547f2791797fa95fce4f1407906457",
+      "timestamp": "2026-09-17T20:06:49.634Z"
+    },
+    {
+      "gateId": "check-query-bounds",
+      "outputFile": "check-query-bounds.txt",
+      "command": "node scripts/check-query-bounds.js",
+      "exitCode": 0,
+      "sha256": "dc33a321bfceda37b594294ab25f65891d91b401edaf0510e594dec792ea2dcb",
+      "timestamp": "2026-09-17T20:06:50.616Z"
+    },
+    {
+      "gateId": "check-cache-collisions",
+      "outputFile": "check-cache-collisions.txt",
+      "command": "node scripts/check-cache-collisions.js",
+      "exitCode": 0,
+      "sha256": "aa650583c8dfab3bc10d0fdcdaad853cc812d73cce28d72c136c9cba9c551505",
+      "timestamp": "2026-09-17T20:06:50.745Z"
+    },
+    {
+      "gateId": "check-mock-fidelity",
+      "outputFile": "check-mock-fidelity.txt",
+      "command": "node scripts/check-mock-fidelity.js",
+      "exitCode": 0,
+      "sha256": "1e6d541426f3bfbe5299c230d787e34142466baa26a2707b644655b00d5a99ae",
+      "timestamp": "2026-09-17T20:06:50.891Z"
+    },
+    {
+      "gateId": "check-payload-projections",
+      "outputFile": "check-payload-projections.txt",
+      "command": "node scripts/check-payload-projections.js",
+      "exitCode": 0,
+      "sha256": "70ded6690e8aa6812d79900f45db011918f77f0dd250b0d5a511d85e08bab627",
+      "timestamp": "2026-09-17T20:06:52.112Z"
+    },
+    {
+      "gateId": "check-csp",
+      "outputFile": "check-csp.txt",
+      "command": "node scripts/check-csp.js",
+      "exitCode": 0,
+      "sha256": "51fa5f067a9f7f54973aab801d6bfb0632ee8ffa030f64b9300badab56825638",
+      "timestamp": "2026-09-17T20:06:52.224Z"
+    },
+    {
+      "gateId": "check-query-plan-doc",
+      "outputFile": "check-query-plan-doc.txt",
+      "command": "node scripts/check-query-plan-doc.js",
+      "exitCode": 0,
+      "sha256": "0ac11fe2de835d70970ecb2245b259d2ae355bd47e5db927f52859b8c12e8331",
+      "timestamp": "2026-09-17T20:06:52.570Z"
+    },
+    {
+      "gateId": "verify-perf-budget",
+      "outputFile": "verify-perf-budget.txt",
+      "command": "node scripts/verify-perf-budget.js",
+      "exitCode": 0,
+      "sha256": "d9ec4155145254e4382563a572bcf85fee1d7b6cfc69cf49a55507b7ab874dec",
+      "timestamp": "2026-09-17T20:06:52.727Z"
+    },
+    {
+      "gateId": "verify-perf-artifact",
+      "outputFile": "verify-perf-artifact.txt",
+      "command": "node scripts/verify-perf-artifact.js",
+      "exitCode": 0,
+      "sha256": "7828a04bd6b424d12ede1f057428e49af9df2e9b8c2346761493b3ab2d004747",
+      "timestamp": "2026-09-17T20:06:52.877Z"
+    },
+    {
+      "gateId": "perf-trace-results",
+      "outputFile": "perf-trace-results.json",
+      "command": "cp docs/perf-trace-results.json docs/evidence/perf-trace-results.json",
+      "exitCode": 0,
+      "sha256": "b04eb99d25448a9340c0d8d370434805c458defc5e749da97b67dd62187e8c6a",
+      "timestamp": "2026-09-17T20:06:52.934Z"
+    },
+    {
+      "gateId": "db-reset",
+      "outputFile": "db-reset.txt",
+      "command": "npx supabase db reset",
+      "exitCode": 0,
+      "sha256": "b5e9f60af7d9844f61f0b55952ccc0df16abd805635d9e0b452a99b7b867083b",
+      "timestamp": "2026-09-17T20:07:38.294Z"
+    },
+    {
+      "gateId": "e2e-desktop-chrome",
+      "outputFile": "e2e-desktop-chrome.txt",
+      "command": "npx playwright test tests/e2e --project=\"Desktop Chrome\" --workers=1",
+      "exitCode": 0,
+      "sha256": "f1d1308072d671f5156c4bb3e349793c845186791fdbb1fa09760da411e7846f",
+      "timestamp": "2026-09-17T20:08:52.800Z"
+    },
+    {
+      "gateId": "db-snapshot",
+      "outputFile": "db-snapshot.txt",
+      "command": "node scripts/db-snapshot.js after --assert-equal",
+      "exitCode": 0,
+      "sha256": "200ed9f4f98b160a2a2f29cc6a8f2942b7ae21208fac2982ac61863624db183a",
+      "timestamp": "2026-09-17T20:08:53.133Z"
+    }
+  ]
+}

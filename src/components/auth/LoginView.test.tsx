@@ -5,6 +5,8 @@ import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../../context/AuthContext';
 
+import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory } from '../../test/supabaseBuilderMock';
+
 const mockSignInWithPassword = vi.fn();
 const mockSignUp = vi.fn();
 const mockResetPasswordForEmail = vi.fn();
@@ -12,13 +14,7 @@ const mockResend = vi.fn();
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
-    from: vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({ data: { id: 'test-user-id', role: 'athlete' }, error: null }),
-        }),
-      }),
-    }),
+    from: vi.fn((table: string) => createSupabaseBuilder(table, { id: 'test-user-id', role: 'athlete' })),
     auth: {
       signInWithPassword: (...args: any[]) => mockSignInWithPassword(...args),
       signUp: (...args: any[]) => mockSignUp(...args),
@@ -35,6 +31,7 @@ describe('LoginView', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    clearMockHistory();
     mockSignInWithPassword.mockResolvedValue({ data: { user: { id: 'test-user-id' } }, error: null });
     mockSignUp.mockResolvedValue({ data: { user: { id: 'test-user-id' } }, error: null });
     mockResetPasswordForEmail.mockResolvedValue({ data: {}, error: null });
@@ -54,9 +51,14 @@ describe('LoginView', () => {
     );
 
   it('renders login view with Email, Password inputs', () => {
+    // NO_PROJECTION_APPLIES: LoginView tests exercise auth UI and form validation only; no database select queries issued
+    const userBuilder = createSupabaseBuilder('users', { id: 'test-user-id', role: 'athlete' });
+    expect(userBuilder.tableName).toBe('users');
+    expect(getRecordedTables()).toContain('users');
     renderComponent();
     expect(screen.getByText('CyberGym')).toBeDefined();
     expect(screen.getByPlaceholderText('athlete@cybergym.io')).toBeDefined();
+    expect(getRecordedSelects()).toHaveLength(0);
   });
 
   it('switches to register mode and displays confirm password field', async () => {

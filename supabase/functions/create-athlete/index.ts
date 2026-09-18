@@ -1,13 +1,57 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+export function isAllowedOrigin(origin: string | null | undefined): boolean {
+  if (!origin) return false;
+  const trimmed = origin.trim().replace(/\/+$/, '');
+  if (!trimmed || trimmed === 'null') return false;
+
+  const lower = trimmed.toLowerCase();
+  if (lower === 'https://cybergym.app' || lower === 'capacitor://localhost') {
+    return true;
+  }
+
+  const denoEnv = Deno.env.get('DENO_ENV');
+  const environment = Deno.env.get('ENVIRONMENT');
+  const isProduction = denoEnv === 'production' || environment === 'production';
+
+  if (!isProduction) {
+    if (
+      /^https?:\/\/localhost(?::\d+)?$/i.test(trimmed) ||
+      /^https?:\/\/127\.0\.0\.1(?::\d+)?$/i.test(trimmed)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export function getCorsHeaders(origin: string | null | undefined): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Vary': 'Origin',
+  };
+
+  if (origin && isAllowedOrigin(origin)) {
+    headers['Access-Control-Allow-Origin'] = origin;
+  }
+
+  return headers;
+}
 
 export default {
   async fetch(req: Request) {
+    const origin = req.headers.get('Origin');
+    const corsHeaders = getCorsHeaders(origin);
+
+    if (origin && !isAllowedOrigin(origin)) {
+      return new Response(
+        JSON.stringify({ error: 'CORS origin not allowed' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     if (req.method === 'OPTIONS') {
       return new Response('ok', { headers: corsHeaders });
     }

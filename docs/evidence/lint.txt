@@ -1,0 +1,159 @@
+
+> cybergym@0.0.0 lint
+> oxlint
+
+
+  ! eslint(no-unused-vars): Identifier 'crypto' is imported but never used.
+   ,-[tests/perf/perf-trace.spec.ts:4:8]
+ 3 | import path from 'node:path';
+ 4 | import crypto from 'node:crypto';
+   :        ^^^|^^
+   :           `-- 'crypto' is imported here
+ 5 | import { execSync } from 'node:child_process';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'execSync' is imported but never used.
+   ,-[tests/perf/perf-trace.spec.ts:5:10]
+ 4 | import crypto from 'node:crypto';
+ 5 | import { execSync } from 'node:child_process';
+   :          ^^^^|^^^
+   :              `-- 'execSync' is imported here
+ 6 | import { createClient } from '@supabase/supabase-js';
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Variable 'preflightPassed' is assigned a value but never used. Unused variables should start with a '_'.
+    ,-[tests/perf/perf-trace.spec.ts:25:5]
+ 24 | const perfResults: Record<string, any> = {};
+ 25 | let preflightPassed = false;
+    :     ^^^^^^^|^^^^^^^
+    :            `-- 'preflightPassed' is declared here
+ 26 | 
+    `----
+     ,-[tests/perf/perf-trace.spec.ts:123:5]
+ 122 | 
+ 123 |     preflightPassed = true;
+     :     ^^^^^^^|^^^^^^^
+     :            `-- it was last assigned here
+ 124 |     console.log(
+     `----
+  help: Did you mean to use this variable?
+
+  ! react(globals): Cannot reassign variables declared outside of the component/hook
+     ,-[src/context/AuthDeduplication.test.tsx:105:7]
+ 104 |     const DualCallerConsumer: React.FC = () => {
+ 105 |       authContextVal = useAuth();
+     :       ^^^^^^^|^^^^^^
+     :              `-- `authContextVal` cannot be reassigned
+ 106 |       return <div>DualCaller</div>;
+     `----
+  help: Variable `authContextVal` is declared outside of the component/hook. Reassigning this value during render is a side effect which can cause unpredictable behavior. If this variable is used in rendering, use useState instead. Otherwise, update it in an effect
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/globals
+
+  ! react(globals): Cannot reassign variables declared outside of the component/hook
+     ,-[src/context/AuthDeduplication.test.tsx:147:7]
+ 146 |     const Consumer: React.FC = () => {
+ 147 |       authContextVal = useAuth();
+     :       ^^^^^^^|^^^^^^
+     :              `-- `authContextVal` cannot be reassigned
+ 148 |       return <div>Consumer</div>;
+     `----
+  help: Variable `authContextVal` is declared outside of the component/hook. Reassigning this value during render is a side effect which can cause unpredictable behavior. If this variable is used in rendering, use useState instead. Otherwise, update it in an effect
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/globals
+
+  ! react(globals): Cannot reassign variables declared outside of the component/hook
+     ,-[src/context/AuthDeduplication.test.tsx:179:7]
+ 178 |     const CoachConsumer: React.FC = () => {
+ 179 |       authContextVal = useAuth();
+     :       ^^^^^^^|^^^^^^
+     :              `-- `authContextVal` cannot be reassigned
+ 180 |       coachContextVal = useCoach();
+     `----
+  help: Variable `authContextVal` is declared outside of the component/hook. Reassigning this value during render is a side effect which can cause unpredictable behavior. If this variable is used in rendering, use useState instead. Otherwise, update it in an effect
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/globals
+
+  ! react(globals): Cannot reassign variables declared outside of the component/hook
+     ,-[src/context/AuthDeduplication.test.tsx:180:7]
+ 179 |       authContextVal = useAuth();
+ 180 |       coachContextVal = useCoach();
+     :       ^^^^^^^|^^^^^^^
+     :              `-- `coachContextVal` cannot be reassigned
+ 181 |       return <div>CoachConsumer</div>;
+     `----
+  help: Variable `coachContextVal` is declared outside of the component/hook. Reassigning this value during render is a side effect which can cause unpredictable behavior. If this variable is used in rendering, use useState instead. Otherwise, update it in an effect
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/globals
+
+  ! react(globals): Cannot reassign variables declared outside of the component/hook
+     ,-[src/context/AuthDeduplication.test.tsx:228:7]
+ 227 |     const CoachConsumer: React.FC = () => {
+ 228 |       authContextVal = useAuth();
+     :       ^^^^^^^|^^^^^^
+     :              `-- `authContextVal` cannot be reassigned
+ 229 |       coachContextVal = useCoach();
+     `----
+  help: Variable `authContextVal` is declared outside of the component/hook. Reassigning this value during render is a side effect which can cause unpredictable behavior. If this variable is used in rendering, use useState instead. Otherwise, update it in an effect
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/globals
+
+  ! react(globals): Cannot reassign variables declared outside of the component/hook
+     ,-[src/context/AuthDeduplication.test.tsx:229:7]
+ 228 |       authContextVal = useAuth();
+ 229 |       coachContextVal = useCoach();
+     :       ^^^^^^^|^^^^^^^
+     :              `-- `coachContextVal` cannot be reassigned
+ 230 |       return <div>CoachConsumer</div>;
+     `----
+  help: Variable `coachContextVal` is declared outside of the component/hook. Reassigning this value during render is a side effect which can cause unpredictable behavior. If this variable is used in rendering, use useState instead. Otherwise, update it in an effect
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/globals
+
+  ! eslint(no-unused-vars): Parameter '_' is declared but never used.
+     ,-[scripts/merge-perf-shards.js:157:17]
+ 156 |     const mismatchDetails = Array.from(shardRunIds.entries())
+ 157 |       .filter(([_, id]) => id !== majorityId)
+     :                 |
+     :                 `-- '_' is declared here
+ 158 |       .map(([r, id]) => `route "${r}" has runId "${id}" (differs from runId "${majorityId}")`)
+     `----
+  help: Consider removing this parameter.
+
+  ! react(only-export-components): Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+    ,-[src/components/nutrition/EditMealModal.tsx:23:10]
+ 22 | // import it from this path.
+ 23 | export { friendlyError };
+    :          ^^^^^^^^^^^^^
+ 24 | 
+    `----
+
+  ! react(set-state-in-effect): Calling setState synchronously within an effect can trigger cascading renders
+    ,-[src/components/nutrition/MealLogRow.tsx:84:7]
+ 81 | 
+ 82 |   useEffect(() => {
+    :   ^^^^|^^^^
+    :       `-- This is the containing effect
+ 83 |     if (log.items !== undefined) {
+ 84 |       setOnDemandItems(normalizeItems(log.items));
+    :       ^^^^^^^^|^^^^^^^
+    :               `-- Avoid calling setState() directly within an effect
+ 85 |     }
+    `----
+  help: Effects should synchronize React with external systems. Calling setState synchronously inside an effect starts another render and is usually unnecessary. Derive the value during render, initialize state directly, or update it from the event that caused the change. Use an effect only when synchronizing with an external system.
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/set-state-in-effect
+
+  ! react(only-export-components): Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+    ,-[src/components/nutrition/NutritionEngine.tsx:28:27]
+ 27 | 
+ 28 | export { type StagedItem, stagedToItem, stagedReference, type StagedMeal } from './nutritionEngineHelpers';
+    :                           ^^^^^^^^^^^^
+ 29 | 
+    `----
+
+  ! react(only-export-components): Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+    ,-[src/components/nutrition/NutritionEngine.tsx:28:41]
+ 27 | 
+ 28 | export { type StagedItem, stagedToItem, stagedReference, type StagedMeal } from './nutritionEngineHelpers';
+    :                                         ^^^^^^^^^^^^^^^
+ 29 | 
+    `----
+
+Found 14 warnings and 0 errors.
+Finished in 109ms on 165 files with 116 rules using 24 threads.

@@ -1,0 +1,23 @@
+====================================================
+⚡ CyberGym Performance Budget Verification (DIR-D6)
+====================================================
+
+--------------------------------------------------------------------------------
+| METRIC                        | ACTUAL                   | BUDGET                   | STATUS  |
+--------------------------------------------------------------------------------
+| index-*.js raw size           | 40,512 B (39.56 KB)      | <= 120,000 B (117.19 KB) | ✓ PASS  |
+| react-vendor-*.js raw size    | 182,129 B (177.86 KB)    | <= 185,000 B (180.66 KB) | ✓ PASS  |
+| Initial route JS gzip size    | 157,146 B (153.46 KB)    | <= 256,000 B (250.00 KB) | ✓ PASS  |
+| Max component LOC             | 600 lines (src/components/coach/CoachCockpit.tsx)| <= 600 lines             | ✓ PASS  |
+--------------------------------------------------------------------------------
+
+Initial Route JS Chunk Breakdown:
+  • assets/index-TJSwQH4E.js                   Gzip:   9949 B (  9.72 KB) | Raw:   40512 B
+  • assets/rolldown-runtime-CbXtAM7H.js        Gzip:    368 B (  0.36 KB) | Raw:     589 B
+  • assets/lucide-react-DgORt80F.js            Gzip:   7373 B (  7.20 KB) | Raw:   20035 B
+  • assets/react-vendor-Cqic2lDV.js            Gzip:  56673 B ( 55.34 KB) | Raw:  182129 B
+  • assets/tanstack-B5wdz_NE.js                Gzip:  17184 B ( 16.78 KB) | Raw:   59840 B
+  • assets/react-router-dom-p9Ck5xa0.js        Gzip:  13978 B ( 13.65 KB) | Raw:   39188 B
+  • assets/supabase-CcMctgS4.js                Gzip:  51621 B ( 50.41 KB) | Raw:  203077 B
+
+✅ ALL PERFORMANCE BUDGET CHECKS PASSED.

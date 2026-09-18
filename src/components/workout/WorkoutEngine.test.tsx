@@ -12,10 +12,13 @@ import { CoachProvider } from '../../context/CoachContext';
 import { useCoach } from '../../hooks/useCoach';
 import { supabase } from '../../lib/supabase';
 import { getLocalDateStr } from '../../utils/ghostSets';
+import { isValidUUID, resolveRoutineAndExercises } from './workoutEngineHelpers';
+import type { Exercise, RoutineTemplate } from '../../types/database';
+import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory } from '../../test/supabaseBuilderMock';
 
 const { mockSession } = vi.hoisted(() => ({
   mockSession: {
-    user: { id: 'test-user-id', email: 'athlete@example.com' },
+    user: { id: '00000000-0000-4000-8000-000000000001', email: 'athlete@example.com' },
   },
 }));
 
@@ -23,7 +26,7 @@ vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: vi.fn(),
     auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user-id' } } }),
+      getUser: vi.fn().mockResolvedValue({ data: { user: { id: '00000000-0000-4000-8000-000000000001' } } }),
       getSession: vi.fn().mockResolvedValue({ data: { session: mockSession } }),
       onAuthStateChange: vi.fn().mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } }),
     },
@@ -39,6 +42,7 @@ describe('WorkoutEngine', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    clearMockHistory();
     vi.setSystemTime(new Date('2026-09-06T12:00:00Z'));
     localStorage.clear();
     sessionStorage.clear();
@@ -47,43 +51,20 @@ describe('WorkoutEngine', () => {
     localStorage.setItem(
       'cybergym_user',
       JSON.stringify({
-        id: 'test-user-id',
+        id: '00000000-0000-4000-8000-000000000001',
         email: 'athlete@example.com',
         username: 'athlete',
         role: 'athlete',
       })
     );
-    (supabase.auth.getUser as any).mockResolvedValue({ data: { user: { id: 'test-user-id' } } });
+    (supabase.auth.getUser as any).mockResolvedValue({ data: { user: { id: '00000000-0000-4000-8000-000000000001' } } });
     (supabase.auth.getSession as any).mockResolvedValue({ data: { session: mockSession } });
     (supabase.auth.onAuthStateChange as any).mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } });
 
-    // Mock supabase.from
-    const mockSelect = vi.fn().mockReturnValue({
-      eq: vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-        order: vi.fn().mockResolvedValue({ data: [], error: null }),
-        single: vi.fn().mockResolvedValue({ data: null, error: null }),
-        gte: vi.fn().mockReturnValue({
-          lte: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-      }),
-      order: vi.fn().mockResolvedValue({ data: [], error: null }),
-      or: vi.fn().mockResolvedValue({ data: [], error: null }),
-      in: vi.fn().mockReturnValue({
-        order: vi.fn().mockResolvedValue({ data: [], error: null }),
-      }),
-    });
-
-    (supabase.from as any).mockImplementation((_table: string) => ({
-      select: mockSelect,
-      insert: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({ data: { id: 'new-id' }, error: null }),
-        }),
-      }),
-      update: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
-      delete: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
-    }));
+    // Mock supabase.from using full PostgREST builder test double
+    (supabase.from as any).mockImplementation((table: string) =>
+      createSupabaseBuilder(table, { data: [], error: null })
+    );
 
     queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -117,6 +98,22 @@ describe('WorkoutEngine', () => {
     expect(screen.getAllByText('Rest Day').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Rest & Recovery')).toBeDefined();
     expect(screen.getByText('Choose Routine')).toBeDefined();
+
+    expect(getRecordedTables()).toContain('exercises');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'exercises',
+      projection: 'id, name, body_part, is_master',
+    });
+    expect(getRecordedTables()).toContain('routine_templates');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'routine_templates',
+      projection: 'id, user_id, name, is_master, assigned_to, days_of_week, created_at',
+    });
+    expect(getRecordedTables()).toContain('workouts');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'workouts',
+      projection: 'id, date, name, sets(id, reps, weight, set_index, created_at, exercise_id)',
+    });
   });
 
   it('automatically schedules Push, Quads, & Core - Reduced on Monday', async () => {
@@ -176,34 +173,14 @@ describe('WorkoutEngine', () => {
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'sets') {
-        return { insert: mockInsert };
+        const b = createSupabaseBuilder('sets', { data: [], error: null });
+        b.insert = mockInsert;
+        return b;
       }
       if (table === 'workouts') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ data: [{ id: 'workout-1' }], error: null }),
-            }),
-          }),
-          insert: vi.fn().mockReturnValue({
-            select: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({ data: { id: 'workout-1' }, error: null }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder('workouts', { data: [{ id: 'workout-1' }], error: null });
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          or: vi.fn().mockResolvedValue({ data: [], error: null }),
-          in: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -230,6 +207,8 @@ describe('WorkoutEngine', () => {
     expect(payload.set_index).toBe(1);
     expect(payload.set_type).toBe('working');
     expect(payload.rpe).toBeNull();
+    // sets is mutation-only (insert); NO_PROJECTION_APPLIES
+    expect(getRecordedTables()).toContain('sets');
   });
 
   it('allows batch logging all remaining sets for an exercise', async () => {
@@ -252,46 +231,21 @@ describe('WorkoutEngine', () => {
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'sets') {
-        return {
-          insert: mockInsert,
-          select: vi.fn().mockReturnValue({
-            in: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: pastWorkoutSets, error: null }),
-            }),
-          }),
-        };
+        const b = createSupabaseBuilder('sets', { data: pastWorkoutSets, error: null });
+        b.insert = mockInsert;
+        return b;
       }
       if (table === 'workouts') {
-        const selectObj: any = {};
-        selectObj.eq = vi.fn((field: string) => {
-          if (field === 'user_id') {
-            const userChain: any = Promise.resolve({ data: [{ id: 'prev-w1', date: '2026-08-30' }], error: null });
-            userChain.eq = vi.fn().mockResolvedValue({ data: [{ id: 'workout-1' }], error: null });
-            return userChain;
-          }
-          return Promise.resolve({ data: [], error: null });
+        return createSupabaseBuilder('workouts', {
+          resolver: (b: any) => {
+            if (b.filters.some((f: any) => f.column === 'date')) {
+              return { data: [{ id: 'workout-1' }], error: null };
+            }
+            return { data: [{ id: 'prev-w1', date: '2026-08-30' }], error: null };
+          },
         });
-        return {
-          select: vi.fn().mockReturnValue(selectObj),
-          insert: vi.fn().mockReturnValue({
-            select: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({ data: { id: 'workout-1' }, error: null }),
-            }),
-          }),
-        };
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          or: vi.fn().mockResolvedValue({ data: [], error: null }),
-          in: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -338,46 +292,21 @@ describe('WorkoutEngine', () => {
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'sets') {
-        return {
-          insert: mockInsert,
-          select: vi.fn().mockReturnValue({
-            in: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: pastWorkoutSets, error: null }),
-            }),
-          }),
-        };
+        const b = createSupabaseBuilder('sets', { data: pastWorkoutSets, error: null });
+        b.insert = mockInsert;
+        return b;
       }
       if (table === 'workouts') {
-        const selectObj: any = {};
-        selectObj.eq = vi.fn((field: string) => {
-          if (field === 'user_id') {
-            const userChain: any = Promise.resolve({ data: [{ id: 'prev-w1', date: '2026-08-30' }], error: null });
-            userChain.eq = vi.fn().mockResolvedValue({ data: [{ id: 'workout-1' }], error: null });
-            return userChain;
-          }
-          return Promise.resolve({ data: [], error: null });
+        return createSupabaseBuilder('workouts', {
+          resolver: (b: any) => {
+            if (b.filters.some((f: any) => f.column === 'date')) {
+              return { data: [{ id: 'workout-1' }], error: null };
+            }
+            return { data: [{ id: 'prev-w1', date: '2026-08-30' }], error: null };
+          },
         });
-        return {
-          select: vi.fn().mockReturnValue(selectObj),
-          insert: vi.fn().mockReturnValue({
-            select: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({ data: { id: 'workout-1' }, error: null }),
-            }),
-          }),
-        };
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          or: vi.fn().mockResolvedValue({ data: [], error: null }),
-          in: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -461,46 +390,31 @@ describe('WorkoutEngine', () => {
   it('resolves exercise names for custom routine templates instead of displaying raw UUIDs', async () => {
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'routine_templates') {
-        return {
-          select: vi.fn().mockReturnValue({
-            or: vi.fn().mockResolvedValue({
-              data: [
+        return createSupabaseBuilder('routine_templates', {
+          data: [
+            {
+              id: 'custom-tpl-1',
+              name: 'Custom Bulgarian Split Routine',
+              user_id: '00000000-0000-4000-8000-000000000001',
+              is_master: false,
+              days_of_week: ['Mon'],
+              exercises: [
                 {
-                  id: 'custom-tpl-1',
-                  name: 'Custom Bulgarian Split Routine',
-                  user_id: 'test-user-id',
-                  is_master: false,
-                  days_of_week: ['Mon'],
-                  exercises: [
-                    {
-                      id: 'te-1',
-                      template_id: 'custom-tpl-1',
-                      exercise_id: '00000000-0000-0000-0000-000000000999',
-                      order_index: 0,
-                      target_sets: 4,
-                      target_reps: 10,
-                      exercise: { name: 'Bulgarian Split Squat' },
-                    },
-                  ],
+                  id: 'te-1',
+                  template_id: 'custom-tpl-1',
+                  exercise_id: '00000000-0000-0000-0000-000000000999',
+                  order_index: 0,
+                  target_sets: 4,
+                  target_reps: 10,
+                  exercise: { name: 'Bulgarian Split Squat' },
                 },
               ],
-              error: null,
-            }),
-          }),
-        };
+            },
+          ],
+          error: null,
+        });
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          or: vi.fn().mockResolvedValue({ data: [], error: null }),
-          in: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -563,35 +477,21 @@ describe('WorkoutEngine', () => {
   it('displays mutation error notification when set logging fails', async () => {
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'sets') {
-        return {
-          insert: vi.fn().mockReturnValue({
-            select: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({ data: null, error: { message: 'Database connection failed' } }),
-            }),
+        const b = createSupabaseBuilder('sets', {
+          data: null,
+          error: { message: 'Database connection failed' },
+        });
+        b.insert = vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({ data: null, error: { message: 'Database connection failed' } }),
           }),
-        };
+        });
+        return b;
       }
       if (table === 'workouts') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ data: [{ id: 'workout-1' }], error: null }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder('workouts', { data: [{ id: 'workout-1' }], error: null });
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          or: vi.fn().mockResolvedValue({ data: [], error: null }),
-          in: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -618,28 +518,15 @@ describe('WorkoutEngine', () => {
     });
 
     (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'sets') return { insert: mockInsert };
-      if (table === 'workouts') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ data: [{ id: 'workout-1' }], error: null }),
-            }),
-          }),
-        };
+      if (table === 'sets') {
+        const b = createSupabaseBuilder('sets', { data: [], error: null });
+        b.insert = mockInsert;
+        return b;
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          or: vi.fn().mockResolvedValue({ data: [], error: null }),
-          in: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      };
+      if (table === 'workouts') {
+        return createSupabaseBuilder('workouts', { data: [{ id: 'workout-1' }], error: null });
+      }
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -666,20 +553,11 @@ describe('WorkoutEngine', () => {
     const mockInsert = vi.fn();
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'sets') {
-        return { insert: mockInsert };
+        const b = createSupabaseBuilder('sets', { data: [], error: null });
+        b.insert = mockInsert;
+        return b;
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          or: vi.fn().mockResolvedValue({ data: [], error: null }),
-          in: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -700,53 +578,32 @@ describe('WorkoutEngine', () => {
   it('displays mutation error when batch logging an exercise that cannot be resolved to a UUID', async () => {
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'routine_templates') {
-        return {
-          select: vi.fn().mockReturnValue({
-            or: vi.fn().mockResolvedValue({
-              data: [
+        return createSupabaseBuilder('routine_templates', {
+          data: [
+            {
+              id: 'custom-tpl-invalid',
+              name: 'Custom Broken Routine',
+              user_id: '00000000-0000-4000-8000-000000000001',
+              is_master: false,
+              days_of_week: ['Mon'],
+              exercises: [
                 {
-                  id: 'custom-tpl-invalid',
-                  name: 'Custom Broken Routine',
-                  user_id: 'test-user-id',
-                  is_master: false,
-                  days_of_week: ['Mon'],
-                  exercises: [
-                    {
-                      id: 'te-1',
-                      template_id: 'custom-tpl-invalid',
-                      exercise_id: 'invalid-non-uuid-exercise',
-                      order_index: 0,
-                      target_sets: 2,
-                    },
-                  ],
+                  id: 'te-1',
+                  template_id: 'custom-tpl-invalid',
+                  exercise_id: 'invalid-non-uuid-exercise',
+                  order_index: 0,
+                  target_sets: 2,
                 },
               ],
-              error: null,
-            }),
-          }),
-        };
+            },
+          ],
+          error: null,
+        });
       }
       if (table === 'workouts') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ data: [{ id: 'workout-1' }], error: null }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder('workouts', { data: [{ id: 'workout-1' }], error: null });
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          or: vi.fn().mockResolvedValue({ data: [], error: null }),
-          in: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -790,47 +647,15 @@ describe('WorkoutEngine', () => {
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'sets') {
-        return {
-          select: vi.fn().mockReturnValue({
-            in: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: loggedSetsToday, error: null }),
-            }),
-            order: vi.fn().mockResolvedValue({ data: loggedSetsToday, error: null }),
-          }),
-        };
+        return createSupabaseBuilder('sets', { data: loggedSetsToday, error: null });
       }
       if (table === 'workouts') {
-        const selectObj: any = {};
-        selectObj.eq = vi.fn((field: string) => {
-          if (field === 'user_id') {
-            const userChain: any = Promise.resolve({
-              data: [{ id: 'workout-today', date: today, name: 'Workout A (Push, Quads & Core)' }],
-              error: null,
-            });
-            userChain.eq = vi.fn().mockResolvedValue({
-              data: [{ id: 'workout-today', date: today, name: 'Workout A (Push, Quads & Core)' }],
-              error: null,
-            });
-            return userChain;
-          }
-          return Promise.resolve({ data: [], error: null });
+        return createSupabaseBuilder('workouts', {
+          data: [{ id: 'workout-today', date: today, name: 'Workout A (Push, Quads & Core)' }],
+          error: null,
         });
-        return {
-          select: vi.fn().mockReturnValue(selectObj),
-        };
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          or: vi.fn().mockResolvedValue({ data: [], error: null }),
-          in: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -867,29 +692,14 @@ describe('WorkoutEngine', () => {
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'sets') {
-        return { insert: mockInsert };
+        const b = createSupabaseBuilder('sets', { data: [], error: null });
+        b.insert = mockInsert;
+        return b;
       }
       if (table === 'workouts') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ data: [{ id: 'workout-1' }], error: null }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder('workouts', { data: [{ id: 'workout-1' }], error: null });
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          or: vi.fn().mockResolvedValue({ data: [], error: null }),
-          in: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -955,45 +765,15 @@ describe('WorkoutEngine', () => {
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'sets') {
-        return {
-          select: vi.fn().mockReturnValue({
-            in: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: loggedSets, error: null }),
-            }),
-            order: vi.fn().mockResolvedValue({ data: loggedSets, error: null }),
-          }),
-        };
+        return createSupabaseBuilder('sets', { data: loggedSets, error: null });
       }
       if (table === 'workouts') {
-        const selectObj: any = {};
-        selectObj.eq = vi.fn((field: string) => {
-          if (field === 'user_id') {
-            const userChain: any = Promise.resolve({
-              data: [{ id: 'w-custom-1', date: today, name: 'Ad-hoc Arm Blast' }],
-              error: null,
-            });
-            userChain.eq = vi.fn().mockResolvedValue({
-              data: [{ id: 'w-custom-1', date: today, name: 'Ad-hoc Arm Blast' }],
-              error: null,
-            });
-            return userChain;
-          }
-          return Promise.resolve({ data: [], error: null });
+        return createSupabaseBuilder('workouts', {
+          data: [{ id: 'w-custom-1', date: today, name: 'Ad-hoc Arm Blast' }],
+          error: null,
         });
-        return { select: vi.fn().mockReturnValue(selectObj) };
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          or: vi.fn().mockResolvedValue({ data: [], error: null }),
-          in: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -1008,62 +788,43 @@ describe('WorkoutEngine', () => {
   it('deduplicates custom and default templates in routine modal and prioritizes custom DB template without (Custom) suffix', async () => {
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'routine_templates') {
-        return {
-          select: vi.fn().mockReturnValue({
-            or: vi.fn().mockResolvedValue({
-              data: [
+        return createSupabaseBuilder('routine_templates', {
+          data: [
+            {
+              id: 'tpl-custom-push',
+              name: 'Push, Quads, & Core - Reduced',
+              days_of_week: ['Mon', 'Thu'],
+              exercises: [
                 {
-                  id: 'tpl-custom-push',
-                  name: 'Push, Quads, & Core - Reduced',
-                  days_of_week: ['Mon', 'Thu'],
-                  exercises: [
-                    {
-                      exercise_id: 'ex-bench',
-                      order_index: 0,
-                      target_sets: 4,
-                      target_reps: 8,
-                      exercise: { name: 'Incline Bench Press' },
-                    },
-                    {
-                      exercise_id: 'ex-custom-ext',
-                      order_index: 1,
-                      target_sets: 3,
-                      target_reps: 12,
-                      exercise: { name: 'Custom Quad Destroyer' },
-                    },
-                  ],
+                  exercise_id: 'ex-bench',
+                  order_index: 0,
+                  target_sets: 4,
+                  target_reps: 8,
+                  exercise: { name: 'Incline Bench Press' },
+                },
+                {
+                  exercise_id: 'ex-custom-ext',
+                  order_index: 1,
+                  target_sets: 3,
+                  target_reps: 12,
+                  exercise: { name: 'Custom Quad Destroyer' },
                 },
               ],
-              error: null,
-            }),
-          }),
-        };
+            },
+          ],
+          error: null,
+        });
       }
       if (table === 'exercises') {
-        return {
-          select: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({
-              data: [
-                { id: 'ex-bench', name: 'Incline Bench Press', body_part: 'Chest' },
-                { id: 'ex-custom-ext', name: 'Custom Quad Destroyer', body_part: 'Legs' },
-              ],
-              error: null,
-            }),
-          }),
-        };
+        return createSupabaseBuilder('exercises', {
+          data: [
+            { id: 'ex-bench', name: 'Incline Bench Press', body_part: 'Chest' },
+            { id: 'ex-custom-ext', name: 'Custom Quad Destroyer', body_part: 'Legs' },
+          ],
+          error: null,
+        });
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          or: vi.fn().mockResolvedValue({ data: [], error: null }),
-          in: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -1108,37 +869,27 @@ describe('WorkoutEngine', () => {
     });
 
     (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'users') {
+        return createSupabaseBuilder('users', {
+          data: {
+            id: '00000000-0000-4000-8000-000000000001',
+            email: 'athlete@example.com',
+            username: 'athlete',
+            role: 'athlete',
+            auto_rest_timer: false,
+          },
+          error: null,
+        });
+      }
       if (table === 'sets') {
-        return {
-          insert: mockInsert,
-          select: vi.fn().mockReturnValue({
-            in: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
-          }),
-        };
+        const b = createSupabaseBuilder('sets', { data: [], error: null });
+        b.insert = mockInsert;
+        return b;
       }
       if (table === 'workouts') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ data: [{ id: 'workout-1' }], error: null }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder('workouts', { data: [{ id: 'workout-1' }], error: null });
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          or: vi.fn().mockResolvedValue({ data: [], error: null }),
-          in: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -1176,34 +927,19 @@ describe('WorkoutEngine', () => {
   it('switches to custom routine with empty exercises and correctly clears active exercises without stale state', async () => {
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'routine_templates') {
-        return {
-          select: vi.fn().mockReturnValue({
-            or: vi.fn().mockResolvedValue({
-              data: [
-                {
-                  id: 'tpl-empty-custom',
-                  name: 'Empty Custom Routine',
-                  days_of_week: [],
-                  exercises: [],
-                },
-              ],
-              error: null,
-            }),
-          }),
-        };
+        return createSupabaseBuilder('routine_templates', {
+          data: [
+            {
+              id: 'tpl-empty-custom',
+              name: 'Empty Custom Routine',
+              days_of_week: [],
+              exercises: [],
+            },
+          ],
+          error: null,
+        });
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          or: vi.fn().mockResolvedValue({ data: [], error: null }),
-          in: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -1268,41 +1004,15 @@ describe('WorkoutEngine', () => {
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'sets') {
-        return {
-          select: vi.fn().mockReturnValue({
-            in: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: todaySets, error: null }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder('sets', { data: todaySets, error: null });
       }
       if (table === 'workouts') {
-        const selectObj: any = {};
-        selectObj.eq = vi.fn((field: string) => {
-          if (field === 'user_id') {
-            const userChain: any = Promise.resolve({ data: [{ id: 'w1', date: '2026-09-06' }], error: null });
-            userChain.eq = vi.fn().mockResolvedValue({ data: [{ id: 'w1' }], error: null });
-            return userChain;
-          }
-          return Promise.resolve({ data: [], error: null });
+        return createSupabaseBuilder('workouts', {
+          data: [{ id: 'w1', date: '2026-09-06' }],
+          error: null,
         });
-        return {
-          select: vi.fn().mockReturnValue(selectObj),
-          update: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
-        };
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          or: vi.fn().mockResolvedValue({ data: [], error: null }),
-          in: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -1356,29 +1066,14 @@ describe('WorkoutEngine', () => {
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'sets') {
-        return { insert: mockInsert };
+        const b = createSupabaseBuilder('sets', { data: [], error: null });
+        b.insert = mockInsert;
+        return b;
       }
       if (table === 'workouts') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ data: [{ id: 'workout-1' }], error: null }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder('workouts', { data: [{ id: 'workout-1' }], error: null });
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          or: vi.fn().mockResolvedValue({ data: [], error: null }),
-          in: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -1410,28 +1105,15 @@ describe('WorkoutEngine', () => {
     });
 
     (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'sets') return { insert: mockInsert };
-      if (table === 'workouts') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ data: [{ id: 'workout-1' }], error: null }),
-            }),
-          }),
-        };
+      if (table === 'sets') {
+        const b = createSupabaseBuilder('sets', { data: [], error: null });
+        b.insert = mockInsert;
+        return b;
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          or: vi.fn().mockResolvedValue({ data: [], error: null }),
-          in: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      };
+      if (table === 'workouts') {
+        return createSupabaseBuilder('workouts', { data: [{ id: 'workout-1' }], error: null });
+      }
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -1458,28 +1140,15 @@ describe('WorkoutEngine', () => {
     const mockInsert = vi.fn();
 
     (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'sets') return { insert: mockInsert };
-      if (table === 'workouts') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ data: [{ id: 'workout-1' }], error: null }),
-            }),
-          }),
-        };
+      if (table === 'sets') {
+        const b = createSupabaseBuilder('sets', { data: [], error: null });
+        b.insert = mockInsert;
+        return b;
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          or: vi.fn().mockResolvedValue({ data: [], error: null }),
-          in: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      };
+      if (table === 'workouts') {
+        return createSupabaseBuilder('workouts', { data: [{ id: 'workout-1' }], error: null });
+      }
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -1517,29 +1186,15 @@ describe('WorkoutEngine', () => {
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'workouts') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ data: [{ id: 'w-prev', date: '2026-09-01', name: 'Workout A' }], error: null }),
-          }),
-        };
+        return createSupabaseBuilder('workouts', {
+          data: [{ id: 'w-prev', date: '2026-09-01', name: 'Workout A' }],
+          error: null,
+        });
       }
       if (table === 'sets') {
-        return {
-          select: vi.fn().mockReturnValue({
-            in: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: historicalSets, error: null }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder('sets', { data: historicalSets, error: null });
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -1589,7 +1244,7 @@ describe('WorkoutEngine', () => {
       expect(screen.getByText('Lat Pull Down')).toBeDefined();
     });
 
-    const draftKey = 'cybergym_active_exercises_test-user-id_2026-09-06';
+    const draftKey = 'cybergym_active_exercises_00000000-0000-4000-8000-000000000001_2026-09-06';
     expect(sessionStorage.getItem(draftKey)).toContain('Lat Pull Down');
 
     // Select Rest Day
@@ -1623,7 +1278,7 @@ describe('WorkoutEngine', () => {
       expect(screen.getByText("No exercises in today's workout yet")).toBeDefined();
     });
 
-    const routineKey = 'cybergym_routine_test-user-id_2026-09-06';
+    const routineKey = 'cybergym_routine_00000000-0000-4000-8000-000000000001_2026-09-06';
     expect(sessionStorage.getItem(routineKey)).toBe('Free Workout');
 
     // Simulate tab switch by unmounting and remounting
@@ -1655,7 +1310,7 @@ describe('WorkoutEngine', () => {
     const lastMoveUpBtn = moveUpBtns[moveUpBtns.length - 1];
     fireEvent.click(lastMoveUpBtn);
 
-    const draftKey = 'cybergym_active_exercises_test-user-id_2026-09-06';
+    const draftKey = 'cybergym_active_exercises_00000000-0000-4000-8000-000000000001_2026-09-06';
     const stored = JSON.parse(sessionStorage.getItem(draftKey) || '[]');
     expect(stored.indexOf('Lat Pull Down')).toBe(stored.length - 2);
 
@@ -1732,32 +1387,15 @@ describe('WorkoutEngine', () => {
 
       (supabase.from as any).mockImplementation((table: string) => {
         if (table === 'sets') {
-          return {
-            select: vi.fn().mockReturnValue({
-              in: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: loggedSetsToday, error: null }),
-              }),
-            }),
-          };
+          return createSupabaseBuilder('sets', { data: loggedSetsToday, error: null });
         }
         if (table === 'workouts') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({
-                data: [{ id: 'workout-today', date: today, name: 'Workout A (Push, Quads & Core)' }],
-                error: null,
-              }),
-            }),
-          };
+          return createSupabaseBuilder('workouts', {
+            data: [{ id: 'workout-today', date: today, name: 'Workout A (Push, Quads & Core)' }],
+            error: null,
+          });
         }
-        return {
-          select: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder(table, { data: [], error: null });
       });
 
       const { unmount } = renderComponent();
@@ -1793,7 +1431,7 @@ describe('WorkoutEngine', () => {
       fireEvent.click(moveUpBtns[0]);
 
       // Verify order updated in session store
-      const session = workoutSessionStore.getActiveSession('test-user-id', '2026-09-06');
+      const session = workoutSessionStore.getActiveSession('00000000-0000-4000-8000-000000000001', '2026-09-06');
       expect(session?.exercises[0]).toBe('Cable Lateral Raises');
       expect(session?.exercises[1]).toBe('Incline Bench Press');
 
@@ -1801,7 +1439,7 @@ describe('WorkoutEngine', () => {
       renderComponent();
 
       await waitFor(() => {
-        const sessionAfter = workoutSessionStore.getActiveSession('test-user-id', '2026-09-06');
+        const sessionAfter = workoutSessionStore.getActiveSession('00000000-0000-4000-8000-000000000001', '2026-09-06');
         expect(sessionAfter?.exercises[0]).toBe('Cable Lateral Raises');
         expect(sessionAfter?.exercises[1]).toBe('Incline Bench Press');
       });
@@ -1827,7 +1465,7 @@ describe('WorkoutEngine', () => {
       unmount();
 
       // Verify written to session store
-      const session = workoutSessionStore.getActiveSession('test-user-id', '2026-09-06');
+      const session = workoutSessionStore.getActiveSession('00000000-0000-4000-8000-000000000001', '2026-09-06');
       expect(session?.inputDrafts['Incline Bench Press_1']).toEqual({ weight: '225', reps: '5' });
 
       // Remount
@@ -1850,7 +1488,7 @@ describe('WorkoutEngine', () => {
 
       await selectWorkoutA();
 
-      expect(localStorage.getItem('cybergym_current_session_pointer_test-user-id')).toBe('2026-09-08');
+      expect(localStorage.getItem('cybergym_current_session_pointer_00000000-0000-4000-8000-000000000001')).toBe('2026-09-08');
 
       unmount();
 
@@ -1892,65 +1530,29 @@ describe('WorkoutEngine', () => {
 
       (supabase.from as any).mockImplementation((table: string) => {
         if (table === 'users') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn((col: string) => {
-                if (col === 'id') {
-                  return {
-                    single: vi.fn().mockResolvedValue({
-                      data: { id: 'coach-id', email: 'coach@example.com', role: 'coach', is_coach_mode: true, auto_rest_timer: true },
-                      error: null,
-                    }),
-                  };
-                }
-                return { order: vi.fn().mockResolvedValue({ data: [], error: null }) };
-              }),
-            }),
-          };
+          return createSupabaseBuilder('users', {
+            data: { id: 'coach-id', email: 'coach@example.com', role: 'coach', is_coach_mode: true, auto_rest_timer: true },
+            error: null,
+          });
         }
         if (table === 'coach_athlete_links') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  order: vi.fn().mockResolvedValue({
-                    data: [
-                      {
-                        athlete_id: athleteAId,
-                        status: 'active',
-                        athlete: { id: athleteAId, username: 'Athlete A', email: 'a@example.com', role: 'athlete', created_at: '2026-09-01' },
-                      },
-                      {
-                        athlete_id: athleteBId,
-                        status: 'active',
-                        athlete: { id: athleteBId, username: 'Athlete B', email: 'b@example.com', role: 'athlete', created_at: '2026-09-01' },
-                      },
-                    ],
-                    error: null,
-                  }),
-                }),
-              }),
-            }),
-          };
+          return createSupabaseBuilder('coach_athlete_links', {
+            data: [
+              {
+                athlete_id: athleteAId,
+                status: 'active',
+                athlete: { id: athleteAId, username: 'Athlete A', email: 'a@example.com', role: 'athlete', created_at: '2026-09-01' },
+              },
+              {
+                athlete_id: athleteBId,
+                status: 'active',
+                athlete: { id: athleteBId, username: 'Athlete B', email: 'b@example.com', role: 'athlete', created_at: '2026-09-01' },
+              },
+            ],
+            error: null,
+          });
         }
-        return {
-          select: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-              gte: vi.fn().mockReturnValue({
-                lte: vi.fn().mockResolvedValue({ data: [], error: null }),
-              }),
-            }),
-            in: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
-            or: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder(table, { data: [], error: null });
       });
 
       const CoachTestHarness: React.FC = () => {
@@ -2073,7 +1675,7 @@ describe('WorkoutEngine', () => {
 
       const athleteCustomTemplate = {
         id: 'tpl-custom-push',
-        user_id: 'test-user-id',
+        user_id: '00000000-0000-4000-8000-000000000001',
         name: 'Master Hypertrophy Push',
         is_master: false,
         assigned_to: null,
@@ -2091,41 +1693,22 @@ describe('WorkoutEngine', () => {
 
       (supabase.from as any).mockImplementation((table: string) => {
         if (table === 'routine_templates') {
-          return {
-            select: vi.fn().mockReturnValue({
-              or: vi.fn().mockResolvedValue({
-                // Deliberately return master FIRST to test that precedence sorting promotes custom
-                data: [masterTemplate, athleteCustomTemplate],
-                error: null,
-              }),
-            }),
-          };
+          return createSupabaseBuilder('routine_templates', {
+            // Deliberately return master FIRST to test that precedence sorting promotes custom
+            data: [masterTemplate, athleteCustomTemplate],
+            error: null,
+          });
         }
         if (table === 'exercises') {
-          return {
-            select: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [
-                  { id: 'ex-bench', name: 'Incline Bench Press', body_part: 'Chest' },
-                  { id: 'ex-custom-press', name: 'Personalized Heavy Press', body_part: 'Chest' },
-                ],
-                error: null,
-              }),
-            }),
-          };
+          return createSupabaseBuilder('exercises', {
+            data: [
+              { id: 'ex-bench', name: 'Incline Bench Press', body_part: 'Chest' },
+              { id: 'ex-custom-press', name: 'Personalized Heavy Press', body_part: 'Chest' },
+            ],
+            error: null,
+          });
         }
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            or: vi.fn().mockResolvedValue({ data: [], error: null }),
-            in: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder(table, { data: [], error: null });
       });
 
       renderComponent();
@@ -2162,76 +1745,39 @@ describe('WorkoutEngine', () => {
 
       (supabase.from as any).mockImplementation((table: string) => {
         if (table === 'workouts') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({
-                data: [{ id: workoutId, date: today, name: 'Heavy Squat Day' }],
-                error: null,
-              }),
-            }),
-          };
+          return createSupabaseBuilder('workouts', {
+            data: [{ id: workoutId, date: today, name: 'Heavy Squat Day' }],
+            error: null,
+          });
         }
         if (table === 'sets') {
-          return {
-            select: vi.fn().mockReturnValue({
-              in: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({
-                  data: [
-                    {
-                      id: 's-cold-1',
-                      workout_id: workoutId,
-                      exercise_id: realExerciseUUID,
-                      set_index: 1,
-                      set_type: 'working',
-                      weight: 315,
-                      reps: 5,
-                      rpe: null,
-                      created_at: `${today}T10:00:00Z`,
-                      workouts: {
-                        date: today,
-                        name: 'Heavy Squat Day',
-                      },
-                      exercise: {
-                        id: realExerciseUUID,
-                        name: 'Barbell Back Squat',
-                        body_part: 'Legs',
-                      },
-                    },
-                  ],
-                  error: null,
-                }),
-              }),
-            }),
-          };
+          return createSupabaseBuilder('sets', {
+            data: [
+              {
+                id: 's-cold-1',
+                workout_id: workoutId,
+                exercise_id: realExerciseUUID,
+                set_index: 1,
+                set_type: 'working',
+                weight: 315,
+                reps: 5,
+                rpe: null,
+                created_at: `${today}T10:00:00Z`,
+                workouts: {
+                  date: today,
+                  name: 'Heavy Squat Day',
+                },
+                exercise: {
+                  id: realExerciseUUID,
+                  name: 'Barbell Back Squat',
+                  body_part: 'Legs',
+                },
+              },
+            ],
+            error: null,
+          });
         }
-        if (table === 'exercises') {
-          return {
-            select: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
-          };
-        }
-        if (table === 'routine_templates') {
-          return {
-            select: vi.fn().mockReturnValue({
-              or: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
-          };
-        }
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              single: vi.fn().mockResolvedValue({ data: null, error: null }),
-            }),
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            or: vi.fn().mockResolvedValue({ data: [], error: null }),
-            in: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder(table, { data: [], error: null });
       });
 
       renderComponent();
@@ -2259,8 +1805,8 @@ describe('WorkoutEngine', () => {
       // Pre-seed corrupted session into localStorage
       const corruptedSession = {
         schemaVersion: 1,
-        sessionId: 'session_test-user-id_2026-09-06_12345',
-        userId: 'test-user-id',
+        sessionId: 'session_00000000-0000-4000-8000-000000000001_2026-09-06_12345',
+        userId: '00000000-0000-4000-8000-000000000001',
         workoutDate: today,
         routineName: 'Leg Destruction',
         exercises: [corruptedUUID],
@@ -2275,37 +1821,20 @@ describe('WorkoutEngine', () => {
         completedAt: null,
       };
       localStorage.setItem(
-        `cybergym_active_session_test-user-id_${today}`,
+        `cybergym_active_session_00000000-0000-4000-8000-000000000001_${today}`,
         JSON.stringify(corruptedSession)
       );
 
       (supabase.from as any).mockImplementation((table: string) => {
         if (table === 'exercises') {
-          return {
-            select: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [
-                  { id: corruptedUUID, name: cleanExerciseName, body_part: 'Legs' },
-                ],
-                error: null,
-              }),
-            }),
-          };
+          return createSupabaseBuilder('exercises', {
+            data: [
+              { id: corruptedUUID, name: cleanExerciseName, body_part: 'Legs' },
+            ],
+            error: null,
+          });
         }
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              single: vi.fn().mockResolvedValue({ data: null, error: null }),
-            }),
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            or: vi.fn().mockResolvedValue({ data: [], error: null }),
-            in: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder(table, { data: [], error: null });
       });
 
       renderComponent();
@@ -2325,7 +1854,7 @@ describe('WorkoutEngine', () => {
       expect(repsInput.value).toBe('10');
 
       // Verify localStorage was healed
-      const healedSession = workoutSessionStore.getActiveSession('test-user-id', today);
+      const healedSession = workoutSessionStore.getActiveSession('00000000-0000-4000-8000-000000000001', today);
       expect(healedSession).toBeDefined();
       expect(healedSession?.exercises).toEqual(['Bulgarian Split Squat']);
       expect(healedSession?.targetSetCounts['Bulgarian Split Squat']).toBe(4);
@@ -2342,71 +1871,39 @@ describe('WorkoutEngine', () => {
 
       (supabase.from as any).mockImplementation((table: string) => {
         if (table === 'workouts') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({
-                data: [{ id: workoutId, date: today, name: 'Cross-Tab Sync Workout' }],
-                error: null,
-              }),
-            }),
-          };
+          return createSupabaseBuilder('workouts', {
+            data: [{ id: workoutId, date: today, name: 'Cross-Tab Sync Workout' }],
+            error: null,
+          });
         }
         if (table === 'sets') {
-          return {
-            select: vi.fn().mockReturnValue({
-              in: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({
-                  data: [
-                    {
-                      id: 's-sync-1',
-                      workout_id: workoutId,
-                      exercise_id: realExerciseUUID,
-                      set_index: 1,
-                      set_type: 'working',
-                      weight: 225,
-                      reps: 8,
-                      rpe: null,
-                      created_at: `${today}T10:00:00Z`,
-                      workouts: {
-                        date: today,
-                        name: 'Cross-Tab Sync Workout',
-                      },
-                      exercise: {
-                        id: realExerciseUUID,
-                        name: 'Overhead Press',
-                        body_part: 'Shoulders',
-                      },
-                    },
-                  ],
-                  error: null,
-                }),
-              }),
-            }),
-          };
+          return createSupabaseBuilder('sets', {
+            data: [
+              {
+                id: 's-sync-1',
+                workout_id: workoutId,
+                exercise_id: realExerciseUUID,
+                set_index: 1,
+                set_type: 'working',
+                weight: 225,
+                reps: 8,
+                rpe: null,
+                created_at: `${today}T10:00:00Z`,
+                workouts: {
+                  date: today,
+                  name: 'Cross-Tab Sync Workout',
+                },
+                exercise: {
+                  id: realExerciseUUID,
+                  name: 'Overhead Press',
+                  body_part: 'Shoulders',
+                },
+              },
+            ],
+            error: null,
+          });
         }
-        if (table === 'nutrition_logs') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              }),
-            }),
-          };
-        }
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              single: vi.fn().mockResolvedValue({ data: null, error: null }),
-            }),
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            or: vi.fn().mockResolvedValue({ data: [], error: null }),
-            in: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder(table, { data: [], error: null });
       });
 
       // Render WorkoutEngine
@@ -2416,7 +1913,7 @@ describe('WorkoutEngine', () => {
       });
 
       // Verify cached entry has clean exercise_name
-      const cachedData = queryClient.getQueryData<any[]>(['workout_sets', 'test-user-id']);
+      const cachedData = queryClient.getQueryData<any[]>(['workout_sets', '00000000-0000-4000-8000-000000000001', '90d']);
       expect(cachedData).toBeDefined();
       expect(cachedData?.[0]?.exercise_name).toBe('Overhead Press');
       expect(cachedData?.[0]?.workout_name).toBe('Cross-Tab Sync Workout');
@@ -2450,8 +1947,8 @@ describe('WorkoutEngine', () => {
 
       const corruptedSession = {
         schemaVersion: 1,
-        sessionId: 'session_test-user-id_2026-09-06_99999',
-        userId: 'test-user-id',
+        sessionId: 'session_00000000-0000-4000-8000-000000000001_2026-09-06_99999',
+        userId: '00000000-0000-4000-8000-000000000001',
         workoutDate: today,
         routineName: 'Mixed Tier Test',
         exercises: [uuidCatalog, uuidSets, uuidDefault, uuidUnknown],
@@ -2480,77 +1977,50 @@ describe('WorkoutEngine', () => {
       };
 
       localStorage.setItem(
-        `cybergym_active_session_test-user-id_${today}`,
+        `cybergym_active_session_00000000-0000-4000-8000-000000000001_${today}`,
         JSON.stringify(corruptedSession)
       );
 
       (supabase.from as any).mockImplementation((table: string) => {
         if (table === 'exercises') {
-          return {
-            select: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [
-                  { id: uuidCatalog, name: 'Romanian Deadlift', body_part: 'Hamstrings' },
-                ],
-                error: null,
-              }),
-            }),
-          };
+          return createSupabaseBuilder('exercises', {
+            data: [
+              { id: uuidCatalog, name: 'Romanian Deadlift', body_part: 'Hamstrings' },
+            ],
+            error: null,
+          });
         }
         if (table === 'sets') {
-          return {
-            select: vi.fn().mockReturnValue({
-              in: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({
-                  data: [
-                    {
-                      id: 's-joined-1',
-                      workout_id: 'w-1',
-                      exercise_id: uuidSets,
-                      set_index: 1,
-                      set_type: 'working',
-                      weight: 65,
-                      reps: 12,
-                      rpe: null,
-                      created_at: `${today}T10:00:00Z`,
-                      workouts: { date: today, name: 'Mixed Tier Test' },
-                      exercise: {
-                        id: uuidSets,
-                        name: 'Cable Face Pulls',
-                        body_part: 'Shoulders',
-                      },
-                    },
-                  ],
-                  error: null,
-                }),
-              }),
-            }),
-          };
+          return createSupabaseBuilder('sets', {
+            data: [
+              {
+                id: 's-joined-1',
+                workout_id: 'w-1',
+                exercise_id: uuidSets,
+                set_index: 1,
+                set_type: 'working',
+                weight: 65,
+                reps: 12,
+                rpe: null,
+                created_at: `${today}T10:00:00Z`,
+                workouts: { date: today, name: 'Mixed Tier Test' },
+                exercise: {
+                  id: uuidSets,
+                  name: 'Cable Face Pulls',
+                  body_part: 'Shoulders',
+                },
+              },
+            ],
+            error: null,
+          });
         }
         if (table === 'workouts') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({
-                data: [{ id: 'w-1', date: today, name: 'Mixed Tier Test' }],
-                error: null,
-              }),
-            }),
-          };
+          return createSupabaseBuilder('workouts', {
+            data: [{ id: 'w-1', date: today, name: 'Mixed Tier Test' }],
+            error: null,
+          });
         }
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              single: vi.fn().mockResolvedValue({ data: null, error: null }),
-            }),
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            or: vi.fn().mockResolvedValue({ data: [], error: null }),
-            in: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder(table, { data: [], error: null });
       });
 
       renderComponent();
@@ -2570,7 +2040,7 @@ describe('WorkoutEngine', () => {
       expect(screen.getByText(uuidUnknown)).toBeDefined();
 
       // Verify healed session in store
-      const healedSession = workoutSessionStore.getActiveSession('test-user-id', today);
+      const healedSession = workoutSessionStore.getActiveSession('00000000-0000-4000-8000-000000000001', today);
       expect(healedSession).toBeDefined();
       expect(healedSession?.exercises).toEqual([
         'Romanian Deadlift',
@@ -2588,75 +2058,61 @@ describe('WorkoutEngine', () => {
       // Wednesday: 2026-09-09
       vi.setSystemTime(new Date('2026-09-09T10:00:00Z'));
 
-      const athleteId = 'test-user-id';
+      const athleteId = '00000000-0000-4000-8000-000000000001';
       const coachId = 'coach-999';
 
       (supabase.from as any).mockImplementation((table: string) => {
         if (table === 'routine_templates') {
-          return {
-            select: vi.fn().mockReturnValue({
-              or: vi.fn().mockResolvedValue({
-                data: [
-                  {
-                    id: 'tpl-personal',
-                    user_id: athleteId,
-                    assigned_to: null,
-                    is_master: false,
-                    name: 'Personal User Routine',
-                    days_of_week: ['Wed'],
-                    created_at: '2026-09-01T00:00:00Z',
-                    exercises: [
-                      {
-                        exercise_id: 'ex-1',
-                        exercise_name: 'Barbell Squat',
-                        target_sets: 3,
-                        target_reps: 10,
-                        order_index: 0,
-                      },
-                    ],
-                  },
-                  {
-                    id: 'tpl-coach-assigned',
-                    user_id: coachId,
-                    assigned_to: athleteId,
-                    is_master: false,
-                    name: 'Coach Assigned Priority Routine',
-                    days_of_week: ['Wed'],
-                    created_at: '2026-09-01T00:00:00Z',
-                    exercises: [
-                      {
-                        exercise_id: 'ex-2',
-                        exercise_name: 'Incline Dumbbell Press',
-                        target_sets: 4,
-                        target_reps: 8,
-                        order_index: 0,
-                      },
-                    ],
-                  },
-                ],
-                error: null,
-              }),
-            }),
-          };
+          const templates = [
+            {
+              id: 'tpl-personal',
+              user_id: athleteId,
+              assigned_to: null,
+              is_master: false,
+              name: 'Personal User Routine',
+              days_of_week: ['Wed'],
+              created_at: '2026-09-01T00:00:00Z',
+              exercises: [
+                {
+                  exercise_id: 'ex-1',
+                  exercise: { name: 'Barbell Squat' },
+                  target_sets: 3,
+                  target_reps: 10,
+                  order_index: 0,
+                },
+              ],
+            },
+            {
+              id: 'tpl-coach-assigned',
+              user_id: coachId,
+              assigned_to: athleteId,
+              is_master: false,
+              name: 'Coach Assigned Priority Routine',
+              days_of_week: ['Wed'],
+              created_at: '2026-09-01T00:00:00Z',
+              exercises: [
+                {
+                  exercise_id: 'ex-2',
+                  exercise: { name: 'Incline Dumbbell Press' },
+                  target_sets: 4,
+                  target_reps: 8,
+                  order_index: 0,
+                },
+              ],
+            },
+          ];
+          return createSupabaseBuilder('routine_templates', {
+            resolver: (builder: any) => {
+              const idFilter = builder.filters.find((f: any) => f.method === 'eq' && f.column === 'id');
+              if (idFilter) {
+                const found = templates.find((t) => t.id === idFilter.value);
+                return { data: found || null, error: null };
+              }
+              return { data: templates, error: null };
+            },
+          });
         }
-        return {
-          select: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-              gte: vi.fn().mockReturnValue({
-                lte: vi.fn().mockResolvedValue({ data: [], error: null }),
-              }),
-            }),
-            in: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
-            or: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder(table, { data: [], error: null });
       });
 
       renderComponent();
@@ -2668,7 +2124,974 @@ describe('WorkoutEngine', () => {
         expect(screen.queryByText('Personal User Routine')).toBeNull();
       });
     });
+
+    describe('DIR-D1 Security & PostgREST Filter Injection Hardening', () => {
+      it('validates standard RFC 4122 UUID identifiers with UUID_REGEX and isValidUUID', () => {
+        // Valid UUIDv4
+        expect(isValidUUID('00000000-0000-4000-8000-000000000001')).toBe(true);
+        expect(isValidUUID('a540a224-10c4-4116-bb8f-45b2def0f2ac')).toBe(true);
+        expect(isValidUUID('cff134bc-62a0-4196-9f6e-c6a1f864c6d4')).toBe(true);
+
+        // Valid UUIDv1
+        expect(isValidUUID('6ba7b810-9dad-11d1-80b4-00c04fd430c8')).toBe(true);
+
+        // Malformed strings
+        expect(isValidUUID('not-a-uuid')).toBe(false);
+        expect(isValidUUID('test-user-id')).toBe(false);
+        expect(isValidUUID('')).toBe(false);
+        expect(isValidUUID(null)).toBe(false);
+        expect(isValidUUID(undefined)).toBe(false);
+        expect(isValidUUID(12345)).toBe(false);
+        expect(isValidUUID('123e4567-e89b-12d3-a456-42661417400')).toBe(false); // short
+
+        // PostgREST filter injection payloads
+        expect(isValidUUID('00000000-0000-4000-8000-000000000001,is_master.eq.true')).toBe(false);
+        expect(isValidUUID('00000000-0000-4000-8000-000000000001),role.eq.admin')).toBe(false);
+        expect(isValidUUID("00000000-0000-4000-8000-000000000001' OR '1'='1")).toBe(false);
+        expect(isValidUUID('00000000-0000-4000-8000-000000000001.user_id.neq.null')).toBe(false);
+      });
+
+      it('validates standard 8-4-4-4-12 hex UUID format including seeded accounts and rejects injection payloads', () => {
+        expect(isValidUUID('a0000000-0000-0000-0000-000000000002')).toBe(true);
+        expect(isValidUUID("x' or is_master.eq.true--")).toBe(false);
+        expect(isValidUUID('not-a-uuid')).toBe(false);
+      });
+
+      it('yields safe empty array and does not query routine_templates when targetUserId is malformed', async () => {
+        const mockOr = vi.fn().mockResolvedValue({ data: [], error: null });
+        const mockRoutineSelect = vi.fn().mockReturnValue({ or: mockOr });
+
+        (supabase.from as any).mockImplementation((table: string) => {
+          if (table === 'routine_templates') {
+            return { select: mockRoutineSelect };
+          }
+          return createSupabaseBuilder(table, { data: [], error: null });
+        });
+
+        // Set malformed targetUserId in auth
+        (supabase.auth.getUser as any).mockResolvedValue({
+          data: { user: { id: 'malformed-athlete-id-not-uuid' } },
+        });
+        (supabase.auth.getSession as any).mockResolvedValue({
+          data: { session: { user: { id: 'malformed-athlete-id-not-uuid', email: 'mal@example.com' } } },
+        });
+        localStorage.setItem(
+          'cybergym_user',
+          JSON.stringify({
+            id: 'malformed-athlete-id-not-uuid',
+            email: 'mal@example.com',
+            username: 'attacker',
+            role: 'athlete',
+          })
+        );
+
+        renderComponent();
+
+        // Verify component renders safely without crashing (shows fallback Rest Day or default template)
+        await waitFor(() => {
+          expect(screen.getByTestId('routine-select-btn')).toBeDefined();
+        });
+
+        // Crucial security assertion: routine_templates table query was NEVER executed with malformed ID
+        expect(mockRoutineSelect).not.toHaveBeenCalled();
+        expect(mockOr).not.toHaveBeenCalled();
+      });
+
+      it('yields safe empty array and suppresses PostgREST filter execution on injection-shaped targetUserId', async () => {
+        const mockOr = vi.fn().mockResolvedValue({ data: [], error: null });
+        const mockRoutineSelect = vi.fn().mockReturnValue({ or: mockOr });
+
+        (supabase.from as any).mockImplementation((table: string) => {
+          if (table === 'routine_templates') {
+            return { select: mockRoutineSelect };
+          }
+          return createSupabaseBuilder(table, { data: [], error: null });
+        });
+
+        const injectionPayload = '00000000-0000-4000-8000-000000000001,is_master.eq.true,id.neq.0';
+        (supabase.auth.getUser as any).mockResolvedValue({
+          data: { user: { id: injectionPayload } },
+        });
+        (supabase.auth.getSession as any).mockResolvedValue({
+          data: { session: { user: { id: injectionPayload, email: 'attacker@example.com' } } },
+        });
+        localStorage.setItem(
+          'cybergym_user',
+          JSON.stringify({
+            id: injectionPayload,
+            email: 'attacker@example.com',
+            username: 'attacker',
+            role: 'athlete',
+          })
+        );
+
+        renderComponent();
+
+        await waitFor(() => {
+          expect(screen.getByTestId('routine-select-btn')).toBeDefined();
+        });
+
+        // Assert query did not execute and .or() was never called with mutated DSL tokens
+        expect(mockRoutineSelect).not.toHaveBeenCalled();
+        expect(mockOr).not.toHaveBeenCalled();
+      });
+
+      it('executes routine_templates query with strictly parameterized PostgREST filter on valid UUID targetUserId', async () => {
+        const validUserId = '00000000-0000-4000-8000-000000000001';
+        let capturedFilter: string | null = null;
+
+        const mockLimit = vi.fn().mockResolvedValue({ data: [], error: null });
+        const mockOr = vi.fn().mockImplementation((filter: string) => {
+          capturedFilter = filter;
+          return {
+            limit: mockLimit,
+            then: (resolve: any) => mockLimit().then(resolve),
+          };
+        });
+
+        (supabase.from as any).mockImplementation((table: string) => {
+          if (table === 'routine_templates') {
+            return {
+              select: vi.fn().mockReturnValue({ or: mockOr }),
+            };
+          }
+          return createSupabaseBuilder(table, { data: [], error: null });
+        });
+
+        renderComponent();
+
+        await waitFor(() => {
+          expect(mockOr).toHaveBeenCalledTimes(1);
+        });
+
+        // Assert exact, safe parameterized filter grammar
+        expect(capturedFilter).toBe(
+          `user_id.eq.${validUserId},is_master.eq.true,assigned_to.eq.${validUserId}`
+        );
+        // Verify validUserId is strictly parameterized and safe
+        expect(capturedFilter).toContain(`user_id.eq.${validUserId}`);
+        expect(capturedFilter).toContain(`assigned_to.eq.${validUserId}`);
+      });
+    });
+
+    describe('DIR-B3 PostgREST resource embedding single round-trip', () => {
+      it('queries workouts with embedded sets in a single call and maps them without querying sets table', async () => {
+        let capturedWorkoutsSelect: string | null = null;
+        let setsTableQueried = false;
+
+        const embeddedWorkouts = [
+          {
+            id: 'w-embedded-1',
+            date: '2026-09-06',
+            name: 'Workout A (Push, Quads & Core)',
+            sets: [
+              {
+                id: 's-emb-1',
+                workout_id: 'w-embedded-1',
+                exercise_id: 'e0000000-0000-0000-0000-000000000001',
+                weight: 225,
+                weight_lbs: 225,
+                reps: 5,
+                set_order: 1,
+                set_index: 1,
+                created_at: '2026-09-06T10:00:00Z',
+                exercise: { id: 'e0000000-0000-0000-0000-000000000001', name: 'Incline Bench Press', body_part: 'Chest' },
+              },
+            ],
+          },
+        ];
+
+        (supabase.from as any).mockImplementation((table: string) => {
+          if (table === 'sets') {
+            setsTableQueried = true;
+            return createSupabaseBuilder('sets', { data: [], error: null });
+          }
+          if (table === 'workouts') {
+            const b = createSupabaseBuilder('workouts', { data: embeddedWorkouts, error: null });
+            const origSelect = b.select.bind(b);
+            b.select = vi.fn().mockImplementation((cols: string) => {
+              capturedWorkoutsSelect = cols;
+              return origSelect(cols);
+            });
+            return b;
+          }
+          return createSupabaseBuilder(table, { data: [], error: null });
+        });
+
+        renderComponent();
+
+        await waitFor(() => {
+          expect(capturedWorkoutsSelect).toContain('sets(');
+        });
+
+        expect(setsTableQueried).toBe(false);
+      });
+    });
+
+    describe('FIX-05 & FIX-12 Architectural Directives', () => {
+      it('surfaces visible error banner with Retry button when workout logs query fails and refetches on click (FIX-12)', async () => {
+        let failWorkouts = true;
+        (supabase.from as any).mockImplementation((table: string) => {
+          if (table === 'workouts') {
+            return createSupabaseBuilder('workouts', {
+              resolver: () => {
+                if (failWorkouts) {
+                  return { data: null, error: new Error('Database connection failed (HTTP 500)') };
+                }
+                return { data: [], error: null };
+              },
+            });
+          }
+          return createSupabaseBuilder(table, { data: [], error: null });
+        });
+
+        renderComponent();
+
+        // Verify error banner and Retry button render in DOM
+        await waitFor(() => {
+          expect(screen.getByTestId('workout-logs-error')).toBeDefined();
+          expect(screen.getByText('Failed to load workout history')).toBeDefined();
+          expect(screen.getByText(/Database connection failed/i)).toBeDefined();
+          expect(screen.getByTestId('retry-logs-btn')).toBeDefined();
+        });
+
+        // Allow retry to succeed
+        failWorkouts = false;
+        fireEvent.click(screen.getByTestId('retry-logs-btn'));
+
+        // Error banner should clear once query succeeds
+        await waitFor(() => {
+          expect(screen.queryByTestId('workout-logs-error')).toBeNull();
+        });
+      });
+
+      it('disambiguates 90-day workout history cache from all-time history cache without cross-pollution (FIX-05)', async () => {
+        const targetUserId = '00000000-0000-4000-8000-000000000001';
+        const ninetyDaysOldDate = '2026-08-01';
+        const oneYearOldDate = '2025-01-01';
+
+        // Workouts mock returning 90d workout
+        (supabase.from as any).mockImplementation((table: string) => {
+          if (table === 'workouts') {
+            return createSupabaseBuilder('workouts', {
+              data: [
+                {
+                  id: 'w-recent',
+                  date: ninetyDaysOldDate,
+                  name: 'Recent Workout',
+                  sets: [
+                    {
+                      id: 's-recent',
+                      workout_id: 'w-recent',
+                      exercise_id: 'ex-1',
+                      set_index: 1,
+                      weight: 185,
+                      reps: 10,
+                      created_at: `${ninetyDaysOldDate}T10:00:00Z`,
+                      exercise: { id: 'ex-1', name: 'Bench Press', body_part: 'Chest' },
+                    },
+                  ],
+                },
+              ],
+              error: null,
+            });
+          }
+          return createSupabaseBuilder(table, { data: [], error: null });
+        });
+
+        const { unmount } = renderComponent();
+
+        await waitFor(() => {
+          expect(queryClient.getQueryData(['workout_sets', targetUserId, '90d'])).toBeDefined();
+        });
+
+        // 90-day cache exists, all-time cache does not exist yet
+        expect(queryClient.getQueryData(['workout_sets', targetUserId, 'all'])).toBeUndefined();
+
+        unmount();
+
+        // Now mock workouts and sets for HistoryView
+        (supabase.from as any).mockImplementation((table: string) => {
+          if (table === 'workouts') {
+            return createSupabaseBuilder('workouts', {
+              data: [
+                { id: 'w-recent', date: ninetyDaysOldDate, name: 'Recent Workout' },
+                { id: 'w-old', date: oneYearOldDate, name: 'Ancient Workout' },
+              ],
+              error: null,
+            });
+          }
+          if (table === 'sets') {
+            return createSupabaseBuilder('sets', {
+              data: [
+                {
+                  id: 's-recent',
+                  workout_id: 'w-recent',
+                  exercise_id: 'ex-1',
+                  weight: 185,
+                  reps: 10,
+                  created_at: `${ninetyDaysOldDate}T10:00:00Z`,
+                  workouts: { date: ninetyDaysOldDate, name: 'Recent Workout' },
+                  exercise: { id: 'ex-1', name: 'Bench Press', body_part: 'Chest' },
+                },
+                {
+                  id: 's-old',
+                  workout_id: 'w-old',
+                  exercise_id: 'ex-1',
+                  weight: 135,
+                  reps: 12,
+                  created_at: `${oneYearOldDate}T10:00:00Z`,
+                  workouts: { date: oneYearOldDate, name: 'Ancient Workout' },
+                  exercise: { id: 'ex-1', name: 'Bench Press', body_part: 'Chest' },
+                },
+              ],
+              error: null,
+            });
+          }
+          return createSupabaseBuilder(table, { data: [], error: null });
+        });
+
+        render(
+          <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+              <CoachProvider>
+                <HistoryView />
+              </CoachProvider>
+            </AuthProvider>
+          </QueryClientProvider>
+        );
+
+        await waitFor(() => {
+          expect(queryClient.getQueryData(['workout_sets', targetUserId, 'all'])).toBeDefined();
+        });
+
+        const allData = queryClient.getQueryData<any[]>(['workout_sets', targetUserId, 'all']);
+        const ninetyData = queryClient.getQueryData<any[]>(['workout_sets', targetUserId, '90d']);
+
+        // Both caches coexist without collision or cross-pollution
+        expect(allData).toHaveLength(2);
+        expect(ninetyData).toHaveLength(1);
+      });
+    });
+
+    describe('P1-6 Negative Controls (NC-2, NC-3, NC-4)', () => {
+      it('NC-2: workouts cold read carries date bounds (.gte/.lte) and limit(5)', async () => {
+        let workoutsBuilder: any = null;
+
+        (supabase.from as any).mockImplementation((table: string) => {
+          const builder = createSupabaseBuilder(table, { data: [], error: null });
+          if (table === 'workouts') {
+            workoutsBuilder = builder;
+          }
+          return builder;
+        });
+
+        renderComponent();
+
+        await waitFor(() => {
+          expect(workoutsBuilder).not.toBeNull();
+        });
+
+        // Verify limit(5) is strictly applied
+        expect(workoutsBuilder.limitValue).toBe(5);
+
+        // Verify date bounds (.gte and .lte on date) are strictly applied around target date
+        const gteDate = workoutsBuilder.filters.find((f: any) => f.method === 'gte' && f.column === 'date');
+        const lteDate = workoutsBuilder.filters.find((f: any) => f.method === 'lte' && f.column === 'date');
+
+        expect(gteDate).toBeDefined();
+        expect(lteDate).toBeDefined();
+        expect(gteDate.value).toMatch(/^2026-09-06T00:00:00/);
+        expect(lteDate.value).toMatch(/^2026-09-06T23:59:59/);
+      });
+
+      it('NC-3: deferral is real - opening /workout with picker closed issues 0 requests with limit=50, opening picker issues limit=50 query', async () => {
+        let limit50Count = 0;
+        let limit100Count = 0;
+
+        (supabase.from as any).mockImplementation((table: string) => {
+          if (table === 'routine_templates') {
+            const builder = createSupabaseBuilder('routine_templates', { data: [], error: null });
+            const origLimit = builder.limit.bind(builder);
+            builder.limit = vi.fn().mockImplementation((count: number, options?: any) => {
+              if (count === 50) limit50Count++;
+              if (count === 100) limit100Count++;
+              return origLimit(count, options);
+            });
+            return builder;
+          }
+          return createSupabaseBuilder(table, { data: [], error: null });
+        });
+
+        renderComponent();
+
+        // On initial render (cold paint, picker closed), only the list query (limit 100) runs
+        await waitFor(() => {
+          expect(limit100Count).toBeGreaterThanOrEqual(1);
+        });
+        expect(limit50Count).toBe(0);
+
+        // Open the routine picker modal
+        const routineBtn = screen.getByTestId('routine-select-btn');
+        fireEvent.click(routineBtn);
+
+        // Deferred full query (limit 50) is now triggered
+        await waitFor(() => {
+          expect(limit50Count).toBe(1);
+          expect(screen.getByText('Select Routine')).toBeDefined();
+        });
+      });
+
+      it('NC-4: invalidation coherence - logging a set invalidates/refetches both today session and ghost sets and updates UI without full reload', async () => {
+        let workoutsFetchCount = 0;
+        let rpcFetchCount = 0;
+
+        const mockInsert = vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({
+              data: {
+                id: 'new-set-123',
+                workout_id: 'workout-today',
+                exercise_id: 'e0000000-0000-0000-0000-000000000001',
+                weight: 185,
+                reps: 8,
+                set_index: 1,
+                set_type: 'working',
+                rpe: null,
+                created_at: new Date().toISOString(),
+              },
+              error: null,
+            }),
+          }),
+        });
+
+        (supabase as any).rpc = vi.fn().mockImplementation((fn: string, _params: any) => {
+          if (fn === 'get_ghost_sets') {
+            rpcFetchCount++;
+            return Promise.resolve({
+              data: [
+                {
+                  id: 'ghost-1',
+                  exercise_id: 'e0000000-0000-0000-0000-000000000001',
+                  exercise_name: 'Incline Bench Press',
+                  weight: 175,
+                  reps: 10,
+                  set_index: 1,
+                  set_type: 'working',
+                  workout_date: '2026-09-01',
+                },
+              ],
+              error: null,
+            });
+          }
+          return Promise.resolve({ data: [], error: null });
+        });
+
+        let currentWorkoutsData: any[] = [
+          {
+            id: 'workout-today',
+            date: '2026-09-06T10:00:00.000Z',
+            name: 'Workout A (Push, Quads & Core)',
+            sets: [],
+          },
+        ];
+
+        (supabase.from as any).mockImplementation((table: string) => {
+          if (table === 'sets') {
+            const b = createSupabaseBuilder('sets', { data: [], error: null });
+            b.insert = mockInsert;
+            return b;
+          }
+          if (table === 'workouts') {
+            workoutsFetchCount++;
+            return createSupabaseBuilder('workouts', {
+              resolver: () => ({ data: currentWorkoutsData, error: null }),
+            });
+          }
+          return createSupabaseBuilder(table, { data: [], error: null });
+        });
+
+        renderComponent();
+        await selectWorkoutA();
+
+        await waitFor(() => {
+          expect(workoutsFetchCount).toBeGreaterThanOrEqual(1);
+          expect(rpcFetchCount).toBeGreaterThanOrEqual(1);
+        });
+
+        const initialWorkoutsFetches = workoutsFetchCount;
+        const initialRpcFetches = rpcFetchCount;
+
+        // When set is logged, update simulated workouts data
+        currentWorkoutsData = [
+          {
+            id: 'workout-today',
+            date: '2026-09-06T10:00:00.000Z',
+            name: 'Workout A (Push, Quads & Core)',
+            sets: [
+              {
+                id: 'new-set-123',
+                workout_id: 'workout-today',
+                exercise_id: 'e0000000-0000-0000-0000-000000000001',
+                weight: 185,
+                reps: 8,
+                set_index: 1,
+                set_type: 'working',
+                created_at: new Date().toISOString(),
+                exercise: { id: 'e0000000-0000-0000-0000-000000000001', name: 'Incline Bench Press', body_part: 'Chest' },
+              },
+            ],
+          },
+        ];
+
+        // Type inputs and commit set
+        const weightInput = screen.getByTestId('ghost-weight-0-0');
+        const repsInput = screen.getByTestId('ghost-reps-0-0');
+        const commitBtn = screen.getByTestId('commit-set-btn-0-0');
+
+        await userEvent.type(weightInput, '185');
+        await userEvent.type(repsInput, '8');
+        fireEvent.click(commitBtn);
+
+        // Invalidation triggers refetch of both today's workouts query and ghost sets RPC
+        await waitFor(() => {
+          expect(workoutsFetchCount).toBeGreaterThan(initialWorkoutsFetches);
+          expect(rpcFetchCount).toBeGreaterThan(initialRpcFetches);
+        });
+
+        // UI reflects the logged set without page reload
+        await waitFor(() => {
+          expect(screen.getByTestId('delete-set-btn-0-0')).toBeDefined();
+          expect(screen.queryByTestId('commit-set-btn-0-0')).toBeNull();
+        });
+      });
+    describe('P1-6d Negative Controls (Template Row Coverage & Detail Fetch)', () => {
+      it('NC-A (the regression itself): self-coached template with days_of_week=[] resolves all 6 exercises and targets on cold paint when 2 exercises are logged', async () => {
+        const myUserId = '00000000-0000-4000-8000-000000000001';
+        const templateExercises = [
+          { id: 'te-1', template_id: 'tpl-nc-a-1', exercise_id: 'ex-1', order_index: 1, target_sets: 4, target_reps: 8, exercise: { name: 'Barbell Bench Press' } },
+          { id: 'te-2', template_id: 'tpl-nc-a-1', exercise_id: 'ex-2', order_index: 2, target_sets: 3, target_reps: 10, exercise: { name: 'Incline Dumbbell Press' } },
+          { id: 'te-3', template_id: 'tpl-nc-a-1', exercise_id: 'ex-3', order_index: 3, target_sets: 3, target_reps: 12, exercise: { name: 'Cable Crossover' } },
+          { id: 'te-4', template_id: 'tpl-nc-a-1', exercise_id: 'ex-4', order_index: 4, target_sets: 4, target_reps: 8, exercise: { name: 'Overhead Press' } },
+          { id: 'te-5', template_id: 'tpl-nc-a-1', exercise_id: 'ex-5', order_index: 5, target_sets: 4, target_reps: 15, exercise: { name: 'Lateral Raise' } },
+          { id: 'te-6', template_id: 'tpl-nc-a-1', exercise_id: 'ex-6', order_index: 6, target_sets: 3, target_reps: 12, exercise: { name: 'Triceps Pushdown' } },
+        ];
+
+        const mockTemplates = [
+          {
+            id: 'tpl-nc-a-1',
+            user_id: myUserId,
+            assigned_to: null,
+            is_master: false,
+            days_of_week: [] as string[],
+            name: 'Hypertrophy NC-A Routine',
+            created_at: '2026-09-01T00:00:00.000Z',
+            exercises: templateExercises,
+          },
+        ];
+
+        const mockExercisesList = [
+          { id: 'ex-1', name: 'Barbell Bench Press', body_part: 'Chest' },
+          { id: 'ex-2', name: 'Incline Dumbbell Press', body_part: 'Chest' },
+          { id: 'ex-3', name: 'Cable Crossover', body_part: 'Chest' },
+          { id: 'ex-4', name: 'Overhead Press', body_part: 'Shoulders' },
+          { id: 'ex-5', name: 'Lateral Raise', body_part: 'Shoulders' },
+          { id: 'ex-6', name: 'Triceps Pushdown', body_part: 'Arms' },
+        ];
+
+        const mockWorkoutsData = [
+          {
+            id: 'workout-today-nca',
+            date: '2026-09-06T10:00:00.000Z',
+            name: 'Hypertrophy NC-A Routine',
+            sets: [
+              {
+                id: 'set-nca-1',
+                workout_id: 'workout-today-nca',
+                exercise_id: 'ex-1',
+                set_index: 1,
+                weight: 205,
+                reps: 8,
+                created_at: '2026-09-06T10:05:00.000Z',
+                exercise: { id: 'ex-1', name: 'Barbell Bench Press', body_part: 'Chest' },
+              },
+              {
+                id: 'set-nca-2',
+                workout_id: 'workout-today-nca',
+                exercise_id: 'ex-2',
+                set_index: 1,
+                weight: 75,
+                reps: 10,
+                created_at: '2026-09-06T10:10:00.000Z',
+                exercise: { id: 'ex-2', name: 'Incline Dumbbell Press', body_part: 'Chest' },
+              },
+            ],
+          },
+        ];
+
+        (supabase.from as any).mockImplementation((table: string) => {
+          if (table === 'routine_templates') {
+            return createSupabaseBuilder('routine_templates', {
+              resolver: (builder: any) => {
+                // Detail query resolver (eq('id', ...))
+                const idFilter = builder.filters.find((f: any) => f.method === 'eq' && f.column === 'id');
+                if (idFilter) {
+                  const found = mockTemplates.find((t) => t.id === idFilter.value);
+                  if (!found) return null;
+                  return {
+                    id: found.id,
+                    exercises: found.exercises,
+                  };
+                }
+
+                // List query with .or() filter
+                const orFilter = builder.filters.find((f: any) => f.method === 'or')?.args[0] as string;
+                const filtered = mockTemplates.filter((t) => {
+                  if (orFilter && orFilter.includes('days_of_week.cs.')) {
+                    const dayMatch = /days_of_week\.cs\.\{([^}]+)\}/.exec(orFilter)?.[1] || '';
+                    const isUserSched = t.user_id === myUserId && t.days_of_week?.includes(dayMatch);
+                    const isMasterSched = t.is_master && t.days_of_week?.includes(dayMatch);
+                    const isAssigned = t.assigned_to === myUserId;
+                    return isUserSched || isMasterSched || isAssigned;
+                  }
+                  return t.user_id === myUserId || t.is_master || t.assigned_to === myUserId;
+                });
+
+                if (!builder.projection.includes('template_exercises')) {
+                  return filtered.map(({ exercises: _ex, ...rest }) => rest);
+                }
+                return filtered;
+              },
+            });
+          }
+          if (table === 'exercises') {
+            return createSupabaseBuilder('exercises', {
+              data: mockExercisesList,
+              error: null,
+            });
+          }
+          if (table === 'workouts') {
+            return createSupabaseBuilder('workouts', {
+              data: mockWorkoutsData,
+              error: null,
+            });
+          }
+          return createSupabaseBuilder(table, { data: [], error: null });
+        });
+
+        renderComponent();
+
+        // Wait for session resolution
+        await waitFor(() => {
+          expect(screen.getByTestId('routine-select-btn')).toBeDefined();
+        });
+
+        // The exercise cards must contain ALL SIX exercises in order_index order
+        const exerciseCards = await screen.findAllByTestId(/exercise-card-/);
+        const renderedExerciseNames = exerciseCards.map((card) => {
+          const nameSpan = card.querySelector('span.font-extrabold');
+          return nameSpan?.textContent?.trim();
+        });
+
+        expect(renderedExerciseNames).toEqual([
+          'Barbell Bench Press',
+          'Incline Dumbbell Press',
+          'Cable Crossover',
+          'Overhead Press',
+          'Lateral Raise',
+          'Triceps Pushdown',
+        ]);
+      });
+
+      it('NC-B (scheduling still works): template scheduled today resolves via scheduledCustom with exercises populated through detail fetch', async () => {
+        const myUserId = '00000000-0000-4000-8000-000000000001';
+        // Date 2026-09-06 is Sunday ('Sun')
+        const sundayTemplate = {
+          id: 'tpl-sunday-sched',
+          user_id: myUserId,
+          name: 'Sunday Strength Blast',
+          is_master: false,
+          assigned_to: null,
+          days_of_week: ['Sun'],
+          created_at: '2026-09-01T00:00:00.000Z',
+          exercises: [
+            {
+              id: 'te-sun-1',
+              template_id: 'tpl-sunday-sched',
+              exercise_id: 'ex-sun-1',
+              order_index: 0,
+              target_sets: 4,
+              target_reps: 6,
+              exercise: { name: 'Deadlift' },
+            },
+            {
+              id: 'te-sun-2',
+              template_id: 'tpl-sunday-sched',
+              exercise_id: 'ex-sun-2',
+              order_index: 1,
+              target_sets: 3,
+              target_reps: 8,
+              exercise: { name: 'Front Squat' },
+            },
+          ],
+        };
+
+        const mockExercisesList = [
+          { id: 'ex-sun-1', name: 'Deadlift', body_part: 'Back', is_master: true },
+          { id: 'ex-sun-2', name: 'Front Squat', body_part: 'Legs', is_master: true },
+        ];
+
+        let detailQueryCount = 0;
+        (supabase.from as any).mockImplementation((table: string) => {
+          if (table === 'routine_templates') {
+            return createSupabaseBuilder('routine_templates', {
+              resolver: (builder: any) => {
+                const idFilter = builder.filters.find((f: any) => f.method === 'eq' && f.column === 'id');
+                if (idFilter) {
+                  detailQueryCount++;
+                  if (idFilter.value === sundayTemplate.id) {
+                    return {
+                      id: sundayTemplate.id,
+                      exercises: sundayTemplate.exercises,
+                    };
+                  }
+                  return null;
+                }
+                return [{
+                  id: sundayTemplate.id,
+                  user_id: sundayTemplate.user_id,
+                  name: sundayTemplate.name,
+                  is_master: sundayTemplate.is_master,
+                  assigned_to: sundayTemplate.assigned_to,
+                  days_of_week: sundayTemplate.days_of_week,
+                  created_at: sundayTemplate.created_at,
+                }];
+              },
+            });
+          }
+          if (table === 'exercises') {
+            return createSupabaseBuilder('exercises', {
+              data: mockExercisesList,
+              error: null,
+            });
+          }
+          if (table === 'workouts') {
+            return createSupabaseBuilder('workouts', {
+              data: [],
+              error: null,
+            });
+          }
+          return createSupabaseBuilder(table, { data: [], error: null });
+        });
+
+        renderComponent();
+
+        await waitFor(() => {
+          expect(screen.getByText('Sunday Strength Blast')).toBeDefined();
+        });
+
+        const cards = await screen.findAllByTestId(/exercise-card-/);
+        expect(cards).toHaveLength(2);
+        expect(screen.getByText('Deadlift')).toBeDefined();
+        expect(screen.getByText('Front Squat')).toBeDefined();
+        expect(detailQueryCount).toBe(1);
+      });
+
+      it('NC-C (bidirectional prefix preserved): covers exact equality, template startsWith logged, and logged startsWith template', () => {
+        const customTemplates: RoutineTemplate[] = [
+          {
+            id: 'tpl-1',
+            user_id: 'user-1',
+            name: 'Upper Hypertrophy',
+            is_master: false,
+            assigned_to: null,
+            days_of_week: [],
+            exercises: [
+              {
+                id: 'te-1',
+                template_id: 'tpl-1',
+                exercise_id: 'ex-1',
+                order_index: 0,
+                target_sets: 4,
+                target_reps: 8,
+                exercise: { name: 'Bench Press' },
+              },
+            ],
+          },
+          {
+            id: 'tpl-2',
+            user_id: 'user-1',
+            name: 'Pull Day',
+            is_master: false,
+            assigned_to: null,
+            days_of_week: [],
+            exercises: [
+              {
+                id: 'te-2',
+                template_id: 'tpl-2',
+                exercise_id: 'ex-2',
+                order_index: 0,
+                target_sets: 3,
+                target_reps: 10,
+                exercise: { name: 'Pull-up' },
+              },
+            ],
+          },
+          {
+            id: 'tpl-3',
+            user_id: 'user-1',
+            name: 'Legs Heavy',
+            is_master: false,
+            assigned_to: null,
+            days_of_week: [],
+            exercises: [
+              {
+                id: 'te-3',
+                template_id: 'tpl-3',
+                exercise_id: 'ex-3',
+                order_index: 0,
+                target_sets: 5,
+                target_reps: 5,
+                exercise: { name: 'Squat' },
+              },
+            ],
+          },
+        ];
+
+        const mockExList = [
+          { id: 'ex-1', name: 'Bench Press', body_part: 'Chest' },
+          { id: 'ex-2', name: 'Pull-up', body_part: 'Back' },
+          { id: 'ex-3', name: 'Squat', body_part: 'Legs' },
+        ] as Exercise[];
+
+        // Arm 1: Exact equality
+        const resExact = resolveRoutineAndExercises(
+          '2026-09-06',
+          [{ workout_name: 'Upper Hypertrophy', exercise_id: 'ex-1' } as any],
+          customTemplates,
+          mockExList
+        );
+        expect(resExact.routineName).toBe('Upper Hypertrophy');
+        expect(resExact.exercises).toEqual(['Bench Press']);
+        expect(resExact.targetSets['Bench Press']).toBe(4);
+        expect(resExact.targetReps['Bench Press']).toBe(8);
+
+        // Arm 2: Template name starts with logged name (Template: "Legs Heavy", Logged: "Legs")
+        const resTplStarts = resolveRoutineAndExercises(
+          '2026-09-06',
+          [{ workout_name: 'Legs', exercise_id: 'ex-3' } as any],
+          customTemplates,
+          mockExList
+        );
+        expect(resTplStarts.routineName).toBe('Legs Heavy');
+        expect(resTplStarts.exercises).toEqual(['Squat']);
+        expect(resTplStarts.targetSets['Squat']).toBe(5);
+        expect(resTplStarts.targetReps['Squat']).toBe(5);
+
+        // Arm 3: Logged name starts with template name (Template: "Pull Day", Logged: "Pull Day (Week 4 Focus)")
+        const resLoggedStarts = resolveRoutineAndExercises(
+          '2026-09-06',
+          [{ workout_name: 'Pull Day (Week 4 Focus)', exercise_id: 'ex-2' } as any],
+          customTemplates,
+          mockExList
+        );
+        expect(resLoggedStarts.routineName).toBe('Pull Day');
+        expect(resLoggedStarts.exercises).toEqual(['Pull-up']);
+        expect(resLoggedStarts.targetSets['Pull-up']).toBe(3);
+        expect(resLoggedStarts.targetReps['Pull-up']).toBe(10);
+      });
+
+      it('NC-D (detail fetch is on demand): cold paint issues zero requests carrying template_exercises( from list query; exactly one detail fetch occurs, and only after template resolves', async () => {
+        const myUserId = '00000000-0000-4000-8000-000000000001';
+        const targetTemplate = {
+          id: 'tpl-ncd-demand',
+          user_id: myUserId,
+          name: 'Demand Driven Routine',
+          is_master: false,
+          assigned_to: null,
+          days_of_week: ['Sun'],
+          created_at: '2026-09-01T00:00:00.000Z',
+          exercises: [
+            {
+              id: 'te-ncd-1',
+              template_id: 'tpl-ncd-demand',
+              exercise_id: 'ex-ncd-1',
+              order_index: 0,
+              target_sets: 3,
+              target_reps: 12,
+              exercise: { name: 'Lateral Raise' },
+            },
+          ],
+        };
+
+        const listQueries: { projection: string; limit?: number }[] = [];
+        const detailQueries: { projection: string; id: string }[] = [];
+
+        (supabase.from as any).mockImplementation((table: string) => {
+          if (table === 'routine_templates') {
+            return createSupabaseBuilder('routine_templates', {
+              resolver: (builder: any) => {
+                const idFilter = builder.filters.find((f: any) => f.method === 'eq' && f.column === 'id');
+                const limitVal = builder.limitValue;
+                if (idFilter) {
+                  detailQueries.push({ projection: builder.projection, id: idFilter.value });
+                  return {
+                    id: targetTemplate.id,
+                    exercises: targetTemplate.exercises,
+                  };
+                }
+                listQueries.push({ projection: builder.projection, limit: limitVal });
+                return [{
+                  id: targetTemplate.id,
+                  user_id: targetTemplate.user_id,
+                  name: targetTemplate.name,
+                  is_master: targetTemplate.is_master,
+                  assigned_to: targetTemplate.assigned_to,
+                  days_of_week: targetTemplate.days_of_week,
+                  created_at: targetTemplate.created_at,
+                }];
+              },
+            });
+          }
+          if (table === 'exercises') {
+            return createSupabaseBuilder('exercises', {
+              data: [{ id: 'ex-ncd-1', name: 'Lateral Raise', body_part: 'Shoulders', is_master: true }],
+              error: null,
+            });
+          }
+          if (table === 'workouts') {
+            return createSupabaseBuilder('workouts', {
+              data: [],
+              error: null,
+            });
+          }
+          return createSupabaseBuilder(table, { data: [], error: null });
+        });
+
+        renderComponent();
+
+        await waitFor(() => {
+          expect(screen.getByText('Demand Driven Routine')).toBeDefined();
+        });
+
+        // 1. Cold paint list query issues ZERO requests carrying template_exercises(
+        expect(listQueries.length).toBeGreaterThanOrEqual(1);
+        listQueries.forEach((q) => {
+          expect(q.projection).not.toContain('template_exercises');
+          expect(q.projection).toBe('id, user_id, name, is_master, assigned_to, days_of_week, created_at');
+          expect(q.limit).toBe(100);
+        });
+
+        // 2. Exactly one detail fetch occurs, and only for the resolved template
+        expect(detailQueries).toHaveLength(1);
+        expect(detailQueries[0].id).toBe(targetTemplate.id);
+        expect(detailQueries[0].projection).toBe(
+          'id, exercises:template_exercises(id, template_id, exercise_id, order_index, target_sets, target_reps, exercise:exercises(name))'
+        );
+      });
+    });
   });
+});
 });
 
 

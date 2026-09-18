@@ -1,0 +1,77 @@
+
+Running 31 tests using 1 worker
+
+  ✓   1 [Desktop Chrome] › tests/e2e/coach-athlete-lifecycle.spec.ts:4:3 › Coach-Athlete Code Linking & Lifecycle E2E › complete lifecycle: link, macro target update, and disconnect (5.3s)
+  ✓   2 [Desktop Chrome] › tests/e2e/coach-athlete.spec.ts:4:3 › Coach-Athlete Multi-Tenant Flow E2E › coach logs in and accesses coach cockpit (1.4s)
+  ✓   3 [Desktop Chrome] › tests/e2e/coach-athlete.spec.ts:22:3 › Coach-Athlete Multi-Tenant Flow E2E › coach builds and saves a workout routine template (2.0s)
+  ✓   4 [Desktop Chrome] › tests/e2e/error-states.spec.ts:5:3 › RFIX-11 Error States & Retry Affordance E2E › Route 1: /workout displays error state and retry affordance on PostgREST read error, recovering on retry (2.9s)
+  ✓   5 [Desktop Chrome] › tests/e2e/error-states.spec.ts:34:3 › RFIX-11 Error States & Retry Affordance E2E › Route 2: /history displays error state and retry affordance on PostgREST read error, recovering on retry (2.7s)
+  ✓   6 [Desktop Chrome] › tests/e2e/error-states.spec.ts:63:3 › RFIX-11 Error States & Retry Affordance E2E › Route 3: /nutrition displays error state and retry affordance on PostgREST read error, recovering on retry (2.8s)
+  ✓   7 [Desktop Chrome] › tests/e2e/error-states.spec.ts:92:3 › RFIX-11 Error States & Retry Affordance E2E › Route 4: /exercises displays error state and retry affordance on PostgREST read error, recovering on retry (2.9s)
+  ✓   8 [Desktop Chrome] › tests/e2e/error-states.spec.ts:121:3 › RFIX-11 Error States & Retry Affordance E2E › Route 5: /coach displays error state and retry affordance on PostgREST read error, recovering on retry (3.0s)
+[RFIX-09] Total load-more clicks executed: 3
+[RFIX-09] Scroll steps taken: 36 (cap 400)
+[RFIX-09] Distinct session count reached: 151
+DISTINCT_SESSIONS_COUNT=151
+  ✓   9 [Desktop Chrome] › tests/e2e/history-pagination.spec.ts:4:3 › RFIX-09 History Pagination Verification › A user with 151 workouts can reach all 151 distinct sessions from /history (9.4s)
+  ✓  10 [Desktop Chrome] › tests/e2e/mobile-viewport.spec.ts:4:3 › Mobile Viewport & Ergonomics › has correct viewport meta tag with viewport-fit=cover and no user-scalable=no (671ms)
+  ✓  11 [Desktop Chrome] › tests/e2e/mobile-viewport.spec.ts:13:3 › Mobile Viewport & Ergonomics › prevents horizontal scroll overflow on mobile (1.6s)
+  ✓  12 [Desktop Chrome] › tests/e2e/mobile-viewport.spec.ts:37:3 › Mobile Viewport & Ergonomics › ensures text inputs have >= 16px font size on mobile to prevent iOS auto-zoom (961ms)
+  ✓  13 [Desktop Chrome] › tests/e2e/nutrition-flow.spec.ts:154:3 › Nutrition Flow E2E › renders 5-ring/card macro dashboard and conversational analysis input (2.2s)
+  ✓  14 [Desktop Chrome] › tests/e2e/nutrition-flow.spec.ts:171:3 › Nutrition Flow E2E › allows manual meal entry and displays logged meal in timeline (2.5s)
+  ✓  15 [Desktop Chrome] › tests/e2e/nutrition-flow.spec.ts:247:3 › Nutrition Flow E2E › submits conversational meal prompt, interacts with staged card and quick log (2.6s)
+  ✓  16 [Desktop Chrome] › tests/e2e/nutrition-flow.spec.ts:288:3 › Nutrition Flow E2E › analyzes multi-dish conversational meal "I ate Com Tam & Eggs" and elaborates all component items (2.7s)
+  ✓  17 [Desktop Chrome] › tests/e2e/nutrition-flow.spec.ts:319:3 › Nutrition Flow E2E › preserves exact pre-analyzed structured breakdown text verbatim with exact totals (2.7s)
+  ✓  18 [Desktop Chrome] › tests/e2e/nutrition-flow.spec.ts:375:3 › Nutrition Flow E2E › allows editing a logged meal in today timeline and history view with updated macros (4.5s)
+  -  19 [Desktop Chrome] › tests/e2e/nutrition-hierarchy-320.spec.ts:157:3 › Nutrition hierarchy at 320px › a staged multi-component meal keeps every component inside its card
+  -  20 [Desktop Chrome] › tests/e2e/nutrition-hierarchy-320.spec.ts:171:3 › Nutrition hierarchy at 320px › the component name stays legible rather than collapsing to one glyph
+  -  21 [Desktop Chrome] › tests/e2e/nutrition-hierarchy-320.spec.ts:190:3 › Nutrition hierarchy at 320px › every control on a component row still meets the 44px touch target
+  -  22 [Desktop Chrome] › tests/e2e/nutrition-hierarchy-320.spec.ts:203:3 › Nutrition hierarchy at 320px › a logged breakdown expands and stays inside its card, then cleans up
+  -  23 [Desktop Chrome] › tests/e2e/nutrition-hierarchy-320.spec.ts:243:3 › Nutrition hierarchy at 320px › the document itself never scrolls sideways on the nutrition page
+  -  24 [Desktop Chrome] › tests/e2e/nutrition-hierarchy-320.spec.ts:250:3 › Nutrition hierarchy at 320px › interactive nutrient breakdown popup opens at 320px, meets touch targets, and never overflows
+[RFIX-06 Order A: Cold /workout]
+URL: http://127.0.0.1:58821/rest/v1/routine_templates?select=id%2Cuser_id%2Cname%2Cis_master%2Cassigned_to%2Cdays_of_week%2Ccreated_at&or=%28user_id.eq.a0000000-0000-0000-0000-000000000002%2Cis_master.eq.true%2Cassigned_to.eq.a0000000-0000-0000-0000-000000000002%29&order=created_at.desc&limit=100
+HTTP Status: 200
+Limit: 100
+Order: created_at.desc
+Select: id,user_id,name,is_master,assigned_to,days_of_week,created_at
+Payload Bytes: 21574
+VERIFICATION_ORDER_A_BYTES=21574
+VERIFICATION_ORDER_A_LIMIT=100
+VERIFICATION_ORDER_A_STATUS=PASS
+  ✓  25 [Desktop Chrome] › tests/e2e/rfix-06-payload.spec.ts:6:3 › RFIX-06 Payload & Cache Key Disambiguation Verification › Order A: Cold navigation directly to /workout measures <= 51,200 B and asserts limit=100 & order (1.1s)
+[RFIX-06 Order B Step 1: /exercises]
+URL: http://127.0.0.1:58821/rest/v1/routine_templates?select=id%2Cuser_id%2Cname%2Cis_master%2Cassigned_to%2Cdays_of_week%2Ccreated_at%2Cexercises%3Atemplate_exercises%28id%2Ctemplate_id%2Cexercise_id%2Corder_index%2Ctarget_sets%2Ctarget_reps%2Cexercise%3Aexercises%28id%2Cname%2Cbody_part%29%29&or=%28user_id.eq.a0000000-0000-0000-0000-000000000002%2Cis_master.eq.true%2Cassigned_to.eq.a0000000-0000-0000-0000-000000000002%29&order=created_at.desc&limit=100
+HTTP Status: 200
+Limit: 100
+Order: created_at.desc
+Payload Bytes: 72168
+VERIFICATION_ORDER_B_EXERCISES_BYTES=72168
+[RFIX-06 Order B Step 2: /exercises -> /workout]
+URL: http://127.0.0.1:58821/rest/v1/routine_templates?select=id%2Cuser_id%2Cname%2Cis_master%2Cassigned_to%2Cdays_of_week%2Ccreated_at&or=%28user_id.eq.a0000000-0000-0000-0000-000000000002%2Cis_master.eq.true%2Cassigned_to.eq.a0000000-0000-0000-0000-000000000002%29&order=created_at.desc&limit=100
+HTTP Status: 200
+Limit: 100
+Order: created_at.desc
+Payload Bytes: 21574
+VERIFICATION_ORDER_B_EXERCISES_LIMIT=100
+VERIFICATION_ORDER_B_WORKOUT_LIMIT=100
+VERIFICATION_ORDER_B_WORKOUT_BYTES=21574
+VERIFICATION_ORDER_B_STATUS=PASS
+  ✓  26 [Desktop Chrome] › tests/e2e/rfix-06-payload.spec.ts:63:3 › RFIX-06 Payload & Cache Key Disambiguation Verification › Order B: Client navigation /exercises -> /workout refetches bounded query <= 51,200 B and asserts projection & order (1.9s)
+  ✓  27 [Desktop Chrome] › tests/e2e/workout-flow.spec.ts:14:3 › Workout Flow E2E › loads workout engine with sticky rest timer and exercise routines (1.3s)
+  ✓  28 [Desktop Chrome] › tests/e2e/workout-flow.spec.ts:29:3 › Workout Flow E2E › allows toggling rest timer presets and controls (1.4s)
+  ✓  29 [Desktop Chrome] › tests/e2e/workout-flow.spec.ts:53:3 › Workout Flow E2E › interacts with workout sets, draft inputs, and commit action (1.6s)
+  ✓  30 [Desktop Chrome] › tests/e2e/workout-flow.spec.ts:84:3 › Workout Flow E2E › renders real historical workout set benchmarks (ghost sets) and history session data (3.8s)
+  ✓  31 [Desktop Chrome] › tests/e2e/workout-flow.spec.ts:122:3 › Workout Flow E2E › negative control: displays error banner and retry affordance if workout queries fail (2.8s)
+[globalTeardown] Cleaning up test-generated residue...
+[globalTeardown] Database residue cleaned successfully:
+SELECT 3
+DO
+DELETE 1
+DELETE 1
+DELETE 0
+DELETE 2
+DELETE 0
+
+  6 skipped
+  25 passed (1.2m)

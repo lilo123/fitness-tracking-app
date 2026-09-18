@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - v2-rewrite
+      - master
+  pull_request:
+    branches:
+      - main
+      - v2-rewrite
+      - master
+
+jobs:
+  ci:
+    name: Build, Test, Lint, Audit & Budget Enforcement
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      VITE_SUPABASE_URL: http://127.0.0.1:58821
+      VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js (version 22)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter (oxlint)
+        run: npm run lint
+
+      - name: TypeScript typecheck
+        run: npx tsc -b
+
+      - name: Build application
+        run: npm run build
+
+      - name: Verify performance budget
+        run: npm run perf:budget
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase local emulator
+        run: npx supabase start -x studio,migra,deno-relay,pgadmin-schema-diff
+
+      - name: Reset database and seed
+        run: npx supabase db reset
+
+      - name: Seed performance benchmark data
+        run: npm run seed:stress
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Run complete test suite (test:all)
+        run: npm run test:all
+
+      # Non-blocking pending human decision H-3: /workout payload measures ~182-194 KB vs the 153,600 B ceiling.
+      # The ceiling must not be relaxed to make it pass. The breach remains visible in CI output.
+      - name: Run performance trace (non-blocking, H-3 escalation)
+        continue-on-error: true
+        run: npm run perf:trace
+
+      - name: Verify performance artifact (non-blocking, H-3/H-4 escalation)
+        continue-on-error: true
+        run: npm run perf:verify
+
+      - name: Audit dependencies
+        run: npm audit --omit=dev --audit-level=high

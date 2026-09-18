@@ -7,6 +7,7 @@ import { AuthProvider } from '../context/AuthContext';
 import { CoachProvider } from '../context/CoachContext';
 import { supabase } from '../lib/supabase';
 import { getLocalDateStr } from '../utils/date';
+import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory } from '../test/supabaseBuilderMock';
 
 /**
  * Edit and Delete now live behind a single overflow trigger (`meal-actions-<id>`)
@@ -58,29 +59,15 @@ describe('NutritionEngine', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    clearMockHistory();
     (supabase.auth.getUser as any).mockResolvedValue({ data: { user: { id: 'test-user-id' } } });
     (supabase.auth.getSession as any).mockResolvedValue({ data: { session: mockSession } });
     (supabase.auth.onAuthStateChange as any).mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } });
 
-    // Default mock implementation
-    const mockSelect = vi.fn().mockReturnValue({
-      eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              single: vi.fn().mockResolvedValue({ data: null, error: null })
-              })
-            })
-          }),
-      order: vi.fn().mockResolvedValue({ data: [], error: null }),
-    });
-
-    (supabase.from as any).mockImplementation((_table: string) => ({
-      select: mockSelect,
-      insert: vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) }),
-      update: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) }) }),
-      delete: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
-    }));
+    // Default mock implementation using full PostgREST builder test double
+    (supabase.from as any).mockImplementation((table: string) =>
+      createSupabaseBuilder(table, { data: [], error: null })
+    );
 
     queryClient = new QueryClient({
       defaultOptions: {
@@ -225,32 +212,11 @@ describe('NutritionEngine', () => {
   it('logs a staged meal to supabase nutrition_logs', async () => {
     const mockInsert = vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) });
     (supabase.from as any).mockImplementation((table: string) => {
+      const b = createSupabaseBuilder(table, { data: [], error: null });
       if (table === 'nutrition_logs') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null })
-              })
-            })
-          }),
-          }),
-          insert: mockInsert,
-        };
+        b.insert = mockInsert;
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              single: vi.fn().mockResolvedValue({ data: null, error: null })
-              })
-            })
-          }),
-        }),
-      };
+      return b;
     });
 
     (supabase.functions.invoke as any).mockResolvedValue({
@@ -295,41 +261,16 @@ describe('NutritionEngine', () => {
     const mockInsert = vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) });
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'custom_dishes') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({
-              data: [{ id: 'dish-1', name: 'Protein Oats', calories: 420, protein: 35, carbs: 55, fat: 8 }],
-              error: null,
-            }),
-          }),
-        };
+        return createSupabaseBuilder('custom_dishes', {
+          data: [{ id: 'dish-1', name: 'Protein Oats', calories: 420, protein: 35, carbs: 55, fat: 8 }],
+          error: null,
+        });
       }
+      const b = createSupabaseBuilder(table, { data: [], error: null });
       if (table === 'nutrition_logs') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null })
-              })
-            })
-          }),
-          }),
-          insert: mockInsert,
-        };
+        b.insert = mockInsert;
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              single: vi.fn().mockResolvedValue({ data: null, error: null })
-              })
-            })
-          }),
-        }),
-      };
+      return b;
     });
 
     renderComponent();
@@ -349,37 +290,21 @@ describe('NutritionEngine', () => {
     expect(payload.food_name).toBe('Protein Oats');
     expect(payload.calories).toBe(420);
     expect(payload.protein).toBe(35);
+    expect(getRecordedTables()).toContain('custom_dishes');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'custom_dishes',
+      projection: 'id, user_id, name, calories, protein, carbs, fat, fiber, created_at',
+    });
   });
 
   it('allows manual entry logging when toggled', async () => {
     const mockInsert = vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) });
     (supabase.from as any).mockImplementation((table: string) => {
+      const b = createSupabaseBuilder(table, { data: [], error: null });
       if (table === 'nutrition_logs') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null })
-              })
-            })
-          }),
-          }),
-          insert: mockInsert,
-        };
+        b.insert = mockInsert;
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              single: vi.fn().mockResolvedValue({ data: null, error: null })
-              })
-            })
-          }),
-        }),
-      };
+      return b;
     });
 
     renderComponent();
@@ -408,26 +333,11 @@ describe('NutritionEngine', () => {
   it('saves a staged meal as a custom dish with JSON serialized ingredients and fiber', async () => {
     const mockInsert = vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) });
     (supabase.from as any).mockImplementation((table: string) => {
+      const b = createSupabaseBuilder(table, { data: [], error: null });
       if (table === 'custom_dishes') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-          insert: mockInsert,
-        };
+        b.insert = mockInsert;
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              single: vi.fn().mockResolvedValue({ data: null, error: null })
-              })
-            })
-          }),
-        }),
-      };
+      return b;
     });
 
     (supabase.functions.invoke as any).mockResolvedValue({
@@ -586,38 +496,23 @@ describe('NutritionEngine', () => {
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'custom_dishes') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({
-              data: [
-                {
-                  id: 'dish-1',
-                  name: 'Protein Oats',
-                  calories: 420,
-                  protein: 35,
-                  carbs: 55,
-                  fat: 6,
-                  fiber: 8,
-                  ingredients: serializedIngredients,
-                },
-              ],
-              error: null,
-            }),
-          }),
-        };
+        return createSupabaseBuilder('custom_dishes', {
+          data: [
+            {
+              id: 'dish-1',
+              name: 'Protein Oats',
+              calories: 420,
+              protein: 35,
+              carbs: 55,
+              fat: 6,
+              fiber: 8,
+              ingredients: serializedIngredients,
+            },
+          ],
+          error: null,
+        });
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              single: vi.fn().mockResolvedValue({ data: null, error: null })
-              })
-            })
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -641,26 +536,11 @@ describe('NutritionEngine', () => {
   it('opens custom dish modal to create and save a new custom dish with fiber', async () => {
     const mockInsert = vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) });
     (supabase.from as any).mockImplementation((table: string) => {
+      const b = createSupabaseBuilder(table, { data: [], error: null });
       if (table === 'custom_dishes') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-          insert: mockInsert,
-        };
+        b.insert = mockInsert;
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              single: vi.fn().mockResolvedValue({ data: null, error: null })
-              })
-            })
-          }),
-        }),
-      };
+      return b;
     });
 
     renderComponent();
@@ -903,32 +783,11 @@ Total Fiber: 8 g`;
   it('accurately extracts portion size and logs serving_size and serving_unit to supabase from Friday Menu Grounded', async () => {
     const mockInsert = vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) });
     (supabase.from as any).mockImplementation((table: string) => {
+      const b = createSupabaseBuilder(table, { data: [], error: null });
       if (table === 'nutrition_logs') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null })
-              })
-            })
-          }),
-          }),
-          insert: mockInsert,
-        };
+        b.insert = mockInsert;
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              single: vi.fn().mockResolvedValue({ data: null, error: null })
-              })
-            })
-          }),
-        }),
-      };
+      return b;
     });
 
     (supabase.functions.invoke as any).mockResolvedValue({
@@ -1070,32 +929,11 @@ Total Fiber: 1 g`;
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'nutrition_logs') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [mockMeal], error: null })
-              })
-            })
-          }),
-          }),
-          update: mockUpdate,
-          delete: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
-        };
+        const b = createSupabaseBuilder('nutrition_logs', { data: [mockMeal], error: null });
+        b.update = mockUpdate;
+        return b;
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              single: vi.fn().mockResolvedValue({ data: null, error: null })
-              })
-            })
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -1104,6 +942,12 @@ Total Fiber: 1 g`;
     await waitFor(() => {
       expect(screen.getByText('Avocado Toast & Poached Egg')).toBeDefined();
       expect(screen.getByTestId('meal-actions-today-log-1')).toBeDefined();
+    });
+
+    expect(getRecordedTables()).toContain('nutrition_logs');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'nutrition_logs',
+      projection: 'id, user_id, food_name, meal_type, calories, protein, carbs, fat, fiber, serving_size, serving_unit, logged_at, created_at, has_components',
     });
 
     // Click edit button
@@ -1175,32 +1019,11 @@ Total Fiber: 1 g`;
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'nutrition_logs') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [mockMeal], error: null })
-              })
-            })
-          }),
-          }),
-          update: mockUpdate,
-          delete: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
-        };
+        const b = createSupabaseBuilder('nutrition_logs', { data: [mockMeal], error: null });
+        b.update = mockUpdate;
+        return b;
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              single: vi.fn().mockResolvedValue({ data: null, error: null })
-              })
-            })
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -1241,32 +1064,11 @@ Total Fiber: 1 g`;
     const mockUpdate = vi.fn();
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'nutrition_logs') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [mockMeal], error: null })
-              })
-            })
-          }),
-          }),
-          update: mockUpdate,
-          delete: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
-        };
+        const b = createSupabaseBuilder('nutrition_logs', { data: [mockMeal], error: null });
+        b.update = mockUpdate;
+        return b;
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              single: vi.fn().mockResolvedValue({ data: null, error: null })
-              })
-            })
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -1300,47 +1102,26 @@ Total Fiber: 1 g`;
     const todayStr = getLocalDateStr(new Date());
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'nutrition_logs') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({
-                data: [
-                  {
-                    id: 'over-meal-1',
-                    food_name: 'Massive Feast',
-                    calories: 2500, // exceeds 2200 default by 300
-                    protein: 180, // exceeds 160 default by 20
-                    carbs: 250, // exceeds 220 default by 30
-                    fat: 80, // exceeds 70 default by 10
-                    fiber: 35, // exceeds 30 default by 5
-                    logged_at: `${todayStr}T12:00:00Z`,
-                    meal_type: 'Lunch',
-                    serving_size: 1,
-                    serving_unit: 'serving',
-                  },
-                ],
-                error: null,
-              })
-              })
-            })
-          }),
-          }),
-        };
+        return createSupabaseBuilder('nutrition_logs', {
+          data: [
+            {
+              id: 'over-meal-1',
+              food_name: 'Massive Feast',
+              calories: 2500, // exceeds 2200 default by 300
+              protein: 180, // exceeds 160 default by 20
+              carbs: 250, // exceeds 220 default by 30
+              fat: 80, // exceeds 70 default by 10
+              fiber: 35, // exceeds 30 default by 5
+              logged_at: `${todayStr}T12:00:00Z`,
+              meal_type: 'Lunch',
+              serving_size: 1,
+              serving_unit: 'serving',
+            },
+          ],
+          error: null,
+        });
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              single: vi.fn().mockResolvedValue({ data: null, error: null })
-              })
-            })
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -1366,47 +1147,26 @@ Total Fiber: 1 g`;
     const todayStr = getLocalDateStr(new Date());
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'nutrition_logs') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({
-                data: [
-                  {
-                    id: 'under-meal-1',
-                    food_name: 'Light Snack',
-                    calories: 500, // 2200 default - 500 = 1700 remaining
-                    protein: 40, // 160 default - 40 = 120 remaining
-                    carbs: 60, // 220 default - 60 = 160 remaining
-                    fat: 20, // 70 default - 20 = 50 remaining
-                    fiber: 10, // 30 default - 10 = 20 remaining
-                    logged_at: `${todayStr}T12:00:00Z`,
-                    meal_type: 'Snack',
-                    serving_size: 1,
-                    serving_unit: 'serving',
-                  },
-                ],
-                error: null,
-              })
-              })
-            })
-          }),
-          }),
-        };
+        return createSupabaseBuilder('nutrition_logs', {
+          data: [
+            {
+              id: 'under-meal-1',
+              food_name: 'Light Snack',
+              calories: 500, // 2200 default - 500 = 1700 remaining
+              protein: 40, // 160 default - 40 = 120 remaining
+              carbs: 60, // 220 default - 60 = 160 remaining
+              fat: 20, // 70 default - 20 = 50 remaining
+              fiber: 10, // 30 default - 10 = 20 remaining
+              logged_at: `${todayStr}T12:00:00Z`,
+              meal_type: 'Snack',
+              serving_size: 1,
+              serving_unit: 'serving',
+            },
+          ],
+          error: null,
+        });
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              single: vi.fn().mockResolvedValue({ data: null, error: null })
-              })
-            })
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -1453,41 +1213,16 @@ Total Fiber: 1 g`;
     const mockInsert = vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) });
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'custom_dishes') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({
-              data: [{ id: 'dish-evening-1', name: 'Grilled Salmon Bowl', calories: 620, protein: 45, carbs: 50, fat: 20 }],
-              error: null,
-            }),
-          }),
-        };
+        return createSupabaseBuilder('custom_dishes', {
+          data: [{ id: 'dish-evening-1', name: 'Grilled Salmon Bowl', calories: 620, protein: 45, carbs: 50, fat: 20 }],
+          error: null,
+        });
       }
+      const b = createSupabaseBuilder(table, { data: [], error: null });
       if (table === 'nutrition_logs') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null })
-              })
-            })
-          }),
-          }),
-          insert: mockInsert,
-        };
+        b.insert = mockInsert;
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              single: vi.fn().mockResolvedValue({ data: null, error: null })
-              })
-            })
-          }),
-        }),
-      };
+      return b;
     });
 
     try {
@@ -1509,7 +1244,7 @@ Total Fiber: 1 g`;
 
       const payload = mockInsert.mock.calls[0][0][0];
       expect(payload.food_name).toBe('Grilled Salmon Bowl');
-      expect(payload.logged_at).toBe('2026-09-08T20:30:00Z');
+      expect(payload.logged_at).toBe('2026-09-08T20:30:00.000Z');
       expect(payload.logged_at.startsWith('2026-09-08')).toBe(true);
     } finally {
       vi.useRealTimers();
@@ -1520,41 +1255,16 @@ Total Fiber: 1 g`;
     const mockInsert = vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) });
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'custom_dishes') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({
-              data: [{ id: 'dish-evening-2', name: 'Steak & Rice', calories: 750, protein: 55, carbs: 60, fat: 25 }],
-              error: null,
-            }),
-          }),
-        };
+        return createSupabaseBuilder('custom_dishes', {
+          data: [{ id: 'dish-evening-2', name: 'Steak & Rice', calories: 750, protein: 55, carbs: 60, fat: 25 }],
+          error: null,
+        });
       }
+      const b = createSupabaseBuilder(table, { data: [], error: null });
       if (table === 'nutrition_logs') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null })
-              })
-            })
-          }),
-          }),
-          insert: mockInsert,
-        };
+        b.insert = mockInsert;
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              single: vi.fn().mockResolvedValue({ data: null, error: null })
-              })
-            })
-          }),
-        }),
-      };
+      return b;
     });
 
     renderComponent();
@@ -1577,7 +1287,7 @@ Total Fiber: 1 g`;
 
     const payload = mockInsert.mock.calls[0][0][0];
     expect(payload.food_name).toBe('Steak & Rice');
-    expect(payload.logged_at).toMatch(/^2026-09-05T\d{2}:\d{2}:\d{2}Z$/);
+    expect(payload.logged_at).toMatch(/^2026-09-05T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/);
     expect(payload.logged_at.startsWith('2026-09-05')).toBe(true);
   });
 
@@ -1836,32 +1546,11 @@ Total Fiber: 1 g`;
 
     const mockInsert = vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) });
     (supabase.from as any).mockImplementation((table: string) => {
+      const b = createSupabaseBuilder(table, { data: [], error: null });
       if (table === 'nutrition_logs') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null })
-              })
-            })
-          }),
-          }),
-          insert: mockInsert,
-        };
+        b.insert = mockInsert;
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              single: vi.fn().mockResolvedValue({ data: null, error: null })
-              })
-            })
-          }),
-        }),
-      };
+      return b;
     });
 
     (supabase.functions.invoke as any).mockResolvedValue({
@@ -2367,31 +2056,14 @@ Total Fiber: 1 g`;
   it('opens custom dish edit modal when edit pencil button on carousel card is clicked', async () => {
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'custom_dishes') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [
-                  { id: 'dish-edit-1', name: 'Macro Oats', calories: 350, protein: 30, carbs: 45, fat: 5, fiber: 6, ingredients: '' },
-                ],
-                error: null,
-              }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder('custom_dishes', {
+          data: [
+            { id: 'dish-edit-1', name: 'Macro Oats', calories: 350, protein: 30, carbs: 45, fat: 5, fiber: 6, ingredients: '' },
+          ],
+          error: null,
+        });
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-                single: vi.fn().mockResolvedValue({ data: null, error: null }),
-              }),
-            }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -2407,6 +2079,213 @@ Total Fiber: 1 g`;
       expect(screen.getByText('Edit Custom Dish')).toBeDefined();
       expect(screen.getByDisplayValue('Macro Oats')).toBeDefined();
       expect(screen.getByDisplayValue('350')).toBeDefined();
+    });
+  });
+
+  it('P1-1: rendering >= 10 dishes asserts 0 fetchDishDetail calls, and opening one dish editor asserts exactly 1', async () => {
+    const dishes = Array.from({ length: 12 }, (_, i) => ({
+      id: `dish-perf-${i + 1}`,
+      user_id: 'test-user-id',
+      name: `Dish ${i + 1}`,
+      calories: 300 + i * 10,
+      protein: 20 + i,
+      carbs: 30,
+      fat: 10,
+      fiber: 2,
+      created_at: new Date(Date.now() - i * 1000).toISOString(),
+    }));
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'custom_dishes') {
+        return createSupabaseBuilder('custom_dishes', {
+          resolver: (builder: any) => {
+            if (builder.projection === 'id, items, ingredients') {
+              const idFilter = builder.filters.find((f: any) => f.column === 'id');
+              const dishId = idFilter?.value;
+              return {
+                id: dishId,
+                items: [
+                  {
+                    id: 'item-1',
+                    name: 'Detail Oats',
+                    displayPortion: '1 cup',
+                    quantity: 1,
+                    unit: 'cup',
+                    calories: 300,
+                    protein: 20,
+                    carbs: 30,
+                    fat: 10,
+                    fiber: 2,
+                  },
+                ],
+                ingredients: null,
+              };
+            }
+            return dishes;
+          },
+        });
+      }
+      return createSupabaseBuilder(table, { data: [], error: null });
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('custom-dish-card-dish-perf-1')).toBeDefined();
+    });
+
+    // Verify 10+ dishes are rendered
+    for (let i = 1; i <= 10; i++) {
+      expect(screen.getByTestId(`custom-dish-card-dish-perf-${i}`)).toBeDefined();
+    }
+
+    // 0 fetchDishDetail calls so far
+    const detailFetchesBefore = getRecordedSelects().filter(
+      (s) => s.table === 'custom_dishes' && s.projection === 'id, items, ingredients'
+    );
+    expect(detailFetchesBefore.length).toBe(0);
+
+    // Open one dish editor
+    const editBtn = screen.getByTestId('edit-dish-btn-dish-perf-1');
+    fireEvent.click(editBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('Edit Custom Dish')).toBeDefined();
+    });
+
+    // Exactly 1 fetchDishDetail call occurred
+    const detailFetchesAfter = getRecordedSelects().filter(
+      (s) => s.table === 'custom_dishes' && s.projection === 'id, items, ingredients'
+    );
+    expect(detailFetchesAfter.length).toBe(1);
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'custom_dishes',
+      projection: 'id, items, ingredients',
+    });
+  });
+
+  it('P1-1: surfaces fetch failure with role="alert" and a retry affordance when dish detail fetch fails', async () => {
+    let shouldFail = true;
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'custom_dishes') {
+        return createSupabaseBuilder('custom_dishes', {
+          resolver: (builder: any) => {
+            if (builder.projection === 'id, items, ingredients') {
+              if (shouldFail) {
+                return { data: null, error: new Error('Network error loading dish details') };
+              }
+              return {
+                id: 'dish-err-1',
+                items: [
+                  {
+                    id: 'item-1',
+                    name: 'Oats',
+                    displayPortion: '1 cup',
+                    quantity: 1,
+                    unit: 'cup',
+                    calories: 300,
+                    protein: 20,
+                    carbs: 30,
+                    fat: 10,
+                    fiber: 2,
+                  },
+                ],
+                ingredients: null,
+              };
+            }
+            return [
+              {
+                id: 'dish-err-1',
+                user_id: 'test-user-id',
+                name: 'Error Dish',
+                calories: 300,
+                protein: 20,
+                carbs: 30,
+                fat: 10,
+                fiber: 2,
+                created_at: new Date().toISOString(),
+              },
+            ];
+          },
+        });
+      }
+      return createSupabaseBuilder(table, { data: [], error: null });
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('custom-dish-card-dish-err-1')).toBeDefined();
+    });
+
+    // Staging the dish triggers fetchDishDetail
+    fireEvent.click(screen.getByTestId('custom-dish-card-dish-err-1'));
+
+    const errorAlert = await screen.findByTestId('dish-fetch-error');
+    expect(errorAlert).toBeDefined();
+    expect(errorAlert.getAttribute('role')).toBe('alert');
+    expect(errorAlert.textContent).toContain('Network error loading dish details');
+
+    const retryBtn = screen.getByTestId('dish-fetch-retry');
+    expect(retryBtn).toBeDefined();
+    expect(retryBtn.textContent).toBe('Retry');
+
+    // Clicking retry after fixing failure succeeds
+    shouldFail = false;
+    fireEvent.click(retryBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('dish-fetch-error')).toBeNull();
+      expect(screen.getByTestId('staged-meal-card')).toBeDefined();
+    });
+  });
+
+  it('P1-1 / C-3: preserves fallback chain verbatim: normalizeItems -> legacy ingredients -> single synthetic item', async () => {
+    const legacyIngredients = JSON.stringify([
+      { name: 'Rolled Oats', portion: '50g', calories: 190, protein: 7, carbs: 34, fat: 3, fiber: 5 },
+    ]);
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'custom_dishes') {
+        return createSupabaseBuilder('custom_dishes', {
+          resolver: (builder: any) => {
+            if (builder.projection === 'id, items, ingredients') {
+              return {
+                id: 'dish-legacy-1',
+                items: null,
+                ingredients: legacyIngredients,
+              };
+            }
+            return [
+              {
+                id: 'dish-legacy-1',
+                user_id: 'test-user-id',
+                name: 'Legacy Dish',
+                calories: 190,
+                protein: 7,
+                carbs: 34,
+                fat: 3,
+                fiber: 5,
+                created_at: new Date().toISOString(),
+              },
+            ];
+          },
+        });
+      }
+      return createSupabaseBuilder(table, { data: [], error: null });
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('custom-dish-card-dish-legacy-1')).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByTestId('custom-dish-card-dish-legacy-1'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('staged-meal-card')).toBeDefined();
+      expect(screen.getByText('Rolled Oats')).toBeDefined();
     });
   });
 
@@ -2452,42 +2331,26 @@ Total Fiber: 1 g`;
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'custom_dishes') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [
-                  {
-                    id: 'dish-breakkie',
-                    name: 'Google Breakkie',
-                    calories: expectedTotals.calories,
-                    protein: expectedTotals.protein,
-                    carbs: expectedTotals.carbs,
-                    fat: expectedTotals.fat,
-                    fiber: expectedTotals.fiber,
-                    // Un-backfilled: the legacy blob is the only breakdown.
-                    ingredients: serialized,
-                  },
-                ],
-                error: null,
-              }),
-            }),
-          }),
-          update: mockUpdate,
-        };
+        const b = createSupabaseBuilder('custom_dishes', {
+          data: [
+            {
+              id: 'dish-breakkie',
+              name: 'Google Breakkie',
+              calories: expectedTotals.calories,
+              protein: expectedTotals.protein,
+              carbs: expectedTotals.carbs,
+              fat: expectedTotals.fat,
+              fiber: expectedTotals.fiber,
+              // Un-backfilled: the legacy blob is the only breakdown.
+              ingredients: serialized,
+            },
+          ],
+          error: null,
+        });
+        b.update = mockUpdate;
+        return b;
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-                single: vi.fn().mockResolvedValue({ data: null, error: null }),
-              }),
-            }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -2539,32 +2402,16 @@ Total Fiber: 1 g`;
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'custom_dishes') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [
-                  { id: 'dish-del-1', name: 'Delete Me Dish', calories: 200, protein: 10, carbs: 20, fat: 2, fiber: 1 },
-                ],
-                error: null,
-              }),
-            }),
-          }),
-          delete: mockDelete,
-        };
+        const b = createSupabaseBuilder('custom_dishes', {
+          data: [
+            { id: 'dish-del-1', name: 'Delete Me Dish', calories: 200, protein: 10, carbs: 20, fat: 2, fiber: 1 },
+          ],
+          error: null,
+        });
+        b.delete = mockDelete;
+        return b;
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-                single: vi.fn().mockResolvedValue({ data: null, error: null }),
-              }),
-            }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
@@ -2602,45 +2449,18 @@ Total Fiber: 1 g`;
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'custom_dishes') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [
-                  { id: 'dish-toast-1', name: 'Power Bowl', calories: 550, protein: 40, carbs: 60, fat: 12, fiber: 8 },
-                ],
-                error: null,
-              }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder('custom_dishes', {
+          data: [
+            { id: 'dish-toast-1', name: 'Power Bowl', calories: 550, protein: 40, carbs: 60, fat: 12, fiber: 8 },
+          ],
+          error: null,
+        });
       }
+      const b = createSupabaseBuilder(table, { data: [], error: null });
       if (table === 'nutrition_logs') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              gte: vi.fn().mockReturnValue({
-                lte: vi.fn().mockReturnValue({
-                  order: vi.fn().mockResolvedValue({ data: [], error: null }),
-                }),
-              }),
-            }),
-          }),
-          insert: mockInsert,
-        };
+        b.insert = mockInsert;
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-                single: vi.fn().mockResolvedValue({ data: null, error: null }),
-              }),
-            }),
-          }),
-        }),
-      };
+      return b;
     });
 
     renderComponent();
@@ -2665,45 +2485,14 @@ Total Fiber: 1 g`;
   it('auto-dismisses floating Quick-Log Toast widget after 2.8s', async () => {
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'custom_dishes') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [
-                  { id: 'dish-toast-2', name: 'Greek Yogurt Parfait', calories: 280, protein: 22, carbs: 35, fat: 4, fiber: 3 },
-                ],
-                error: null,
-              }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder('custom_dishes', {
+          data: [
+            { id: 'dish-toast-2', name: 'Greek Yogurt Parfait', calories: 280, protein: 22, carbs: 35, fat: 4, fiber: 3 },
+          ],
+          error: null,
+        });
       }
-      if (table === 'nutrition_logs') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              gte: vi.fn().mockReturnValue({
-                lte: vi.fn().mockReturnValue({
-                  order: vi.fn().mockResolvedValue({ data: [], error: null }),
-                }),
-              }),
-            }),
-          }),
-          insert: vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) }),
-        };
-      }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-                single: vi.fn().mockResolvedValue({ data: null, error: null }),
-              }),
-            }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -2729,46 +2518,15 @@ Total Fiber: 1 g`;
   it('handles rapid multi-tap on quick-log button by updating toast content and resetting auto-dismiss timer', async () => {
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'custom_dishes') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [
-                  { id: 'dish-a', name: 'Meal A', calories: 400, protein: 30, carbs: 40, fat: 10, fiber: 5 },
-                  { id: 'dish-b', name: 'Meal B', calories: 250, protein: 20, carbs: 20, fat: 5, fiber: 2 },
-                ],
-                error: null,
-              }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder('custom_dishes', {
+          data: [
+            { id: 'dish-a', name: 'Meal A', calories: 400, protein: 30, carbs: 40, fat: 10, fiber: 5 },
+            { id: 'dish-b', name: 'Meal B', calories: 250, protein: 20, carbs: 20, fat: 5, fiber: 2 },
+          ],
+          error: null,
+        });
       }
-      if (table === 'nutrition_logs') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              gte: vi.fn().mockReturnValue({
-                lte: vi.fn().mockReturnValue({
-                  order: vi.fn().mockResolvedValue({ data: [], error: null }),
-                }),
-              }),
-            }),
-          }),
-          insert: vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) }),
-        };
-      }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-                single: vi.fn().mockResolvedValue({ data: null, error: null }),
-              }),
-            }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -2868,32 +2626,11 @@ Total Fiber: 1 g`;
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'nutrition_logs') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              gte: vi.fn().mockReturnValue({
-                lte: vi.fn().mockReturnValue({
-                  order: vi.fn().mockResolvedValue({ data: [mockMeal], error: null }),
-                }),
-              }),
-            }),
-          }),
-          update: mockUpdate,
-          delete: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
-        };
+        const b = createSupabaseBuilder('nutrition_logs', { data: [mockMeal], error: null });
+        b.update = mockUpdate;
+        return b;
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-                single: vi.fn().mockResolvedValue({ data: null, error: null }),
-              }),
-            }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -3068,33 +2805,9 @@ Total Fiber: 1 g`;
 
       (supabase.from as any).mockImplementation((table: string) => {
         if (table === 'nutrition_logs') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                gte: vi.fn().mockReturnValue({
-                  lte: vi.fn().mockReturnValue({
-                    order: vi.fn().mockResolvedValue({ data: mockLogs, error: null }),
-                  }),
-                }),
-              }),
-            }),
-            insert: vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) }),
-            update: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) }) }),
-            delete: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
-          };
+          return createSupabaseBuilder('nutrition_logs', { data: mockLogs, error: null });
         }
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              gte: vi.fn().mockReturnValue({
-                lte: vi.fn().mockReturnValue({
-                  order: vi.fn().mockResolvedValue({ data: [], error: null }),
-                  single: vi.fn().mockResolvedValue({ data: null, error: null }),
-                }),
-              }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder(table, { data: [], error: null });
       });
 
       renderComponent();

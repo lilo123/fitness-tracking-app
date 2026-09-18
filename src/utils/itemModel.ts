@@ -13,6 +13,7 @@
  */
 
 import { convertPortion, type CanonicalUnit } from './unitConverter';
+import type { Json } from '../types/supabase';
 
 export interface NutritionItem {
   id: string;
@@ -31,6 +32,7 @@ export interface NutritionItem {
   carbs: number;
   fat: number;
   fiber: number;
+  [key: string]: Json | undefined;
 }
 
 export interface MacroTotals {

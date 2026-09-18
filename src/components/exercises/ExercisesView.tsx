@@ -13,9 +13,11 @@ import {
   AlertCircle,
   Pencil,
   Copy,
+  RotateCcw,
 } from 'lucide-react';
 import { EditTemplateModal } from './EditTemplateModal';
 import { EditExerciseModal } from './EditExerciseModal';
+import { isValidUUID } from '../workout/workoutEngineHelpers';
 
 const MUSCLE_TAXONOMY = {
   "Chest": ["chest", "pecs", "pectoral", "upper chest", "lower chest"],
@@ -50,30 +52,53 @@ export const ExercisesView: React.FC = () => {
   const [isForking, setIsForking] = useState<boolean>(false);
 
   // Queries
-  const { data: exercises = [] } = useQuery({
-    queryKey: ['exercises', user?.id],
+  const {
+    data: exercises = [],
+    isError: isExercisesError,
+    error: exercisesError,
+    refetch: refetchExercises,
+  } = useQuery({
+    queryKey: ['exercises', 'library', user?.id],
     queryFn: async () => {
-      let query = supabase.from('exercises').select('*').eq('is_archived', false);
-      if (user?.id) {
-        query = query.or(`is_master.eq.true,user_id.eq.${user.id}`);
+      let query = supabase
+        .from('exercises')
+        .select('id, name, body_part, is_master, is_archived, user_id, created_at')
+        .eq('is_archived', false);
+      if (user?.id && isValidUUID(user.id)) {
+        const filter = ['is_master.eq.true', 'user_id.eq.' + user.id].join(',');
+        query = query.or(filter);
       } else {
         query = query.eq('is_master', true);
       }
-      const { data, error } = await query.order('name');
+      const { data, error } = await query.order('name').limit(200);
       if (error) throw error;
       return data as Exercise[];
     },
   });
 
-  const { data: templates = [] } = useQuery({
-    queryKey: ['routine_templates', targetUserId],
+  const {
+    data: templates = [],
+    isError: isTemplatesError,
+    error: templatesError,
+    refetch: refetchTemplates,
+  } = useQuery({
+    queryKey: ['routine_templates', targetUserId, 'exercises'],
     queryFn: async () => {
-      if (!targetUserId) return [];
+      if (!targetUserId || !isValidUUID(targetUserId)) return [];
+      const filter = [
+        'user_id.eq.' + targetUserId,
+        'is_master.eq.true',
+        'assigned_to.eq.' + targetUserId,
+      ].join(',');
+      // payload-gate: accepted-list — routine template catalog, measured 0 B on /exercises (unmeasured route)
       const { data, error } = await supabase
         .from('routine_templates')
-        .select('*, exercises:template_exercises(*, exercise:exercises(name, body_part))')
-        .or(`user_id.eq.${targetUserId},is_master.eq.true,assigned_to.eq.${targetUserId}`)
-        .order('created_at', { ascending: false });
+        .select(
+          'id, user_id, name, is_master, assigned_to, days_of_week, created_at, exercises:template_exercises(id, template_id, exercise_id, order_index, target_sets, target_reps, exercise:exercises(id, name, body_part))'
+        )
+        .or(filter)
+        .order('created_at', { ascending: false })
+        .limit(100);
       if (error) throw error;
       if (!data) return [];
       // Deterministic precedence sort:
@@ -94,6 +119,13 @@ export const ExercisesView: React.FC = () => {
       });
     },
   });
+
+  const isReadError = activeTab === 'exercises' ? isExercisesError : isTemplatesError;
+  const readError = activeTab === 'exercises' ? exercisesError : templatesError;
+  const handleRetryExercises = () => {
+    void refetchExercises();
+    void refetchTemplates();
+  };
 
   // Mutations
   const createExerciseMutation = useMutation({
@@ -147,7 +179,7 @@ export const ExercisesView: React.FC = () => {
       const { error } = await supabase.from('routine_templates').delete().eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['routine_templates', targetUserId] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['routine_templates'] }),
   });
 
   const toggleBodyPart = (part: string) => {
@@ -184,6 +216,39 @@ export const ExercisesView: React.FC = () => {
           Templates
         </button>
       </div>
+ 
+      {/* Read Error Banner */}
+      {isReadError && (
+        <div
+          data-testid="exercises-read-error"
+          className="bg-rose-500/15 border border-rose-500/40 text-rose-300 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-lg mb-4"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <AlertCircle className="w-5 h-5 shrink-0 text-rose-400" />
+            <div className="min-w-0">
+              <div className="font-bold text-white text-sm">
+                Failed to load {activeTab === 'exercises' ? 'exercises' : 'routine templates'}
+              </div>
+              <div className="text-rose-300/90 text-xs">
+                {readError instanceof Error
+                  ? readError.message
+                  : typeof readError === 'string'
+                  ? readError
+                  : (readError as any)?.message || 'Unable to load exercise data. Please try again.'}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleRetryExercises}
+            data-testid="retry-exercises-btn"
+            className="flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-rose-200 bg-rose-500/20 hover:bg-rose-500/30 active:scale-95 border border-rose-500/40 rounded-xl transition touch-manipulation min-h-[44px] min-w-[44px] shrink-0 cursor-pointer"
+          >
+            <RotateCcw className="w-4 h-4 shrink-0" />
+            <span>Retry</span>
+          </button>
+        </div>
+      )}
 
       {activeTab === 'exercises' && (
         <div className="space-y-6">
@@ -242,6 +307,11 @@ export const ExercisesView: React.FC = () => {
               </div>
             )}
             <div className="space-y-2">
+              {!isReadError && exercises.length === 0 && (
+                <div className="p-8 text-center bg-zinc-900/40 border border-zinc-800/60 rounded-2xl text-xs text-zinc-500">
+                  No exercises found in your library.
+                </div>
+              )}
               {exercises.map((ex) => {
                 const canEditExercise = isCoach || (ex.user_id === user?.id && !ex.is_master);
                 const canDelete = isCoach || (ex.user_id === user?.id && !ex.is_master);
@@ -330,7 +400,7 @@ export const ExercisesView: React.FC = () => {
 
           {/* Saved Templates List */}
           <div className="space-y-2">
-            {filteredTemplates.length === 0 ? (
+            {!isReadError && filteredTemplates.length === 0 ? (
               <div className="p-8 text-center bg-zinc-900/40 border border-zinc-800/60 rounded-2xl text-xs text-zinc-500">
                 {templates.length === 0
                   ? 'No routine templates found. Tap "+ New Routine" to create one.'
@@ -451,7 +521,7 @@ export const ExercisesView: React.FC = () => {
           setEditingTemplate(null);
         }}
         onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ['routine_templates', targetUserId] });
+          queryClient.invalidateQueries({ queryKey: ['routine_templates'] });
         }}
       />
     </div>

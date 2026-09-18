@@ -381,8 +381,13 @@ inspector_port = 8083
 # The Deno major version to use.
 deno_version = 2
 
-# [edge_runtime.secrets]
-# secret_key = "env(SECRET_VALUE)"
+# Secrets injected into the local edge-runtime container.
+# Values are resolved from `supabase/.env` (gitignored; see `supabase/.env.example`).
+# Deployed environments get these from the Supabase dashboard instead, so this
+# block only affects `supabase start` / `supabase functions serve` locally.
+[edge_runtime.secrets]
+GEMINI_API_KEY = "env(GEMINI_API_KEY)"
+GEMINI_MODEL_ID = "env(GEMINI_MODEL_ID)"
 
 [analytics]
 enabled = true

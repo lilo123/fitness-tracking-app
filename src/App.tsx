@@ -5,15 +5,23 @@ import { useAuth } from './hooks/useAuth';
 import { CoachProvider } from './context/CoachContext';
 import { Header } from './components/common/Header';
 import { BottomNav } from './components/common/BottomNav';
-import { WorkoutEngine } from './components/workout/WorkoutEngine';
-import { NutritionEngine } from './components/nutrition/NutritionEngine';
-import { SettingsView } from './components/settings/SettingsView';
 import { LoginView } from './components/auth/LoginView';
 import { ResetPasswordView } from './components/auth/ResetPasswordView';
-import { ExercisesView } from './components/exercises/ExercisesView';
 import { GlobalRestTimerPill } from './components/common/GlobalRestTimerPill';
 import './App.css';
 
+const WorkoutEngine = React.lazy(() =>
+  import('./components/workout/WorkoutEngine').then((m) => ({ default: m.WorkoutEngine }))
+);
+const NutritionEngine = React.lazy(() =>
+  import('./components/nutrition/NutritionEngine').then((m) => ({ default: m.NutritionEngine }))
+);
+const ExercisesView = React.lazy(() =>
+  import('./components/exercises/ExercisesView').then((m) => ({ default: m.ExercisesView }))
+);
+const SettingsView = React.lazy(() =>
+  import('./components/settings/SettingsView').then((m) => ({ default: m.SettingsView }))
+);
 const CoachCockpit = React.lazy(() =>
   import('./components/coach/CoachCockpit').then((m) => ({ default: m.CoachCockpit }))
 );
@@ -22,7 +30,7 @@ const HistoryView = React.lazy(() =>
 );
 
 const LazyFallback: React.FC = () => (
-  <div className="flex items-center justify-center p-12 text-cyan-400 font-mono text-xs">
+  <div className="min-h-[60vh] flex items-center justify-center p-12 text-cyan-400 font-mono text-xs">
     Loading...
   </div>
 );
@@ -34,13 +42,18 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
   /* oxlint-disable react/set-state-in-effect */
   useEffect(() => {
-    if (!loading) {
+    if (!loading || user) {
       setShowRetry(false);
       return;
     }
     const timer = setTimeout(() => setShowRetry(true), 2000);
     return () => clearTimeout(timer);
-  }, [loading]);
+  }, [loading, user]);
+
+  // Display content immediately when optimistic cached user is available
+  if (user) {
+    return <>{children}</>;
+  }
 
   if (loading) {
     return (
@@ -63,32 +76,29 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
       </div>
     );
   }
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-  return <>{children}</>;
+  return <Navigate to="/login" replace />;
 };
 
 // Guard for Coach-only routes
 const CoachRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isCoachMode, loading } = useAuth();
+  if (user) {
+    if (!isCoachMode) {
+      return <Navigate to="/workout" replace />;
+    }
+    return <>{children}</>;
+  }
   if (loading) return null;
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-  if (!isCoachMode) {
-    return <Navigate to="/workout" replace />;
-  }
-  return <>{children}</>;
+  return <Navigate to="/login" replace />;
 };
 
 // Guard for Login route when already authenticated
 const PublicOnlyRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isCoachMode, loading } = useAuth();
-  if (loading) return null;
   if (user) {
     return <Navigate to={isCoachMode ? '/coach' : '/workout'} replace />;
   }
+  if (loading) return null;
   return <>{children}</>;
 };
 
@@ -99,74 +109,72 @@ function AppLayout() {
     <div className="min-h-[100dvh] flex flex-col bg-zinc-950 text-zinc-100 selection:bg-cyan-500/20 selection:text-cyan-300">
       <Header />
       <main className={`flex-1 max-w-xl w-full mx-auto p-4 ${user ? 'pb-[calc(9.5rem+env(safe-area-inset-bottom,0px))]' : 'pb-8'}`}>
-        <Routes>
-          <Route path="/" element={<Navigate to="/workout" replace />} />
-          <Route
-            path="/workout"
-            element={
-              <ProtectedRoute>
-                <WorkoutEngine />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/nutrition"
-            element={
-              <ProtectedRoute>
-                <NutritionEngine />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/history"
-            element={
-              <ProtectedRoute>
-                <React.Suspense fallback={<LazyFallback />}>
+        <React.Suspense fallback={<LazyFallback />}>
+          <Routes>
+            <Route path="/" element={<Navigate to="/workout" replace />} />
+            <Route
+              path="/workout"
+              element={
+                <ProtectedRoute>
+                  <WorkoutEngine />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/nutrition"
+              element={
+                <ProtectedRoute>
+                  <NutritionEngine />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/history"
+              element={
+                <ProtectedRoute>
                   <HistoryView />
-                </React.Suspense>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/exercises"
-            element={
-              <ProtectedRoute>
-                <ExercisesView />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/coach"
-            element={
-              <CoachRoute>
-                <React.Suspense fallback={<LazyFallback />}>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/exercises"
+              element={
+                <ProtectedRoute>
+                  <ExercisesView />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/coach"
+              element={
+                <CoachRoute>
                   <CoachCockpit />
-                </React.Suspense>
-              </CoachRoute>
-            }
-          />
-          <Route
-            path="/settings"
-            element={
-              <ProtectedRoute>
-                <SettingsView />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/login"
-            element={
-              <PublicOnlyRoute>
-                <LoginView />
-              </PublicOnlyRoute>
-            }
-          />
-          <Route 
-            path="/reset-password" 
-            element={<ResetPasswordView />} 
-          />
-          <Route path="*" element={<Navigate to="/workout" replace />} />
-        </Routes>
+                </CoachRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <SettingsView />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/login"
+              element={
+                <PublicOnlyRoute>
+                  <LoginView />
+                </PublicOnlyRoute>
+              }
+            />
+            <Route 
+              path="/reset-password" 
+              element={<ResetPasswordView />} 
+            />
+            <Route path="*" element={<Navigate to="/workout" replace />} />
+          </Routes>
+        </React.Suspense>
       </main>
       <GlobalRestTimerPill />
       <BottomNav />

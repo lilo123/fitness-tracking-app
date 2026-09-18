@@ -74,21 +74,22 @@ const EditSetForm: React.FC<EditSetFormProps> = ({
       set_type: SetType;
     }) => {
       const { id, ...updates } = payload;
-      const builder = supabase.from('sets').update(updates).eq('id', id);
-      const res =
-        typeof (builder as any)?.select === 'function'
-          ? await (builder as any).select()
-          : await builder;
+      const { data, error } = await supabase.from('sets').update(updates).eq('id', id).select();
 
-      if (res?.error) {
-        throw res.error;
+      if (error) {
+        throw error;
       }
-      return res?.data;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workout_sets'] });
+      queryClient.invalidateQueries({ queryKey: ['history_sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['exercise_stats'] });
+      queryClient.invalidateQueries({ queryKey: ['session_sets'] });
       if (targetUserId) {
         queryClient.invalidateQueries({ queryKey: ['workout_sets', targetUserId] });
+        queryClient.invalidateQueries({ queryKey: ['history_sessions', targetUserId] });
+        queryClient.invalidateQueries({ queryKey: ['exercise_stats', targetUserId] });
       }
       onClose();
       if (onSuccess) {
@@ -102,21 +103,22 @@ const EditSetForm: React.FC<EditSetFormProps> = ({
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const builder = supabase.from('sets').delete().eq('id', id);
-      const res =
-        typeof (builder as any)?.select === 'function'
-          ? await (builder as any).select()
-          : await builder;
+      const { data, error } = await supabase.from('sets').delete().eq('id', id);
 
-      if (res?.error) {
-        throw res.error;
+      if (error) {
+        throw error;
       }
-      return res?.data;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workout_sets'] });
+      queryClient.invalidateQueries({ queryKey: ['history_sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['exercise_stats'] });
+      queryClient.invalidateQueries({ queryKey: ['session_sets'] });
       if (targetUserId) {
         queryClient.invalidateQueries({ queryKey: ['workout_sets', targetUserId] });
+        queryClient.invalidateQueries({ queryKey: ['history_sessions', targetUserId] });
+        queryClient.invalidateQueries({ queryKey: ['exercise_stats', targetUserId] });
       }
       onClose();
       if (onSuccess) {

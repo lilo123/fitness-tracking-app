@@ -1,0 +1,18 @@
+=========================================================
+PERF ARTIFACT VERIFICATION
+=========================================================
+artifact : docs/perf-trace-results.json
+measured : 2026-09-17T20:05:19.232Z  seed=payload-stress
+ceiling  : 153600 B
+---------------------------------------------------------
+  workout_seeded      123085 B   [  7/9 q]   within budget
+  nutrition             2269 B   [  4/6 q]   within budget
+  history              26560 B   [  5/9 q]   within budget
+  coach                57422 B   [ 8/11 q]   within budget
+---------------------------------------------------------
+  note: source fingerprint matches (6c7ce52415fe)
+  note: git commit matches (9d2a01c)
+  note: working tree was dirty at measurement time (fingerprint is authoritative)
+  note: seed profile verified: payload-stress
+
+VERDICT: PASS — artifact is provably current and every route is within budget.

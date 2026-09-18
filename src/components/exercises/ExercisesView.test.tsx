@@ -6,15 +6,16 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../../context/AuthContext';
 import { CoachProvider } from '../../context/CoachContext';
 import { supabase } from '../../lib/supabase';
+import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory } from '../../test/supabaseBuilderMock';
 import { workoutSessionStore } from '../../utils/workoutSessionStore';
 
 const { mockAthleteSession, mockCoachState } = vi.hoisted(() => ({
   mockAthleteSession: {
-    user: { id: 'athlete-123', email: 'athlete@example.com' },
+    user: { id: 'a0000000-0000-4000-8000-000000000123', email: 'athlete@example.com' },
   },
   mockCoachState: {
     isCoach: false,
-    selectedAthleteId: 'athlete-123',
+    selectedAthleteId: 'a0000000-0000-4000-8000-000000000123',
   },
 }));
 
@@ -30,7 +31,7 @@ vi.mock('../../lib/supabase', () => ({
     },
     rpc: vi.fn(),
     auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'athlete-123' } } }),
+      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'a0000000-0000-4000-8000-000000000123' } } }),
       getSession: vi.fn().mockResolvedValue({ data: { session: mockAthleteSession } }),
       onAuthStateChange: vi.fn().mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } }),
     },
@@ -48,99 +49,64 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    clearMockHistory();
     localStorage.clear();
     sessionStorage.clear();
     workoutSessionStore.resetForTesting();
     mockCoachState.isCoach = false;
-    mockCoachState.selectedAthleteId = 'athlete-123';
+    mockCoachState.selectedAthleteId = 'a0000000-0000-4000-8000-000000000123';
     (supabase.rpc as any) = mockRpc;
 
     const sampleExercises = [
       { id: 'ex-master-1', name: 'Barbell Squat', body_part: 'Legs', is_master: true, user_id: null, is_archived: false },
-      { id: 'ex-custom-1', name: 'My Athlete Curl', body_part: 'Arms', is_master: false, user_id: 'athlete-123', is_archived: false },
+      { id: 'ex-custom-1', name: 'My Athlete Curl', body_part: 'Arms', is_master: false, user_id: 'a0000000-0000-4000-8000-000000000123', is_archived: false },
     ];
 
     (supabase.auth.getSession as any).mockResolvedValue({ data: { session: mockAthleteSession } });
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'exercises') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              or: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: sampleExercises, error: null }),
-              }),
-              order: vi.fn().mockResolvedValue({ data: sampleExercises, error: null }),
-            }),
-            or: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: sampleExercises, error: null }),
-            }),
-          }),
-          insert: mockInsertExercise,
-          update: mockUpdateExercise,
-        };
+        const b = createSupabaseBuilder('exercises', { data: sampleExercises, error: null });
+        b.insert = mockInsertExercise;
+        b.update = mockUpdateExercise;
+        return b;
       }
       if (table === 'routine_templates') {
         const templatesData = [
           {
             id: 'tpl-1',
-            user_id: 'athlete-123',
+            user_id: 'a0000000-0000-4000-8000-000000000123',
             name: 'Leg Blast',
             is_master: false,
             days_of_week: ['Mon', 'Thu'],
             exercises: [{ id: 'te-1', exercise_id: 'ex-master-1' }],
           },
         ];
-        return {
+        const b = createSupabaseBuilder('routine_templates', { data: templatesData, error: null });
+        b.insert = mockInsertTemplate.mockReturnValue({
           select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: templatesData,
-                error: null,
-              }),
-            }),
-            or: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: templatesData,
-                error: null,
-              }),
+            single: vi.fn().mockResolvedValue({
+              data: { id: 'new-tpl-id', name: 'Push Routine', days_of_week: ['Mon', 'Wed'] },
+              error: null,
             }),
           }),
-          insert: mockInsertTemplate.mockReturnValue({
-            select: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({
-                data: { id: 'new-tpl-id', name: 'Push Routine', days_of_week: ['Mon', 'Wed'] },
-                error: null,
-              }),
-            }),
-          }),
-          update: mockUpdateTemplate,
-          delete: mockDeleteTemplate,
-        };
+        });
+        b.update = mockUpdateTemplate;
+        b.delete = mockDeleteTemplate;
+        return b;
       }
       if (table === 'template_exercises') {
-        return {
-          insert: vi.fn().mockResolvedValue({ error: null }),
-        };
+        const b = createSupabaseBuilder('template_exercises', { data: [], error: null });
+        b.insert = vi.fn().mockResolvedValue({ error: null });
+        return b;
       }
       if (table === 'users') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({
-                data: { id: 'athlete-123', role: 'athlete', username: 'TestAthlete' },
-                error: null,
-              }),
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder('users', {
+          data: { id: 'a0000000-0000-4000-8000-000000000123', role: 'athlete', username: 'TestAthlete' },
+          error: null,
+        });
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     queryClient = new QueryClient({
@@ -174,6 +140,22 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
       const deleteButtons = screen.getAllByTitle('Delete');
       expect(deleteButtons.length).toBe(1);
     });
+
+    expect(getRecordedTables()).toContain('exercises');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'exercises',
+      projection: 'id, name, body_part, is_master, is_archived, user_id, created_at',
+    });
+    expect(getRecordedTables()).toContain('routine_templates');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'routine_templates',
+      projection: 'id, user_id, name, is_master, assigned_to, days_of_week, created_at, exercises:template_exercises(id, template_id, exercise_id, order_index, target_sets, target_reps, exercise:exercises(id, name, body_part))',
+    });
+    expect(getRecordedTables()).toContain('users');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'users',
+      projection: 'id, email, username, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, is_coach_mode, coach_code, coach_tier, max_athletes, created_at',
+    });
   });
 
   it('creates custom exercise scoped to the athlete', async () => {
@@ -195,7 +177,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
           body_part: 'Arms',
           is_master: false,
           is_archived: false,
-          user_id: 'athlete-123',
+          user_id: 'a0000000-0000-4000-8000-000000000123',
         }),
       ]);
     });
@@ -259,7 +241,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
             target_sets: 4,
           }),
         ],
-        p_user_id: 'athlete-123',
+        p_user_id: 'a0000000-0000-4000-8000-000000000123',
       });
       expect(screen.queryByTestId('edit-template-modal')).toBeNull();
     });
@@ -269,46 +251,32 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     // Add master template to mock
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'routine_templates') {
-        return {
-          select: vi.fn().mockReturnValue({
-            or: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [
-                  {
-                    id: 'tpl-master-1',
-                    user_id: 'coach-999',
-                    name: 'Master Hypertrophy Push',
-                    is_master: true,
-                    days_of_week: ['Tue', 'Fri'],
-                    exercises: [{ id: 'te-m1', exercise_id: 'ex-master-1', target_sets: 4, target_reps: 8 }],
-                  },
-                ],
-                error: null,
-              }),
-            }),
-          }),
-          insert: mockInsertTemplate,
-        };
+        const b = createSupabaseBuilder('routine_templates', {
+          data: [
+            {
+              id: 'tpl-master-1',
+              user_id: 'coach-999',
+              name: 'Master Hypertrophy Push',
+              is_master: true,
+              days_of_week: ['Tue', 'Fri'],
+              exercises: [{ id: 'te-m1', exercise_id: 'ex-master-1', target_sets: 4, target_reps: 8 }],
+            },
+          ],
+          error: null,
+        });
+        b.insert = mockInsertTemplate;
+        return b;
       }
       if (table === 'exercises') {
-        return {
-          select: vi.fn().mockReturnValue({
-            or: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [{ id: 'ex-master-1', name: 'Barbell Squat', body_part: 'Legs' }],
-                error: null,
-              }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder('exercises', {
+          data: [{ id: 'ex-master-1', name: 'Barbell Squat', body_part: 'Legs' }],
+          error: null,
+        });
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({ data: { id: 'athlete-123' }, error: null }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, {
+        data: { id: 'a0000000-0000-4000-8000-000000000123' },
+        error: null,
+      });
     });
 
     renderComponent();
@@ -348,7 +316,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
             target_reps: 8,
           }),
         ],
-        p_user_id: 'athlete-123',
+        p_user_id: 'a0000000-0000-4000-8000-000000000123',
       });
     });
   });
@@ -361,59 +329,45 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'routine_templates') {
-        return {
+        const b = createSupabaseBuilder('routine_templates', {
+          data: [
+            {
+              id: 'tpl-master-err',
+              user_id: 'coach-999',
+              name: 'Master Routine',
+              is_master: true,
+              days_of_week: ['Mon'],
+              exercises: [{ id: 'te-1', exercise_id: 'ex-master-1', target_sets: 3, target_reps: 10 }],
+            },
+          ],
+          error: null,
+        });
+        b.insert = vi.fn().mockReturnValue({
           select: vi.fn().mockReturnValue({
-            or: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [
-                  {
-                    id: 'tpl-master-err',
-                    user_id: 'coach-999',
-                    name: 'Master Routine',
-                    is_master: true,
-                    days_of_week: ['Mon'],
-                    exercises: [{ id: 'te-1', exercise_id: 'ex-master-1', target_sets: 3, target_reps: 10 }],
-                  },
-                ],
-                error: null,
-              }),
+            single: vi.fn().mockResolvedValue({
+              data: { id: 'tpl-new-failed-fork', name: 'Master Routine (Copy)' },
+              error: null,
             }),
           }),
-          insert: vi.fn().mockReturnValue({
-            select: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({
-                data: { id: 'tpl-new-failed-fork', name: 'Master Routine (Copy)' },
-                error: null,
-              }),
-            }),
-          }),
-          delete: mockDeleteTpl,
-        };
+        });
+        b.delete = mockDeleteTpl;
+        return b;
       }
       if (table === 'template_exercises') {
-        return {
-          insert: vi.fn().mockResolvedValue({ error: { message: 'Network insertion timeout' } }),
-        };
+        const b = createSupabaseBuilder('template_exercises', { data: [], error: null });
+        b.insert = vi.fn().mockResolvedValue({ error: { message: 'Network insertion timeout' } });
+        return b;
       }
       if (table === 'exercises') {
-        return {
-          select: vi.fn().mockReturnValue({
-            or: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [{ id: 'ex-master-1', name: 'Barbell Squat', body_part: 'Legs' }],
-                error: null,
-              }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder('exercises', {
+          data: [{ id: 'ex-master-1', name: 'Barbell Squat', body_part: 'Legs' }],
+          error: null,
+        });
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({ data: { id: 'athlete-123' }, error: null }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, {
+        data: { id: 'a0000000-0000-4000-8000-000000000123' },
+        error: null,
+      });
     });
 
     renderComponent();
@@ -432,18 +386,20 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
       expect(screen.getByTestId('template-error')).toBeDefined();
       expect(mockDeleteTpl).toHaveBeenCalled();
       expect(mockDeleteTplEq).toHaveBeenCalledWith('id', 'tpl-new-failed-fork');
+      // template_exercises is mutation-only (insert); NO_PROJECTION_APPLIES
+      expect(getRecordedTables()).toContain('template_exercises');
     });
   });
 
   it('updates exercise in library and synchronizes active workout session drafts via renameExercise', async () => {
     // Initialize active session in workoutSessionStore with old exercise name
-    workoutSessionStore.getOrInitSession('athlete-123', '2026-09-08', {
+    workoutSessionStore.getOrInitSession('a0000000-0000-4000-8000-000000000123', '2026-09-08', {
       routineName: 'Arm Day',
       exercises: ['My Athlete Curl'],
       targetSetCounts: { 'My Athlete Curl': 3 },
       targetRepCounts: { 'My Athlete Curl': 10 },
     });
-    workoutSessionStore.setDraftInput('athlete-123', '2026-09-08', 'My Athlete Curl', 0, { weight: '35', reps: '10' });
+    workoutSessionStore.setDraftInput('a0000000-0000-4000-8000-000000000123', '2026-09-08', 'My Athlete Curl', 0, { weight: '35', reps: '10' });
     workoutSessionStore.flushPendingWrites();
 
     renderComponent();
@@ -484,7 +440,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     });
 
     // Verify active workout session was synchronized via workoutSessionStore.renameExercise
-    const session = workoutSessionStore.getSession('athlete-123', '2026-09-08');
+    const session = workoutSessionStore.getSession('a0000000-0000-4000-8000-000000000123', '2026-09-08');
     expect(session?.exercises).toEqual(['Bicep Cable Curl']);
     expect(session?.targetSetCounts['Bicep Cable Curl']).toBe(3);
     expect(session?.targetSetCounts['My Athlete Curl']).toBeUndefined();
@@ -509,38 +465,24 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'routine_templates') {
-        return {
-          select: vi.fn().mockReturnValue({
-            or: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [masterTpl],
-                error: null,
-              }),
-            }),
-          }),
-          update: mockUpdateTemplate,
-          delete: mockDeleteTemplate,
-        };
+        const b = createSupabaseBuilder('routine_templates', {
+          data: [masterTpl],
+          error: null,
+        });
+        b.update = mockUpdateTemplate;
+        b.delete = mockDeleteTemplate;
+        return b;
       }
       if (table === 'exercises') {
-        return {
-          select: vi.fn().mockReturnValue({
-            or: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [{ id: 'ex-master-1', name: 'Barbell Squat', body_part: 'Legs' }],
-                error: null,
-              }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder('exercises', {
+          data: [{ id: 'ex-master-1', name: 'Barbell Squat', body_part: 'Legs' }],
+          error: null,
+        });
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({ data: { id: 'athlete-123' }, error: null }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, {
+        data: { id: 'a0000000-0000-4000-8000-000000000123' },
+        error: null,
+      });
     });
 
     // 1. Scenario A: Coach in Catalog Mode (isCoach = true, selectedAthleteId = '')
@@ -566,9 +508,9 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     fireEvent.click(screen.getByTestId('cancel-template-btn'));
     unmountA();
 
-    // 2. Scenario B: Coach Impersonating an Athlete (isCoach = true, selectedAthleteId = 'athlete-123')
+    // 2. Scenario B: Coach Impersonating an Athlete (isCoach = true, selectedAthleteId = 'a0000000-0000-4000-8000-000000000123')
     mockCoachState.isCoach = true;
-    mockCoachState.selectedAthleteId = 'athlete-123';
+    mockCoachState.selectedAthleteId = 'a0000000-0000-4000-8000-000000000123';
 
     const { unmount: unmountB } = renderComponent();
     fireEvent.click(screen.getByRole('button', { name: /Templates/i }));
@@ -603,7 +545,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
   it('provides list-first template layout with day filter toolbar and + New Routine create mode trigger', async () => {
     const mondayTemplate = {
       id: 'tpl-mon',
-      user_id: 'athlete-123',
+      user_id: 'a0000000-0000-4000-8000-000000000123',
       name: 'Monday Heavy Push',
       is_master: false,
       days_of_week: ['Mon'],
@@ -612,7 +554,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
 
     const fridayTemplate = {
       id: 'tpl-fri',
-      user_id: 'athlete-123',
+      user_id: 'a0000000-0000-4000-8000-000000000123',
       name: 'Friday Heavy Pull',
       is_master: false,
       days_of_week: ['Fri'],
@@ -621,43 +563,25 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'routine_templates') {
-        return {
-          select: vi.fn().mockReturnValue({
-            or: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [mondayTemplate, fridayTemplate],
-                error: null,
-              }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder('routine_templates', {
+          data: [mondayTemplate, fridayTemplate],
+          error: null,
+        });
       }
       if (table === 'exercises') {
         const sampleEx = [
           { id: 'ex-master-1', name: 'Barbell Squat', body_part: 'Legs' },
           { id: 'ex-custom-1', name: 'My Athlete Curl', body_part: 'Arms' },
         ];
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              or: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: sampleEx, error: null }),
-              }),
-              order: vi.fn().mockResolvedValue({ data: sampleEx, error: null }),
-            }),
-            or: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: sampleEx, error: null }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder('exercises', {
+          data: sampleEx,
+          error: null,
+        });
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({ data: { id: 'athlete-123' }, error: null }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, {
+        data: { id: 'a0000000-0000-4000-8000-000000000123' },
+        error: null,
+      });
     });
 
     renderComponent();
@@ -737,9 +661,29 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
             target_reps: 10,
           }),
         ],
-        p_user_id: 'athlete-123',
+        p_user_id: 'a0000000-0000-4000-8000-000000000123',
       });
       expect(screen.queryByTestId('edit-template-modal')).toBeNull();
     });
   });
+
+  it('prevents query string injection and rejects invalid UUIDs in user.id and targetUserId (FIX-13)', async () => {
+    mockCoachState.selectedAthleteId = "malformed-id',is_master.eq.true";
+    mockAthleteSession.user.id = "malformed-id',is_master.eq.true";
+
+    const mockOr = vi.fn();
+    (supabase.from as any).mockImplementation((table: string) => {
+      const b = createSupabaseBuilder(table, { data: [], error: null });
+      b.or = mockOr;
+      return b;
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      // .or() should NEVER be called with the malformed injection string
+      expect(mockOr).not.toHaveBeenCalled();
+    });
+  });
 });
+

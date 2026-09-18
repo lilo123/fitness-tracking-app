@@ -3,21 +3,16 @@ import type { Exercise, RoutineTemplate } from '../../types/database';
 import { supabase } from '../../lib/supabase';
 import {
   X,
-  ArrowUp,
-  ArrowDown,
-  Trash2,
   Plus,
-  Minus,
-  Search,
-  Dumbbell,
   Calendar,
   AlertCircle,
   Check,
-  ArrowLeft,
+  Dumbbell,
 } from 'lucide-react';
+import { ExercisePickerSheet } from './ExercisePickerSheet';
+import { TemplateExerciseItem } from './TemplateExerciseItem';
 
 const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const CATEGORIES = ['All', 'Chest', 'Back', 'Arms', 'Shoulders', 'Legs', 'Core'];
 
 export interface EditableTemplateExercise {
   id?: string;
@@ -216,7 +211,7 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
       // 1. Try atomic database RPC function first
       const rpcId = isFork ? null : template?.id || null;
       const { error: rpcErr } = await supabase.rpc('save_routine_template', {
-        p_template_id: rpcId,
+        p_template_id: rpcId as unknown as string,
         p_name: name.trim(),
         p_days_of_week: days,
         p_exercises: exercisePayload,
@@ -392,90 +387,17 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
         {/* Single Fluid Scroll Body (NO NESTED SCROLL TRAPS) */}
         <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-5 space-y-5">
           {isPickerOpen ? (
-            /* Add Exercise Sub-Sheet / Drawer View */
-            <div className="space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    data-testid="close-exercise-picker"
-                    onClick={() => setIsPickerOpen(false)}
-                    className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition touch-manipulation"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                  </button>
-                  <h3 className="text-sm font-bold text-white">Add Exercises to Routine</h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsPickerOpen(false)}
-                  className="px-4 py-2 min-h-[44px] flex items-center justify-center bg-violet-500/20 text-violet-300 border border-violet-500/40 rounded-xl text-xs font-bold hover:bg-violet-500/30 transition touch-manipulation"
-                >
-                  Done
-                </button>
-              </div>
-
-              {/* Search Bar */}
-              <div className="relative">
-                <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Search exercise library..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl pl-9 pr-3 py-2.5 text-xs focus:border-violet-500 outline-none"
-                />
-              </div>
-
-              {/* Category Filter Pills */}
-              <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-                {CATEGORIES.map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`px-3.5 py-2 min-h-[44px] flex items-center justify-center rounded-xl text-xs font-bold shrink-0 transition touch-manipulation ${
-                      selectedCategory === cat
-                        ? 'bg-violet-500 text-white shadow-neon-violet'
-                        : 'bg-zinc-950 text-zinc-400 border border-zinc-800 hover:border-zinc-700'
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-
-              {/* Exercise Selection List */}
-              <div className="space-y-2">
-                {filteredExercises.map((ex) => (
-                  <div
-                    key={ex.id}
-                    className="flex items-center justify-between p-3.5 bg-zinc-950 border border-zinc-800/90 rounded-2xl"
-                  >
-                    <div className="min-w-0 pr-3">
-                      <div className="text-xs font-bold text-white truncate">{ex.name}</div>
-                      <div className="text-[10px] text-zinc-500 mt-0.5">{ex.body_part || 'Other'}</div>
-                    </div>
-                    <button
-                      type="button"
-                      data-testid={`add-exercise-btn-${ex.id}`}
-                      onClick={() => addExercise(ex)}
-                      className="px-4 py-2 min-h-[44px] bg-violet-500/15 hover:bg-violet-500/25 text-violet-300 border border-violet-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shrink-0 touch-manipulation"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add</span>
-                    </button>
-                  </div>
-                ))}
-                {filteredExercises.length === 0 && (
-                  <div className="text-center py-8 text-xs text-zinc-500">
-                    {exercises.length === templateExercises.length
-                      ? 'All available exercises already added to routine.'
-                      : 'No matching exercises found.'}
-                  </div>
-                )}
-              </div>
-            </div>
+            <ExercisePickerSheet
+              filteredExercises={filteredExercises}
+              totalExercisesCount={exercises.length}
+              templateExercisesCount={templateExercises.length}
+              searchQuery={searchQuery}
+              onSearchQueryChange={setSearchQuery}
+              selectedCategory={selectedCategory}
+              onSelectedCategoryChange={setSelectedCategory}
+              onAddExercise={addExercise}
+              onClose={() => setIsPickerOpen(false)}
+            />
           ) : (
             /* Main Routine Editor View */
             <>
@@ -539,126 +461,17 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
                   </div>
                 ) : (
                   templateExercises.map((te, idx) => (
-                    <div
+                    <TemplateExerciseItem
                       key={te.exercise_id}
-                      className="bg-zinc-950/90 border border-zinc-800/90 rounded-2xl p-3.5 space-y-3"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-xs font-mono font-bold text-violet-400 shrink-0">
-                            {idx + 1}.
-                          </span>
-                          <span className="text-xs font-extrabold text-white truncate">
-                            {te.exercise_name}
-                          </span>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-400 shrink-0">
-                            {te.body_part}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            type="button"
-                            disabled={idx === 0}
-                            data-testid={`move-up-${idx}`}
-                            onClick={() => moveExercise(idx, -1)}
-                            className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-zinc-400 hover:text-white disabled:opacity-30 transition touch-manipulation hover:bg-zinc-900"
-                            title="Move Up"
-                          >
-                            <ArrowUp className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            disabled={idx === templateExercises.length - 1}
-                            data-testid={`move-down-${idx}`}
-                            onClick={() => moveExercise(idx, 1)}
-                            className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-zinc-400 hover:text-white disabled:opacity-30 transition touch-manipulation hover:bg-zinc-900"
-                            title="Move Down"
-                          >
-                            <ArrowDown className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            data-testid={`remove-exercise-${idx}`}
-                            onClick={() => removeExercise(idx)}
-                            className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-zinc-500 hover:text-rose-400 transition touch-manipulation hover:bg-zinc-900"
-                            title="Remove"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Steppers Row */}
-                      <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 pt-1 border-t border-zinc-900">
-                        {/* Sets Stepper */}
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Sets</span>
-                          <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-0.5">
-                            <button
-                              type="button"
-                              data-testid={`dec-sets-${idx}`}
-                              onClick={() => updateSets(idx, te.target_sets - 1)}
-                              disabled={te.target_sets <= 1}
-                              className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-30 rounded-lg active:scale-95 touch-manipulation"
-                            >
-                              <Minus className="w-3.5 h-3.5" />
-                            </button>
-                            <input
-                              type="number"
-                              min={1}
-                              max={20}
-                              data-testid={`sets-input-${idx}`}
-                              value={te.target_sets}
-                              onChange={(e) => updateSets(idx, parseInt(e.target.value, 10))}
-                              className="w-9 bg-transparent text-white font-mono font-black text-xs text-center outline-none"
-                            />
-                            <button
-                              type="button"
-                              data-testid={`inc-sets-${idx}`}
-                              onClick={() => updateSets(idx, te.target_sets + 1)}
-                              disabled={te.target_sets >= 20}
-                              className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-30 rounded-lg active:scale-95 touch-manipulation"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Reps Stepper */}
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Reps</span>
-                          <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-0.5">
-                            <button
-                              type="button"
-                              data-testid={`dec-reps-${idx}`}
-                              onClick={() => updateReps(idx, te.target_reps - 1)}
-                              disabled={te.target_reps <= 1}
-                              className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-30 rounded-lg active:scale-95 touch-manipulation"
-                            >
-                              <Minus className="w-3.5 h-3.5" />
-                            </button>
-                            <input
-                              type="number"
-                              min={1}
-                              max={100}
-                              data-testid={`reps-input-${idx}`}
-                              value={te.target_reps}
-                              onChange={(e) => updateReps(idx, parseInt(e.target.value, 10))}
-                              className="w-11 bg-transparent text-white font-mono font-black text-xs text-center outline-none"
-                            />
-                            <button
-                              type="button"
-                              data-testid={`inc-reps-${idx}`}
-                              onClick={() => updateReps(idx, te.target_reps + 1)}
-                              disabled={te.target_reps >= 100}
-                              className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-30 rounded-lg active:scale-95 touch-manipulation"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                      exercise={te}
+                      index={idx}
+                      totalCount={templateExercises.length}
+                      onMoveUp={(i) => moveExercise(i, -1)}
+                      onMoveDown={(i) => moveExercise(i, 1)}
+                      onRemove={removeExercise}
+                      onUpdateSets={updateSets}
+                      onUpdateReps={updateReps}
+                    />
                   ))
                 )}
 

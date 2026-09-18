@@ -1,8 +1,20 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MealLogRow } from './MealLogRow';
 import type { NutritionLog } from '../../types/database';
 import type { NutritionItem } from '../../utils/itemModel';
+import { supabase } from '../../lib/supabase';
+import {
+  createSupabaseBuilder,
+  getRecordedSelects,
+  clearMockHistory,
+} from '../../test/supabaseBuilderMock';
+
+vi.mock('../../lib/supabase', () => ({
+  supabase: {
+    from: vi.fn(),
+  },
+}));
 
 function component(over: Partial<NutritionItem> = {}): NutritionItem {
   return {
@@ -41,6 +53,14 @@ function log(items: NutritionItem[] | null): NutritionLog {
 const noop = () => {};
 
 describe('MealLogRow', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearMockHistory();
+    (supabase.from as any).mockImplementation((table: string) =>
+      createSupabaseBuilder(table, { data: null, error: null })
+    );
+  });
+
   it('renders no accordion affordance for a single-component or plain log', () => {
     render(<MealLogRow log={log(null)} onEdit={noop} onDelete={noop} />);
 
@@ -53,6 +73,25 @@ describe('MealLogRow', () => {
   it('treats a one-item breakdown as a leaf, not a one-child accordion', () => {
     render(<MealLogRow log={log([component()])} onEdit={noop} onDelete={noop} />);
     expect(screen.queryByTestId('meal-log-accordion-trigger')).toBeNull();
+  });
+
+  it('renders no accordion affordance when items is omitted from projection (undefined)', () => {
+    const rowWithoutItems: NutritionLog = {
+      id: 'log-no-items',
+      user_id: 'u1',
+      food_name: 'Plain Rice',
+      calories: 200,
+      protein: 4,
+      carbs: 45,
+      fat: 1,
+      fiber: 1,
+      meal_type: 'Lunch',
+      logged_at: '2026-01-01T12:00:00Z',
+      // items omitted
+    };
+    render(<MealLogRow log={rowWithoutItems} onEdit={noop} onDelete={noop} />);
+    expect(screen.queryByTestId('meal-log-accordion-trigger')).toBeNull();
+    expect(screen.queryByTestId('meal-log-count-badge')).toBeNull();
   });
 
   it('expands a multi-component log and lists its components', () => {
@@ -384,6 +423,172 @@ describe('MealLogRow', () => {
     expect(alert.textContent).toBe('third write failed');
     expect(screen.getByText(/840 kcal/)).toBeDefined();
     expect(screen.queryByText(/210 kcal/)).toBeNull();
+  });
+
+  it('does not fan out queries on mount when items are omitted and fetches exactly 1 query on expand', async () => {
+    const multiItems = [
+      component({ id: 'c1', name: 'Salmon', calories: 300 }),
+      component({ id: 'c2', name: 'Rice', calories: 200 }),
+    ];
+
+    const rows: (NutritionLog & { has_components?: boolean })[] = Array.from({ length: 10 }, (_, i) => ({
+      id: `log-multi-${i}`,
+      user_id: 'u1',
+      food_name: `Meal ${i}`,
+      calories: 500,
+      protein: 40,
+      carbs: 45,
+      fat: 15,
+      fiber: 5,
+      meal_type: 'Dinner',
+      logged_at: '2026-01-01T18:00:00Z',
+      has_components: i === 0,
+    }));
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'nutrition_logs') {
+        return createSupabaseBuilder('nutrition_logs', {
+          data: { id: 'log-multi-0', items: multiItems },
+          error: null,
+        });
+      }
+      return createSupabaseBuilder(table, { data: null, error: null });
+    });
+
+    render(
+      <div>
+        {rows.map((r) => (
+          <MealLogRow key={r.id} log={r} onEdit={noop} onDelete={noop} />
+        ))}
+      </div>
+    );
+
+    // Assert zero queries before expand: eliminates the N+1 fan-out regression
+    const queriesBefore = getRecordedSelects().filter((s) => s.table === 'nutrition_logs');
+    expect(queriesBefore.length).toBe(0);
+
+    // Assert honest conservative presentation: only row 0 has trigger, rows 1-9 render as leaves
+    const triggers = screen.queryAllByTestId('meal-log-accordion-trigger');
+    expect(triggers).toHaveLength(1);
+
+    // Expand the single expandable row
+    fireEvent.click(triggers[0]);
+
+    // Assert exactly 1 query after one expand (lazy on-demand fetch)
+    await waitFor(() => {
+      const queriesAfter = getRecordedSelects().filter((s) => s.table === 'nutrition_logs');
+      expect(queriesAfter.length).toBe(1);
+    });
+
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'nutrition_logs',
+      projection: 'id, items',
+    });
+
+    // Components rendered in panel
+    expect(await screen.findByTestId('meal-log-panel')).toBeDefined();
+    expect(screen.getByText('Salmon')).toBeDefined();
+    expect(screen.getByText('Rice')).toBeDefined();
+  });
+
+  it('surfaces an error state with retry button when on-demand fetch fails on expand and allows retry', async () => {
+    const rowWithComponents: NutritionLog & { has_components?: boolean } = {
+      id: 'log-fetch-error-test',
+      user_id: 'u1',
+      food_name: 'Failed Fetch Meal',
+      calories: 400,
+      protein: 30,
+      carbs: 40,
+      fat: 10,
+      fiber: 4,
+      meal_type: 'Lunch',
+      logged_at: '2026-01-01T12:00:00Z',
+      has_components: true,
+    };
+
+    // First attempt: on-demand fetch fails
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'nutrition_logs') {
+        return createSupabaseBuilder('nutrition_logs', {
+          data: null,
+          error: { message: 'Network timeout loading components' },
+        });
+      }
+      return createSupabaseBuilder(table, { data: null, error: null });
+    });
+
+    render(<MealLogRow log={rowWithComponents} onEdit={noop} onDelete={noop} />);
+
+    // 0 queries on mount
+    expect(getRecordedSelects().filter((s) => s.table === 'nutrition_logs').length).toBe(0);
+
+    // Trigger is rendered because has_components is true
+    const trigger = screen.getByTestId('meal-log-accordion-trigger');
+    fireEvent.click(trigger);
+
+    // Must surface error state with role="alert" and data-testid="meal-log-fetch-error"
+    const errorAlert = await screen.findByTestId('meal-log-fetch-error');
+    expect(errorAlert.getAttribute('role')).toBe('alert');
+    expect(errorAlert.textContent).toContain('Network timeout loading components');
+
+    // Must provide retry button
+    const retryBtn = screen.getByTestId('meal-log-fetch-retry');
+    expect(retryBtn).toBeDefined();
+
+    // Second attempt: retry succeeds with 2 components
+    const multiItems = [
+      component({ id: 'c1', name: 'Chicken', calories: 250 }),
+      component({ id: 'c2', name: 'Rice', calories: 150 }),
+    ];
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'nutrition_logs') {
+        return createSupabaseBuilder('nutrition_logs', {
+          data: { id: 'log-fetch-error-test', items: multiItems },
+          error: null,
+        });
+      }
+      return createSupabaseBuilder(table, { data: null, error: null });
+    });
+
+    // Click retry
+    fireEvent.click(retryBtn);
+
+    // Error alert disappears, and panel expands
+    await waitFor(() => {
+      expect(screen.queryByTestId('meal-log-fetch-error')).toBeNull();
+    });
+    expect(await screen.findByTestId('meal-log-panel')).toBeDefined();
+    expect(screen.getByText('Chicken')).toBeDefined();
+    expect(screen.getByText('Rice')).toBeDefined();
+  });
+
+  it('maintains conservative leaf presentation (expandable = false) when has_components is omitted', () => {
+    const leafRows: NutritionLog[] = Array.from({ length: 10 }, (_, i) => ({
+      id: `log-leaf-${i}`,
+      user_id: 'u1',
+      food_name: `Plain Meal ${i}`,
+      calories: 300,
+      protein: 20,
+      carbs: 30,
+      fat: 10,
+      fiber: 2,
+      meal_type: 'Breakfast',
+      logged_at: '2026-01-01T08:00:00Z',
+    }));
+
+    render(
+      <div>
+        {leafRows.map((r) => (
+          <MealLogRow key={r.id} log={r} onEdit={noop} onDelete={noop} />
+        ))}
+      </div>
+    );
+
+    // No queries issued
+    expect(getRecordedSelects().filter((s) => s.table === 'nutrition_logs').length).toBe(0);
+    // 0 accordion triggers or badges rendered
+    expect(screen.queryAllByTestId('meal-log-accordion-trigger')).toHaveLength(0);
+    expect(screen.queryAllByTestId('meal-log-count-badge')).toHaveLength(0);
   });
 });
 

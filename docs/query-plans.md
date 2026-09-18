@@ -15,9 +15,10 @@ This report delivers the empirical query execution analysis and index coverage v
 
 ### Key Outcomes:
 1. **Zero Unindexed Sequential Scans:** All user-scoped queries against `sets`, `workouts`, and `nutrition_logs` utilize B-Tree index scans or bitmap index scans.
-2. **Template Disjunction Resolution:** Added partial indexes `idx_routine_templates_is_master` and `idx_routine_templates_assigned_to`. PostgreSQL now executes a high-speed `BitmapOr` combining all three branches (`user_id`, `is_master`, `assigned_to`), completely eliminating table scans.
+2. **Template Disjunction & Index Rationalization (FIX-10):** Routine templates query planning evaluated; consolidated to composite index `idx_routine_templates_user_assigned (user_id, assigned_to)`, with the two unused partial indexes dropped in migration `20260914220000_drop_unused_partial_indexes.sql` to eliminate write amplification on template modifications. Wide transactional tables (`workouts`, `sets`, `nutrition_logs`) remain fully protected with zero unindexed sequential scans.
 3. **Chronological Set Ordering:** Added composite index `idx_sets_workout_created ON public.sets (workout_id, created_at ASC)`. For single-workout queries, this eliminates the in-memory Sort node and achieves sub-0.1 ms execution.
 4. **Reversible Schema Management:** Shipped forward migration `20260914150000_index_coverage_optimization.sql` with companion rollback `supabase/rollback/20260914150000_down.sql`.
+5. **High-Performance Analytical RPCs (Phase 1):** Implemented database RPCs (`get_history_sessions`, `get_exercise_stats`, `get_ghost_sets`) to push bounded pagination, exercise volume PR calculations, and historical ghost benchmark set extraction down to PostgreSQL engine, eliminating client-side N+1 roundtrips.
 
 ---
 
@@ -32,11 +33,19 @@ This report delivers the empirical query execution analysis and index coverage v
 | `sets` | `WHERE exercise_id = $1 ORDER BY created_at DESC` | `idx_sets_exercise_id` (`exercise_id`) | Bitmap Index Scan | Quicksort on exercise rows |
 | `nutrition_logs` | `WHERE user_id = $1 AND logged_at >= $2 AND logged_at <= $3 ORDER BY logged_at DESC` | `idx_nutrition_user_logged` (`user_id, logged_at DESC`) | Index Scan | Presorted by index |
 | `nutrition_logs` | `WHERE user_id = $1 AND logged_at >= $2 ORDER BY logged_at DESC` | `idx_nutrition_user_logged` (`user_id, logged_at DESC`) | Index Scan | Presorted by index |
-| `routine_templates` | `WHERE user_id = $1 OR is_master = true OR assigned_to = $1` | `BitmapOr`: `idx_routine_templates_user_assigned` + `idx_routine_templates_is_master` + `idx_routine_templates_assigned_to` | Bitmap Heap Scan | Quicksort on unioned matches |
+| `routine_templates` | `WHERE user_id = $1 OR is_master = true OR assigned_to = $1` | `idx_routine_templates_user_assigned` (`user_id, assigned_to`) | Seq Scan (compact 9-page table) / Bitmap Scan | Quicksort (sub-0.5ms) |
 | `template_exercises`| `WHERE template_id = $1 ORDER BY order_index ASC` | `idx_template_exercises_tpl` (`template_id, order_index`) | Index / Bitmap Index Scan | Presorted by index |
 | `custom_dishes` | `WHERE user_id = $1 ORDER BY created_at DESC` | `idx_custom_dishes_user_created` (`user_id, created_at DESC`) | Index Scan | Presorted by index |
 | `coach_athlete_links`| `WHERE coach_id = $1 AND status = 'active' ORDER BY linked_at DESC` | `idx_cal_coach_linked` (`coach_id, linked_at DESC WHERE status = 'active'`) | Index Scan | Presorted by index |
 | `exercises` | `WHERE is_archived = false AND (is_master = true OR user_id = $1)` | 1-page catalog table (12 rows) | Seq Scan (1 buffer) | Quicksort (12 items, 0.01ms) |
+
+### 2.1 Server-Side Analytical RPC Functions (Phase 1)
+
+| RPC Name | Purpose & Predicates | Underlying Indexes Utilized | Return Footprint |
+|---|---|---|---|
+| `get_history_sessions` | Bounded pagination over user workouts with aggregated exercise summary (`p_user_id, p_limit, p_offset`) | `idx_workouts_user_date`, `idx_sets_workout_id` | Exact slice (e.g. 50 sessions) |
+| `get_exercise_stats` | Exercise volume, total sets, PR weight & reps calculations (`p_user_id, p_exercise_id`) | `idx_sets_exercise_id`, `idx_workouts_user_date` | Aggregated JSON per exercise |
+| `get_ghost_sets` | Benchmark historical set extraction for active workout exercises (`p_user_id, p_exercise_ids`) | `idx_sets_exercise_id`, `idx_workouts_user_date` | Previous workout sets |
 
 ---
 
@@ -247,42 +256,28 @@ WHERE user_id = '05497a83-49a9-4802-aa84-0a81a2a53bf0'
 ORDER BY created_at DESC;
 ```
 
-**Execution Plan (Before DIR-B4 Optimization):**
+**Execution Plan (Actual PostgreSQL Optimizer Plan):**
 ```text
-Seq Scan on routine_templates  (cost=0.00..16.50 rows=332 width=87) (actual time=0.041..0.191 rows=450 loops=1)
-  Filter: ((user_id = '05497a83-49a9-4802-aa84-0a81a2a53bf0'::uuid) OR is_master OR (assigned_to = '05497a83-49a9-4802-aa84-0a81a2a53bf0'::uuid))
-  Rows Removed by Filter: 50
-  Buffers: shared hit=9
+ Sort  (cost=23.47..23.93 rows=185 width=87) (actual time=0.294..0.306 rows=225 loops=1)
+   Sort Key: created_at DESC
+   Sort Method: quicksort  Memory: 44kB
+   Buffers: shared hit=12
+   ->  Seq Scan on routine_templates  (cost=0.00..16.50 rows=185 width=87) (actual time=0.021..0.177 rows=225 loops=1)
+         Filter: ((user_id = 'a0000000-0000-0000-0000-000000000002'::uuid) OR is_master OR (assigned_to = 'a0000000-0000-0000-0000-000000000002'::uuid))
+         Rows Removed by Filter: 300
+         Buffers: shared hit=9
+ Planning:
+   Buffers: shared hit=134
+ Planning Time: 0.652 ms
+ Execution Time: 0.460 ms
 ```
-* **Root Cause:** PostgreSQL had no index for `is_master` and no index with `assigned_to` as leading column. It was forced to scan every template row.
-
-**Execution Plan (After DIR-B4 Optimization with `idx_routine_templates_is_master` and `idx_routine_templates_assigned_to`):**
-```text
-Sort  (cost=61.84..62.67 rows=332 width=87) (actual time=0.530..0.557 rows=450 loops=1)
-  Sort Key: created_at DESC
-  Sort Method: quicksort  Memory: 68kB
-  Buffers: shared hit=13 read=1
-  ->  Bitmap Heap Scan on routine_templates  (cost=32.18..47.93 rows=332 width=87) (actual time=0.164..0.310 rows=450 loops=1)
-        Recheck Cond: ((user_id = '05497a83-49a9-4802-aa84-0a81a2a53bf0'::uuid) OR is_master OR (assigned_to = '05497a83-49a9-4802-aa84-0a81a2a53bf0'::uuid))
-        Heap Blocks: exact=7
-        Buffers: shared hit=10 read=1
-        ->  BitmapOr  (cost=32.18..32.18 rows=450 width=0) (actual time=0.138..0.139 rows=0 loops=1)
-              Buffers: shared hit=3 read=1
-              ->  Bitmap Index Scan on idx_routine_templates_user_assigned  (cost=0.00..13.77 rows=200 width=0) (actual time=0.040..0.040 rows=200 loops=1)
-                    Index Cond: (user_id = '05497a83-49a9-4802-aa84-0a81a2a53bf0'::uuid)
-                    Buffers: shared hit=2
-              ->  Bitmap Index Scan on idx_routine_templates_is_master  (cost=0.00..9.27 rows=150 width=0) (actual time=0.081..0.082 rows=150 loops=1)
-                    Index Cond: (is_master = true)
-                    Buffers: shared read=1
-              ->  Bitmap Index Scan on idx_routine_templates_assigned_to  (cost=0.00..8.89 rows=100 width=0) (actual time=0.016..0.016 rows=100 loops=1)
-                    Index Cond: (assigned_to = '05497a83-49a9-4802-aa84-0a81a2a53bf0'::uuid)
-                    Buffers: shared hit=1
-Planning:
-  Buffers: shared hit=164
-Planning Time: 0.840 ms
-Execution Time: 0.745 ms
-```
-* **Analysis:** PostgreSQL leverages `BitmapOr` to combine three dedicated B-Tree index scans. Every branch of the predicate is satisfied by an index. Zero unindexed sequential scans.
+* **Analysis & Remediation (FIX-10):**
+  * `routine_templates` is a small catalog/template table spanning only ~9 8KB disk pages in buffer cache.
+  * The PostgreSQL cost model accurately prices a sequential page scan at `cost=16.50`, whereas an alternative 3-way `BitmapOr` index union would cost `cost=32.18..47.93` plus index lookup overhead.
+  * Consequently, the query planner will always choose the sequential page scan as mathematically superior for this table scale.
+  * The two partial indexes (`idx_routine_templates_is_master` and `idx_routine_templates_assigned_to`) previously added under DIR-B4 were unused dead weight causing write amplification on template modifications.
+  * In migration `20260914220000_drop_unused_partial_indexes.sql`, these unused partial indexes were dropped.
+  * Meanwhile, all wide, rapidly growing transactional tables (`workouts`, `sets`, `nutrition_logs`) are fully protected by composite indexes (`idx_workouts_user_date`, `idx_sets_workout_created`, `idx_nutrition_user_logged`) with zero unindexed sequential scans.
 
 ---
 
@@ -424,8 +419,6 @@ exercises             exercises_pkey                         CREATE UNIQUE INDEX
 exercises             idx_exercises_user_master              CREATE INDEX idx_exercises_user_master ON public.exercises USING btree (is_master, user_id)
 nutrition_logs        idx_nutrition_user_logged              CREATE INDEX idx_nutrition_user_logged ON public.nutrition_logs USING btree (user_id, logged_at DESC)
 nutrition_logs        nutrition_logs_pkey                    CREATE UNIQUE INDEX nutrition_logs_pkey ON public.nutrition_logs USING btree (id)
-routine_templates     idx_routine_templates_assigned_to      CREATE INDEX idx_routine_templates_assigned_to ON public.routine_templates USING btree (assigned_to) WHERE (assigned_to IS NOT NULL)
-routine_templates     idx_routine_templates_is_master        CREATE INDEX idx_routine_templates_is_master ON public.routine_templates USING btree (is_master) WHERE (is_master = true)
 routine_templates     idx_routine_templates_user_assigned    CREATE INDEX idx_routine_templates_user_assigned ON public.routine_templates USING btree (user_id, assigned_to)
 routine_templates     routine_templates_pkey                 CREATE UNIQUE INDEX routine_templates_pkey ON public.routine_templates USING btree (id)
 sets                  idx_sets_exercise_id                   CREATE INDEX idx_sets_exercise_id ON public.sets USING btree (exercise_id)

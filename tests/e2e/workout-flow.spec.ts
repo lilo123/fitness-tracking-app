@@ -80,6 +80,60 @@ test.describe('Workout Flow E2E', () => {
     await page.goto('/history');
     await expect(page.locator('text=Workout History')).toBeVisible();
   });
+
+  test('renders real historical workout set benchmarks (ghost sets) and history session data', async ({ page }) => {
+    // Assert no query error banner is displayed
+    await expect(page.locator('[data-testid="workout-logs-error"]')).not.toBeVisible();
+
+    // Wait for routine controls to render
+    const routineSelectBtn = page.locator('[data-testid="routine-select-btn"]');
+    const chooseRoutineBtn = page.locator('button:has-text("Choose Routine")');
+    await expect(page.locator('[data-testid="routine-select-btn"], button:has-text("Choose Routine")').first()).toBeVisible();
+
+    if (await chooseRoutineBtn.isVisible()) {
+      await chooseRoutineBtn.click();
+      await page.click('button:has-text("Workout A (Push, Quads & Core)")');
+    } else {
+      const routineText = await routineSelectBtn.textContent();
+      if (!routineText?.includes('Workout A (Push, Quads & Core)')) {
+        await routineSelectBtn.click();
+        await page.click('button:has-text("Workout A (Push, Quads & Core)")');
+      }
+    }
+
+    const firstCard = page.locator('[data-testid="exercise-card-0"]');
+    await expect(firstCard).toBeVisible();
+    await page.waitForTimeout(1500);
+    await expect(page.locator('[data-testid="workout-logs-error"]')).not.toBeVisible();
+
+    // Assert that real historical data from the database is rendered as ghost benchmarks
+    const ghostWeightInput = page.locator('[data-testid="ghost-weight-0-0"]');
+    await expect(ghostWeightInput).toBeVisible();
+    await expect(ghostWeightInput).toHaveAttribute('placeholder', '185');
+    await expect(firstCard.getByText('185 lbs × 8').first()).toBeVisible();
+
+    // Assert historical session renders in History view
+    await page.goto('/history');
+    await expect(page.locator('text=Workout History')).toBeVisible();
+    await expect(page.locator('text=Push Day Benchmark').first()).toBeVisible();
+    await expect(page.locator('text=185 lbs').first()).toBeVisible();
+  });
+
+  test('negative control: displays error banner and retry affordance if workout queries fail', async ({ page }) => {
+    // Intercept workouts queries with 400 Bad Request simulating P0 phantom column error
+    await page.route('**/rest/v1/workouts*', (route) =>
+      route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: 'column sets_1.weight_lbs does not exist', code: '42703' }),
+      })
+    );
+
+    await page.goto('/workout');
+    await expect(page.locator('[data-testid="workout-logs-error"]')).toBeVisible();
+    await expect(page.locator('[data-testid="retry-logs-btn"]')).toBeVisible();
+  });
 });
+
 
 

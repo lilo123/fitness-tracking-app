@@ -98,23 +98,34 @@ export interface NutritionLog {
    * five parent macros above are Σ(items) and the DB enforces it.
    */
   items?: NutritionItem[] | null;
+  /**
+   * Maintained automatically by DB as a stored generated column.
+   * True if items has >= 2 components (level 1 / expandable).
+   */
+  has_components?: boolean | null;
 }
 
-export interface CustomDish {
+export interface CustomDishRow {
   id: string;
   user_id: string;
   name: string;
-  /** @deprecated Legacy free-text breakdown. Read for backfill only; never write it. */
-  ingredients: string | null;
   calories: number | null;
   protein: number | null;
   carbs: number | null;
   fat: number | null;
   fiber?: number | null;
   created_at?: string;
+}
+
+export type CustomDish = CustomDishRow;
+
+export interface CustomDishDetail extends CustomDishRow {
+  /** @deprecated Legacy free-text breakdown. Read for backfill only; never write it. */
+  ingredients?: string | null;
   /** See {@link NutritionLog.items}. */
   items?: NutritionItem[] | null;
 }
+
 
 export interface RoutineTemplate {
   id: string;
@@ -131,7 +142,7 @@ export interface TemplateExercise {
   id: string;
   template_id: string;
   exercise_id: string;
-  exercise?: { name: string };
+  exercise?: { name: string } | null;
   exercise_name?: string;
   order_index: number;
   target_sets: number;

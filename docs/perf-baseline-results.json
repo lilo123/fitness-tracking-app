@@ -1,0 +1,505 @@
+{
+  "timestamp": "2026-09-16T05:56:29.258Z",
+  "provenance": {
+    "environment": "Linux (Cloudtop) · Node v22.22.2 · Vite 8 · Playwright 1.62 · Lighthouse 13.4.1",
+    "gitCommit": "3a81eaedea47af3845029fafc11d1bf2fa4fe486",
+    "distAssetCount": 23,
+    "distFiles": [
+      {
+        "name": "supabase-CcMctgS4.js",
+        "rawBytes": 203077,
+        "gzipBytes": 51621
+      },
+      {
+        "name": "react-vendor-Cqic2lDV.js",
+        "rawBytes": 182129,
+        "gzipBytes": 56673
+      },
+      {
+        "name": "NutritionEngine-DNcvEefZ.js",
+        "rawBytes": 91292,
+        "gzipBytes": 21411
+      },
+      {
+        "name": "index-UHxEGm16.css",
+        "rawBytes": 76278,
+        "gzipBytes": 11387
+      },
+      {
+        "name": "tanstack-B5wdz_NE.js",
+        "rawBytes": 59840,
+        "gzipBytes": 17184
+      },
+      {
+        "name": "WorkoutEngine-Cwn2j7Ef.js",
+        "rawBytes": 41233,
+        "gzipBytes": 10297
+      },
+      {
+        "name": "index-DRb2By6s.js",
+        "rawBytes": 40274,
+        "gzipBytes": 9851
+      },
+      {
+        "name": "react-router-dom-p9Ck5xa0.js",
+        "rawBytes": 39188,
+        "gzipBytes": 13978
+      },
+      {
+        "name": "HistoryView-DT0xKiV-.js",
+        "rawBytes": 38075,
+        "gzipBytes": 9468
+      },
+      {
+        "name": "ExercisesView-CoBERId0.js",
+        "rawBytes": 37342,
+        "gzipBytes": 7954
+      },
+      {
+        "name": "CoachCockpit-CFP2EMoW.js",
+        "rawBytes": 35835,
+        "gzipBytes": 8204
+      },
+      {
+        "name": "MealLogRow-BCo7_3J9.js",
+        "rawBytes": 28904,
+        "gzipBytes": 7744
+      },
+      {
+        "name": "SettingsView-C_MIGTN5.js",
+        "rawBytes": 21473,
+        "gzipBytes": 4535
+      },
+      {
+        "name": "lucide-react-DgORt80F.js",
+        "rawBytes": 20035,
+        "gzipBytes": 7373
+      },
+      {
+        "name": "vendor-BK4PVOmw.js",
+        "rawBytes": 11547,
+        "gzipBytes": 4265
+      },
+      {
+        "name": "workoutSessionStore-B2hQ0VLC.js",
+        "rawBytes": 8767,
+        "gzipBytes": 2464
+      },
+      {
+        "name": "workoutEngineHelpers-CU3Qk1rk.js",
+        "rawBytes": 7757,
+        "gzipBytes": 2116
+      },
+      {
+        "name": "useWorkoutQueries-Dgov4yyT.js",
+        "rawBytes": 3730,
+        "gzipBytes": 1441
+      },
+      {
+        "name": "date-Bz-YVRRR.js",
+        "rawBytes": 3595,
+        "gzipBytes": 1425
+      },
+      {
+        "name": "index.html",
+        "rawBytes": 1801,
+        "gzipBytes": 780
+      },
+      {
+        "name": "historyGrouping-79j9jPL5.js",
+        "rawBytes": 661,
+        "gzipBytes": 392
+      },
+      {
+        "name": "rolldown-runtime-CbXtAM7H.js",
+        "rawBytes": 589,
+        "gzipBytes": 368
+      },
+      {
+        "name": "useCoach-4T83iR3U.js",
+        "rawBytes": 278,
+        "gzipBytes": 224
+      }
+    ]
+  },
+  "throttling": {
+    "enabled": true,
+    "method": "simulate",
+    "preset": "Slow 4G + 4x CPU",
+    "rttMs": 150,
+    "throughputKbps": 1638.4,
+    "requestLatencyMs": 562.5,
+    "downloadThroughputKbps": 1474.56,
+    "uploadThroughputKbps": 675,
+    "cpuSlowdownMultiplier": 4
+  },
+  "routes": {
+    "/workout": {
+      "route": "/workout",
+      "name": "Workout",
+      "score": 93,
+      "fcp": {
+        "displayValue": "2.1 s",
+        "numericValue": 2074.37165
+      },
+      "lcp": {
+        "displayValue": "2.9 s",
+        "numericValue": 2912.508400000001
+      },
+      "tbt": {
+        "displayValue": "40 ms",
+        "numericValue": 41
+      },
+      "cls": {
+        "displayValue": "0",
+        "numericValue": 0
+      },
+      "tti": {
+        "displayValue": "2.9 s",
+        "numericValue": 2912.508400000001
+      },
+      "criteria": {
+        "criterion4": {
+          "description": "Lighthouse mobile Performance >= 85",
+          "threshold": ">= 85",
+          "value": 93,
+          "pass": true
+        },
+        "criterion5": {
+          "description": "LCP (/workout only) <= 2.5s (2500 ms)",
+          "threshold": "<= 2500 ms",
+          "value": 2913,
+          "applicable": true,
+          "pass": false
+        },
+        "criterion6": {
+          "description": "Total Blocking Time <= 200 ms",
+          "threshold": "<= 200 ms",
+          "value": 41,
+          "pass": true
+        },
+        "criterion7": {
+          "description": "Cumulative Layout Shift <= 0.05",
+          "threshold": "<= 0.05",
+          "value": 0,
+          "pass": true
+        }
+      }
+    },
+    "/nutrition": {
+      "route": "/nutrition",
+      "name": "Nutrition",
+      "score": 94,
+      "fcp": {
+        "displayValue": "2.1 s",
+        "numericValue": 2130.391625
+      },
+      "lcp": {
+        "displayValue": "2.7 s",
+        "numericValue": 2709.06995
+      },
+      "tbt": {
+        "displayValue": "30 ms",
+        "numericValue": 29.500000000000227
+      },
+      "cls": {
+        "displayValue": "0",
+        "numericValue": 0.0001260231225033463
+      },
+      "tti": {
+        "displayValue": "2.7 s",
+        "numericValue": 2709.06995
+      },
+      "criteria": {
+        "criterion4": {
+          "description": "Lighthouse mobile Performance >= 85",
+          "threshold": ">= 85",
+          "value": 94,
+          "pass": true
+        },
+        "criterion5": {
+          "description": "LCP (/workout only) <= 2.5s (2500 ms)",
+          "threshold": "<= 2500 ms",
+          "value": 2709,
+          "applicable": false,
+          "pass": true
+        },
+        "criterion6": {
+          "description": "Total Blocking Time <= 200 ms",
+          "threshold": "<= 200 ms",
+          "value": 30,
+          "pass": true
+        },
+        "criterion7": {
+          "description": "Cumulative Layout Shift <= 0.05",
+          "threshold": "<= 0.05",
+          "value": 0.0001,
+          "pass": true
+        }
+      }
+    },
+    "/history": {
+      "route": "/history",
+      "name": "History",
+      "score": 95,
+      "fcp": {
+        "displayValue": "1.9 s",
+        "numericValue": 1859.4752
+      },
+      "lcp": {
+        "displayValue": "2.7 s",
+        "numericValue": 2685.3370000000004
+      },
+      "tbt": {
+        "displayValue": "40 ms",
+        "numericValue": 37
+      },
+      "cls": {
+        "displayValue": "0",
+        "numericValue": 0.0001260231225033463
+      },
+      "tti": {
+        "displayValue": "2.7 s",
+        "numericValue": 2687.3870000000006
+      },
+      "criteria": {
+        "criterion4": {
+          "description": "Lighthouse mobile Performance >= 85",
+          "threshold": ">= 85",
+          "value": 95,
+          "pass": true
+        },
+        "criterion5": {
+          "description": "LCP (/workout only) <= 2.5s (2500 ms)",
+          "threshold": "<= 2500 ms",
+          "value": 2685,
+          "applicable": false,
+          "pass": true
+        },
+        "criterion6": {
+          "description": "Total Blocking Time <= 200 ms",
+          "threshold": "<= 200 ms",
+          "value": 37,
+          "pass": true
+        },
+        "criterion7": {
+          "description": "Cumulative Layout Shift <= 0.05",
+          "threshold": "<= 0.05",
+          "value": 0.0001,
+          "pass": true
+        }
+      }
+    },
+    "/coach": {
+      "route": "/coach",
+      "name": "Coach",
+      "score": 93,
+      "fcp": {
+        "displayValue": "2.1 s",
+        "numericValue": 2077.21515
+      },
+      "lcp": {
+        "displayValue": "2.9 s",
+        "numericValue": 2860.77175
+      },
+      "tbt": {
+        "displayValue": "90 ms",
+        "numericValue": 89.5
+      },
+      "cls": {
+        "displayValue": "0",
+        "numericValue": 0
+      },
+      "tti": {
+        "displayValue": "2.9 s",
+        "numericValue": 2920.3217499999996
+      },
+      "criteria": {
+        "criterion4": {
+          "description": "Lighthouse mobile Performance >= 85",
+          "threshold": ">= 85",
+          "value": 93,
+          "pass": true
+        },
+        "criterion5": {
+          "description": "LCP (/workout only) <= 2.5s (2500 ms)",
+          "threshold": "<= 2500 ms",
+          "value": 2861,
+          "applicable": false,
+          "pass": true
+        },
+        "criterion6": {
+          "description": "Total Blocking Time <= 200 ms",
+          "threshold": "<= 200 ms",
+          "value": 90,
+          "pass": true
+        },
+        "criterion7": {
+          "description": "Cumulative Layout Shift <= 0.05",
+          "threshold": "<= 0.05",
+          "value": 0,
+          "pass": true
+        }
+      }
+    },
+    "/exercises": {
+      "route": "/exercises",
+      "name": "Exercises",
+      "score": 92,
+      "fcp": {
+        "displayValue": "2.1 s",
+        "numericValue": 2079.0657
+      },
+      "lcp": {
+        "displayValue": "3.1 s",
+        "numericValue": 3106.7042
+      },
+      "tbt": {
+        "displayValue": "40 ms",
+        "numericValue": 37
+      },
+      "cls": {
+        "displayValue": "0",
+        "numericValue": 0.0001260231225033463
+      },
+      "tti": {
+        "displayValue": "3.1 s",
+        "numericValue": 3106.7042
+      },
+      "criteria": {
+        "criterion4": {
+          "description": "Lighthouse mobile Performance >= 85",
+          "threshold": ">= 85",
+          "value": 92,
+          "pass": true
+        },
+        "criterion5": {
+          "description": "LCP (/workout only) <= 2.5s (2500 ms)",
+          "threshold": "<= 2500 ms",
+          "value": 3107,
+          "applicable": false,
+          "pass": true
+        },
+        "criterion6": {
+          "description": "Total Blocking Time <= 200 ms",
+          "threshold": "<= 200 ms",
+          "value": 37,
+          "pass": true
+        },
+        "criterion7": {
+          "description": "Cumulative Layout Shift <= 0.05",
+          "threshold": "<= 0.05",
+          "value": 0.0001,
+          "pass": true
+        }
+      }
+    },
+    "/settings": {
+      "route": "/settings",
+      "name": "Settings",
+      "score": 96,
+      "fcp": {
+        "displayValue": "2.0 s",
+        "numericValue": 2002.1885499999999
+      },
+      "lcp": {
+        "displayValue": "2.5 s",
+        "numericValue": 2459.8898999999997
+      },
+      "tbt": {
+        "displayValue": "60 ms",
+        "numericValue": 58.9685750000001
+      },
+      "cls": {
+        "displayValue": "0",
+        "numericValue": 0.0001260231225033463
+      },
+      "tti": {
+        "displayValue": "2.5 s",
+        "numericValue": 2459.8899
+      },
+      "criteria": {
+        "criterion4": {
+          "description": "Lighthouse mobile Performance >= 85",
+          "threshold": ">= 85",
+          "value": 96,
+          "pass": true
+        },
+        "criterion5": {
+          "description": "LCP (/workout only) <= 2.5s (2500 ms)",
+          "threshold": "<= 2500 ms",
+          "value": 2460,
+          "applicable": false,
+          "pass": true
+        },
+        "criterion6": {
+          "description": "Total Blocking Time <= 200 ms",
+          "threshold": "<= 200 ms",
+          "value": 59,
+          "pass": true
+        },
+        "criterion7": {
+          "description": "Cumulative Layout Shift <= 0.05",
+          "threshold": "<= 0.05",
+          "value": 0.0001,
+          "pass": true
+        }
+      }
+    }
+  },
+  "criteria": {
+    "criterion4": {
+      "id": "criterion-4",
+      "description": "Lighthouse mobile Performance, all six routes",
+      "threshold": ">= 85",
+      "status": "PASS",
+      "scores": {
+        "/workout": 93,
+        "/nutrition": 94,
+        "/history": 95,
+        "/coach": 93,
+        "/exercises": 92,
+        "/settings": 96
+      },
+      "failingRoutes": []
+    },
+    "criterion5": {
+      "id": "criterion-5",
+      "description": "Largest Contentful Paint, /workout, Slow 4G",
+      "threshold": "<= 2.5 s (2500 ms)",
+      "status": "FAIL",
+      "workoutLcpMs": 2913,
+      "workoutLcpDisplay": "2.9 s"
+    },
+    "criterion6": {
+      "id": "criterion-6",
+      "description": "Total Blocking Time, all routes",
+      "threshold": "<= 200 ms",
+      "status": "PASS",
+      "tbtMs": {
+        "/workout": 41,
+        "/nutrition": 30,
+        "/history": 37,
+        "/coach": 90,
+        "/exercises": 37,
+        "/settings": 59
+      },
+      "failingRoutes": []
+    },
+    "criterion7": {
+      "id": "criterion-7",
+      "description": "Cumulative Layout Shift, all routes",
+      "threshold": "<= 0.05",
+      "status": "PASS",
+      "cls": {
+        "/workout": 0,
+        "/nutrition": 0.0001,
+        "/history": 0.0001,
+        "/coach": 0,
+        "/exercises": 0.0001,
+        "/settings": 0.0001
+      },
+      "failingRoutes": []
+    }
+  }
+}

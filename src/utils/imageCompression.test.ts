@@ -6,6 +6,9 @@ import {
   getBase64SizeBytes,
   compressImageBase64,
   compressImageFile,
+  isWorkerCompressionSupported,
+  setWorkerCompressionSupportedForTesting,
+  resetWorkerCacheForTesting,
 } from './imageCompression';
 
 describe('imageCompression utils', () => {
@@ -297,7 +300,7 @@ describe('imageCompression utils', () => {
 
       HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue(mockContext);
 
-      let capturedImageInstance: any = null;
+      const capturedImages: any[] = [];
 
       class StuckImage {
         onload: (() => void) | null = vi.fn();
@@ -308,7 +311,7 @@ describe('imageCompression utils', () => {
         src = '';
 
         constructor() {
-          capturedImageInstance = this;
+          capturedImages.push(this);
         }
       }
 
@@ -320,8 +323,9 @@ describe('imageCompression utils', () => {
       vi.advanceTimersByTime(1001);
 
       const result = await promise;
+      const capturedImageInstance = capturedImages[0];
 
-      expect(capturedImageInstance).not.toBeNull();
+      expect(capturedImageInstance).toBeDefined();
       expect(capturedImageInstance.onload).toBeNull();
       expect(capturedImageInstance.onerror).toBeNull();
       expect(capturedImageInstance.src).toBe('');
@@ -374,7 +378,7 @@ describe('imageCompression utils', () => {
       globalThis.URL.createObjectURL = vi.fn().mockReturnValue('blob:http://localhost/mock-error-blob');
       globalThis.URL.revokeObjectURL = mockRevokeObjectURL;
 
-      let capturedErrorImg: any = null;
+      const capturedErrors: any[] = [];
       class ErrorImage {
         onload: (() => void) | null = null;
         onerror: (() => void) | null = null;
@@ -384,7 +388,7 @@ describe('imageCompression utils', () => {
         private _src = '';
 
         constructor() {
-          capturedErrorImg = this;
+          capturedErrors.push(this);
         }
 
         get src() {
@@ -404,6 +408,7 @@ describe('imageCompression utils', () => {
 
       const mockBlob = new Blob(['bad-image-data'], { type: 'image/png' });
       const result = await compressImageFile(mockBlob, 1024, 0.7);
+      const capturedErrorImg = capturedErrors[0];
 
       expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:http://localhost/mock-error-blob');
       expect(capturedErrorImg.onload).toBeNull();
@@ -431,6 +436,347 @@ describe('imageCompression utils', () => {
 
       expect(result).toBeDefined();
       expect(result.mimeType).toBe('image/jpeg');
+    });
+  });
+
+  describe('Worker and OffscreenCanvas detection and off-thread execution (DIR-C3)', () => {
+    let originalWorker: any;
+    let originalOffscreenCanvas: any;
+    let originalCreateImageBitmap: any;
+    let originalCreateObjectURL: any;
+    let originalRevokeObjectURL: any;
+    let originalGetContext: any;
+    let originalToDataURL: any;
+    let originalImage: any;
+
+    beforeEach(() => {
+      originalWorker = (globalThis as any).Worker;
+      originalOffscreenCanvas = (globalThis as any).OffscreenCanvas;
+      originalCreateImageBitmap = (globalThis as any).createImageBitmap;
+      originalCreateObjectURL = globalThis.URL.createObjectURL;
+      originalRevokeObjectURL = globalThis.URL.revokeObjectURL;
+      originalGetContext = HTMLCanvasElement.prototype.getContext;
+      originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
+      originalImage = globalThis.Image;
+      resetWorkerCacheForTesting();
+    });
+
+    afterEach(() => {
+      (globalThis as any).Worker = originalWorker;
+      (globalThis as any).OffscreenCanvas = originalOffscreenCanvas;
+      (globalThis as any).createImageBitmap = originalCreateImageBitmap;
+      globalThis.URL.createObjectURL = originalCreateObjectURL;
+      globalThis.URL.revokeObjectURL = originalRevokeObjectURL;
+      HTMLCanvasElement.prototype.getContext = originalGetContext;
+      HTMLCanvasElement.prototype.toDataURL = originalToDataURL;
+      globalThis.Image = originalImage;
+      resetWorkerCacheForTesting();
+      vi.restoreAllMocks();
+    });
+
+    it('detects lack of worker support in default JSDOM environment', () => {
+      expect(isWorkerCompressionSupported()).toBe(false);
+    });
+
+    it('returns false when Worker is defined but OffscreenCanvas is missing', () => {
+      (globalThis as any).Worker = class {};
+      (globalThis as any).OffscreenCanvas = undefined;
+      (globalThis as any).createImageBitmap = vi.fn();
+      expect(isWorkerCompressionSupported()).toBe(false);
+    });
+
+    it('returns false when OffscreenCanvas is defined but 2D context is unsupported', () => {
+      (globalThis as any).Worker = class {};
+      (globalThis as any).OffscreenCanvas = class {
+        getContext() {
+          return null;
+        }
+        convertToBlob = vi.fn();
+      };
+      (globalThis as any).createImageBitmap = vi.fn();
+      expect(isWorkerCompressionSupported()).toBe(false);
+    });
+
+    it('returns false when OffscreenCanvas convertToBlob is missing', () => {
+      (globalThis as any).Worker = class {};
+      (globalThis as any).OffscreenCanvas = class {
+        getContext() {
+          return {};
+        }
+      };
+      (globalThis as any).createImageBitmap = vi.fn();
+      expect(isWorkerCompressionSupported()).toBe(false);
+    });
+
+    it('returns true when Worker, OffscreenCanvas 2D context, and createImageBitmap are available', () => {
+      (globalThis as any).Worker = class {};
+      (globalThis as any).OffscreenCanvas = class {
+        getContext(id: string) {
+          if (id === '2d') return {};
+          return null;
+        }
+        convertToBlob = vi.fn();
+      };
+      (globalThis as any).createImageBitmap = vi.fn();
+      expect(isWorkerCompressionSupported()).toBe(true);
+    });
+
+    it('respects setWorkerCompressionSupportedForTesting override', () => {
+      setWorkerCompressionSupportedForTesting(true);
+      expect(isWorkerCompressionSupported()).toBe(true);
+      setWorkerCompressionSupportedForTesting(false);
+      expect(isWorkerCompressionSupported()).toBe(false);
+      setWorkerCompressionSupportedForTesting(null);
+    });
+
+    it('executes compressImageFile via Worker when supported and terminates worker after completion', async () => {
+      setWorkerCompressionSupportedForTesting(true);
+
+      const mockTerminate = vi.fn();
+      let postedData: any = null;
+
+      class MockWorker {
+        onmessage: ((e: MessageEvent) => void) | null = null;
+        onerror: ((e: any) => void) | null = null;
+        terminate = mockTerminate;
+        postMessage = vi.fn((data: any) => {
+          postedData = data;
+          setTimeout(() => {
+            if (this.onmessage) {
+              this.onmessage({
+                data: {
+                  id: data.id,
+                  success: true,
+                  result: {
+                    base64: 'd29ya2VyLWNvbXByZXNzZWQ=',
+                    dataUrl: 'data:image/jpeg;base64,d29ya2VyLWNvbXByZXNzZWQ=',
+                    mimeType: 'image/jpeg',
+                    sizeBytes: 1234,
+                    width: 800,
+                    height: 600,
+                  },
+                },
+              } as MessageEvent);
+            }
+          }, 0);
+        });
+      }
+
+      (globalThis as any).Worker = MockWorker;
+      globalThis.URL.createObjectURL = vi.fn().mockReturnValue('blob:http://localhost/worker-script');
+
+      const mockBlob = new Blob(['athlete-photo-bytes'], { type: 'image/jpeg' });
+      const result = await compressImageFile(mockBlob, 1024, 0.8);
+
+      expect(postedData).toBeDefined();
+      expect(postedData.blob).toBe(mockBlob);
+      expect(postedData.maxDimension).toBe(1024);
+      expect(postedData.quality).toBe(0.8);
+      expect(result.base64).toBe('d29ya2VyLWNvbXByZXNzZWQ=');
+      expect(result.width).toBe(800);
+      expect(result.height).toBe(600);
+      expect(mockTerminate).toHaveBeenCalled();
+    });
+
+    it('executes compressImageBase64 via Worker when supported and terminates worker after completion', async () => {
+      setWorkerCompressionSupportedForTesting(true);
+
+      const mockTerminate = vi.fn();
+      let postedData: any = null;
+
+      class MockWorker {
+        onmessage: ((e: MessageEvent) => void) | null = null;
+        onerror: ((e: any) => void) | null = null;
+        terminate = mockTerminate;
+        postMessage = vi.fn((data: any) => {
+          postedData = data;
+          setTimeout(() => {
+            if (this.onmessage) {
+              this.onmessage({
+                data: {
+                  id: data.id,
+                  success: true,
+                  result: {
+                    base64: 'YmFzZTY0LXdvcmtlci1yZXN1bHQ=',
+                    dataUrl: 'data:image/jpeg;base64,YmFzZTY0LXdvcmtlci1yZXN1bHQ=',
+                    mimeType: 'image/jpeg',
+                    sizeBytes: 5678,
+                    width: 1024,
+                    height: 768,
+                  },
+                },
+              } as MessageEvent);
+            }
+          }, 0);
+        });
+      }
+
+      (globalThis as any).Worker = MockWorker;
+      globalThis.URL.createObjectURL = vi.fn().mockReturnValue('blob:http://localhost/worker-script');
+
+      const result = await compressImageBase64('data:image/jpeg;base64,c291cmNl', 'image/jpeg', 1024, 0.7);
+
+      expect(postedData).toBeDefined();
+      expect(postedData.base64).toBe('c291cmNl');
+      expect(result.base64).toBe('YmFzZTY0LXdvcmtlci1yZXN1bHQ=');
+      expect(result.width).toBe(1024);
+      expect(result.height).toBe(768);
+      expect(mockTerminate).toHaveBeenCalled();
+    });
+
+    it('gracefully falls back to main-thread canvas when Worker encounters runtime error', async () => {
+      setWorkerCompressionSupportedForTesting(true);
+
+      const mockTerminate = vi.fn();
+
+      class FailingWorker {
+        onmessage: ((e: MessageEvent) => void) | null = null;
+        onerror: ((e: any) => void) | null = null;
+        terminate = mockTerminate;
+        postMessage = vi.fn((data: any) => {
+          setTimeout(() => {
+            if (this.onmessage) {
+              this.onmessage({
+                data: {
+                  id: data.id,
+                  success: false,
+                  error: 'OffscreenCanvas memory allocation failure',
+                },
+              } as MessageEvent);
+            }
+          }, 0);
+        });
+      }
+
+      (globalThis as any).Worker = FailingWorker;
+      globalThis.URL.createObjectURL = vi.fn().mockReturnValue('blob:http://localhost/worker-script');
+
+      // Mock canvas for main-thread fallback
+      const mockFillRect = vi.fn();
+      const mockDrawImage = vi.fn();
+      HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue({
+        fillStyle: '',
+        fillRect: mockFillRect,
+        drawImage: mockDrawImage,
+      });
+      HTMLCanvasElement.prototype.toDataURL = vi.fn().mockReturnValue('data:image/jpeg;base64,ZmFsbGJhY2stcmVzdWx0');
+
+      class MockImg {
+        onload: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        crossOrigin = '';
+        naturalWidth = 1000;
+        naturalHeight = 1000;
+        width = 1000;
+        height = 1000;
+        private _src = '';
+        get src() { return this._src; }
+        set src(v: string) {
+          this._src = v;
+          if (v) setTimeout(() => { if (this.onload) this.onload(); }, 0);
+        }
+      }
+      globalThis.Image = MockImg as any;
+
+      const mockBlob = new Blob(['photo-bytes'], { type: 'image/jpeg' });
+      const result = await compressImageFile(mockBlob, 1024, 0.7);
+
+      expect(mockTerminate).toHaveBeenCalled();
+      expect(result.base64).toBe('ZmFsbGJhY2stcmVzdWx0');
+      expect(mockDrawImage).toHaveBeenCalled();
+    });
+
+    it('gracefully falls back to main-thread canvas when Worker constructor throws (e.g. CSP violation)', async () => {
+      setWorkerCompressionSupportedForTesting(true);
+
+      (globalThis as any).Worker = class {
+        constructor() {
+          throw new Error('SecurityError: Worker creation blocked by Content-Security-Policy');
+        }
+      };
+      globalThis.URL.createObjectURL = vi.fn().mockReturnValue('blob:http://localhost/worker-script');
+
+      // Mock canvas for main-thread fallback
+      HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue({
+        fillStyle: '',
+        fillRect: vi.fn(),
+        drawImage: vi.fn(),
+      });
+      HTMLCanvasElement.prototype.toDataURL = vi.fn().mockReturnValue('data:image/jpeg;base64,Y3NwLWZhbGxiYWNr');
+
+      class MockImg {
+        onload: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        crossOrigin = '';
+        naturalWidth = 500;
+        naturalHeight = 500;
+        width = 500;
+        height = 500;
+        private _src = '';
+        get src() { return this._src; }
+        set src(v: string) {
+          this._src = v;
+          if (v) setTimeout(() => { if (this.onload) this.onload(); }, 0);
+        }
+      }
+      globalThis.Image = MockImg as any;
+
+      const result = await compressImageBase64('data:image/jpeg;base64,dGVzdA==', 'image/jpeg', 1024, 0.7);
+      expect(result.base64).toBe('Y3NwLWZhbGxiYWNr');
+    });
+
+    it('terminates worker and falls back when worker execution exceeds timeout', async () => {
+      vi.useFakeTimers();
+      setWorkerCompressionSupportedForTesting(true);
+
+      const mockTerminate = vi.fn();
+
+      class StalledWorker {
+        onmessage: ((e: MessageEvent) => void) | null = null;
+        onerror: ((e: any) => void) | null = null;
+        terminate = mockTerminate;
+        postMessage = vi.fn(); // Never responds
+      }
+
+      (globalThis as any).Worker = StalledWorker;
+      globalThis.URL.createObjectURL = vi.fn().mockReturnValue('blob:http://localhost/worker-script');
+
+      HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue({
+        fillStyle: '',
+        fillRect: vi.fn(),
+        drawImage: vi.fn(),
+      });
+      HTMLCanvasElement.prototype.toDataURL = vi.fn().mockReturnValue('data:image/jpeg;base64,dGltZW91dC1mYWxsYmFjaw==');
+
+      class MockImg {
+        onload: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        crossOrigin = '';
+        naturalWidth = 600;
+        naturalHeight = 600;
+        width = 600;
+        height = 600;
+        private _src = '';
+        get src() { return this._src; }
+        set src(v: string) {
+          this._src = v;
+          if (v) setTimeout(() => { if (this.onload) this.onload(); }, 0);
+        }
+      }
+      globalThis.Image = MockImg as any;
+
+      const promise = compressImageBase64('data:image/jpeg;base64,c3RhbGw=', 'image/jpeg', 1024, 0.7);
+
+      // Fast forward past worker timeout (5000ms)
+      await vi.advanceTimersByTimeAsync(5001);
+      // Fast forward main thread onload
+      await vi.advanceTimersByTimeAsync(50);
+
+      const result = await promise;
+      expect(mockTerminate).toHaveBeenCalled();
+      expect(result.base64).toBe('dGltZW91dC1mYWxsYmFjaw==');
+
+      vi.useRealTimers();
     });
   });
 });

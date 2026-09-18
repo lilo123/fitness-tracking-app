@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './AuthContext';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
+import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory } from '../test/supabaseBuilderMock';
 import type { UserProfile } from '../types/database';
 
 vi.mock('../lib/supabase', () => ({
@@ -55,15 +56,12 @@ describe('AuthContext - iOS PWA Resilience & Lifecycle', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    clearMockHistory();
     localStorage.clear();
 
-    (supabase.from as any).mockImplementation(() => ({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
-        }),
-      }),
-    }));
+    (supabase.from as any).mockImplementation((table: string) => {
+      return createSupabaseBuilder(table, mockProfile);
+    });
 
     (supabase.auth.getSession as any).mockResolvedValue({
       data: {
@@ -235,15 +233,9 @@ describe('AuthContext - iOS PWA Resilience & Lifecycle', () => {
       username: 'UpdatedCyberWarrior',
     };
 
-    const mockSelect = vi.fn().mockReturnValue({
-      eq: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({ data: updatedProfile, error: null }),
-      }),
+    (supabase.from as any).mockImplementation((table: string) => {
+      return createSupabaseBuilder(table, updatedProfile);
     });
-
-    (supabase.from as any).mockImplementation(() => ({
-      select: mockSelect,
-    }));
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -262,6 +254,12 @@ describe('AuthContext - iOS PWA Resilience & Lifecycle', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('auth-profile-username').textContent).toBe('UpdatedCyberWarrior');
+    });
+
+    expect(getRecordedTables()).toContain('users');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'users',
+      projection: 'id, email, username, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, is_coach_mode, coach_code, coach_tier, max_athletes, created_at',
     });
   });
 
@@ -303,13 +301,9 @@ describe('AuthContext - iOS PWA Resilience & Lifecycle', () => {
       email: 'neo@cybergym.io',
     };
 
-    (supabase.from as any).mockImplementation(() => ({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({ data: newUserProfile, error: null }),
-        }),
-      }),
-    }));
+    (supabase.from as any).mockImplementation((table: string) => {
+      return createSupabaseBuilder(table, newUserProfile);
+    });
 
     await act(async () => {
       if (authStateCallback) {
@@ -322,6 +316,129 @@ describe('AuthContext - iOS PWA Resilience & Lifecycle', () => {
     await waitFor(() => {
       expect(screen.getByTestId('auth-user-id').textContent).toBe(newUserProfile.id);
       expect(screen.getByTestId('auth-profile-username').textContent).toBe(newUserProfile.username);
+    });
+  });
+
+  it('7. deduplicates concurrent getSession() calls during simultaneous visibilitychange and pageshow lifecycle resumes', async () => {
+    let resolveGetSession: (val: any) => void;
+    const pendingSessionPromise = new Promise((resolve) => {
+      resolveGetSession = resolve;
+    });
+
+    const getSessionSpy = vi.fn().mockImplementation(() => pendingSessionPromise);
+    (supabase.auth.getSession as any).mockImplementation(getSessionSpy);
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <TestConsumer />
+        </AuthProvider>
+      </QueryClientProvider>
+    );
+
+    // Initial mount calls getSession once
+    expect(getSessionSpy).toHaveBeenCalledTimes(1);
+
+    // Resolve initial mount call
+    await act(async () => {
+      resolveGetSession!({
+        data: {
+          session: {
+            user: { id: mockProfile.id, email: mockProfile.email },
+          },
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-loading').textContent).toBe('false');
+    });
+
+    const callCountAfterMount = getSessionSpy.mock.calls.length;
+
+    // Set up a pending promise for subsequent getSession calls to simulate in-flight revalidation
+    let resolveResumeSession: (val: any) => void;
+    const resumeSessionPromise = new Promise((resolve) => {
+      resolveResumeSession = resolve;
+    });
+    getSessionSpy.mockImplementation(() => resumeSessionPromise);
+
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'visible',
+    });
+
+    // Fire both visibilitychange and pageshow concurrently before the first resolves
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+      window.dispatchEvent(new Event('pageshow'));
+    });
+
+    // Exactly 1 new getSession call should have been triggered despite two concurrent resume events
+    expect(getSessionSpy.mock.calls.length).toBe(callCountAfterMount + 1);
+
+    // Now resolve the in-flight revalidation
+    await act(async () => {
+      resolveResumeSession!({
+        data: {
+          session: {
+            user: { id: mockProfile.id, email: mockProfile.email },
+          },
+        },
+      });
+      await resumeSessionPromise;
+    });
+
+    // isRevalidatingRef is now reset; a subsequent resume event triggers a new call
+    let resolveSecondResume: (val: any) => void;
+    const secondResumePromise = new Promise((resolve) => {
+      resolveSecondResume = resolve;
+    });
+    getSessionSpy.mockImplementation(() => secondResumePromise);
+
+    act(() => {
+      window.dispatchEvent(new Event('pageshow'));
+    });
+
+    expect(getSessionSpy.mock.calls.length).toBe(callCountAfterMount + 2);
+
+    await act(async () => {
+      resolveSecondResume!({
+        data: {
+          session: {
+            user: { id: mockProfile.id, email: mockProfile.email },
+          },
+        },
+      });
+      await secondResumePromise;
+    });
+  });
+
+  it('8. clears user state and localStorage when background session revalidation determines session is expired/invalid', async () => {
+    localStorage.setItem('cybergym_user', JSON.stringify(mockProfile));
+
+    // getSession returns null session (expired or revoked)
+    (supabase.auth.getSession as any).mockResolvedValue({
+      data: { session: null },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <TestConsumer />
+        </AuthProvider>
+      </QueryClientProvider>
+    );
+
+    // Synchronously hydrated from cache initially
+    expect(screen.getByTestId('auth-loading').textContent).toBe('false');
+    expect(screen.getByTestId('auth-user-id').textContent).toBe(mockProfile.id);
+
+    // After background revalidation resolves as invalid/expired, user state is cleared
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-user-id').textContent).toBe('none');
+      expect(screen.getByTestId('auth-profile-username').textContent).toBe('none');
+      expect(localStorage.getItem('cybergym_user')).toBeNull();
     });
   });
 });

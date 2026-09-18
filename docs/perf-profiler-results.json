@@ -1,0 +1,23 @@
+{
+  "singleCharacterTyping": {
+    "totalCommits": 1,
+    "actualDurationMs": 14.640035000008993,
+    "baseDurationMs": 14.339446000010867,
+    "phases": [
+      "update"
+    ]
+  },
+  "fullSetEntryInteraction": {
+    "totalCommits": 5,
+    "actualDurationMs": 80.55624099999932,
+    "baseDurationMs": 18.125290000004043,
+    "phases": [
+      "update",
+      "update",
+      "update",
+      "update",
+      "update"
+    ]
+  },
+  "totalWorkoutEngineCommitsInSession": 9
+}

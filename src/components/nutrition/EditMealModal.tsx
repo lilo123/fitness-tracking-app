@@ -88,15 +88,16 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
       fiber: number;
     }) => {
       const { id, ...updates } = payload;
-      const builder = supabase.from('nutrition_logs').update(updates).eq('id', id);
-      const res = typeof (builder as any)?.select === 'function'
-        ? await (builder as any).select()
-        : await builder;
+      const { data, error } = await supabase
+        .from('nutrition_logs')
+        .update(updates)
+        .eq('id', id)
+        .select();
 
-      if (res?.error) {
-        throw res.error;
+      if (error) {
+        throw error;
       }
-      return res?.data;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['nutrition_logs'] });

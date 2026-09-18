@@ -1,0 +1,753 @@
+
+ RUN  v4.1.11 /usr/local/google/home/duynguyenn/fitness-tracking
+
+ ✓ src/utils/date.test.ts (69 tests) 313ms
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+ ✓ src/lib/supabase.test.ts (6 tests) 670ms
+     ✓ exports a supabase client when in development  653ms
+ ✓ src/utils/measure-baseline.budget-labels.test.ts (8 tests) 391ms
+ ✓ src/utils/ghostSets.test.ts (16 tests) 655ms
+       ✓ guarantees all qualifying exercises receive ghost sets under dynamic date-shifted query against prior 500-set workout  585ms
+ ✓ src/utils/imageCompression.test.ts (34 tests) 1090ms
+       ✓ compressImageFile falls back gracefully when URL.createObjectURL throws  1007ms
+stderr | src/components/auth/LoginView.test.tsx > LoginView > renders login view with Email, Password inputs
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ src/components/nutrition/CustomDishEditor.test.tsx (9 tests) 465ms
+ ✓ src/components/nutrition/useNutritionData.test.tsx (10 tests) 525ms
+ ✓ src/utils/check-payload-projections.test.ts (8 tests) 1862ms
+stderr | src/components/auth/ResetPasswordView.test.tsx > ResetPasswordView > renders reset password form with password and confirm password fields
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ src/components/nutrition/EditMealModal.test.tsx (13 tests) 471ms
+stderr | src/components/auth/LoginView.test.tsx > LoginView > switches to register mode and displays confirm password field
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+Not implemented: Window's scrollTo() method
+ ✓ src/components/auth/ResetPasswordView.test.tsx (4 tests) 811ms
+     ✓ renders reset password form with password and confirm password fields  435ms
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+ ✓ src/components/auth/LoginView.test.tsx (5 tests) 1176ms
+     ✓ switches to register mode and displays confirm password field  472ms
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+ ✓ src/components/workout/EditSetModal.test.tsx (12 tests) 1408ms
+     ✓ rejects invalid RPE values out of 1-10 range  441ms
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+ ✓ src/components/nutrition/NutrientBreakdownModal.test.tsx (28 tests) 1815ms
+     ✓ renders modal dialog with 2-row stacked header and mobile drag handle when open  427ms
+stderr | src/components/workout/WorkoutEngine.test.tsx > WorkoutEngine > renders Sunday Rest Day card by default on Sunday when no routine is scheduled
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | src/components/workout/WorkoutEngine.test.tsx > WorkoutEngine > renders Sunday Rest Day card by default on Sunday when no routine is scheduled
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+stderr | src/components/NutritionEngine.test.tsx > NutritionEngine > mounts successfully and renders Today's Nutrition 5-ring dashboard, conversational input, and quick log carousel
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | src/components/NutritionEngine.test.tsx > NutritionEngine > mounts successfully and renders Today's Nutrition 5-ring dashboard, conversational input, and quick log carousel
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | src/components/history/HistoryView.test.tsx > HistoryView > scaleMealMutation fetches items and macros on-demand when items are omitted from log
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | src/components/history/HistoryView.test.tsx > HistoryView > scaleMealMutation fetches items and macros on-demand when items are omitted from log
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ src/components/nutrition/MealLogRow.test.tsx (21 tests) 1983ms
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+stderr | src/components/workout/WorkoutEngine.test.tsx > WorkoutEngine > allows opening routine selector and picking Free Workout
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | src/components/workout/WorkoutEngine.test.tsx > WorkoutEngine > allows opening routine selector and picking Free Workout
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+Not implemented: Window's scrollTo() method
+ ✓ src/components/history/Virtualization.test.tsx (10 tests) 2155ms
+     ✓ WorkoutSessionHistory: mounts <= 200 DOM nodes at rest with a 2,000-set account (DIR-C2 Threshold)  631ms
+     ✓ WorkoutExerciseHistory: virtualizes long exercise lists with search and category filters  325ms
+     ✓ NutritionHistoryTimeline: virtualizes daily nutrition logs and retains meal operations  399ms
+     ✓ CoachAthleteTimeline: virtualizes athlete history timeline and preserves drilldown expansion  309ms
+stdout | src/components/workout/WorkoutEngine.profiler.test.tsx > WorkoutEngine React Profiler Baseline > measures React Profiler commits for single character typing and full set-entry interaction
+__PROFILER_OUTPUT_JSON__{"singleCharacterTyping":{"totalCommits":1,"actualDurationMs":64.55682499998784,"baseDurationMs":57.76210699998592,"phases":["update"]},"fullSetEntryInteraction":{"totalCommits":5,"actualDurationMs":300.75640400009434,"baseDurationMs":28.537184999978308,"phases":["update","update","update","update","update"]},"totalWorkoutEngineCommitsInSession":9}
+
+--- React Profiler WorkoutEngine Baseline ---
+Single Character Typing ('1' into weight):
+  Commits: 1
+  Actual Duration: 64.56 ms
+  Base Duration: 57.76 ms
+Full Set-Entry Interaction (type weight, reps, click commit):
+  Commits: 5
+  Actual Duration: 300.76 ms
+  Base Duration: 28.54 ms
+---------------------------------------------
+
+
+ ✓ src/components/nutrition/ComponentRow.test.tsx (8 tests) 539ms
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+ ✓ src/components/workout/WorkoutEngine.profiler.test.tsx (1 test) 1769ms
+     ✓ measures React Profiler commits for single character typing and full set-entry interaction  1755ms
+ ✓ src/App.test.tsx (6 tests) 2434ms
+     ✓ renders top Header and bottom navigation tabs  328ms
+     ✓ navigates to Nutrition tab when bottom nav item is clicked  752ms
+     ✓ persists global rest timer pill across /workout, /nutrition, and /history navigation  612ms
+     ✓ renders protected content immediately without showing loading spinner when cached user exists in localStorage  396ms
+ ✓ src/components/common/GlobalRestTimerPill.test.tsx (5 tests) 220ms
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+stderr | src/context/AuthContext.test.tsx > AuthContext - iOS PWA Resilience & Lifecycle > 1. synchronously hydrates user and profile from localStorage on initial render
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | src/context/AuthContext.test.tsx > AuthContext - iOS PWA Resilience & Lifecycle > 1. synchronously hydrates user and profile from localStorage on initial render
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+Not implemented: Window's scrollTo() method
+stderr | src/context/AuthContext.test.tsx > AuthContext - iOS PWA Resilience & Lifecycle > 2. resolves via 3000ms timeout race when getSession hangs and clears loading
+[AuthContext] getSession timed out after 3000ms. Utilizing cached credentials if available.
+
+stderr | src/context/AuthContext.test.tsx > AuthContext - iOS PWA Resilience & Lifecycle > 2b. retains cached credentials when getSession fast-rejects (e.g. airplane mode / offline)
+[AuthContext] getSession rejection: Error: Failed to fetch
+    at /usr/local/google/home/duynguyenn/fitness-tracking/src/context/AuthContext.test.tsx:132:57
+    at file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64
+
+stderr | src/context/AuthContext.test.tsx > AuthContext - iOS PWA Resilience & Lifecycle > 2b. retains cached credentials when getSession fast-rejects (e.g. airplane mode / offline)
+[AuthContext] getSession timed out after 3000ms. Utilizing cached credentials if available.
+
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+ ✓ src/context/AuthContext.test.tsx (9 tests) 299ms
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+stderr | src/components/coach/CoachCockpit.test.tsx > CoachCockpit > toggles mobile segmented tabs between activity, macros, and templates
+An update to CoachProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to CoachProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ src/utils/workoutSessionStore.test.ts (19 tests) 191ms
+ ✓ src/hooks/useModalA11y.test.tsx (7 tests) 311ms
+Not implemented: Window's scrollTo() method
+ ✓ src/utils/verify-closeout-claims.test.ts (20 tests) 276ms
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+ ✓ src/components/exercises/ExercisesView.test.tsx (10 tests) 3641ms
+     ✓ renders exercise library with Master badges and isolates delete permission  310ms
+     ✓ creates custom exercise scoped to the athlete  661ms
+     ✓ opens EditTemplateModal when Edit button is clicked on user template, edits details, and saves  351ms
+     ✓ enforces comprehensive permission matrix: coach edits master (with warning banner) vs athlete fork vs coach impersonation  601ms
+     ✓ provides list-first template layout with day filter toolbar and + New Routine create mode trigger  578ms
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+ ✓ src/utils/detect-seed-profile.test.ts (14 tests) 109ms
+ ✓ src/components/settings/SettingsView.test.tsx (13 tests) 3694ms
+     ✓ renders 5-column daily macro goals grid including Calories, Protein, Carbs, Fat, and Fiber  779ms
+     ✓ allows toggling between Athlete View and Coach View modes for coach  368ms
+     ✓ renders error banner with alert styling when saving goals fails  440ms
+     ✓ renders My Coach card and allows linking to a coach via link_to_coach RPC  337ms
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+ ✓ src/utils/promiseDedupe.test.ts (4 tests) 99ms
+stderr | src/components/common/Header.test.tsx > Header connection status badge > renders Offline status badge when navigator is offline
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | src/components/common/Header.test.tsx > Header connection status badge > renders Offline status badge when navigator is offline
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+stderr | src/components/common/Header.test.tsx > Header connection status badge > updates badge dynamically when window network events fire
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | src/components/common/Header.test.tsx > Header connection status badge > updates badge dynamically when window network events fire
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ src/components/common/Header.test.tsx (3 tests) 238ms
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+ ✓ src/utils/restTimerStore.test.ts (12 tests) 46ms
+ ✓ src/context/AuthDeduplication.test.tsx (4 tests) 119ms
+Not implemented: Window's scrollTo() method
+ ✓ src/hooks/useOnlineStatus.test.ts (4 tests) 72ms
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+ ✓ src/utils/unitConverter.test.ts (52 tests) 59ms
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+ ✓ src/components/coach/CoachCockpit.test.tsx (17 tests) 4412ms
+     ✓ renders Coach Dashboard and Athlete Switcher correctly  702ms
+     ✓ allows adding exercises and customizing target sets and reps in template builder  545ms
+     ✓ renders athlete recent workouts with formatted short dates  368ms
+     ✓ allows coach to view and update athlete macro targets via update_athlete_macros RPC  615ms
+     ✓ renders activity timeline with exercise volume drilldowns and nutrition compliance badges  471ms
+Not implemented: Window's scrollTo() method
+stderr | src/components/history/HistoryView.test.tsx > HistoryView > Coach Inspection Mode > resets editingMealLog and editingSet when switching athletes or toggling inspect mode
+An update to HistoryView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to HistoryView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+Not implemented: Window's scrollTo() method
+ ✓ src/utils/backfill.test.ts (31 tests) 40ms
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+ ✓ src/utils/nutrition.test.ts (26 tests) 28ms
+Not implemented: Window's scrollTo() method
+stderr | src/components/history/HistoryView.test.tsx > HistoryView > P1-4: History Route Payload Optimization & RPC integration > 5. 500-set fetch emits truncation warning on expand
+[useHistoryData] fetchSessionSets query reached cap of 500 rows; older historical sets may be truncated.
+
+ ✓ src/utils/itemModel.test.ts (22 tests) 20ms
+ ✓ src/utils/scaling.test.ts (15 tests) 21ms
+ ✓ src/utils/sound.test.ts (4 tests) 17ms
+ ✓ src/utils/historicalMigration.test.ts (7 tests) 18ms
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+ ✓ src/components/history/HistoryView.test.tsx (31 tests) 6134ms
+     ✓ renders workout history view by default and allows toggling between By Session and By Exercise  452ms
+     ✓ displays mutation error notification when meal deletion fails  443ms
+     ✓ opens Edit Meal modal pre-filled with meal values when Edit button is clicked in nutrition history  400ms
+     ✓ submits updated meal changes and executes update mutation on supabase  362ms
+     ✓ displays error notification in Edit Meal modal when meal update fails  336ms
+       ✓ 5. 500-set fetch emits truncation warning on expand  708ms
+stderr | src/components/NutritionEngine.test.tsx > NutritionEngine > falls back to manual entry with error banner when edge function invocation fails
+AI Edge function failed: Error: Network error
+    at /usr/local/google/home/duynguyenn/fitness-tracking/src/components/NutritionEngine.test.tsx:390:58
+    at file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64
+
+stderr | src/components/NutritionEngine.test.tsx > NutritionEngine > falls back to manual entry with error banner when edge function returns error in payload without throwing
+AI Edge function failed: Error: Model quota exceeded. Please try again later.
+    at handleAnalyze (/usr/local/google/home/duynguyenn/fitness-tracking/src/components/nutrition/useNutritionAi.ts:211:21)
+
+stderr | src/components/NutritionEngine.test.tsx > NutritionEngine > falls back to manual entry when edge function returns invalid empty response without macro data
+AI Edge function failed: Error: Invalid parsed response: missing nutrition data
+    at handleAnalyze (/usr/local/google/home/duynguyenn/fitness-tracking/src/components/nutrition/useNutritionAi.ts:274:13)
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+stderr | src/components/NutritionEngine.test.tsx > NutritionEngine > unwraps HTTP 429 from error.context and renders 15 RPM cooldown warning banner with switch to manual entry button
+AI Edge function failed: Error: Gemini rate limit exceeded (15 RPM). Please wait 15 seconds or switch to manual entry.
+    at handleAnalyze (/usr/local/google/home/duynguyenn/fitness-tracking/src/components/nutrition/useNutritionAi.ts:188:27) {
+  is429: true,
+  retryAfter: 15
+}
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+stderr | src/components/NutritionEngine.test.tsx > NutritionEngine > keeps meal photo pinned at top when switching to manual entry
+AI Edge function failed: Error: Gemini rate limit exceeded (15 RPM). Please wait 15 seconds or switch to manual entry.
+    at handleAnalyze (/usr/local/google/home/duynguyenn/fitness-tracking/src/components/nutrition/useNutritionAi.ts:188:27)
+    at runNextTicks (node:internal/process/task_queues:64:5)
+    at listOnTimeout (node:internal/timers:547:9)
+    at processTimers (node:internal/timers:521:7) {
+  is429: true,
+  retryAfter: 15
+}
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+stderr | src/components/NutritionEngine.test.tsx > NutritionEngine > pre-populates manual dish name with "Meal Photo" when switching to manual with photo and empty text
+AI Edge function failed: Error: Gemini rate limit exceeded (15 RPM). Please wait 15 seconds or switch to manual entry.
+    at handleAnalyze (/usr/local/google/home/duynguyenn/fitness-tracking/src/components/nutrition/useNutritionAi.ts:188:27)
+    at runNextTicks (node:internal/process/task_queues:64:5)
+    at listOnTimeout (node:internal/timers:547:9)
+    at processTimers (node:internal/timers:521:7) {
+  is429: true,
+  retryAfter: 15
+}
+
+Not implemented: Window's scrollTo() method
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+stderr | src/components/NutritionEngine.test.tsx > NutritionEngine > unwraps Retry-After directly from error.context.headers when response body is plain text or empty
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | src/components/NutritionEngine.test.tsx > NutritionEngine > unwraps Retry-After directly from error.context.headers when response body is plain text or empty
+An update to AuthProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+stderr | src/components/NutritionEngine.test.tsx > NutritionEngine > unwraps Retry-After directly from error.context.headers when response body is plain text or empty
+AI Edge function failed: Error: Gemini rate limit exceeded (15 RPM). Please wait 15 seconds or switch to manual entry.
+    at handleAnalyze (/usr/local/google/home/duynguyenn/fitness-tracking/src/components/nutrition/useNutritionAi.ts:188:27)
+    at runNextTicks (node:internal/process/task_queues:64:5)
+    at listOnTimeout (node:internal/timers:547:9)
+    at processTimers (node:internal/timers:521:7) {
+  is429: true,
+  retryAfter: 30
+}
+
+Not implemented: Window's scrollTo() method
+stderr | src/components/NutritionEngine.test.tsx > NutritionEngine > unwraps HTTP 400 JSON error from error.context and replaces generic non-2xx status message
+AI Edge function failed: Error: Input text or meal photo is required for nutrition parsing.
+    at handleAnalyze (/usr/local/google/home/duynguyenn/fitness-tracking/src/components/nutrition/useNutritionAi.ts:195:29) {
+  code: '',
+  status: 400
+}
+
+stderr | src/components/NutritionEngine.test.tsx > NutritionEngine > unwraps HTTP 422 non-food error from error.context and displays descriptive warning banner
+AI Edge function failed: Error: No food detected in input or image. Please provide a meal photo or food description.
+    at handleAnalyze (/usr/local/google/home/duynguyenn/fitness-tracking/src/components/nutrition/useNutritionAi.ts:195:29) {
+  code: 'NON_FOOD_DETECTED',
+  status: 422
+}
+
+ ✓ src/components/workout/WorkoutEngine.test.tsx (61 tests) 9660ms
+     ✓ automatically schedules Push, Quads, & Core - Reduced on Monday  457ms
+     ✓ renders streamlined 5-column grid headers and omits Type and RPE inputs  394ms
+     ✓ commits a ghost set on one-tap click with set_type: working and rpe: null  1305ms
+     ✓ allows batch logging all remaining sets for an exercise  434ms
+     ✓ displays mutation error notification when set logging fails  430ms
+     ✓ supports decimal weight input precision (e.g. 22.5 lbs)  350ms
+stderr | src/components/NutritionEngine.test.tsx > NutritionEngine > unwraps HTTP 503 capacity overload from error.context and displays capacity message
+AI Edge function failed: Error: AI model capacity is temporarily exhausted. Please try again in 5 seconds or switch to manual entry.
+    at handleAnalyze (/usr/local/google/home/duynguyenn/fitness-tracking/src/components/nutrition/useNutritionAi.ts:195:29) {
+  code: 'CAPACITY_EXHAUSTED',
+  status: 503
+}
+
+stderr | src/components/NutritionEngine.test.tsx > NutritionEngine > enforces adaptive timeouts of 30s for text-only input
+AI Edge function failed: Error: Edge function timeout after 30s
+    at /usr/local/google/home/duynguyenn/fitness-tracking/src/components/nutrition/useNutritionAi.ts:106:45
+    at callTimer (file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:1773:25)
+    at doTickInner (file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:2444:30)
+    at doTick (file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:2525:21)
+    at Object.tick (file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:2533:21)
+    at FakeTimers.advanceTimersByTime (file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3271:44)
+    at Object.advanceTimersByTime (file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3509:13)
+    at /usr/local/google/home/duynguyenn/fitness-tracking/src/components/NutritionEngine.test.tsx:1856:12
+    at /usr/local/google/home/duynguyenn/fitness-tracking/node_modules/@testing-library/react/dist/act-compat.js:47:24
+    at process.env.NODE_ENV.exports.act (/usr/local/google/home/duynguyenn/fitness-tracking/node_modules/react/cjs/react.development.js:814:22)
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+stderr | src/components/NutritionEngine.test.tsx > NutritionEngine > enforces 45s timeout boundary when photo is attached
+AI Edge function failed: Error: Edge function timeout after 45s
+    at /usr/local/google/home/duynguyenn/fitness-tracking/src/components/nutrition/useNutritionAi.ts:106:45
+    at callTimer (file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:1773:25)
+    at doTickInner (file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:2444:30)
+    at doTick (file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:2525:21)
+    at Object.tick (file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:2533:21)
+    at FakeTimers.advanceTimersByTime (file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3271:44)
+    at Object.advanceTimersByTime (file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3509:13)
+    at /usr/local/google/home/duynguyenn/fitness-tracking/src/components/NutritionEngine.test.tsx:1893:12
+    at /usr/local/google/home/duynguyenn/fitness-tracking/node_modules/@testing-library/react/dist/act-compat.js:47:24
+    at process.env.NODE_ENV.exports.act (/usr/local/google/home/duynguyenn/fitness-tracking/node_modules/react/cjs/react.development.js:814:22)
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+stderr | src/components/NutritionEngine.test.tsx > NutritionEngine > preserves attached photo preview in DOM when edge function analysis fails
+AI Edge function failed: Error: Network error
+    at /usr/local/google/home/duynguyenn/fitness-tracking/src/components/NutritionEngine.test.tsx:1910:14
+    at file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | src/components/NutritionEngine.test.tsx > NutritionEngine > displays Retry Analysis button in error banner and succeeds on retry
+AI Edge function failed: Error: AI model capacity is temporarily exhausted. Please try again in 5 seconds or switch to manual entry.
+    at handleAnalyze (/usr/local/google/home/duynguyenn/fitness-tracking/src/components/nutrition/useNutritionAi.ts:195:29) {
+  code: '',
+  status: 503
+}
+
+stderr | src/components/NutritionEngine.test.tsx > NutritionEngine > complies with WCAG 2.5.5 touch target size (min 44x44px) and touch-manipulation on Retry Analysis button
+AI Edge function failed: Error: AI failed
+    at /usr/local/google/home/duynguyenn/fitness-tracking/src/components/NutritionEngine.test.tsx:1990:14
+    at file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///usr/local/google/home/duynguyenn/fitness-tracking/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64
+
+stderr | src/components/NutritionEngine.test.tsx > NutritionEngine > unwraps error from error.context when context is a plain object without .clone()
+AI Edge function failed: Error: Direct context error message without clone
+    at handleAnalyze (/usr/local/google/home/duynguyenn/fitness-tracking/src/components/nutrition/useNutritionAi.ts:195:29) {
+  code: 'CUSTOM_ERROR',
+  status: 400
+}
+
+ ✓ src/components/NutritionEngine.test.tsx (61 tests) 11911ms
+     ✓ mounts successfully and renders Today's Nutrition 5-ring dashboard, conversational input, and quick log carousel  419ms
+     ✓ parses meal into staged meal card with itemized ingredient math breakdown  2614ms
+     ✓ allows portion adjustment and 1-tap item deletion in staged meal card  771ms
+     ✓ allows manual entry logging when toggled  619ms
+     ✓ falls back to manual entry with error banner when edge function invocation fails  387ms
+     ✓ falls back to manual entry with error banner when edge function returns error in payload without throwing  326ms
+     ✓ opens custom dish modal to create and save a new custom dish with fiber  476ms
+     ✓ parses conversational multi-dish "Com Tam & Eggs" and elaborates components via AI with Authorization Bearer header  327ms
+
+ Test Files  42 passed (42)
+      Tests  719 passed (719)
+   Start at  20:06:29
+   Duration  19.48s (transform 31.24s, setup 16.04s, import 47.13s, tests 62.17s, environment 116.81s)
+

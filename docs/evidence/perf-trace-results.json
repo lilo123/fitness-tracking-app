@@ -1,0 +1,241 @@
+{
+  "_meta": {
+    "generatedAt": "2026-09-17T20:05:19.232Z",
+    "gitCommit": "9d2a01cbc5de20591782afbc33afe7be10b90653",
+    "gitDirty": true,
+    "sourceFingerprint": "6c7ce52415fe4974fa217c79709672e3",
+    "ceilingBytes": 153600,
+    "seedProfile": "payload-stress",
+    "runId": "30cb47fc-0d3d-4823-9c0b-0e30335d3c2b",
+    "measuredAtFirst": "2026-09-17T20:05:02.417Z",
+    "measuredAtLast": "2026-09-17T20:05:17.575Z",
+    "routesMeasured": 4,
+    "routesOverCeiling": []
+  },
+  "workout_seeded": {
+    "route": "/workout",
+    "user": "bench-athlete@cybergym.io (550 sets, 350 nutrition logs)",
+    "totalRequests": 54,
+    "totalTransferredBytes": 11877284,
+    "supabaseQueryCount": 7,
+    "supabaseTransferredBytes": 123085,
+    "queryBreakdown": [
+      {
+        "path": "users",
+        "query": "?select=id%2Cemail%2Cusername%2Crole%2Ctarget_calories%2Ctarget_protein%2Ctarget_carbs%2Ctarget_fat%2Ctarget_fiber%2Cauto_rest_timer%2Cis_coach_mode%2Ccoach_code%2Ccoach_tier%2Cmax_athletes%2Ccreated_at&id=eq.05497a83-49a9-4802-aa84-0a81a2a53bf0",
+        "status": 200,
+        "bytes": 370
+      },
+      {
+        "path": "users",
+        "query": "?select=role&id=eq.05497a83-49a9-4802-aa84-0a81a2a53bf0",
+        "status": 200,
+        "bytes": 18
+      },
+      {
+        "path": "users",
+        "query": "?select=id%2Cemail%2Cusername%2Crole%2Ctarget_calories%2Ctarget_protein%2Ctarget_carbs%2Ctarget_fat%2Ctarget_fiber%2Cauto_rest_timer%2Cis_coach_mode%2Ccoach_code%2Ccoach_tier%2Cmax_athletes%2Ccreated_at&id=eq.05497a83-49a9-4802-aa84-0a81a2a53bf0",
+        "status": 200,
+        "bytes": 370
+      },
+      {
+        "path": "exercises",
+        "query": "?select=id%2Cname%2Cbody_part%2Cis_master&order=name.asc&limit=200",
+        "status": 200,
+        "bytes": 1340
+      },
+      {
+        "path": "routine_templates",
+        "query": "?select=id%2Cuser_id%2Cname%2Cis_master%2Cassigned_to%2Cdays_of_week%2Ccreated_at&or=%28user_id.eq.05497a83-49a9-4802-aa84-0a81a2a53bf0%2Cis_master.eq.true%2Cassigned_to.eq.05497a83-49a9-4802-aa84-0a81a2a53bf0%29&order=created_at.desc&limit=100",
+        "status": 200,
+        "bytes": 21298
+      },
+      {
+        "path": "workouts",
+        "query": "?select=id%2Cdate%2Cname%2Csets%28id%2Creps%2Cweight%2Cset_index%2Ccreated_at%2Cexercise_id%29&user_id=eq.05497a83-49a9-4802-aa84-0a81a2a53bf0&date=gte.2026-09-17T00%3A00%3A00.000Z&date=lte.2026-09-17T23%3A59%3A59.999Z&order=date.desc&sets.limit=500&limit=5",
+        "status": 200,
+        "bytes": 95311
+      },
+      {
+        "path": "rpc/get_ghost_sets",
+        "query": "",
+        "status": 200,
+        "bytes": 4378
+      }
+    ],
+    "vitals": {
+      "fcp": 860,
+      "lcp": 1352,
+      "cls": 1.0660923197981877,
+      "tbt": 565,
+      "longTasksCount": 3
+    },
+    "elapsedMs": 2130,
+    "ceilingBytes": 153600,
+    "overCeiling": false,
+    "runId": "30cb47fc-0d3d-4823-9c0b-0e30335d3c2b",
+    "measuredAt": "2026-09-17T20:05:02.417Z"
+  },
+  "nutrition": {
+    "route": "/nutrition",
+    "totalRequests": 66,
+    "totalTransferredBytes": 12295110,
+    "supabaseQueryCount": 4,
+    "supabaseTransferredBytes": 2269,
+    "queryBreakdown": [
+      {
+        "path": "users",
+        "query": "?select=id%2Cemail%2Cusername%2Crole%2Ctarget_calories%2Ctarget_protein%2Ctarget_carbs%2Ctarget_fat%2Ctarget_fiber%2Cauto_rest_timer%2Cis_coach_mode%2Ccoach_code%2Ccoach_tier%2Cmax_athletes%2Ccreated_at&id=eq.05497a83-49a9-4802-aa84-0a81a2a53bf0",
+        "status": 200,
+        "bytes": 370
+      },
+      {
+        "path": "users",
+        "query": "?select=id%2Cemail%2Cusername%2Crole%2Ctarget_calories%2Ctarget_protein%2Ctarget_carbs%2Ctarget_fat%2Ctarget_fiber%2Cauto_rest_timer%2Cis_coach_mode%2Ccoach_code%2Ccoach_tier%2Cmax_athletes%2Ccreated_at&id=eq.05497a83-49a9-4802-aa84-0a81a2a53bf0",
+        "status": 200,
+        "bytes": 370
+      },
+      {
+        "path": "custom_dishes",
+        "query": "?select=id%2Cuser_id%2Cname%2Ccalories%2Cprotein%2Ccarbs%2Cfat%2Cfiber%2Ccreated_at&user_id=eq.05497a83-49a9-4802-aa84-0a81a2a53bf0&order=created_at.desc&limit=100",
+        "status": 200,
+        "bytes": 1168
+      },
+      {
+        "path": "nutrition_logs",
+        "query": "?select=id%2Cuser_id%2Cfood_name%2Cmeal_type%2Ccalories%2Cprotein%2Ccarbs%2Cfat%2Cfiber%2Cserving_size%2Cserving_unit%2Clogged_at%2Ccreated_at%2Chas_components&user_id=eq.05497a83-49a9-4802-aa84-0a81a2a53bf0&logged_at=gte.2026-09-17T00%3A00%3A00.000Z&logged_at=lte.2026-09-17T23%3A59%3A59.999Z&order=logged_at.desc&limit=100",
+        "status": 200,
+        "bytes": 361
+      }
+    ],
+    "vitals": {
+      "fcp": 0,
+      "lcp": 1340,
+      "cls": 0.009927236566691627,
+      "tbt": 57,
+      "longTasksCount": 1
+    },
+    "ceilingBytes": 153600,
+    "overCeiling": false,
+    "runId": "30cb47fc-0d3d-4823-9c0b-0e30335d3c2b",
+    "measuredAt": "2026-09-17T20:05:07.119Z"
+  },
+  "history": {
+    "route": "/history",
+    "totalRequests": 66,
+    "totalTransferredBytes": 12345072,
+    "supabaseQueryCount": 5,
+    "supabaseTransferredBytes": 26560,
+    "queryBreakdown": [
+      {
+        "path": "users",
+        "query": "?select=id%2Cemail%2Cusername%2Crole%2Ctarget_calories%2Ctarget_protein%2Ctarget_carbs%2Ctarget_fat%2Ctarget_fiber%2Cauto_rest_timer%2Cis_coach_mode%2Ccoach_code%2Ccoach_tier%2Cmax_athletes%2Ccreated_at&id=eq.05497a83-49a9-4802-aa84-0a81a2a53bf0",
+        "status": 200,
+        "bytes": 370
+      },
+      {
+        "path": "exercises",
+        "query": "?select=id%2Cname%2Cbody_part%2Cis_master&order=name.asc&limit=200",
+        "status": 200,
+        "bytes": 1340
+      },
+      {
+        "path": "workouts",
+        "query": "?select=id&user_id=eq.05497a83-49a9-4802-aa84-0a81a2a53bf0&limit=1",
+        "status": 200,
+        "bytes": 47
+      },
+      {
+        "path": "nutrition_logs",
+        "query": "?select=id%2Cuser_id%2Cfood_name%2Cmeal_type%2Ccalories%2Cprotein%2Ccarbs%2Cfat%2Cfiber%2Cserving_size%2Cserving_unit%2Clogged_at%2Ccreated_at%2Chas_components&user_id=eq.05497a83-49a9-4802-aa84-0a81a2a53bf0&order=logged_at.desc&limit=50",
+        "status": 200,
+        "bytes": 17558
+      },
+      {
+        "path": "rpc/get_history_sessions",
+        "query": "",
+        "status": 200,
+        "bytes": 7245
+      }
+    ],
+    "vitals": {
+      "fcp": 0,
+      "lcp": 2196,
+      "cls": 0.1663886378026506,
+      "tbt": 330,
+      "longTasksCount": 3
+    },
+    "ceilingBytes": 153600,
+    "overCeiling": false,
+    "runId": "30cb47fc-0d3d-4823-9c0b-0e30335d3c2b",
+    "measuredAt": "2026-09-17T20:05:12.835Z"
+  },
+  "coach": {
+    "route": "/coach",
+    "totalRequests": 60,
+    "totalTransferredBytes": 12068385,
+    "supabaseQueryCount": 8,
+    "supabaseTransferredBytes": 57422,
+    "queryBreakdown": [
+      {
+        "path": "coach_athlete_links",
+        "query": "?select=athlete_id%2Cstatus%2Clinked_at%2Cathlete%3Ausers%21athlete_id%28id%2Cusername%2Cemail%2Crole%2Ccreated_at%29&coach_id=eq.a0000000-0000-0000-0000-000000000001&status=eq.active&order=linked_at.desc&limit=100",
+        "status": 200,
+        "bytes": 306
+      },
+      {
+        "path": "coach_athlete_links",
+        "query": "?select=athlete_id%2Cstatus%2Clinked_at%2Cathlete%3Ausers%21athlete_id%28id%2Cusername%2Cemail%2Crole%2Ccreated_at%29&coach_id=eq.a0000000-0000-0000-0000-000000000001&status=eq.active&order=linked_at.desc&limit=100",
+        "status": 200,
+        "bytes": 306
+      },
+      {
+        "path": "users",
+        "query": "?select=id%2Cemail%2Cusername%2Crole%2Ctarget_calories%2Ctarget_protein%2Ctarget_carbs%2Ctarget_fat%2Ctarget_fiber%2Cauto_rest_timer%2Cis_coach_mode%2Ccoach_code%2Ccoach_tier%2Cmax_athletes%2Ccreated_at&id=eq.a0000000-0000-0000-0000-000000000001",
+        "status": 200,
+        "bytes": 365
+      },
+      {
+        "path": "exercises",
+        "query": "?select=id%2Cname%2Cbody_part%2Cis_master&order=name.asc&limit=200",
+        "status": 200,
+        "bytes": 1340
+      },
+      {
+        "path": "routine_templates",
+        "query": "?select=id%2Cuser_id%2Cname%2Cis_master%2Cassigned_to%2Cdays_of_week%2Ccreated_at%2Cexercises%3Atemplate_exercises%28id%2Ctemplate_id%2Cexercise_id%2Corder_index%2Ctarget_sets%2Ctarget_reps%29&order=created_at.desc&limit=100",
+        "status": 200,
+        "bytes": 54223
+      },
+      {
+        "path": "nutrition_logs",
+        "query": "?select=id%2Cuser_id%2Cfood_name%2Ccalories%2Cprotein%2Ccarbs%2Cfat%2Cfiber%2Clogged_at&user_id=eq.a0000000-0000-0000-0000-000000000002&logged_at=gte.2026-09-03T00%3A00%3A00.000Z&order=logged_at.desc&limit=100",
+        "status": 200,
+        "bytes": 2
+      },
+      {
+        "path": "users",
+        "query": "?select=id%2Cusername%2Cemail%2Ctarget_calories%2Ctarget_protein%2Ctarget_carbs%2Ctarget_fat%2Ctarget_fiber&id=eq.a0000000-0000-0000-0000-000000000002",
+        "status": 200,
+        "bytes": 198
+      },
+      {
+        "path": "workouts",
+        "query": "?select=id%2Cdate%2Cname%2Csets%28id%2Creps%2Cweight%2Cset_index%2Ccreated_at%2Cexercise_id%29&user_id=eq.a0000000-0000-0000-0000-000000000002&date=gte.2026-09-03&order=date.desc&limit=100&sets.limit=200",
+        "status": 200,
+        "bytes": 682
+      }
+    ],
+    "vitals": {
+      "fcp": 0,
+      "lcp": 1332,
+      "cls": 0,
+      "tbt": 137,
+      "longTasksCount": 2
+    },
+    "ceilingBytes": 153600,
+    "overCeiling": false,
+    "runId": "30cb47fc-0d3d-4823-9c0b-0e30335d3c2b",
+    "measuredAt": "2026-09-17T20:05:17.575Z"
+  }
+}

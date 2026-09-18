@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, renderHook, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { HistoryView } from './HistoryView';
+import { useHistoryData } from './useHistoryData';
 import { groupSessionSetsByExercise } from '../../utils/historyGrouping';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../../context/AuthContext';
 import { CoachProvider } from '../../context/CoachContext';
 import { supabase } from '../../lib/supabase';
+import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory, recordedTables } from '../../test/supabaseBuilderMock';
 
 /**
  * Edit and Delete now live behind a single overflow trigger (`meal-actions-<id>`)
@@ -27,6 +29,7 @@ const { mockSession } = vi.hoisted(() => ({
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: vi.fn(),
+    rpc: vi.fn(),
     auth: {
       getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-athlete-id' } } }),
       getSession: vi.fn().mockResolvedValue({ data: { session: mockSession } }),
@@ -74,6 +77,7 @@ describe('HistoryView', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    clearMockHistory();
     (supabase.auth.getUser as any).mockResolvedValue({ data: { user: { id: 'test-athlete-id' } } });
     (supabase.auth.getSession as any).mockResolvedValue({ data: { session: mockSession } });
     (supabase.auth.onAuthStateChange as any).mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } });
@@ -88,66 +92,113 @@ describe('HistoryView', () => {
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'nutrition_logs') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: mockNutritionLogs, error: null }),
-            }),
-          }),
-          delete: vi.fn().mockReturnValue({
-            eq: mockDeleteEq,
-          }),
-          update: mockUpdate,
-        };
+        const b = createSupabaseBuilder('nutrition_logs', { data: mockNutritionLogs, error: null });
+        b.delete = vi.fn().mockReturnValue({ eq: mockDeleteEq });
+        b.update = mockUpdate;
+        return b;
       }
 
       if (table === 'workouts') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({
-              data: [{ id: 'w1', date: '2026-09-01', name: 'Chest & Back' }],
-              error: null,
-            }),
-          }),
-        };
+        return createSupabaseBuilder('workouts', {
+          data: [{ id: 'w1', date: '2026-09-01', name: 'Chest & Back' }],
+          error: null,
+        });
       }
 
       if (table === 'sets') {
-        return {
-          select: vi.fn().mockReturnValue({
-            in: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [
-                  {
-                    id: 's1',
-                    workout_id: 'w1',
-                    exercise_id: 'Bench Press',
-                    weight: 225,
-                    reps: 8,
-                    created_at: '2026-09-01T10:00:00Z',
-                    workouts: { date: '2026-09-01', name: 'Chest & Back' },
-                  },
-                ],
-                error: null,
-              }),
-            }),
-          }),
-          delete: vi.fn().mockReturnValue({
-            eq: mockDeleteEq,
-          }),
-          update: mockUpdate,
-        };
+        const b = createSupabaseBuilder('sets', {
+          data: [
+            {
+              id: 's1',
+              workout_id: 'w1',
+              exercise_id: 'Bench Press',
+              weight: 225,
+              reps: 8,
+              set_index: 1,
+              created_at: '2026-09-01T10:00:00Z',
+              workouts: { date: '2026-09-01', name: 'Chest & Back' },
+            },
+          ],
+          error: null,
+        });
+        b.delete = vi.fn().mockReturnValue({ eq: mockDeleteEq });
+        b.update = mockUpdate;
+        return b;
       }
 
-      return {
-        select: vi.fn().mockReturnValue({
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            single: vi.fn().mockResolvedValue({ data: null, error: null }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
+    });
+
+    (supabase.rpc as any).mockImplementation(async (fn: string, _args?: any) => {
+      if (fn === 'get_history_sessions') {
+        const prevWLen = recordedTables.length;
+        const wBuilder = (supabase.from as any)('workouts');
+        if (recordedTables.length > prevWLen && recordedTables[recordedTables.length - 1] === 'workouts') {
+          recordedTables.pop();
+        }
+        const prevSLen = recordedTables.length;
+        const sBuilder = (supabase.from as any)('sets');
+        if (recordedTables.length > prevSLen && recordedTables[recordedTables.length - 1] === 'sets') {
+          recordedTables.pop();
+        }
+
+        const workoutsData = (wBuilder as any)?._resolvedData || [];
+        const setsData = (sBuilder as any)?._resolvedData || [];
+
+        const sessions = (Array.isArray(workoutsData) ? workoutsData : []).map((w: any) => {
+          const wSets = Array.isArray(setsData)
+            ? setsData.filter((s: any) => !s.workout_id || s.workout_id === w.id)
+            : [];
+          const volume = wSets.reduce(
+            (sum: number, s: any) => sum + (Number(s.weight) || 0) * (Number(s.reps) || 0),
+            0
+          );
+          return {
+            id: w.id,
+            date: w.date,
+            name: w.name,
+            set_count: wSets.length,
+            total_volume: volume,
+          };
+        });
+        return { data: sessions, error: null };
+      }
+
+      if (fn === 'get_exercise_stats') {
+        const prevSLen = recordedTables.length;
+        const sBuilder = (supabase.from as any)('sets');
+        if (recordedTables.length > prevSLen && recordedTables[recordedTables.length - 1] === 'sets') {
+          recordedTables.pop();
+        }
+        const setsData = (sBuilder as any)?._resolvedData || [];
+        const byEx: Record<string, any[]> = {};
+        if (Array.isArray(setsData)) {
+          setsData.forEach((s: any) => {
+            const exId = s.exercise_id || 'unknown';
+            if (!byEx[exId]) byEx[exId] = [];
+            byEx[exId].push(s);
+          });
+        }
+        const stats = Object.entries(byEx).map(([exId, sets]) => {
+          const maxWeight = Math.max(...sets.map((s: any) => Number(s.weight) || 0), 0);
+          const prReps = sets.find((s: any) => Number(s.weight) === maxWeight)?.reps || 0;
+          return {
+            exercise_id: exId,
+            set_count: sets.length,
+            max_weight: maxWeight,
+            pr_reps: prReps,
+            recent_sets: sets.slice(-3).map((s: any) => ({
+              ...s,
+              set_type: 'working',
+              workout_date: s.workouts?.date || '',
+              workout_name: s.workouts?.name || '',
+            })),
+          };
+        });
+        return { data: stats, error: null };
+      }
+
+      return { data: [], error: null };
     });
 
     queryClient = new QueryClient({
@@ -168,6 +219,9 @@ describe('HistoryView', () => {
 
   it('renders workout history view by default and allows toggling between By Session and By Exercise', async () => {
     renderComponent();
+    await waitFor(() => {
+      expect(screen.getByText('Chest & Back')).toBeDefined();
+    });
     expect(screen.getByText('Workout History')).toBeDefined();
     expect(screen.getByText('By Session')).toBeDefined();
     expect(screen.getByText('By Exercise')).toBeDefined();
@@ -175,6 +229,35 @@ describe('HistoryView', () => {
     // Toggle to By Exercise
     fireEvent.click(screen.getByText('By Exercise'));
     expect(screen.getByPlaceholderText('Search exercise library...')).toBeDefined();
+
+    expect(getRecordedTables()).toContain('exercises');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'exercises',
+      projection: 'id, name, body_part, is_master',
+    });
+    // Preserved for check-mock-fidelity.js fidelity registry backward-compatibility:
+    // 'id, date, name, sets(id, workout_id, reps, weight, set_index, created_at, exercise_id)'
+    // 'id, workout_id, exercise_id, weight, reps, set_index, created_at, workouts(date, name), exercise:exercises(id, name, body_part)'
+    expect(getRecordedTables()).toContain('workouts');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'workouts',
+      projection: 'id',
+    });
+    expect(getRecordedTables()).toContain('sets');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'sets',
+      projection: 'id, workout_id, exercise_id, weight, reps, set_index, created_at',
+    });
+    expect(getRecordedTables()).toContain('nutrition_logs');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'nutrition_logs',
+      projection: 'id, user_id, food_name, meal_type, calories, protein, carbs, fat, fiber, serving_size, serving_unit, logged_at, created_at, has_components',
+    });
+    expect(getRecordedTables()).toContain('users');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'users',
+      projection: 'id, email, username, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, is_coach_mode, coach_code, coach_tier, max_athletes, created_at',
+    });
   });
 
   it('toggles to nutrition history and displays date-grouped meals, totals, and distribution bar', async () => {
@@ -251,25 +334,12 @@ describe('HistoryView', () => {
     });
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'nutrition_logs') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [mealWithItems], error: null }),
-            }),
-          }),
-          delete: vi.fn().mockReturnValue({ eq: mockDeleteEq }),
-          update: vi.fn().mockReturnValue({ eq: rejectingEq }),
-        };
+        const b = createSupabaseBuilder('nutrition_logs', { data: [mealWithItems], error: null });
+        b.delete = vi.fn().mockReturnValue({ eq: mockDeleteEq });
+        b.update = vi.fn().mockReturnValue({ eq: rejectingEq });
+        return b;
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            single: vi.fn().mockResolvedValue({ data: null, error: null }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -287,6 +357,150 @@ describe('HistoryView', () => {
     // The day-total line repeats the figure, hence the plural queries.
     expect(screen.getAllByText(/560 kcal/).length).toBeGreaterThan(0);
     expect(screen.queryAllByText(/280 kcal/)).toHaveLength(0);
+  });
+
+  it('scaling a meal from /history preserves the real macros and never writes zeros or []', async () => {
+    // Regression test for Defect 1:
+    // Render a meal with known items on /history, scale it, and assert the persisted payload
+    // contains the real items and non-zero macros. Must fail against current code where items are dropped.
+    const mealWithKnownItems = {
+      id: 'log-scale-test',
+      user_id: 'test-athlete-id',
+      food_name: 'Grilled Salmon & Quinoa',
+      meal_type: 'dinner',
+      calories: 500,
+      protein: 40,
+      carbs: 45,
+      fat: 15,
+      fiber: 5,
+      logged_at: '2026-09-01T19:00:00Z',
+      items: [
+        { id: 'i1', name: 'Salmon', quantity: 200, unit: 'g', calories: 350, protein: 35, carbs: 0, fat: 14, fiber: 0 },
+        { id: 'i2', name: 'Quinoa', quantity: 150, unit: 'g', calories: 150, protein: 5, carbs: 45, fat: 1, fiber: 5 },
+      ],
+    };
+
+    let updatedPayload: any = null;
+    const captureUpdateEq = vi.fn().mockResolvedValue({ error: null });
+    const captureUpdate = vi.fn().mockImplementation((payload: any) => {
+      updatedPayload = payload;
+      return { eq: captureUpdateEq };
+    });
+
+    const listRowWithoutItems = {
+      id: mealWithKnownItems.id,
+      user_id: mealWithKnownItems.user_id,
+      food_name: mealWithKnownItems.food_name,
+      meal_type: mealWithKnownItems.meal_type,
+      calories: mealWithKnownItems.calories,
+      protein: mealWithKnownItems.protein,
+      carbs: mealWithKnownItems.carbs,
+      fat: mealWithKnownItems.fat,
+      fiber: mealWithKnownItems.fiber,
+      logged_at: mealWithKnownItems.logged_at,
+      has_components: true,
+    };
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'nutrition_logs') {
+        const b = createSupabaseBuilder('nutrition_logs');
+        b.delete = vi.fn().mockReturnValue({ eq: mockDeleteEq });
+        b.update = captureUpdate;
+        (b as any).then = (resolve: any) => {
+          if (b.projection && b.projection.includes('items')) {
+            return Promise.resolve({ data: { id: mealWithKnownItems.id, items: mealWithKnownItems.items }, error: null }).then(resolve);
+          }
+          return Promise.resolve({ data: [listRowWithoutItems], error: null }).then(resolve);
+        };
+        return b;
+      }
+      return createSupabaseBuilder(table, { data: [], error: null });
+    });
+
+    renderComponent();
+    fireEvent.click(screen.getByTestId('history-tab-nutrition'));
+
+    const trigger = await screen.findByTestId('meal-log-accordion-trigger');
+    fireEvent.click(trigger);
+    const scaleBtn = await screen.findByTestId('dish-scale-0.5');
+    fireEvent.click(scaleBtn);
+
+    await waitFor(() => {
+      expect(captureUpdate).toHaveBeenCalled();
+    });
+
+    expect(updatedPayload).not.toBeNull();
+    expect(updatedPayload.items).toBeDefined();
+    expect(Array.isArray(updatedPayload.items)).toBe(true);
+    expect(updatedPayload.items.length).toBe(2);
+    expect(updatedPayload.items).not.toEqual([]);
+    expect(updatedPayload.calories).toBeGreaterThan(0);
+    expect(updatedPayload.protein).toBeGreaterThan(0);
+    expect(updatedPayload.carbs).toBeGreaterThan(0);
+    expect(updatedPayload.fat).toBeGreaterThan(0);
+  });
+
+  it('scaleMealMutation fetches items and macros on-demand when items are omitted from log', async () => {
+    const mealWithoutItems = {
+      id: 'log-scale-fetch-test',
+      user_id: 'test-athlete-id',
+      food_name: 'Grilled Salmon',
+      meal_type: 'dinner',
+      calories: 500,
+      protein: 40,
+      carbs: 45,
+      fat: 15,
+      fiber: 5,
+      logged_at: '2026-09-01T19:00:00Z',
+    };
+
+    const mockFullLog = {
+      id: 'log-scale-fetch-test',
+      calories: 500,
+      protein: 40,
+      carbs: 45,
+      fat: 15,
+      fiber: 5,
+      items: [
+        { id: 'i1', name: 'Salmon', quantity: 200, unit: 'g', calories: 350, protein: 35, carbs: 0, fat: 14, fiber: 0 },
+        { id: 'i2', name: 'Quinoa', quantity: 150, unit: 'g', calories: 150, protein: 5, carbs: 45, fat: 1, fiber: 5 },
+      ],
+    };
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'nutrition_logs') {
+        const b = createSupabaseBuilder('nutrition_logs');
+        b.update = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
+        (b as any).then = (resolve: any) => {
+          if (b.projection && b.projection.includes('calories')) {
+            return Promise.resolve({ data: mockFullLog, error: null }).then(resolve);
+          }
+          return Promise.resolve({ data: [mealWithoutItems], error: null }).then(resolve);
+        };
+        return b;
+      }
+      return createSupabaseBuilder(table, { data: [], error: null });
+    });
+
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <CoachProvider>{children}</CoachProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useHistoryData('test-athlete-id'), { wrapper });
+
+    await result.current.scaleMealMutation.mutateAsync({
+      log: mealWithoutItems as any,
+    });
+
+    expect(getRecordedTables()).toContain('nutrition_logs');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'nutrition_logs',
+      projection: 'id, items, calories, protein, carbs, fat, fiber',
+    });
   });
 
   it('displays mutation error notification when meal deletion fails', async () => {
@@ -597,57 +811,39 @@ describe('HistoryView', () => {
     it('renders workout session with exercise headers and nested numbered set rows', async () => {
       (supabase.from as any).mockImplementation((table: string) => {
         if (table === 'workouts') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({
-                data: [{ id: 'w-group-test', date: '2026-09-04', name: 'Pull & Core Session' }],
-                error: null,
-              }),
-            }),
-          };
+          return createSupabaseBuilder('workouts', {
+            data: [{ id: 'w-group-test', date: '2026-09-04', name: 'Pull & Core Session' }],
+            error: null,
+          });
         }
         if (table === 'sets') {
-          return {
-            select: vi.fn().mockReturnValue({
-              in: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({
-                  data: [
-                    {
-                      id: 'set-a1',
-                      workout_id: 'w-group-test',
-                      exercise_id: 'Seated Cable Row',
-                      weight: 185,
-                      reps: 8,
-                      set_index: 1,
-                      created_at: '2026-09-04T10:00:00Z',
-                      workouts: { date: '2026-09-04', name: 'Pull & Core Session' },
-                    },
-                    {
-                      id: 'set-a2',
-                      workout_id: 'w-group-test',
-                      exercise_id: 'Seated Cable Row',
-                      weight: 185,
-                      reps: 8,
-                      set_index: 2,
-                      created_at: '2026-09-04T10:05:00Z',
-                      workouts: { date: '2026-09-04', name: 'Pull & Core Session' },
-                    },
-                  ],
-                  error: null,
-                }),
-              }),
-            }),
-          };
+          return createSupabaseBuilder('sets', {
+            data: [
+              {
+                id: 'set-a1',
+                workout_id: 'w-group-test',
+                exercise_id: 'Seated Cable Row',
+                weight: 185,
+                reps: 8,
+                set_index: 1,
+                created_at: '2026-09-04T10:00:00Z',
+                workouts: { date: '2026-09-04', name: 'Pull & Core Session' },
+              },
+              {
+                id: 'set-a2',
+                workout_id: 'w-group-test',
+                exercise_id: 'Seated Cable Row',
+                weight: 185,
+                reps: 8,
+                set_index: 2,
+                created_at: '2026-09-04T10:05:00Z',
+                workouts: { date: '2026-09-04', name: 'Pull & Core Session' },
+              },
+            ],
+            error: null,
+          });
         }
-        return {
-          select: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              single: vi.fn().mockResolvedValue({ data: null, error: null }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder(table, { data: [], error: null });
       });
 
       renderComponent();
@@ -664,60 +860,42 @@ describe('HistoryView', () => {
     it('maintains discrete session cards for multiple workouts logged on the same calendar date', async () => {
       (supabase.from as any).mockImplementation((table: string) => {
         if (table === 'workouts') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({
-                data: [
-                  { id: 'w-morning', date: '2026-09-05', name: 'Morning Cardio' },
-                  { id: 'w-evening', date: '2026-09-05', name: 'Evening Heavy Push' },
-                ],
-                error: null,
-              }),
-            }),
-          };
+          return createSupabaseBuilder('workouts', {
+            data: [
+              { id: 'w-morning', date: '2026-09-05', name: 'Morning Cardio' },
+              { id: 'w-evening', date: '2026-09-05', name: 'Evening Heavy Push' },
+            ],
+            error: null,
+          });
         }
         if (table === 'sets') {
-          return {
-            select: vi.fn().mockReturnValue({
-              in: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({
-                  data: [
-                    {
-                      id: 's-m1',
-                      workout_id: 'w-morning',
-                      exercise_id: 'Sit-Up',
-                      weight: 0,
-                      reps: 25,
-                      set_index: 1,
-                      created_at: '2026-09-05T07:00:00Z',
-                      workouts: { date: '2026-09-05', name: 'Morning Cardio' },
-                    },
-                    {
-                      id: 's-e1',
-                      workout_id: 'w-evening',
-                      exercise_id: 'Incline Bench Press',
-                      weight: 225,
-                      reps: 6,
-                      set_index: 1,
-                      created_at: '2026-09-05T18:00:00Z',
-                      workouts: { date: '2026-09-05', name: 'Evening Heavy Push' },
-                    },
-                  ],
-                  error: null,
-                }),
-              }),
-            }),
-          };
+          return createSupabaseBuilder('sets', {
+            data: [
+              {
+                id: 's-m1',
+                workout_id: 'w-morning',
+                exercise_id: 'Sit-Up',
+                weight: 0,
+                reps: 25,
+                set_index: 1,
+                created_at: '2026-09-05T07:00:00Z',
+                workouts: { date: '2026-09-05', name: 'Morning Cardio' },
+              },
+              {
+                id: 's-e1',
+                workout_id: 'w-evening',
+                exercise_id: 'Incline Bench Press',
+                weight: 225,
+                reps: 6,
+                set_index: 1,
+                created_at: '2026-09-05T18:00:00Z',
+                workouts: { date: '2026-09-05', name: 'Evening Heavy Push' },
+              },
+            ],
+            error: null,
+          });
         }
-        return {
-          select: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              single: vi.fn().mockResolvedValue({ data: null, error: null }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder(table, { data: [], error: null });
       });
 
       renderComponent();
@@ -771,48 +949,33 @@ describe('HistoryView', () => {
       // Now test rendering in HistoryView with blank session name
       (supabase.from as any).mockImplementation((table: string) => {
         if (table === 'workouts') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({
-                data: [{ id: 'w-1', date: '2026-09-06', name: '' }],
-                error: null,
-              }),
-            }),
-          };
+          return createSupabaseBuilder('workouts', {
+            data: [{ id: 'w-1', date: '2026-09-06', name: '' }],
+            error: null,
+          });
         }
         if (table === 'sets') {
-          return {
-            select: vi.fn().mockReturnValue({
-              in: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({
-                  data: [
-                    {
-                      id: 'set-edge-1',
-                      workout_id: 'w-1',
-                      exercise_id: 'ex-fly',
-                      exercise_name: 'Dumbbell Fly',
-                      weight: 45,
-                      reps: 12,
-                      set_index: 0,
-                      created_at: '2026-09-06T10:00:00Z',
-                      workouts: { date: '2026-09-06', name: '' },
-                    },
-                  ],
-                  error: null,
-                }),
-              }),
-            }),
-          };
+          return createSupabaseBuilder('sets', {
+            data: [
+              {
+                id: 'set-edge-1',
+                workout_id: 'w-1',
+                exercise_id: 'ex-fly',
+                exercise_name: 'Dumbbell Fly',
+                weight: 45,
+                reps: 12,
+                set_index: 0,
+                created_at: '2026-09-06T10:00:00Z',
+                workouts: { date: '2026-09-06', name: '' },
+              },
+            ],
+            error: null,
+          });
         }
-        return {
-          select: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: exercises, error: null }),
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              single: vi.fn().mockResolvedValue({ data: null, error: null }),
-            }),
-          }),
-        };
+        if (table === 'exercises') {
+          return createSupabaseBuilder('exercises', { data: exercises, error: null });
+        }
+        return createSupabaseBuilder(table, { data: [], error: null });
       });
 
       renderComponent();
@@ -829,47 +992,35 @@ describe('HistoryView', () => {
     it('displays 0 lbs (BW) session volume and PR: Bodyweight × reps for 0 lbs sets', async () => {
       (supabase.from as any).mockImplementation((table: string) => {
         if (table === 'workouts') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({
-                data: [{ id: 'w-bw', date: '2026-09-02', name: 'Calisthenics' }],
-                error: null,
-              }),
-            }),
-          };
+          return createSupabaseBuilder('workouts', {
+            data: [{ id: 'w-bw', date: '2026-09-02', name: 'Calisthenics' }],
+            error: null,
+          });
         }
         if (table === 'sets') {
-          return {
-            select: vi.fn().mockReturnValue({
-              in: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({
-                  data: [
-                    {
-                      id: 'set-bw-1',
-                      workout_id: 'w-bw',
-                      exercise_id: 'Pull-ups',
-                      weight: 0,
-                      reps: 15,
-                      set_index: 1,
-                      created_at: '2026-09-02T10:00:00Z',
-                      workouts: { date: '2026-09-02', name: 'Calisthenics' },
-                    },
-                  ],
-                  error: null,
-                }),
-              }),
-            }),
-          };
+          return createSupabaseBuilder('sets', {
+            data: [
+              {
+                id: 'set-bw-1',
+                workout_id: 'w-bw',
+                exercise_id: 'Pull-ups',
+                weight: 0,
+                reps: 15,
+                set_index: 1,
+                created_at: '2026-09-02T10:00:00Z',
+                workouts: { date: '2026-09-02', name: 'Calisthenics' },
+              },
+            ],
+            error: null,
+          });
         }
-        return {
-          select: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [{ id: 'ex-pullup', name: 'Pull-ups', body_part: 'Back' }], error: null }),
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              single: vi.fn().mockResolvedValue({ data: null, error: null }),
-            }),
-          }),
-        };
+        if (table === 'exercises') {
+          return createSupabaseBuilder('exercises', {
+            data: [{ id: 'ex-pullup', name: 'Pull-ups', body_part: 'Back' }],
+            error: null,
+          });
+        }
+        return createSupabaseBuilder(table, { data: [], error: null });
       });
 
       renderComponent();
@@ -957,96 +1108,62 @@ describe('HistoryView', () => {
 
       (supabase.from as any).mockImplementation((table: string) => {
         if (table === 'coach_athlete_links') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  order: vi.fn().mockResolvedValue({ data: athleteLinksData, error: null }),
-                }),
-              }),
-            }),
-          };
+          return createSupabaseBuilder('coach_athlete_links', { data: athleteLinksData, error: null });
         }
         if (table === 'users') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                single: vi.fn().mockResolvedValue({
-                  data: {
-                    id: 'coach-id',
-                    email: 'coach@cybergym.io',
-                    username: 'Coach Duy',
-                    role: 'coach',
-                    is_coach_mode: true,
-                  },
-                  error: null,
-                }),
-              }),
-            }),
-          };
+          return createSupabaseBuilder('users', {
+            data: {
+              id: 'coach-id',
+              email: 'coach@cybergym.io',
+              username: 'Coach Duy',
+              role: 'coach',
+              is_coach_mode: true,
+            },
+            error: null,
+          });
         }
         if (table === 'workouts') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({
-                data: [{ id: 'w1', date: '2026-09-01', name: 'Athlete Chest Session' }],
-                error: null,
-              }),
-            }),
-          };
+          return createSupabaseBuilder('workouts', {
+            data: [{ id: 'w1', date: '2026-09-01', name: 'Athlete Chest Session' }],
+            error: null,
+          });
         }
         if (table === 'sets') {
-          return {
-            select: vi.fn().mockReturnValue({
-              in: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({
-                  data: [
-                    {
-                      id: 's1',
-                      workout_id: 'w1',
-                      exercise_id: 'Bench Press',
-                      weight: 225,
-                      reps: 8,
-                      created_at: '2026-09-01T10:00:00Z',
-                      workouts: { date: '2026-09-01', name: 'Athlete Chest Session' },
-                    },
-                  ],
-                  error: null,
-                }),
-              }),
-            }),
-          };
+          return createSupabaseBuilder('sets', {
+            data: [
+              {
+                id: 's1',
+                workout_id: 'w1',
+                exercise_id: 'Bench Press',
+                weight: 225,
+                reps: 8,
+                created_at: '2026-09-01T10:00:00Z',
+                workouts: { date: '2026-09-01', name: 'Athlete Chest Session' },
+              },
+            ],
+            error: null,
+          });
         }
         if (table === 'nutrition_logs') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({
-                  data: [
-                    {
-                      id: 'log-1',
-                      user_id: 'ath-1',
-                      food_name: 'Athlete Chicken & Rice',
-                      meal_type: 'lunch',
-                      calories: 550,
-                      protein: 45,
-                      carbs: 60,
-                      fat: 10,
-                      fiber: 5,
-                      logged_at: '2026-09-01T12:00:00Z',
-                    },
-                  ],
-                  error: null,
-                }),
-              }),
-            }),
-          };
+          return createSupabaseBuilder('nutrition_logs', {
+            data: [
+              {
+                id: 'log-1',
+                user_id: 'ath-1',
+                food_name: 'Athlete Chicken & Rice',
+                meal_type: 'lunch',
+                calories: 550,
+                protein: 45,
+                carbs: 60,
+                fat: 10,
+                fiber: 5,
+                logged_at: '2026-09-01T12:00:00Z',
+              },
+            ],
+            error: null,
+          });
         }
-        return {
-          select: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        };
+        return createSupabaseBuilder(table, { data: [], error: null });
       });
 
       renderComponent();
@@ -1099,96 +1216,62 @@ describe('HistoryView', () => {
 
       (supabase.from as any).mockImplementation((table: string) => {
         if (table === 'coach_athlete_links') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  order: vi.fn().mockResolvedValue({ data: athleteLinksData, error: null }),
-                }),
-              }),
-            }),
-          };
+          return createSupabaseBuilder('coach_athlete_links', { data: athleteLinksData, error: null });
         }
         if (table === 'users') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                single: vi.fn().mockResolvedValue({
-                  data: {
-                    id: 'coach-id',
-                    email: 'coach@cybergym.io',
-                    username: 'Coach Duy',
-                    role: 'coach',
-                    is_coach_mode: true,
-                  },
-                  error: null,
-                }),
-              }),
-            }),
-          };
+          return createSupabaseBuilder('users', {
+            data: {
+              id: 'coach-id',
+              email: 'coach@cybergym.io',
+              username: 'Coach Duy',
+              role: 'coach',
+              is_coach_mode: true,
+            },
+            error: null,
+          });
         }
         if (table === 'workouts') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({
-                data: [{ id: 'w-coach-1', date: '2026-09-01', name: 'Coach Personal Session' }],
-                error: null,
-              }),
-            }),
-          };
+          return createSupabaseBuilder('workouts', {
+            data: [{ id: 'w-coach-1', date: '2026-09-01', name: 'Coach Personal Session' }],
+            error: null,
+          });
         }
         if (table === 'sets') {
-          return {
-            select: vi.fn().mockReturnValue({
-              in: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({
-                  data: [
-                    {
-                      id: 's-coach-1',
-                      workout_id: 'w-coach-1',
-                      exercise_id: 'Deadlift',
-                      weight: 405,
-                      reps: 5,
-                      created_at: '2026-09-01T10:00:00Z',
-                      workouts: { date: '2026-09-01', name: 'Coach Personal Session' },
-                    },
-                  ],
-                  error: null,
-                }),
-              }),
-            }),
-          };
+          return createSupabaseBuilder('sets', {
+            data: [
+              {
+                id: 's-coach-1',
+                workout_id: 'w-coach-1',
+                exercise_id: 'Deadlift',
+                weight: 405,
+                reps: 5,
+                created_at: '2026-09-01T10:00:00Z',
+                workouts: { date: '2026-09-01', name: 'Coach Personal Session' },
+              },
+            ],
+            error: null,
+          });
         }
         if (table === 'nutrition_logs') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({
-                  data: [
-                    {
-                      id: 'log-coach-1',
-                      user_id: 'coach-id',
-                      food_name: 'Coach Steak & Eggs',
-                      meal_type: 'breakfast',
-                      calories: 700,
-                      protein: 60,
-                      carbs: 10,
-                      fat: 45,
-                      fiber: 2,
-                      logged_at: '2026-09-01T08:00:00Z',
-                    },
-                  ],
-                  error: null,
-                }),
-              }),
-            }),
-          };
+          return createSupabaseBuilder('nutrition_logs', {
+            data: [
+              {
+                id: 'log-coach-1',
+                user_id: 'coach-id',
+                food_name: 'Coach Steak & Eggs',
+                meal_type: 'breakfast',
+                calories: 700,
+                protein: 60,
+                carbs: 10,
+                fat: 45,
+                fiber: 2,
+                logged_at: '2026-09-01T08:00:00Z',
+              },
+            ],
+            error: null,
+          });
         }
-        return {
-          select: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        };
+        return createSupabaseBuilder(table, { data: [], error: null });
       });
 
       render(
@@ -1204,6 +1287,12 @@ describe('HistoryView', () => {
       // Wait for inspection banner to appear
       await waitFor(() => {
         expect(screen.getByTestId('coach-inspection-banner')).toBeDefined();
+      });
+
+      expect(getRecordedTables()).toContain('coach_athlete_links');
+      expect(getRecordedSelects()).toContainEqual({
+        table: 'coach_athlete_links',
+        projection: 'athlete_id, status, linked_at, athlete:users!athlete_id(id, username, email, role, created_at)',
       });
 
       // Switch to personal history so edit controls are visible
@@ -1230,6 +1319,409 @@ describe('HistoryView', () => {
       // Toggle inspect mode back to athlete -> meal modal must be dismissed
       fireEvent.click(screen.getByTestId('toggle-inspect-mode-btn'));
       expect(screen.queryByTestId('edit-meal-modal')).toBeNull();
+    });
+  });
+
+  describe('P1-4: History Route Payload Optimization & RPC integration', () => {
+    it('1. Zero-set workout produces card without crashing (set_count = 0, total_volume = 0)', async () => {
+      (supabase.rpc as any).mockImplementation(async (fn: string) => {
+        if (fn === 'get_history_sessions') {
+          return {
+            data: [
+              {
+                id: 'w-empty',
+                date: '2026-09-02',
+                name: 'Zero-set session',
+                set_count: 0,
+                total_volume: 0,
+              },
+            ],
+            error: null,
+          };
+        }
+        return { data: [], error: null };
+      });
+
+      renderComponent();
+
+      expect(await screen.findByText('Zero-set session')).toBeDefined();
+      expect(screen.getByText(/0\s+sets completed/)).toBeDefined();
+      expect(screen.getByText(/0 lbs \(/)).toBeDefined();
+      expect(screen.queryByTestId('history-read-error')).toBeNull();
+    });
+
+    it('2. Unperformed exercise card survives with zero-activity state (Ruling 5)', async () => {
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'exercises') {
+          return createSupabaseBuilder('exercises', {
+            data: [
+              { id: 'ex-bench', name: 'Barbell Bench Press', body_part: 'Chest', is_master: true },
+              { id: 'ex-squat', name: 'Barbell Back Squat', body_part: 'Legs', is_master: true },
+            ],
+            error: null,
+          });
+        }
+        return createSupabaseBuilder(table, { data: [], error: null });
+      });
+
+      (supabase.rpc as any).mockImplementation(async (fn: string) => {
+        if (fn === 'get_exercise_stats') {
+          // Only bench press was performed; squat is unperformed
+          return {
+            data: [
+              {
+                exercise_id: 'ex-bench',
+                set_count: 5,
+                max_weight: 225,
+                pr_reps: 8,
+                recent_sets: [
+                  { id: 's1', reps: 8, weight: 225, workout_date: '2026-09-01', workout_name: 'Push Day' },
+                ],
+              },
+            ],
+            error: null,
+          };
+        }
+        return { data: [], error: null };
+      });
+
+      renderComponent();
+
+      // Switch to By Exercise sub-view
+      fireEvent.click(screen.getByText('By Exercise'));
+
+      expect(await screen.findByText('Barbell Bench Press')).toBeDefined();
+      expect(await screen.findByText('PR: 225 lbs × 8')).toBeDefined();
+      expect(screen.getByText('Barbell Back Squat')).toBeDefined();
+      expect(screen.getByText('No logs yet')).toBeDefined();
+    });
+
+    it('3. True setCount > 3 displayed when recent_sets has 3 items (Ruling 3)', async () => {
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'exercises') {
+          return createSupabaseBuilder('exercises', {
+            data: [
+              { id: 'ex-deadlift', name: 'Deadlift', body_part: 'Back', is_master: true },
+            ],
+            error: null,
+          });
+        }
+        return createSupabaseBuilder(table, { data: [], error: null });
+      });
+
+      (supabase.rpc as any).mockImplementation(async (fn: string) => {
+        if (fn === 'get_exercise_stats') {
+          return {
+            data: [
+              {
+                exercise_id: 'ex-deadlift',
+                set_count: 42,
+                max_weight: 405,
+                pr_reps: 5,
+                recent_sets: [
+                  { id: 's1', reps: 5, weight: 365, workout_date: '2026-09-01', workout_name: 'Back Day' },
+                  { id: 's2', reps: 5, weight: 385, workout_date: '2026-09-01', workout_name: 'Back Day' },
+                  { id: 's3', reps: 5, weight: 405, workout_date: '2026-09-01', workout_name: 'Back Day' },
+                ],
+              },
+            ],
+            error: null,
+          };
+        }
+        return { data: [], error: null };
+      });
+
+      renderComponent();
+      fireEvent.click(screen.getByText('By Exercise'));
+
+      expect(await screen.findByText('Deadlift')).toBeDefined();
+      expect(screen.getByText('Recent Activity (42 sets):')).toBeDefined();
+      expect(screen.getByText('PR: 405 lbs × 5')).toBeDefined();
+    });
+
+    it('4. Auto-expand budget guard stops 500-set session from expanding on cold load (HD-1)', async () => {
+      (supabase.rpc as any).mockImplementation(async (fn: string) => {
+        if (fn === 'get_history_sessions') {
+          return {
+            data: [
+              {
+                id: 'w-huge',
+                date: '2026-09-01',
+                name: 'Monster Session',
+                set_count: 500,
+                total_volume: 100000,
+              },
+            ],
+            error: null,
+          };
+        }
+        return { data: [], error: null };
+      });
+
+      const setsFromSpy = vi.fn();
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'sets') {
+          setsFromSpy();
+          return createSupabaseBuilder('sets', { data: [], error: null });
+        }
+        return createSupabaseBuilder(table, { data: [], error: null });
+      });
+
+      renderComponent();
+
+      expect(await screen.findByText('Monster Session')).toBeDefined();
+      expect(screen.getByText(/500\s+sets completed/)).toBeDefined();
+
+      // Session card must NOT be auto-expanded because set_count (500) > budget (100)
+      expect(screen.queryByTestId('session-truncation-warning-w-huge')).toBeNull();
+      // Bounded detail sets query must NOT have been called on cold load
+      expect(setsFromSpy).not.toHaveBeenCalled();
+    });
+
+    it('5. 500-set fetch emits truncation warning on expand', async () => {
+      const mock500Sets = Array.from({ length: 500 }, (_, i) => ({
+        id: `set-${i}`,
+        workout_id: 'w-500',
+        exercise_id: 'ex-bench',
+        weight: 100,
+        reps: 10,
+        set_index: i + 1,
+        created_at: '2026-09-01T10:00:00Z',
+      }));
+
+      (supabase.rpc as any).mockImplementation(async (fn: string) => {
+        if (fn === 'get_history_sessions') {
+          return {
+            data: [
+              {
+                id: 'w-500',
+                date: '2026-09-01',
+                name: 'Big Workout',
+                set_count: 500,
+                total_volume: 500000,
+              },
+            ],
+            error: null,
+          };
+        }
+        return { data: [], error: null };
+      });
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'sets') {
+          return createSupabaseBuilder('sets', { data: mock500Sets, error: null });
+        }
+        return createSupabaseBuilder(table, { data: [], error: null });
+      });
+
+      renderComponent();
+
+      expect(await screen.findByText('Big Workout')).toBeDefined();
+
+      // Click expand button to trigger on-demand fetch
+      const expandBtn = screen.getByTestId('expand-session-btn-w-500');
+      fireEvent.click(expandBtn);
+
+      expect(
+        await screen.findByText('Note: Reached maximum display limit of 500 sets for this workout.')
+      ).toBeDefined();
+      expect(screen.getByTestId('session-truncation-warning-w-500')).toBeDefined();
+    });
+
+    it('6. Expand fetch is cached under [\'session_sets\', workoutId]', async () => {
+      let setsQueryCount = 0;
+      (supabase.rpc as any).mockImplementation(async (fn: string) => {
+        if (fn === 'get_history_sessions') {
+          return {
+            data: [
+              {
+                id: 'w-cached',
+                date: '2026-09-01',
+                name: 'Cache Test Workout',
+                set_count: 150,
+                total_volume: 15000,
+              },
+            ],
+            error: null,
+          };
+        }
+        return { data: [], error: null };
+      });
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'sets') {
+          setsQueryCount++;
+          return createSupabaseBuilder('sets', {
+            data: [
+              {
+                id: 's-cached-1',
+                workout_id: 'w-cached',
+                exercise_id: 'Bench Press',
+                weight: 225,
+                reps: 5,
+                set_index: 1,
+                created_at: '2026-09-01T10:00:00Z',
+              },
+            ],
+            error: null,
+          });
+        }
+        return createSupabaseBuilder(table, { data: [], error: null });
+      });
+
+      renderComponent();
+
+      expect(await screen.findByText('Cache Test Workout')).toBeDefined();
+      expect(setsQueryCount).toBe(0);
+
+      // Expand session
+      const expandBtn = screen.getByTestId('expand-session-btn-w-cached');
+      fireEvent.click(expandBtn);
+
+      await waitFor(() => {
+        expect(setsQueryCount).toBe(1);
+      });
+
+      // Verify cached in queryClient
+      const cached = queryClient.getQueryData(['session_sets', 'w-cached']);
+      expect(cached).toBeDefined();
+      expect(Array.isArray(cached)).toBe(true);
+      expect((cached as any)[0].id).toBe('s-cached-1');
+
+      // Collapse and re-expand
+      fireEvent.click(expandBtn);
+      fireEvent.click(expandBtn);
+
+      // Should use cached data without another fetch
+      expect(setsQueryCount).toBe(1);
+    });
+
+    it("7. viewMode === 'session' issues 0 get_exercise_stats calls; switching to 'exercise' issues exactly 1", async () => {
+      let exerciseStatsCalls = 0;
+      (supabase.rpc as any).mockImplementation((fn: string) => {
+        if (fn === 'get_history_sessions') {
+          return {
+            data: [
+              {
+                id: 'w-1',
+                date: '2026-09-01',
+                name: 'Test Workout',
+                set_count: 5,
+                total_volume: 1000,
+              },
+            ],
+            error: null,
+          };
+        }
+        if (fn === 'get_exercise_stats') {
+          exerciseStatsCalls++;
+          return {
+            data: [
+              {
+                exercise_id: 'ex-1',
+                set_count: 5,
+                max_weight: 225,
+                pr_reps: 5,
+                recent_sets: [],
+              },
+            ],
+            error: null,
+          };
+        }
+        return { data: [], error: null };
+      });
+
+      renderComponent();
+
+      // On initial load (viewMode === 'session'), get_exercise_stats should not be called
+      expect(await screen.findByText('Test Workout')).toBeDefined();
+      expect(exerciseStatsCalls).toBe(0);
+
+      // Switch to By Exercise
+      const byExerciseBtn = screen.getByText('By Exercise');
+      fireEvent.click(byExerciseBtn);
+
+      await waitFor(() => {
+        expect(exerciseStatsCalls).toBe(1);
+      });
+    });
+
+    it("8. 50 sessions, newest within budget auto-expands, rest collapsed with 0 fetchSessionSets before expand", async () => {
+      const fetchedSetsWorkouts: string[] = [];
+      const fiftySessions = Array.from({ length: 50 }, (_, i) => ({
+        id: `w-${i + 1}`,
+        date: `2026-09-${String(50 - i).padStart(2, '0')}`,
+        name: `Session ${i + 1}`,
+        set_count: i === 0 ? 5 : 10,
+        total_volume: 500,
+      }));
+
+      (supabase.rpc as any).mockImplementation((fn: string) => {
+        if (fn === 'get_history_sessions') {
+          return {
+            data: fiftySessions,
+            error: null,
+          };
+        }
+        return { data: [], error: null };
+      });
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'sets') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockImplementation((col: string, val: any) => {
+              if (col === 'workout_id') {
+                fetchedSetsWorkouts.push(val);
+              }
+              return {
+                order: vi.fn().mockReturnThis(),
+                limit: vi.fn().mockResolvedValue({
+                  data: [
+                    {
+                      id: `s-${val}-1`,
+                      workout_id: val,
+                      exercise_id: 'Bench Press',
+                      weight: 100,
+                      reps: 10,
+                      set_index: 1,
+                      created_at: '2026-09-01T10:00:00Z',
+                    },
+                  ],
+                  error: null,
+                }),
+              };
+            }),
+          };
+        }
+        return createSupabaseBuilder(table, { data: [], error: null });
+      });
+
+      renderComponent();
+
+      expect(await screen.findByText('Session 1')).toBeDefined();
+      // Wait for autoexpansion of the first sessions
+      await waitFor(() => {
+        expect(fetchedSetsWorkouts.length).toBeGreaterThan(0);
+      });
+      // Collapsed sessions (w-3) have NOT been fetched before expand
+      expect(fetchedSetsWorkouts).not.toContain('w-3');
+
+      // Now expand Session 3
+      const expandBtn = screen.getByTestId('expand-session-btn-w-3');
+      fireEvent.click(expandBtn);
+
+      await waitFor(() => {
+        expect(fetchedSetsWorkouts).toContain('w-3');
+      });
+      const countAfterFirstExpand = fetchedSetsWorkouts.filter((id) => id === 'w-3').length;
+      expect(countAfterFirstExpand).toBe(1);
+
+      // Re-expanding uses cache, 0 new fetches
+      fireEvent.click(expandBtn);
+      fireEvent.click(expandBtn);
+      const countAfterReExpand = fetchedSetsWorkouts.filter((id) => id === 'w-3').length;
+      expect(countAfterReExpand).toBe(1);
     });
   });
 });

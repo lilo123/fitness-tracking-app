@@ -224,3 +224,152 @@ Deno.test("create-athlete should return 400 when user creation fails in auth adm
     }
 });
 
+Deno.test("create-athlete CORS: preflight OPTIONS returns 200 with dynamic origin for allowed origins", async () => {
+    const allowed = [
+        "https://cybergym.app",
+        "capacitor://localhost",
+        "http://localhost:5173",
+        "http://127.0.0.1:3000",
+    ];
+
+    for (const origin of allowed) {
+        const req = new Request("http://localhost/create-athlete", {
+            method: "OPTIONS",
+            headers: { "Origin": origin },
+        });
+        const res = await app.fetch(req);
+        assertEquals(res.status, 200);
+        assertEquals(res.headers.get("Access-Control-Allow-Origin"), origin);
+        assertEquals(res.headers.get("Vary"), "Origin");
+        assertEquals(
+            res.headers.get("Access-Control-Allow-Headers"),
+            "authorization, x-client-info, apikey, content-type"
+        );
+    }
+});
+
+Deno.test("create-athlete CORS: preflight OPTIONS returns 403 and omits allow-origin for disallowed origins", async () => {
+    const disallowed = [
+        "https://evil.com",
+        "https://cybergym.app.attacker.com",
+        "http://localhost.attacker.com",
+        "http://127.0.0.1.attacker.com",
+        "https://random-site.org",
+        "null",
+    ];
+
+    for (const origin of disallowed) {
+        const req = new Request("http://localhost/create-athlete", {
+            method: "OPTIONS",
+            headers: { "Origin": origin },
+        });
+        const res = await app.fetch(req);
+        assertEquals(res.status, 403);
+        assertEquals(res.headers.get("Access-Control-Allow-Origin"), null);
+        assertEquals(res.headers.get("Vary"), "Origin");
+        const body = await res.json();
+        assertEquals(body.error, "CORS origin not allowed");
+    }
+});
+
+Deno.test("create-athlete CORS: POST request with disallowed origin is rejected with 403 without processing", async () => {
+    const req = new Request("http://localhost/create-athlete", {
+        method: "POST",
+        headers: {
+            "Origin": "https://malicious-website.com",
+            "Authorization": "Bearer some-token",
+        },
+        body: JSON.stringify({ name: "Victim Athlete" }),
+    });
+
+    const res = await app.fetch(req);
+    assertEquals(res.status, 403);
+    assertEquals(res.headers.get("Access-Control-Allow-Origin"), null);
+    assertEquals(res.headers.get("Vary"), "Origin");
+    const body = await res.json();
+    assertEquals(body.error, "CORS origin not allowed");
+});
+
+Deno.test("create-athlete CORS: POST request with allowed origin returns response with Access-Control-Allow-Origin and Vary", async () => {
+    const req = new Request("http://localhost/create-athlete", {
+        method: "POST",
+        headers: {
+            "Origin": "https://cybergym.app",
+        },
+        body: JSON.stringify({ name: "Jane Doe" }),
+    });
+
+    const res = await app.fetch(req);
+    // Unauthenticated request should return 401, but include CORS headers for the allowed origin
+    assertEquals(res.status, 401);
+    assertEquals(res.headers.get("Access-Control-Allow-Origin"), "https://cybergym.app");
+    assertEquals(res.headers.get("Vary"), "Origin");
+});
+
+Deno.test("create-athlete CORS: production environment denies localhost origins and permits production origins", async () => {
+    Deno.env.set("DENO_ENV", "production");
+    try {
+        // Localhost should be rejected in production
+        const reqLocalhost = new Request("http://localhost/create-athlete", {
+            method: "OPTIONS",
+            headers: { "Origin": "http://localhost:5173" },
+        });
+        const resLocalhost = await app.fetch(reqLocalhost);
+        assertEquals(resLocalhost.status, 403);
+        assertEquals(resLocalhost.headers.get("Access-Control-Allow-Origin"), null);
+
+        // 127.0.0.1 should be rejected in production
+        const reqIp = new Request("http://localhost/create-athlete", {
+            method: "OPTIONS",
+            headers: { "Origin": "http://127.0.0.1:3000" },
+        });
+        const resIp = await app.fetch(reqIp);
+        assertEquals(resIp.status, 403);
+        assertEquals(resIp.headers.get("Access-Control-Allow-Origin"), null);
+
+        // Production origins should still be allowed in production
+        const reqProd = new Request("http://localhost/create-athlete", {
+            method: "OPTIONS",
+            headers: { "Origin": "https://cybergym.app" },
+        });
+        const resProd = await app.fetch(reqProd);
+        assertEquals(resProd.status, 200);
+        assertEquals(resProd.headers.get("Access-Control-Allow-Origin"), "https://cybergym.app");
+
+        // Capacitor origin should still be allowed in production
+        const reqCap = new Request("http://localhost/create-athlete", {
+            method: "OPTIONS",
+            headers: { "Origin": "capacitor://localhost" },
+        });
+        const resCap = await app.fetch(reqCap);
+        assertEquals(resCap.status, 200);
+        assertEquals(resCap.headers.get("Access-Control-Allow-Origin"), "capacitor://localhost");
+    } finally {
+        Deno.env.delete("DENO_ENV");
+    }
+});
+
+Deno.test("create-athlete CORS: ENVIRONMENT=production also enforces production origins", async () => {
+    Deno.env.set("ENVIRONMENT", "production");
+    try {
+        const reqLocalhost = new Request("http://localhost/create-athlete", {
+            method: "OPTIONS",
+            headers: { "Origin": "http://localhost:5173" },
+        });
+        const resLocalhost = await app.fetch(reqLocalhost);
+        assertEquals(resLocalhost.status, 403);
+        assertEquals(resLocalhost.headers.get("Access-Control-Allow-Origin"), null);
+
+        const reqProd = new Request("http://localhost/create-athlete", {
+            method: "OPTIONS",
+            headers: { "Origin": "https://cybergym.app" },
+        });
+        const resProd = await app.fetch(reqProd);
+        assertEquals(resProd.status, 200);
+        assertEquals(resProd.headers.get("Access-Control-Allow-Origin"), "https://cybergym.app");
+    } finally {
+        Deno.env.delete("ENVIRONMENT");
+    }
+});
+
+

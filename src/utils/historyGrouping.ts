@@ -1,23 +1,31 @@
 import type { WorkoutSet, Exercise } from '../types/database';
 
-export interface ExerciseGroup {
+export interface ExerciseGroup<T = WorkoutSet & { workout_date?: string; workout_name?: string }> {
   exerciseId: string;
   exerciseName: string;
   bodyPart: string;
-  sets: (WorkoutSet & { workout_date: string; workout_name: string })[];
+  sets: T[];
   totalVolume: number;
 }
 
-export function groupSessionSetsByExercise(
-  sets: (WorkoutSet & { workout_date: string; workout_name: string })[],
+export function groupSessionSetsByExercise<T extends {
+  id?: string;
+  exercise_id?: string;
+  exercise_name?: string;
+  weight?: number;
+  reps?: number;
+  set_index?: number | null;
+  created_at?: string;
+}>(
+  sets: T[],
   exercises: Exercise[]
-): ExerciseGroup[] {
-  const groups: ExerciseGroup[] = [];
-  const groupMap = new Map<string, ExerciseGroup>();
+): ExerciseGroup<T>[] {
+  const groups: ExerciseGroup<T>[] = [];
+  const groupMap = new Map<string, ExerciseGroup<T>>();
 
   sets.forEach((set) => {
     const rawExId = set.exercise_id || '';
-    const rawExName = (set as any).exercise_name || '';
+    const rawExName = set.exercise_name || (set as any).exercise?.name || '';
     const matched = exercises.find(
       (e) =>
         (rawExId && (e.id === rawExId || e.name.toLowerCase() === rawExId.toLowerCase())) ||
@@ -28,7 +36,7 @@ export function groupSessionSetsByExercise(
     const volume = (Number(set.weight) || 0) * (Number(set.reps) || 0);
 
     if (!groupMap.has(exName)) {
-      const group: ExerciseGroup = {
+      const group: ExerciseGroup<T> = {
         exerciseId: rawExId || (matched ? matched.id : exName),
         exerciseName: exName,
         bodyPart,

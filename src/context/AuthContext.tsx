@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import type { UserProfile, UserRole } from '../types/database';
-import { AuthContext } from './AuthContextTypes';
+import { AuthContext, type AuthContextType } from './AuthContextTypes';
 import { restTimerStore } from '../utils/restTimerStore';
+import { dedupeInFlight } from '../utils/promiseDedupe';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [profile, setProfile] = useState<UserProfile | null>(() => {
@@ -37,58 +38,70 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return null;
   });
   const [loading, setLoading] = useState<boolean>(() => {
-    return !localStorage.getItem('cybergym_user');
+    try {
+      const cached = localStorage.getItem('cybergym_user');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.id) return false;
+      }
+    } catch {
+      // Fall through
+    }
+    return true;
   });
   const [viewMode, setViewMode] = useState<UserRole>(() => {
     return (localStorage.getItem('cybergym_view_mode') as UserRole) || 'coach';
   });
 
-  const signedOutRef = React.useRef(false);
+  const signedOutRef = useRef(false);
+  const isRevalidatingRef = useRef(false);
   const queryClient = useQueryClient();
 
-  const fetchProfile = async (userId: string, email?: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
+  const fetchProfile = useCallback(async (userId: string, email?: string) => {
+    return dedupeInFlight(`profile:${userId}`, async () => {
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('id, email, username, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, is_coach_mode, coach_code, coach_tier, max_athletes, created_at')
+          .eq('id', userId)
+          .single();
 
-      if (signedOutRef.current) return;
+        if (signedOutRef.current) return;
 
-      if (data && !error) {
-        setProfile(data as UserProfile);
-        localStorage.setItem('cybergym_user', JSON.stringify(data));
-        if (data.auto_rest_timer !== undefined && data.auto_rest_timer !== null) {
-          localStorage.setItem('cybergym_auto_rest_timer', String(data.auto_rest_timer));
-        }
-        if (data.role === 'coach') {
-          const savedMode = localStorage.getItem('cybergym_view_mode') as UserRole;
-          if (!savedMode) {
-            setViewMode('coach');
-            localStorage.setItem('cybergym_view_mode', 'coach');
+        if (data && !error) {
+          setProfile(data as UserProfile);
+          localStorage.setItem('cybergym_user', JSON.stringify(data));
+          if (data.auto_rest_timer !== undefined && data.auto_rest_timer !== null) {
+            localStorage.setItem('cybergym_auto_rest_timer', String(data.auto_rest_timer));
           }
+          if (data.role === 'coach') {
+            const savedMode = localStorage.getItem('cybergym_view_mode') as UserRole;
+            if (!savedMode) {
+              setViewMode('coach');
+              localStorage.setItem('cybergym_view_mode', 'coach');
+            }
+          }
+        } else {
+          const fallbackProfile: UserProfile = {
+            id: userId,
+            email: email || 'user@example.com',
+            username: email ? email.split('@')[0] : 'athlete',
+            role: 'athlete',
+            target_calories: 2200,
+            target_protein: 160,
+            target_carbs: 220,
+            target_fat: 70,
+            target_fiber: 30,
+            auto_rest_timer: true,
+          };
+          setProfile(fallbackProfile);
+          localStorage.setItem('cybergym_user', JSON.stringify(fallbackProfile));
         }
-      } else {
-        const fallbackProfile: UserProfile = {
-          id: userId,
-          email: email || 'user@example.com',
-          username: email ? email.split('@')[0] : 'athlete',
-          role: 'athlete',
-          target_calories: 2200,
-          target_protein: 160,
-          target_carbs: 220,
-          target_fat: 70,
-          target_fiber: 30,
-          auto_rest_timer: true,
-        };
-        setProfile(fallbackProfile);
-        localStorage.setItem('cybergym_user', JSON.stringify(fallbackProfile));
+      } catch {
+        // Retain current profile
       }
-    } catch {
-      // Retain current profile
-    }
-  };
+    });
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -98,6 +111,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       | { kind: 'timeout' };
 
     const resolveSession = async () => {
+      if (isRevalidatingRef.current) return;
+      isRevalidatingRef.current = true;
+
       try {
         const result: SessionRaceResult = await Promise.race([
           supabase.auth
@@ -130,7 +146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
             return;
           } else {
-            // Explicitly unauthenticated
+            // Explicitly unauthenticated or expired/invalid session
             setUser(null);
             setProfile(null);
             localStorage.removeItem('cybergym_user');
@@ -160,6 +176,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error('[AuthContext] Unexpected session resolution error:', err);
         if (!mounted) return;
         setLoading(false);
+      } finally {
+        isRevalidatingRef.current = false;
       }
     };
 
@@ -186,6 +204,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const handleLifecycleResume = () => {
       if (document.visibilityState === 'visible') {
+        if (isRevalidatingRef.current) return;
+        isRevalidatingRef.current = true;
+
         supabase.auth
           .getSession()
           .then(({ data: { session } }) => {
@@ -196,10 +217,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               fetchProfile(session.user.id, session.user.email).catch((err) => {
                 console.warn('[AuthContext] Background resume fetchProfile error:', err);
               });
+            } else if (!session) {
+              setUser(null);
+              setProfile(null);
+              localStorage.removeItem('cybergym_user');
             }
           })
           .catch((err) => {
             console.warn('[AuthContext] Background resume revalidation error:', err);
+          })
+          .finally(() => {
+            isRevalidatingRef.current = false;
           });
       }
     };
@@ -213,67 +241,73 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       document.removeEventListener('visibilitychange', handleLifecycleResume);
       window.removeEventListener('pageshow', handleLifecycleResume);
     };
-  }, []);
+  }, [fetchProfile]);
 
-  const signIn = async (email: string, password = 'password123') => {
-    try {
-      const sanitizedEmail = email.trim().toLowerCase();
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: sanitizedEmail,
-        password,
-      });
-      if (error) {
-        return { success: false, error: error.message };
-      }
-      if (data?.user) {
-        signedOutRef.current = false;
-        setUser(data.user);
-        await fetchProfile(data.user.id, data.user.email);
-        
-        let userRole: UserRole = 'athlete';
-        const { data: pData } = await supabase.from('users').select('role').eq('id', data.user.id).single();
-        if (pData) {
-          userRole = pData.role;
+  const signIn = useCallback(
+    async (email: string, password = 'password123') => {
+      try {
+        const sanitizedEmail = email.trim().toLowerCase();
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: sanitizedEmail,
+          password,
+        });
+        if (error) {
+          return { success: false, error: error.message };
         }
-        return { success: true, role: userRole };
-      }
-      return { success: true };
-    } catch (err: any) {
-      return { success: false, error: err.message };
-    }
-  };
+        if (data?.user) {
+          signedOutRef.current = false;
+          setUser(data.user);
+          await fetchProfile(data.user.id, data.user.email);
 
-  const signUp = async (email: string, password = 'password123', _role: UserRole = 'athlete') => {
-    try {
-      const sanitizedEmail = email.trim().toLowerCase();
-      const { data, error } = await supabase.auth.signUp({
-        email: sanitizedEmail,
-        password,
-        options: {
-          data: {
-            username: sanitizedEmail.split('@')[0],
-          },
-        },
-      });
-      if (error) {
-        return { success: false, error: error.message };
-      }
-      if (data?.session && data?.user) {
-        setUser(data.user);
-        await fetchProfile(data.user.id, data.user.email);
+          let userRole: UserRole = 'athlete';
+          const { data: pData } = await supabase.from('users').select('role').eq('id', data.user.id).single();
+          if (pData?.role) {
+            userRole = pData.role as UserRole;
+          }
+          return { success: true, role: userRole };
+        }
         return { success: true };
+      } catch (err: any) {
+        return { success: false, error: err.message };
       }
-      return {
-        success: true,
-        needsEmailConfirmation: true,
-        message: 'Account created! Please check your email to verify your account.',
-      };
-    } catch (err: any) {
-      return { success: false, error: err.message };
-    }
-  };
+    },
+    [fetchProfile]
+  );
 
-  const signOut = async () => {
+  const signUp = useCallback(
+    async (email: string, password = 'password123', _role: UserRole = 'athlete') => {
+      try {
+        const sanitizedEmail = email.trim().toLowerCase();
+        const { data, error } = await supabase.auth.signUp({
+          email: sanitizedEmail,
+          password,
+          options: {
+            data: {
+              username: sanitizedEmail.split('@')[0],
+            },
+          },
+        });
+        if (error) {
+          return { success: false, error: error.message };
+        }
+        if (data?.session && data?.user) {
+          setUser(data.user);
+          await fetchProfile(data.user.id, data.user.email);
+          return { success: true };
+        }
+        return {
+          success: true,
+          needsEmailConfirmation: true,
+          message: 'Account created! Please check your email to verify your account.',
+        };
+      } catch (err: any) {
+        return { success: false, error: err.message };
+      }
+    },
+    [fetchProfile]
+  );
+
+  const signOut = useCallback(async () => {
     signedOutRef.current = true;
     try {
       await supabase.auth.signOut();
@@ -290,9 +324,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setProfile(null);
     queryClient.clear();
-  };
+  }, [queryClient]);
 
-  const updateProfile = async (updates: Partial<UserProfile>) => {
+  const updateProfile = useCallback(async (updates: Partial<UserProfile>) => {
     if (!profile) return { success: false, error: 'Not authenticated' };
     // Strip role, coach_tier, and max_athletes mutations: client cannot modify protected fields
     const {
@@ -318,23 +352,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err: any) {
       return { success: false, error: err?.message || 'Update failed' };
     }
-  };
+  }, [profile]);
 
-  const switchRole = async (newRole: UserRole) => {
+  const switchRole = useCallback(async (newRole: UserRole) => {
     // Only verified coaches can toggle between Coach View and Athlete Preview
     if (profile?.role !== 'coach') return;
     setViewMode(newRole);
     localStorage.setItem('cybergym_view_mode', newRole);
-  };
+  }, [profile?.role]);
 
-  const refreshProfile = async () => {
+  const refreshProfile = useCallback(async () => {
     signedOutRef.current = false;
     if (user) {
       await fetchProfile(user.id, user.email);
     }
-  };
+  }, [user, fetchProfile]);
 
-  const resendConfirmation = async (email: string) => {
+  const resendConfirmation = useCallback(async (email: string) => {
     try {
       const { error } = await supabase.auth.resend({
         type: 'signup',
@@ -345,9 +379,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err: any) {
       return { success: false, error: err.message };
     }
-  };
+  }, []);
 
-  const requestPasswordReset = async (email: string) => {
+  const requestPasswordReset = useCallback(async (email: string) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
         redirectTo: `${window.location.origin}/reset-password`,
@@ -357,9 +391,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err: any) {
       return { success: false, error: err.message };
     }
-  };
+  }, []);
 
-  const resetPassword = async (newPassword: string) => {
+  const resetPassword = useCallback(async (newPassword: string) => {
     try {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) return { success: false, error: error.message };
@@ -367,31 +401,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err: any) {
       return { success: false, error: err.message };
     }
-  };
+  }, []);
 
   const role: UserRole = profile?.role === 'coach' ? viewMode : 'athlete';
   const isCoachMode = Boolean(profile?.is_coach_mode || profile?.role === 'coach' || role === 'coach');
 
+  const contextValue = useMemo<AuthContextType>(
+    () => ({
+      user,
+      profile,
+      role,
+      viewMode,
+      isCoachMode,
+      loading,
+      signIn,
+      signUp,
+      signOut,
+      updateProfile,
+      switchRole,
+      refreshProfile,
+      resendConfirmation,
+      requestPasswordReset,
+      resetPassword,
+    }),
+    [
+      user,
+      profile,
+      role,
+      viewMode,
+      isCoachMode,
+      loading,
+      signIn,
+      signUp,
+      signOut,
+      updateProfile,
+      switchRole,
+      refreshProfile,
+      resendConfirmation,
+      requestPasswordReset,
+      resetPassword,
+    ]
+  );
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        profile,
-        role,
-        viewMode,
-        isCoachMode,
-        loading,
-        signIn,
-        signUp,
-        signOut,
-        updateProfile,
-        switchRole,
-        refreshProfile,
-        resendConfirmation,
-        requestPasswordReset,
-        resetPassword,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

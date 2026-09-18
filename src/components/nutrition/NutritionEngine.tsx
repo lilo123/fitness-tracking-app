@@ -1,297 +1,48 @@
-import React, { useState, useMemo, useRef, useEffect, useSyncExternalStore } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabase';
+import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import type { NutritionLog, CustomDish } from '../../types/database';
-import { MacroRing } from '../common/MacroRing';
-import { normalizeDateStr, getLocalDateStr, formatLocalTimestamp } from '../../utils/date';
-import { getDishIcon } from '../../utils/dishIcons';
+import type { NutritionLog, CustomDish, CustomDishDetail } from '../../types/database';
+import { getLocalDateStr, formatLocalTimestamp } from '../../utils/date';
 import { EditMealModal } from './EditMealModal';
-import { formatCalories, formatMacro, roundTo1Decimal, calculateRemainingFuel } from '../../utils/nutrition';
-import { restTimerStore } from '../../utils/restTimerStore';
-import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { formatCalories, roundTo1Decimal } from '../../utils/nutrition';
 import {
-  compressImageBase64,
-  compressImageFile,
-  formatFileSize,
-  type CompressedImage,
-} from '../../utils/imageCompression';
-import {
-  Sparkles,
-  Utensils,
-  Trash2,
-  AlertCircle,
-  CheckCircle2,
-  Flame,
-  Plus,
-  Star,
-  X,
-  Edit2,
-  Check,
-  Calculator,
-  ChevronDown,
-  ChevronUp,
-  Camera as CameraIcon,
-  Image as ImageIcon,
-  RotateCcw,
-} from 'lucide-react';
-import { convertPortion, type CanonicalUnit } from '../../utils/unitConverter';
-import {
-  itemsForPersist,
-  itemsFromLegacyIngredients,
-  normalizeItems,
-  sumItems,
-  type NutritionItem,
+  itemsForPersist, itemsFromLegacyIngredients, normalizeItems, sumItems, type NutritionItem,
 } from '../../utils/itemModel';
-import { ComponentRow } from './ComponentRow';
 import { MealLogRow } from './MealLogRow';
-import { CustomDishEditor } from './CustomDishEditor';
 import { NutrientBreakdownModal, type BreakdownNutrient } from './NutrientBreakdownModal';
-import { useModalA11y } from '../../hooks/useModalA11y';
+import {
+  stagedToItem, buildStagedItem, recomputeStagedTotals, type StagedItem, type StagedMeal,
+} from './nutritionEngineHelpers';
+import { useNutritionData } from './useNutritionData';
+import { useNutritionAi } from './useNutritionAi';
+import { useCustomDishModal } from './useCustomDishModal';
+import { NutritionDashboardRings } from './NutritionDashboardRings';
+import { QuickLogCarousel } from './QuickLogCarousel';
+import { NutritionAiInput } from './NutritionAiInput';
+import { StagedMealCard } from './StagedMealCard';
+import { ManualMealForm } from './ManualMealForm';
+import { CustomDishesModal } from './CustomDishesModal';
+import { Utensils, CheckCircle2, AlertCircle, RotateCcw } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { useQueryClient } from '@tanstack/react-query';
 
-export interface StagedItem {
-  id: string;
-  name: string;
-  /** The original free-text portion string, kept verbatim for provenance. */
-  portion: string;
-  /**
-   * Retained only so that a saved custom dish written by an older client still
-   * round-trips. Quantity is the authoritative control now.
-   */
-  portionMultiplier: number;
-  /** Canonical quantity in `unit`, derived from `portion` on first staging. */
-  quantity: number;
-  unit: CanonicalUnit;
-  /** The quantity at which base* below were measured. Scaling is relative to this. */
-  baseQuantity: number;
-  baseCalories: number;
-  baseProtein: number;
-  baseCarbs: number;
-  baseFat: number;
-  baseFiber: number;
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-  fiber: number;
-}
-
-/** The staged component as the shared level-2 model sees it. */
-export function stagedToItem(it: StagedItem): NutritionItem {
-  return {
-    id: it.id,
-    name: it.name,
-    quantity: it.quantity,
-    unit: it.unit,
-    displayPortion: it.portion,
-    calories: it.calories,
-    protein: it.protein,
-    carbs: it.carbs,
-    fat: it.fat,
-    fiber: it.fiber,
-  };
-}
-
-/** The same component at its reference quantity, for drift-free rescaling. */
-export function stagedReference(it: StagedItem): NutritionItem {
-  return {
-    id: it.id,
-    name: it.name,
-    quantity: it.baseQuantity,
-    unit: it.unit,
-    displayPortion: it.portion,
-    calories: it.baseCalories,
-    protein: it.baseProtein,
-    carbs: it.baseCarbs,
-    fat: it.baseFat,
-    fiber: it.baseFiber,
-  };
-}
-
-export interface StagedMeal {
-  name: string;
-  mealType: string;
-  explanation: string;
-  items: StagedItem[];
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-  fiber: number;
-  servingSize: number;
-  servingUnit: string;
-  photoUrl?: string;
-}
-
-let itemSequence = 0;
-function generateItemId(): string {
-  itemSequence += 1;
-  return `item-${Date.now()}-${itemSequence}`;
-}
-
-function toNumber(value: unknown): number {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
-}
-
-/**
- * Build a staged component, deriving its canonical (quantity, unit) from the
- * free-text portion string. The portion string itself is kept verbatim: it is
- * the provenance escape hatch that makes any future re-interpretation possible.
- */
-function buildStagedItem(raw: {
-  name: string;
-  portion?: string | null;
-  calories?: unknown;
-  protein?: unknown;
-  carbs?: unknown;
-  fat?: unknown;
-  fiber?: unknown;
-  /** Present only when re-staging something that was already scaled. */
-  base?: { calories: number; protein: number; carbs: number; fat: number; fiber: number };
-  quantity?: unknown;
-  unit?: unknown;
-  portionMultiplier?: unknown;
-}): StagedItem {
-  const portion = raw.portion || '1 serving';
-  const derived = convertPortion(portion);
-  const quantity =
-    raw.quantity !== undefined && raw.quantity !== null && Number.isFinite(Number(raw.quantity))
-      ? Math.max(0, Number(raw.quantity))
-      : derived.quantity;
-  const unit: CanonicalUnit =
-    raw.unit === 'g' || raw.unit === 'ml' || raw.unit === 'unit' ? raw.unit : derived.unit;
-
-  const current = {
-    calories: roundTo1Decimal(toNumber(raw.calories)),
-    protein: roundTo1Decimal(toNumber(raw.protein)),
-    carbs: roundTo1Decimal(toNumber(raw.carbs)),
-    fat: roundTo1Decimal(toNumber(raw.fat)),
-    fiber: roundTo1Decimal(toNumber(raw.fiber)),
-  };
-  const base = raw.base
-    ? {
-        calories: roundTo1Decimal(raw.base.calories),
-        protein: roundTo1Decimal(raw.base.protein),
-        carbs: roundTo1Decimal(raw.base.carbs),
-        fat: roundTo1Decimal(raw.base.fat),
-        fiber: roundTo1Decimal(raw.base.fiber),
-      }
-    : current;
-
-  return {
-    id: generateItemId(),
-    name: raw.name,
-    portion,
-    portionMultiplier: Number.isFinite(Number(raw.portionMultiplier)) ? Number(raw.portionMultiplier) : 1,
-    quantity: roundTo1Decimal(quantity),
-    unit,
-    // The reference quantity is the one the base macros were measured at. When
-    // the stored macros already differ from the base ones, the row was scaled,
-    // so the reference is the unscaled quantity.
-    baseQuantity: roundTo1Decimal(derived.quantity),
-    baseCalories: base.calories,
-    baseProtein: base.protein,
-    baseCarbs: base.carbs,
-    baseFat: base.fat,
-    baseFiber: base.fiber,
-    ...current,
-  };
-}
-
-/**
- * Re-derive the staged parent from its components. Called after every component
- * edit so `parent = SUM(items)` holds continuously rather than only at save
- * time — which is also exactly what the database constraint checks.
- */
-function recomputeStagedTotals(items: StagedItem[]) {
-  const totals = sumItems(items.map(stagedToItem));
-  const explanation =
-    items.map((it) => `${formatCalories(it.calories)} kcal (${it.name})`).join(' + ') +
-    ` = ${formatCalories(totals.calories)} kcal`;
-  return {
-    calories: roundTo1Decimal(totals.calories),
-    protein: roundTo1Decimal(totals.protein),
-    carbs: roundTo1Decimal(totals.carbs),
-    fat: roundTo1Decimal(totals.fat),
-    fiber: roundTo1Decimal(totals.fiber),
-    explanation,
-  };
-}
+export { type StagedItem, stagedToItem, stagedReference, type StagedMeal } from './nutritionEngineHelpers';
 
 export const NutritionEngine: React.FC = () => {
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
-
   const targetUserId = user?.id || '';
 
-  // Input & Staged State
-  const [nlInput, setNlInput] = useState('');
-  const [selectedPhoto, setSelectedPhoto] = useState<CompressedImage | null>(null);
-  const [isRateLimited, setIsRateLimited] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    return getLocalDateStr(new Date());
+  });
+
   const [stagedMeal, setStagedMeal] = useState<StagedMeal | null>(null);
   const [showManualForm, setShowManualForm] = useState(false);
   const [breakdownNutrient, setBreakdownNutrient] = useState<BreakdownNutrient | null>(null);
+  const [status, setStatus] = useState<string>('');
+  const [isError, setIsError] = useState(false);
 
-  const handlePickPhoto = async (source: CameraSource) => {
-    try {
-      const image = await Camera.getPhoto({
-        quality: 90,
-        allowEditing: false,
-        resultType: CameraResultType.Base64,
-        source,
-      });
-
-      if (image.base64String) {
-        const mimeType = image.format ? `image/${image.format}` : 'image/jpeg';
-        const compressed = await compressImageBase64(image.base64String, mimeType);
-        if (compressed && compressed.base64) {
-          setSelectedPhoto(compressed);
-          setIsError(false);
-          setIsRateLimited(false);
-        } else {
-          setIsError(true);
-          setStatus('Could not process captured photo. Please try again.');
-        }
-      }
-    } catch (err: any) {
-      const msg = (err?.message || '').toLowerCase();
-      if (msg.includes('cancel')) {
-        return;
-      }
-      if (fileInputRef.current) {
-        fileInputRef.current.click();
-      }
-    }
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const compressed = await compressImageFile(file);
-      if (compressed && compressed.base64) {
-        setSelectedPhoto(compressed);
-        setIsError(false);
-        setIsRateLimited(false);
-      } else {
-        setIsError(true);
-        setStatus('Could not process selected image. Please select a valid photo.');
-      }
-    } catch (err) {
-      console.warn('Image compression failed:', err);
-      setIsError(true);
-      setStatus('Failed to process image.');
-    }
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const handleRemovePhoto = () => {
-    setSelectedPhoto(null);
-  };
-
-  // Manual Form Fallback State (when no staged meal is active)
+  // Manual Form Fallback State
   const [manualDishName, setManualDishName] = useState('');
   const [manualCalories, setManualCalories] = useState<number | ''>('');
   const [manualProtein, setManualProtein] = useState<number | ''>('');
@@ -302,142 +53,36 @@ export const NutritionEngine: React.FC = () => {
   const [manualServingSize, setManualServingSize] = useState<number | ''>(1);
   const [manualServingUnit, setManualServingUnit] = useState<string>('serving');
 
-  // Custom Dish Management Modal State
-  const [showDishModal, setShowDishModal] = useState(false);
-  const [editingDish, setEditingDish] = useState<CustomDish | null>(null);
   const [editingMealLog, setEditingMealLog] = useState<NutritionLog | null>(null);
-  const [dishModalName, setDishModalName] = useState('');
-  const [dishModalCalories, setDishModalCalories] = useState<number | ''>('');
-  const [dishModalProtein, setDishModalProtein] = useState<number | ''>('');
-  const [dishModalCarbs, setDishModalCarbs] = useState<number | ''>('');
-  const [dishModalFat, setDishModalFat] = useState<number | ''>('');
-  const [dishModalFiber, setDishModalFiber] = useState<number | ''>('');
-  // R-01: the modal used to bind a raw `ingredients` text input straight to the
-  // column, so opening + saving a dish silently rewrote (or nulled) its
-  // breakdown. The modal now edits structured components and never writes
-  // `ingredients` at all.
-  const [dishModalItems, setDishModalItems] = useState<NutritionItem[]>([]);
-  const dishModalRef = useModalA11y(showDishModal, () => setShowDishModal(false));
 
-  const [selectedDate, setSelectedDate] = useState<string>(() => {
-    return getLocalDateStr(new Date());
-  });
-
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [status, setStatus] = useState<string>('');
-  const [isError, setIsError] = useState(false);
-
-  // Targets
-  const targetCalories = profile?.target_calories || 2200;
-  const targetProtein = profile?.target_protein || 160;
-  const targetCarbs = profile?.target_carbs || 220;
-  const targetFat = profile?.target_fat || 70;
-  const targetFiber = profile?.target_fiber ?? 30;
-
-  // Fetch custom dishes for context injection & quick log
-  const { data: customDishes = [] } = useQuery({
-    queryKey: ['custom_dishes', targetUserId],
-    queryFn: async () => {
-      if (!targetUserId) return [];
-      try {
-        let query: any = supabase
-          .from('custom_dishes')
-          .select('*')
-          .eq('user_id', targetUserId);
-
-        if (typeof query?.order === 'function') {
-          query = query.order('created_at', { ascending: false });
-        }
-
-        const { data, error } = await query;
-        if (error || !data) return [];
-        return data as CustomDish[];
-      } catch {
-        return [];
-      }
-    },
-  });
-
-  // Fetch nutrition logs for target user
-  const { data: nutritionLogs = [] } = useQuery({
-    queryKey: ['nutrition_logs', targetUserId, selectedDate],
-    queryFn: async () => {
-      if (!targetUserId) return [];
-      try {
-        const { data, error } = await supabase
-          .from('nutrition_logs')
-          .select('*')
-          .eq('user_id', targetUserId)
-          .gte('logged_at', `${selectedDate}T00:00:00.000Z`)
-          .lte('logged_at', `${selectedDate}T23:59:59.999Z`)
-          .order('logged_at', { ascending: false });
-
-        if (error || !data) return [];
-        return data as NutritionLog[];
-      } catch {
-        return [];
-      }
-    },
-    enabled: Boolean(targetUserId && selectedDate),
-  });
-
-  // Calculate daily totals
-  const todayLogs = useMemo(() => {
-    return nutritionLogs.filter((l) => normalizeDateStr(l.logged_at) === selectedDate);
-  }, [nutritionLogs, selectedDate]);
-
-  const dailyTotals = useMemo(() => {
-    return todayLogs.reduce(
-      (acc, log) => {
-        acc.calories += Number(log.calories) || 0;
-        acc.protein += Number(log.protein) || 0;
-        acc.carbs += Number(log.carbs) || 0;
-        acc.fat += Number(log.fat) || 0;
-        acc.fiber += Number(log.fiber) || 0;
-        return acc;
-      },
-      { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
-    );
-  }, [todayLogs]);
-
-  const remainingFuel = useMemo(() => {
-    return calculateRemainingFuel(dailyTotals, {
-      calories: targetCalories,
-      protein: targetProtein,
-      carbs: targetCarbs,
-      fat: targetFat,
-      fiber: targetFiber,
-    });
-  }, [dailyTotals, targetCalories, targetProtein, targetCarbs, targetFat, targetFiber]);
-
-  // Insert mutation
-  const mutation = useMutation({
-    mutationFn: async (newLog: Partial<NutritionLog>) => {
-      const payload = {
-        ...newLog,
-        user_id: targetUserId,
-      };
-
-      const { data, error } = await supabase
-        .from('nutrition_logs')
-        .insert([payload])
-        .select();
-
-      if (error) {
-        throw new Error(error.message);
-      }
-      return data;
-    },
-    onSuccess: () => {
-      setStatus('Saved');
-      setIsError(false);
-      queryClient.invalidateQueries({ queryKey: ['nutrition_logs', targetUserId] });
-      // Reset state
+  const {
+    customDishes,
+    todayLogs,
+    dailyTotals,
+    targets,
+    remainingFuel,
+    mutation,
+    scaleLogMutation,
+    saveCustomDishMutation,
+    deleteCustomDishMutation,
+    activeToast,
+    dismissToast,
+    triggerToast,
+    isTimerActive,
+    isReadError,
+    readError,
+    refetchRead,
+    fetchDishDetail,
+  } = useNutritionData({
+    targetUserId,
+    selectedDate,
+    profile,
+    onMutationSuccessReset: () => {
       setStagedMeal(null);
-      setSelectedPhoto(null);
+      ai.setSelectedPhoto(null);
       setShowManualForm(false);
-      setIsRateLimited(false);
-      setNlInput('');
+      ai.setIsRateLimited(false);
+      ai.setNlInput('');
       setManualDishName('');
       setManualCalories('');
       setManualProtein('');
@@ -445,440 +90,39 @@ export const NutritionEngine: React.FC = () => {
       setManualFat('');
       setManualFiber('');
     },
-    onError: (error: any) => {
-      console.error(error);
-      setStatus('Failed to save log: ' + error.message);
-      setIsError(true);
-    },
+    setStatus,
+    setIsError,
   });
 
-  // Delete log mutation
-  const deleteMutation = useMutation({
-    mutationFn: async (logId: string) => {
-      const { error } = await supabase.from('nutrition_logs').delete().eq('id', logId);
-      if (error) throw error;
+  const [dishFetchError, setDishFetchError] = useState<{ message: string; retry: () => void } | null>(null);
+
+  const ai = useNutritionAi({
+    customDishes,
+    onParsedSuccess: (meal) => {
+      setStagedMeal(meal);
+      setShowManualForm(false);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['nutrition_logs', targetUserId] });
-    },
-  });
-
-  // Whole-dish rescale from the expanded meal row. Parent macros and `items`
-  // must move together in a single UPDATE: the DB asserts parent = Σ(items),
-  // so writing either one alone is rejected.
-  const scaleLogMutation = useMutation({
-    mutationFn: async ({ log, items }: { log: NutritionLog; items: NutritionItem[] }) => {
-      const totals = sumItems(items);
-      const { error } = await supabase
-        .from('nutrition_logs')
-        .update({
-          items: itemsForPersist(items),
-          calories: Math.max(0, roundTo1Decimal(totals.calories)),
-          protein: Math.max(0, roundTo1Decimal(totals.protein)),
-          carbs: Math.max(0, roundTo1Decimal(totals.carbs)),
-          fat: Math.max(0, roundTo1Decimal(totals.fat)),
-          fiber: Math.max(0, roundTo1Decimal(totals.fiber)),
-        })
-        .eq('id', log.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['nutrition_logs', targetUserId] });
-    },
-    onError: (err: any) => {
-      setStatus('Failed to rescale meal: ' + err.message);
-      setIsError(true);
-    },
-  });
-
-  // Custom Dish CRUD mutations
-  const saveCustomDishMutation = useMutation({
-    mutationFn: async (dishPayload: Partial<CustomDish>) => {
-      if (editingDish) {
-        const { data, error } = await supabase
-          .from('custom_dishes')
-          .update(dishPayload)
-          .eq('id', editingDish.id)
-          .select();
-        if (error) throw error;
-        return data;
-      } else {
-        const { data, error } = await supabase
-          .from('custom_dishes')
-          .insert([{ ...dishPayload, user_id: targetUserId }])
-          .select();
-        if (error) throw error;
-        return data;
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['custom_dishes', targetUserId] });
-      setShowDishModal(false);
-      setEditingDish(null);
-      resetDishModalFields();
-      setStatus('Custom dish saved');
-      setIsError(false);
-    },
-    onError: (err: any) => {
-      setStatus('Failed to save custom dish: ' + err.message);
-      setIsError(true);
-    },
-  });
-
-  const editingDishRef = useRef(editingDish);
-  useEffect(() => {
-    editingDishRef.current = editingDish;
-  }, [editingDish]);
-
-  const deleteCustomDishMutation = useMutation({
-    mutationFn: async (dishId: string) => {
-      const { error } = await supabase.from('custom_dishes').delete().eq('id', dishId);
-      if (error) throw error;
-      return dishId;
-    },
-    onSuccess: (deletedId) => {
-      queryClient.invalidateQueries({ queryKey: ['custom_dishes', targetUserId] });
-      if (editingDish?.id === deletedId || editingDishRef.current?.id === deletedId) {
-        setEditingDish(null);
-        resetDishModalFields();
-        setShowDishModal(false);
-      }
-      setStatus('Custom dish deleted');
-      setIsError(false);
-    },
-    onError: (err: any) => {
-      setStatus('Failed to delete dish: ' + err.message);
-      setIsError(true);
-    },
-  });
-
-  const [activeToast, setActiveToast] = useState<{ id: string; name: string; calories: number } | null>(null);
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const dismissToast = () => {
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = null;
-    }
-    setActiveToast(null);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) {
-        clearTimeout(toastTimerRef.current);
-      }
-    };
-  }, []);
-
-  const timerState = useSyncExternalStore(
-    restTimerStore.subscribe,
-    restTimerStore.getSnapshot,
-    restTimerStore.getServerSnapshot
-  );
-  const isTimerActive = timerState.isRunning || timerState.isPaused;
-
-  const resetDishModalFields = () => {
-    setDishModalName('');
-    setDishModalCalories('');
-    setDishModalProtein('');
-    setDishModalCarbs('');
-    setDishModalFat('');
-    setDishModalFiber('');
-    setDishModalItems([]);
-  };
-
-  const handleOpenNewDishModal = () => {
-    dismissToast();
-    setEditingDish(null);
-    resetDishModalFields();
-    setShowDishModal(true);
-  };
-
-  const handleOpenEditDishModal = (dish: CustomDish) => {
-    dismissToast();
-    setEditingDish(dish);
-    setDishModalName(dish.name);
-    setDishModalCalories(dish.calories != null ? roundTo1Decimal(dish.calories) : '');
-    setDishModalProtein(dish.protein != null ? roundTo1Decimal(dish.protein) : '');
-    setDishModalCarbs(dish.carbs != null ? roundTo1Decimal(dish.carbs) : '');
-    setDishModalFat(dish.fat != null ? roundTo1Decimal(dish.fat) : '');
-    setDishModalFiber(dish.fiber != null ? roundTo1Decimal(dish.fiber) : '');
-    // Prefer the structured column; fall back to parsing the legacy free-text
-    // one so pre-migration dishes still open with a breakdown.
-    const rawItems =
-      normalizeItems(dish.items) ??
-      itemsFromLegacyIngredients(dish.id, dish.name, dish.ingredients) ??
-      [];
-    setDishModalItems(
-      rawItems.map((it) => ({
-        ...it,
-        quantity: roundTo1Decimal(it.quantity),
-        calories: roundTo1Decimal(it.calories),
-        protein: roundTo1Decimal(it.protein),
-        carbs: roundTo1Decimal(it.carbs),
-        fat: roundTo1Decimal(it.fat),
-        fiber: roundTo1Decimal(it.fiber),
-      }))
-    );
-    setShowDishModal(true);
-  };
-
-  const handleSaveCustomDishModal = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!dishModalName.trim()) return;
-
-    // A single component is not a hierarchy; persisting it as one would make
-    // every trivial dish render an accordion with one child in it.
-    const persistItems = itemsForPersist(dishModalItems);
-    const totals = persistItems ? sumItems(persistItems) : null;
-
-    // R-30: the DB rejects negatives outright, and a constraint violation here
-    // reads as an opaque Postgres error, so clamp before we ever send it.
-    const clamp = (n: number) => Math.max(0, roundTo1Decimal(n));
-
-    saveCustomDishMutation.mutate({
-      name: dishModalName.trim(),
-      calories: clamp(totals ? totals.calories : Number(dishModalCalories) || 0),
-      protein: clamp(totals ? totals.protein : Number(dishModalProtein) || 0),
-      carbs: clamp(totals ? totals.carbs : Number(dishModalCarbs) || 0),
-      fat: clamp(totals ? totals.fat : Number(dishModalFat) || 0),
-      fiber: clamp(totals ? totals.fiber : Number(dishModalFiber) || 0),
-      items: persistItems,
-      // NOTE: `ingredients` is deliberately absent. It is deprecated and
-      // read-only from here on; writing it is what destroyed breakdowns before.
-    });
-  };
-
-  const handleAnalyze = async () => {
-    if (!nlInput.trim() && !selectedPhoto) return;
-    setIsAnalyzing(true);
-    setStatus('Analyzing...');
-    setIsError(false);
-    setIsRateLimited(false);
-
-    try {
-      let timeoutId: any;
-      const timeoutMs = selectedPhoto ? 45000 : 30000;
-      const timeoutPromise = new Promise((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error(`Edge function timeout after ${timeoutMs / 1000}s`)), timeoutMs);
-      });
-
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-
-      const invokePromise = supabase.functions.invoke('parse-nutrition', {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        body: {
-          input: nlInput,
-          text: nlInput,
-          image_base64: selectedPhoto ? selectedPhoto.base64 : undefined,
-          imageMimeType: selectedPhoto ? selectedPhoto.mimeType : undefined,
-          custom_dishes: customDishes.map((d) => ({
-            name: d.name,
-            calories: d.calories,
-            protein: d.protein,
-            carbs: d.carbs,
-            fat: d.fat,
-            fiber: d.fiber ?? 0,
-          })),
-        },
-      });
-
-      let data: any;
-      let error: any;
-      try {
-        const result = (await Promise.race([invokePromise, timeoutPromise])) as any;
-        data = result?.data;
-        error = result?.error;
-      } finally {
-        if (timeoutId) clearTimeout(timeoutId);
-      }
-
-      if (error) {
-        let serverMessage = '';
-        let errorCode = '';
-        let retryAfterSeconds: number | undefined;
-
-        if (error?.context) {
-          try {
-            const ctxClone = typeof error.context?.clone === 'function' ? error.context.clone() : error.context;
-            if (typeof ctxClone?.json === 'function') {
-              const errData = await ctxClone.json();
-              if (errData?.error) serverMessage = errData.error;
-              if (errData?.code) errorCode = errData.code;
-              if (errData?.retryAfter) retryAfterSeconds = Number(errData.retryAfter);
-            } else if (ctxClone && typeof ctxClone === 'object' && ctxClone.error) {
-              serverMessage = ctxClone.error;
-              if (ctxClone.code) errorCode = ctxClone.code;
-              if (ctxClone.retryAfter) retryAfterSeconds = Number(ctxClone.retryAfter);
-            }
-          } catch {
-            try {
-              const ctxCloneText = typeof error.context?.clone === 'function' ? error.context.clone() : error.context;
-              if (typeof ctxCloneText?.text === 'function') {
-                const textData = await ctxCloneText.text();
-                if (textData && textData.length < 500) {
-                  serverMessage = textData;
-                }
-              }
-            } catch {
-              // ignore
-            }
-          }
-
-          if (!retryAfterSeconds && error.context?.headers) {
-            const headers = error.context.headers;
-            const headerRetry = typeof headers?.get === 'function'
-              ? (headers.get('Retry-After') || headers.get('retry-after'))
-              : (headers['Retry-After'] || headers['retry-after']);
-            if (headerRetry && !isNaN(parseInt(headerRetry, 10))) {
-              retryAfterSeconds = parseInt(headerRetry, 10);
-            }
-          }
-        }
-
-        const is429 = error?.context?.status === 429 || error?.status === 429;
-        if (is429) {
-          const rateLimitMsg = serverMessage || 'Gemini rate limit exceeded (15 RPM). Please wait 15 seconds or switch to manual entry.';
-          const rateErr = new Error(rateLimitMsg);
-          (rateErr as any).is429 = true;
-          (rateErr as any).retryAfter = retryAfterSeconds || 15;
-          throw rateErr;
-        }
-
-        if (serverMessage) {
-          const customErr = new Error(serverMessage);
-          (customErr as any).code = errorCode;
-          (customErr as any).status = error?.context?.status || error?.status;
-          throw customErr;
-        }
-
-        throw error;
-      }
-
-      let parsed = data;
-      if (typeof data === 'string') {
-        const cleaned = data.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-        parsed = JSON.parse(cleaned);
-      }
-
-      if (parsed?.error) {
-        const err = new Error(parsed.error);
-        if (parsed.code) (err as any).code = parsed.code;
-        throw err;
-      }
-
-      if (parsed && (parsed.calories !== undefined || (Array.isArray(parsed.items) && parsed.items.length > 0))) {
-        let items: StagedItem[] = [];
-        if (Array.isArray(parsed.items) && parsed.items.length > 0) {
-          items = parsed.items.map((it: any) =>
-            buildStagedItem({
-              name: it.name || 'Item',
-              portion: it.portion,
-              quantity: it.quantity,
-              unit: it.unit,
-              calories: it.calories,
-              protein: it.protein,
-              carbs: it.carbs,
-              fat: it.fat,
-              fiber: it.fiber,
-            })
-          );
-        } else {
-          items = [
-            buildStagedItem({
-              name: parsed.name || nlInput || (selectedPhoto ? 'Meal Photo' : 'Meal'),
-              portion: '1 serving',
-              calories: parsed.calories,
-              protein: parsed.protein,
-              carbs: parsed.carbs,
-              fat: parsed.fat,
-              fiber: parsed.fiber,
-            }),
-          ];
-        }
-
-        // R-07 — items win.
-        //
-        // This previously preferred the model's top-level scalar and fell back
-        // to the item sum only when the scalar was missing. The edge-function
-        // prompt asks the model to make the two agree, but nothing enforced it,
-        // so whenever the model's arithmetic slipped the discrepancy was
-        // persisted verbatim. That is the entire origin of the one drift row in
-        // production: four macros bit-exact, fiber off by 0.5.
-        //
-        // Deriving from the items also makes the new `items` column satisfy the
-        // database's parent = SUM(items) constraint by construction.
-        const totalCal = roundTo1Decimal(items.reduce((s, it) => s + it.calories, 0));
-        const totalP = roundTo1Decimal(items.reduce((s, it) => s + it.protein, 0));
-        const totalC = roundTo1Decimal(items.reduce((s, it) => s + it.carbs, 0));
-        const totalF = roundTo1Decimal(items.reduce((s, it) => s + it.fat, 0));
-        const totalFib = roundTo1Decimal(items.reduce((s, it) => s + it.fiber, 0));
-
-        setStagedMeal({
-          name: parsed.name || nlInput || (selectedPhoto ? 'Meal Photo' : 'Meal'),
-          mealType: 'Breakfast',
-          explanation:
-            parsed.explanation ||
-            items.map((it) => `${formatCalories(it.calories)} kcal (${it.name})`).join(' + ') + ` = ${formatCalories(totalCal)} kcal`,
-          items,
-          calories: totalCal,
-          protein: totalP,
-          carbs: totalC,
-          fat: totalF,
-          fiber: totalFib,
-          servingSize: Number(parsed.serving_size ?? parsed.servingSize) || 1,
-          servingUnit: parsed.serving_unit || parsed.servingUnit || 'serving',
-          photoUrl: selectedPhoto?.dataUrl,
-        });
-
-        setShowManualForm(false);
-        setIsRateLimited(false);
-        setStatus('Analyzed');
-        return;
-      }
-      throw new Error('Invalid parsed response: missing nutrition data');
-    } catch (error: any) {
-      console.warn('AI Edge function failed:', error);
-      if (error?.is429 || error?.context?.status === 429 || error?.status === 429) {
-        setIsRateLimited(true);
-        setIsError(false);
-        setStatus('');
-        return;
-      }
-      setIsError(true);
-      const errorMsg = error?.message || (typeof error === 'string' ? error : 'Unknown error');
-      setStatus(
-        error?.code === 'NON_FOOD_DETECTED' || error?.status === 422 || error?.context?.status === 422
-          ? `Meal Analysis: ${errorMsg}`
-          : `AI service unavailable: ${errorMsg}`
-      );
+    onFallbackToManual: (dishName) => {
       setShowManualForm(true);
       if (!manualDishName.trim()) {
-        setManualDishName(nlInput.trim() || (selectedPhoto ? 'Meal Photo' : ''));
+        setManualDishName(dishName);
       }
       setStagedMeal(null);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
+    },
+    setStatus,
+    setIsError,
+  });
 
-  /**
-   * Apply an edited component and re-derive the parent from the items.
-   *
-   * This replaces `handleAdjustPortion`, which had two defects that compounded
-   * each other:
-   *   R-02  it applied Math.round to all five macros on every tap, and that
-   *         rounded value was what got persisted. Roughly half of all
-   *         production macro values are fractional.
-   *   R-03  `Math.max(0.25, mult +/- 0.5)` produced the one-way ladder
-   *         1 -> 0.5 -> 0.25 -> 0.75 -> 1.25, from which x1 was unreachable.
-   *         A single stray tap was frequently unrecoverable, which is what made
-   *         R-02 bite in practice.
-   *
-   * Absolute quantities have no ladder and nothing here rounds.
-   */
+  const dishModal = useCustomDishModal({
+    onSaveDish: (args) => saveCustomDishMutation.mutate(args),
+    onDeleteDish: (dishId) => deleteCustomDishMutation.mutate(dishId),
+    onDismissToast: dismissToast,
+    fetchDishDetail,
+    onFetchError: (err, retry) => {
+      setDishFetchError({ message: err?.message || 'Failed to load dish details', retry });
+    },
+  });
+
   const applyStagedItemChange = (itemId: string, next: NutritionItem) => {
     if (!stagedMeal) return;
     const updatedItems = stagedMeal.items.map((it) =>
@@ -912,8 +156,6 @@ export const NutritionEngine: React.FC = () => {
 
   const handleLogStagedMeal = () => {
     if (!stagedMeal) return;
-    // items win: the parent is the sum, so the row satisfies the database's
-    // parent = SUM(items) constraint by construction. Nothing is rounded.
     const items = stagedMeal.items.map(stagedToItem);
     const totals = sumItems(items);
     const isSingle = items.length <= 1;
@@ -928,7 +170,6 @@ export const NutritionEngine: React.FC = () => {
       serving_size: Number(stagedMeal.servingSize) || 1,
       serving_unit: stagedMeal.servingUnit || 'serving',
       logged_at: formatLocalTimestamp(selectedDate),
-      // A single-component meal is a level-2 leaf; persist NULL, never [].
       items: items.length > 1 ? itemsForPersist(items) : null,
     };
     mutation.mutate(payload);
@@ -943,8 +184,6 @@ export const NutritionEngine: React.FC = () => {
         {
           user_id: targetUserId,
           name: stagedMeal.name,
-          // `ingredients` is deprecated and still written here only so that an
-          // Android client that predates the `items` column keeps working.
           ingredients: JSON.stringify(stagedMeal.items),
           items: items.length > 1 ? itemsForPersist(items) : null,
           calories: roundTo1Decimal(totals.calories),
@@ -971,7 +210,6 @@ export const NutritionEngine: React.FC = () => {
           user_id: targetUserId,
           name: item.name,
           ingredients: JSON.stringify([item]),
-          // One component is a leaf, so no breakdown is stored.
           items: null,
           calories: roundTo1Decimal(item.calories),
           protein: roundTo1Decimal(item.protein),
@@ -990,12 +228,24 @@ export const NutritionEngine: React.FC = () => {
     }
   };
 
-  const handleStageCustomDish = (dish: CustomDish & { items?: unknown }) => {
-    // `items` is authoritative. `ingredients` is the deprecated legacy blob and
-    // is only consulted for a row that has not been backfilled, or one written
-    // by a client that predates the column.
+  const handleStageCustomDish = async (dish: CustomDish) => {
+    setDishFetchError(null);
+    let detail: CustomDishDetail | null = null;
+    try {
+      detail = await fetchDishDetail(dish.id);
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to load dish details';
+      setDishFetchError({
+        message: msg,
+        retry: () => {
+          void handleStageCustomDish(dish);
+        },
+      });
+      return;
+    }
+
     const stored =
-      normalizeItems(dish.items) ?? itemsFromLegacyIngredients(dish.id, dish.name, dish.ingredients);
+      normalizeItems(detail?.items) ?? itemsFromLegacyIngredients(dish.id, dish.name, detail?.ingredients);
 
     let items: StagedItem[] = (stored ?? []).map((it) =>
       buildStagedItem({
@@ -1025,15 +275,15 @@ export const NutritionEngine: React.FC = () => {
       ];
     }
 
-    const { explanation, ...totals } = recomputeStagedTotals(items);
+    const { explanation, ...tot } = recomputeStagedTotals(items);
 
     setStagedMeal({
       name: dish.name,
       mealType: 'Breakfast',
       explanation:
-        items.length > 1 ? explanation : `${formatCalories(totals.calories)} kcal (${dish.name})`,
+        items.length > 1 ? explanation : `${formatCalories(tot.calories)} kcal (${dish.name})`,
       items,
-      ...totals,
+      ...tot,
       servingSize: 1,
       servingUnit: 'serving',
     });
@@ -1054,22 +304,10 @@ export const NutritionEngine: React.FC = () => {
       logged_at: formatLocalTimestamp(selectedDate),
     };
     mutation.mutate(payload);
-
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-    }
-    setActiveToast({
-      id: String(Date.now()),
-      name: dish.name,
-      calories: roundTo1Decimal(dish.calories),
-    });
-    toastTimerRef.current = setTimeout(() => {
-      setActiveToast(null);
-      toastTimerRef.current = null;
-    }, 2800);
+    triggerToast(dish);
   };
 
-  const handleManualSave = (e: React.FormEvent) => {
+  const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualDishName.trim()) return;
 
@@ -1091,884 +329,115 @@ export const NutritionEngine: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Daily Macro Rings */}
-      <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-5 shadow-2xl">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Flame className="w-5 h-5 text-amber-400" />
-            <h2 className="text-sm font-black uppercase tracking-wider text-white">
-              Today's Nutrition
-            </h2>
-          </div>
-          <input
-            type="date"
-            data-testid="nutrition-date-input"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="bg-zinc-950 border border-zinc-800 text-cyan-400 rounded-xl px-2.5 py-1.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none cursor-pointer"
-          />
-        </div>
+      <NutritionDashboardRings
+        selectedDate={selectedDate}
+        onDateChange={setSelectedDate}
+        dailyTotals={dailyTotals}
+        targets={targets}
+        remainingFuel={remainingFuel}
+        onSelectBreakdownNutrient={setBreakdownNutrient}
+      />
 
-        <div className="grid grid-cols-6 sm:grid-cols-5 gap-1.5 sm:gap-2">
-          <div className="col-span-2 sm:col-span-1">
-            <MacroRing
-              label="Calories"
-              current={dailyTotals.calories}
-              target={targetCalories}
-              unit="kcal"
-              colorClass="text-amber-400"
-              strokeColor="#f59e0b"
-              onClick={() => setBreakdownNutrient('calories')}
-              testId="macro-ring-calories"
-            />
-          </div>
-          <div className="col-span-2 sm:col-span-1">
-            <MacroRing
-              label="Protein"
-              current={dailyTotals.protein}
-              target={targetProtein}
-              unit="g"
-              colorClass="text-cyan-400"
-              strokeColor="#06b6d4"
-              onClick={() => setBreakdownNutrient('protein')}
-              testId="macro-ring-protein"
-            />
-          </div>
-          <div className="col-span-2 sm:col-span-1">
-            <MacroRing
-              label="Carbs"
-              current={dailyTotals.carbs}
-              target={targetCarbs}
-              unit="g"
-              colorClass="text-emerald-400"
-              strokeColor="#10b981"
-              onClick={() => setBreakdownNutrient('carbs')}
-              testId="macro-ring-carbs"
-            />
-          </div>
-          <div className="col-span-3 sm:col-span-1">
-            <MacroRing
-              label="Fat"
-              current={dailyTotals.fat}
-              target={targetFat}
-              unit="g"
-              colorClass="text-violet-400"
-              strokeColor="#8b5cf6"
-              onClick={() => setBreakdownNutrient('fat')}
-              testId="macro-ring-fat"
-            />
-          </div>
-          <div className="col-span-3 sm:col-span-1">
-            <MacroRing
-              label="Fiber"
-              current={dailyTotals.fiber}
-              target={targetFiber}
-              unit="g"
-              colorClass="text-teal-400"
-              strokeColor="#14b8a6"
-              onClick={() => setBreakdownNutrient('fiber')}
-              testId="macro-ring-fiber"
-            />
-          </div>
-        </div>
+      <QuickLogCarousel
+        customDishes={customDishes}
+        onOpenNewDishModal={dishModal.handleOpenNewDishModal}
+        onStageCustomDish={handleStageCustomDish}
+        onOpenEditDishModal={dishModal.handleOpenEditDishModal}
+        onQuickLogCustomDishDirect={handleQuickLogCustomDishDirect}
+        onDismissToast={dismissToast}
+      />
 
-        {/* Daily Remaining Fuel Indicator */}
+      {(dishFetchError || dishModal.dishFetchError) && (
         <div
-          data-testid="remaining-fuel-container"
-          className="mt-3 pt-3 border-t border-zinc-800/80 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono"
+          role="alert"
+          data-testid="dish-fetch-error"
+          className="flex items-center justify-between gap-2 rounded-xl border border-rose-500/30 bg-rose-500/15 p-3 text-xs font-bold text-rose-300 shadow-lg"
         >
-          <span className="text-zinc-500 uppercase text-[10px] font-bold tracking-wider">Remaining Fuel:</span>
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.currentTarget.focus();
-                setBreakdownNutrient('calories');
-              }}
-              data-testid="remaining-fuel-calories"
-              className={`px-2 py-0.5 min-h-[44px] inline-flex items-center justify-center rounded-lg border text-[11px] font-mono font-bold transition-all cursor-pointer touch-manipulation hover:brightness-110 active:scale-95 ${
-                remainingFuel.calories.isOver
-                  ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
-                  : 'bg-amber-500/10 border-amber-500/25 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.1)]'
-              }`}
-            >
-              {remainingFuel.calories.badgeLabel}
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.currentTarget.focus();
-                setBreakdownNutrient('protein');
-              }}
-              data-testid="remaining-fuel-protein"
-              className={`px-2 py-0.5 min-h-[44px] inline-flex items-center justify-center rounded-lg border text-[11px] font-mono font-bold transition-all cursor-pointer touch-manipulation hover:brightness-110 active:scale-95 ${
-                remainingFuel.protein.isOver
-                  ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
-                  : 'bg-cyan-500/10 border-cyan-500/25 text-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.1)]'
-              }`}
-            >
-              {remainingFuel.protein.badgeLabel}
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.currentTarget.focus();
-                setBreakdownNutrient('carbs');
-              }}
-              data-testid="remaining-fuel-carbs"
-              className={`px-2 py-0.5 min-h-[44px] inline-flex items-center justify-center rounded-lg border text-[11px] font-mono font-bold transition-all cursor-pointer touch-manipulation hover:brightness-110 active:scale-95 ${
-                remainingFuel.carbs.isOver
-                  ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
-                  : 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.1)]'
-              }`}
-            >
-              {remainingFuel.carbs.badgeLabel}
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.currentTarget.focus();
-                setBreakdownNutrient('fat');
-              }}
-              data-testid="remaining-fuel-fat"
-              className={`px-2 py-0.5 min-h-[44px] inline-flex items-center justify-center rounded-lg border text-[11px] font-mono font-bold transition-all cursor-pointer touch-manipulation hover:brightness-110 active:scale-95 ${
-                remainingFuel.fat.isOver
-                  ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
-                  : 'bg-violet-500/10 border-violet-500/25 text-violet-400 shadow-[0_0_8px_rgba(139,92,246,0.1)]'
-              }`}
-            >
-              {remainingFuel.fat.badgeLabel}
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.currentTarget.focus();
-                setBreakdownNutrient('fiber');
-              }}
-              data-testid="remaining-fuel-fiber"
-              className={`px-2 py-0.5 min-h-[44px] inline-flex items-center justify-center rounded-lg border text-[11px] font-mono font-bold transition-all cursor-pointer touch-manipulation hover:brightness-110 active:scale-95 ${
-                remainingFuel.fiber.isOver
-                  ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
-                  : 'bg-teal-500/10 border-teal-500/25 text-teal-400 shadow-[0_0_8px_rgba(20,184,166,0.1)]'
-              }`}
-            >
-              {remainingFuel.fiber.badgeLabel}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 1-Tap Quick-Log Carousel for Custom Dishes */}
-      <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-4 shadow-2xl space-y-2.5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <Star className="w-4 h-4 text-amber-400" />
-            <span className="text-xs font-black uppercase tracking-wider text-white">
-              Quick Log Favorites
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => {
-                dismissToast();
-                if (customDishes.length > 0) {
-                  handleOpenEditDishModal(customDishes[0]);
-                } else {
-                  handleOpenNewDishModal();
-                }
-              }}
-              data-testid="manage-dishes-btn"
-              className="text-[11px] font-bold text-zinc-400 hover:text-white flex items-center gap-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-2.5 py-1 rounded-xl transition touch-manipulation min-h-[36px]"
-            >
-              <Utensils className="w-3 h-3" />
-              <span>Manage Dishes</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleOpenNewDishModal}
-              data-testid="new-dish-btn"
-              className="text-[11px] font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 px-2.5 py-1 rounded-xl transition touch-manipulation min-h-[36px]"
-            >
-              <Plus className="w-3 h-3" />
-              <span>New Dish</span>
-            </button>
-          </div>
-        </div>
-
-        {customDishes.length === 0 ? (
-          <p className="text-xs text-zinc-500 py-1">
-            No saved custom dishes yet. Create a custom dish or save a logged meal to quick-log it later.
-          </p>
-        ) : (
-          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar pt-1">
-            {customDishes.map((dish) => (
-              <div
-                key={dish.id}
-                onClick={() => handleStageCustomDish(dish)}
-                className="bg-zinc-950 hover:bg-zinc-850 border border-zinc-800 hover:border-cyan-500/40 rounded-2xl p-2.5 shrink-0 flex items-center gap-2.5 cursor-pointer transition shadow-sm group select-none"
-                data-testid={`custom-dish-card-${dish.id}`}
-              >
-                <div className="w-7 h-7 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0">
-                  {getDishIcon(dish.name)}
-                </div>
-                <div className="text-left min-w-0">
-                  <div className="text-xs font-bold text-white group-hover:text-cyan-300 transition truncate max-w-[110px] sm:max-w-[160px]">
-                    {dish.name}
-                  </div>
-                  <div className="text-[10px] font-mono text-zinc-400 whitespace-nowrap">
-                    <span className="text-amber-400 font-bold">{formatCalories(dish.calories)} kcal</span>
-                    <span> • </span>
-                    <span className="text-cyan-400 font-semibold">{formatMacro(dish.protein)}g P</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 shrink-0 ml-1">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      dismissToast();
-                      handleOpenEditDishModal(dish);
-                    }}
-                    title="Edit Custom Dish"
-                    aria-label={`Edit ${dish.name}`}
-                    data-testid={`edit-dish-btn-${dish.id}`}
-                    className="min-w-[36px] min-h-[36px] sm:min-w-[44px] sm:min-h-[44px] rounded-xl text-zinc-400 hover:text-cyan-300 hover:bg-zinc-800 transition flex items-center justify-center touch-manipulation"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => handleQuickLogCustomDishDirect(dish, e)}
-                    title="1-Tap Log Meal"
-                    aria-label={`Quick log ${dish.name}, ${dish.calories} calories`}
-                    data-testid={`quick-log-btn-${dish.id}`}
-                    className="min-w-[44px] min-h-[44px] rounded-xl bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30 flex items-center justify-center transition active:scale-95 touch-manipulation"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Conversational AI Food Logger */}
-      <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-5 shadow-2xl space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-neon-cyan">
-              <Sparkles className="w-4 h-4 text-zinc-950 font-black" />
-            </div>
-            <div>
-              <h3 className="text-sm font-black text-white uppercase tracking-wider">
-                Log Food
-              </h3>
-              <p className="text-[11px] text-zinc-400">
-                Describe what you ate in natural language
-              </p>
-            </div>
-          </div>
+          <span className="truncate">
+            {dishFetchError?.message || dishModal.dishFetchError?.message}
+          </span>
           <button
             type="button"
-            onClick={() => setShowManualForm((prev) => !prev)}
-            className="text-[11px] font-bold text-zinc-400 hover:text-white flex items-center justify-center gap-1 bg-zinc-800 hover:bg-zinc-700 px-3 py-2 min-h-[44px] min-w-[44px] rounded-xl transition border border-zinc-700 touch-manipulation"
+            data-testid="dish-fetch-retry"
+            onClick={() => {
+              if (dishFetchError) {
+                dishFetchError.retry();
+              } else if (dishModal.dishFetchError) {
+                dishModal.dishFetchError.retry();
+              }
+            }}
+            className="shrink-0 rounded border border-rose-400/40 bg-rose-500/20 px-2.5 py-1 text-xs font-bold text-rose-200 hover:bg-rose-500/30 touch-manipulation"
           >
-            <span>{showManualForm ? 'Hide Manual' : 'Manual Entry'}</span>
-            {showManualForm ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            Retry
           </button>
         </div>
+      )}
 
-        <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-3 focus-within:border-cyan-500 transition space-y-2.5">
-          {selectedPhoto && (
-            <div data-testid="photo-preview-container" className="relative flex items-center justify-between p-2.5 bg-zinc-900 border border-zinc-750 rounded-xl">
-              <div className="flex items-center gap-3">
-                <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-cyan-500/40 shrink-0 bg-zinc-950 shadow-md">
-                  <img
-                    src={selectedPhoto.dataUrl}
-                    alt="Meal preview"
-                    data-testid="photo-preview"
-                    className="w-full h-full object-cover"
-                  />
-                  {!isAnalyzing && (
-                    <button
-                      type="button"
-                      data-testid="remove-photo-button"
-                      onClick={handleRemovePhoto}
-                      aria-label="Remove photo"
-                      className="absolute top-0 right-0 min-w-[44px] min-h-[44px] p-2 rounded-full bg-zinc-950/80 hover:bg-rose-600 text-white flex items-center justify-center transition border border-zinc-700 touch-manipulation"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                  {isAnalyzing && (
-                    <div
-                      data-testid="laser-scan-animation"
-                      className="absolute inset-0 bg-cyan-500/25 pointer-events-none flex flex-col justify-around overflow-hidden"
-                    >
-                      <div className="w-full h-1 bg-cyan-300 shadow-[0_0_10px_#22d3ee] animate-pulse" />
-                    </div>
-                  )}
-                </div>
+      <NutritionAiInput
+        nlInput={ai.nlInput}
+        onNlInputChange={ai.setNlInput}
+        selectedPhoto={ai.selectedPhoto}
+        onRemovePhoto={ai.handleRemovePhoto}
+        onFileChange={ai.handleFileChange}
+        onPickPhoto={ai.handlePickPhoto}
+        isAnalyzing={ai.isAnalyzing}
+        onAnalyze={ai.handleAnalyze}
+        showManualForm={showManualForm}
+        onToggleManualForm={() => setShowManualForm((prev) => !prev)}
+        isRateLimited={ai.isRateLimited}
+        onSwitchToManual={() => {
+          setShowManualForm(true);
+          ai.setIsRateLimited(false);
+          if (!manualDishName.trim()) {
+            setManualDishName(ai.nlInput.trim() || (ai.selectedPhoto ? 'Meal Photo' : ''));
+          }
+        }}
+        status={status}
+        isError={isError}
+        fileInputRef={ai.fileInputRef}
+        hasCustomDishes={customDishes.length > 0}
+      />
 
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      data-testid="photo-size-badge"
-                      className="px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-400 font-mono text-[10px] font-bold border border-cyan-500/30"
-                    >
-                      {formatFileSize(selectedPhoto.sizeBytes)}
-                    </span>
-                    <span className="text-[10px] text-zinc-500 font-mono">
-                      {selectedPhoto.width}×{selectedPhoto.height}
-                    </span>
-                  </div>
-                  <p className="text-[11px] font-bold text-zinc-300">Meal Photo Attached</p>
-                  <p className="text-[10px] text-zinc-500">Ready for multimodal analysis</p>
-                </div>
-              </div>
+      {stagedMeal && (
+        <StagedMealCard
+          stagedMeal={stagedMeal}
+          onUpdateStagedMeal={setStagedMeal}
+          onApplyStagedItemChange={applyStagedItemChange}
+          onDeleteItem={handleDeleteItem}
+          onSaveItemAsCustomDish={handleSaveItemAsCustomDish}
+          onLogStagedMeal={handleLogStagedMeal}
+          onSaveStagedAsCustomDish={handleSaveStagedAsCustomDish}
+          onDiscardStagedMeal={() => setStagedMeal(null)}
+          isPending={mutation.isPending}
+        />
+      )}
 
-              {!isAnalyzing && (
-                <button
-                  type="button"
-                  onClick={handleRemovePhoto}
-                  className="text-xs text-zinc-400 hover:text-rose-400 font-bold px-2 py-1 min-h-[44px] min-w-[44px] flex items-center justify-center transition touch-manipulation"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-          )}
-
-          <textarea
-            value={nlInput}
-            onChange={(e) => setNlInput(e.target.value)}
-            placeholder={
-              selectedPhoto
-                ? customDishes.length > 0
-                  ? "Add notes or dish name to match custom dishes (e.g., 'Mom's Shake')..."
-                  : "Add notes or context (optional, e.g. 'dressing on the side', 'ate 2/3 of it')"
-                : "Describe what you ate (e.g., 3 eggs, 2 slices sourdough, 1 tbsp butter)"
-            }
-            className="w-full bg-transparent text-white text-base sm:text-xs placeholder:text-zinc-600 outline-none resize-none"
-            rows={3}
-          />
-          <div className="flex justify-between items-center pt-2 border-t border-zinc-850">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                data-testid="camera-trigger"
-                onClick={() => handlePickPhoto(CameraSource.Camera)}
-                disabled={isAnalyzing}
-                className="p-2.5 min-h-[44px] min-w-[44px] rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-cyan-400 border border-zinc-800 transition flex items-center justify-center gap-1.5 text-xs font-bold disabled:opacity-50 touch-manipulation"
-                title="Take Photo"
-              >
-                <CameraIcon className="w-4 h-4 text-cyan-400" />
-                <span className="hidden sm:inline">Camera</span>
-              </button>
-
-              <button
-                type="button"
-                data-testid="gallery-trigger"
-                onClick={() => handlePickPhoto(CameraSource.Photos)}
-                disabled={isAnalyzing}
-                className="p-2.5 min-h-[44px] min-w-[44px] rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-cyan-400 border border-zinc-800 transition flex items-center justify-center gap-1.5 text-xs font-bold disabled:opacity-50 touch-manipulation"
-                title="Photo Gallery"
-              >
-                <ImageIcon className="w-4 h-4 text-cyan-400" />
-                <span className="hidden sm:inline">Gallery</span>
-              </button>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                data-testid="hidden-file-input"
-                onChange={handleFileChange}
-              />
-            </div>
-
-            <button
-              type="button"
-              data-testid="analyze-meal-button"
-              onClick={handleAnalyze}
-              disabled={isAnalyzing || (!nlInput.trim() && !selectedPhoto)}
-              className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black text-xs px-4 py-2.5 min-h-[44px] min-w-[44px] rounded-xl shadow-neon-cyan active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-1.5 touch-manipulation"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>{isAnalyzing ? 'Analyzing...' : 'Analyze Meal'}</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Rate Limit 429 Cooldown Warning Banner */}
-        {isRateLimited && (
-          <div
-            data-testid="rate-limit-banner"
-            className="bg-amber-500/15 border border-amber-500/40 rounded-2xl p-4 space-y-3 shadow-lg"
-          >
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-              <div className="space-y-1 flex-1">
-                <h4 className="text-xs font-black text-amber-400 uppercase tracking-wider">
-                  Rate Limit Exceeded (15 RPM)
-                </h4>
-                <p className="text-xs text-zinc-300">
-                  Gemini rate limit exceeded (15 RPM). Please wait 15 seconds or switch to manual entry.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-1 border-t border-amber-500/20">
-              <button
-                type="button"
-                data-testid="switch-to-manual-btn"
-                onClick={() => {
-                  setShowManualForm(true);
-                  setIsRateLimited(false);
-                  if (!manualDishName.trim()) {
-                    setManualDishName(nlInput.trim() || (selectedPhoto ? 'Meal Photo' : ''));
-                  }
-                }}
-                className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-black text-xs px-3.5 py-2.5 min-h-[44px] min-w-[44px] rounded-xl transition active:scale-95 flex items-center justify-center gap-1.5 shadow-sm touch-manipulation"
-              >
-                <Utensils className="w-3.5 h-3.5" />
-                <span>Switch to Manual Entry</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Staged Meal Card */}
-        {stagedMeal && (
-          <div data-testid="staged-meal-card" className="bg-gradient-to-b from-zinc-950 to-zinc-900 border-2 border-cyan-500/50 rounded-2xl p-4 space-y-4 shadow-xl">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 pb-3">
-              <div className="flex items-center gap-3 flex-1 min-w-[200px]">
-                {stagedMeal.photoUrl && (
-                  <img
-                    src={stagedMeal.photoUrl}
-                    alt={stagedMeal.name}
-                    data-testid="staged-meal-photo-thumbnail"
-                    className="w-12 h-12 rounded-xl object-cover border border-cyan-500/40 shadow-sm shrink-0"
-                  />
-                )}
-                <div className="flex-1">
-                  <label className="block text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-1">
-                    Meal Name
-                  </label>
-                  <input
-                    type="text"
-                    data-testid="dish-name-input"
-                    value={stagedMeal.name}
-                    onChange={(e) => setStagedMeal({ ...stagedMeal, name: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-700 text-white font-black text-base sm:text-sm rounded-xl px-3 py-1.5 outline-none focus:border-cyan-500"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                  Meal Type
-                </label>
-                <select
-                  value={stagedMeal.mealType}
-                  onChange={(e) => setStagedMeal({ ...stagedMeal, mealType: e.target.value })}
-                  className="bg-zinc-900 border border-zinc-700 text-white text-base sm:text-xs font-bold rounded-xl px-3 py-2 outline-none focus:border-cyan-500 min-h-[44px]"
-                >
-                  <option value="Breakfast">Breakfast</option>
-                  <option value="Lunch">Lunch</option>
-                  <option value="Dinner">Dinner</option>
-                  <option value="Snack">Snack</option>
-                  <option value="Pre-Workout">Pre-Workout</option>
-                  <option value="Post-Workout">Post-Workout</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Itemized Ingredient Breakdown */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-[11px] font-black uppercase text-zinc-400 tracking-wider">
-                <span>Itemized Breakdown ({stagedMeal.items.length})</span>
-                <span className="text-zinc-500 text-[10px]">Adjust portion or remove item</span>
-              </div>
-
-              <div className="space-y-1.5">
-                {stagedMeal.items.map((item) => (
-                  <ComponentRow
-                    key={item.id}
-                    item={stagedToItem(item)}
-                    reference={stagedReference(item)}
-                    onChange={(next) => applyStagedItemChange(item.id, next)}
-                    onRemove={() => handleDeleteItem(item.id)}
-                    onSaveToQuickLog={() => handleSaveItemAsCustomDish(item)}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* Mathematical Breakdown Callout */}
-            {stagedMeal.explanation && (
-              <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-xl p-2.5 flex items-start gap-2 text-xs">
-                <Calculator className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                <div className="font-mono text-cyan-200 text-[11px]">
-                  {stagedMeal.explanation}
-                </div>
-              </div>
-            )}
-
-            {/* Macro Summary Row & Editable Fields */}
-            <div className="grid grid-cols-6 sm:grid-cols-5 gap-2 pt-1">
-              <div className="col-span-2 sm:col-span-1">
-                <label className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">
-                  Calories
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  inputMode="numeric"
-                  data-testid="calories-input"
-                  value={roundTo1Decimal(stagedMeal.calories)}
-                  onChange={(e) =>
-                    setStagedMeal({
-                      ...stagedMeal,
-                      calories: e.target.value === '' ? 0 : roundTo1Decimal(Number(e.target.value)),
-                    })
-                  }
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
-                />
-              </div>
-              <div className="col-span-2 sm:col-span-1">
-                <label className="block text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-1">
-                  Protein (g)
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  inputMode="decimal"
-                  data-testid="protein-input"
-                  value={roundTo1Decimal(stagedMeal.protein)}
-                  onChange={(e) =>
-                    setStagedMeal({
-                      ...stagedMeal,
-                      protein: e.target.value === '' ? 0 : roundTo1Decimal(Number(e.target.value)),
-                    })
-                  }
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
-                />
-              </div>
-              <div className="col-span-2 sm:col-span-1">
-                <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">
-                  Carbs (g)
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  inputMode="decimal"
-                  data-testid="carbs-input"
-                  value={roundTo1Decimal(stagedMeal.carbs)}
-                  onChange={(e) =>
-                    setStagedMeal({
-                      ...stagedMeal,
-                      carbs: e.target.value === '' ? 0 : roundTo1Decimal(Number(e.target.value)),
-                    })
-                  }
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
-                />
-              </div>
-              <div className="col-span-3 sm:col-span-1">
-                <label className="block text-[10px] font-bold text-violet-400 uppercase tracking-wider mb-1">
-                  Fat (g)
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  inputMode="decimal"
-                  data-testid="fat-input"
-                  value={roundTo1Decimal(stagedMeal.fat)}
-                  onChange={(e) =>
-                    setStagedMeal({
-                      ...stagedMeal,
-                      fat: e.target.value === '' ? 0 : roundTo1Decimal(Number(e.target.value)),
-                    })
-                  }
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
-                />
-              </div>
-              <div className="col-span-3 sm:col-span-1">
-                <label className="block text-[10px] font-bold text-teal-400 uppercase tracking-wider mb-1">
-                  Fiber (g)
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  inputMode="decimal"
-                  data-testid="fiber-input"
-                  value={roundTo1Decimal(stagedMeal.fiber)}
-                  onChange={(e) =>
-                    setStagedMeal({
-                      ...stagedMeal,
-                      fiber: e.target.value === '' ? 0 : roundTo1Decimal(Number(e.target.value)),
-                    })
-                  }
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
-                />
-              </div>
-            </div>
-
-            {/* Action Buttons Bar */}
-            <div className="flex flex-wrap items-center gap-2 pt-2">
-              <button
-                type="button"
-                onClick={handleLogStagedMeal}
-                disabled={mutation.isPending}
-                className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black py-3 px-4 min-h-[44px] rounded-xl text-xs uppercase tracking-wider shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
-              >
-                <Check className="w-4 h-4" />
-                <span>
-                  {mutation.isPending
-                    ? 'Logging...'
-                    : `Log Meal (+${formatCalories(stagedMeal.calories)} kcal)`}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSaveStagedAsCustomDish}
-                className="bg-zinc-800 hover:bg-zinc-700 text-amber-300 font-bold py-3 px-3.5 min-h-[44px] rounded-xl text-xs border border-zinc-700 transition flex items-center gap-1.5"
-                title="Save this meal as a quick-log custom dish"
-              >
-                <Star className="w-3.5 h-3.5 fill-amber-400" />
-                <span className="hidden sm:inline">Save as Custom Dish</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setStagedMeal(null)}
-                className="bg-zinc-800/60 hover:bg-zinc-800 text-zinc-400 hover:text-white font-bold py-3 px-3 min-h-[44px] rounded-xl text-xs transition"
-              >
-                Discard
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Fallback Manual Review Form */}
-        {!stagedMeal && showManualForm && (
-          <form onSubmit={handleManualSave} className="space-y-3 pt-2 border-t border-zinc-800">
-            {selectedPhoto && (
-              <div data-testid="pinned-photo-in-manual" className="flex items-center gap-3 p-2.5 bg-zinc-950 border border-zinc-800 rounded-2xl">
-                <img
-                  src={selectedPhoto.dataUrl}
-                  alt="Pinned meal"
-                  className="w-12 h-12 rounded-xl object-cover border border-cyan-500/30 shrink-0 shadow-sm"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider">
-                      Pinned Meal Photo
-                    </span>
-                    <button
-                      type="button"
-                      data-testid="remove-pinned-photo-button"
-                      onClick={handleRemovePhoto}
-                      className="text-zinc-500 hover:text-rose-400 text-xs min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg transition touch-manipulation"
-                      title="Remove Photo"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-zinc-400 truncate">
-                    Refer to your meal photo while entering macronutrients manually
-                  </p>
-                </div>
-              </div>
-            )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                  Dish Name
-                </label>
-                <input
-                  type="text"
-                  data-testid="dish-name-input"
-                  value={manualDishName}
-                  onChange={(e) => setManualDishName(e.target.value)}
-                  placeholder="e.g. Scrambled Eggs & Toast"
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                  Meal Type
-                </label>
-                <select
-                  value={manualMealType}
-                  onChange={(e) => setManualMealType(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none min-h-[44px]"
-                >
-                  <option value="Breakfast">Breakfast</option>
-                  <option value="Lunch">Lunch</option>
-                  <option value="Dinner">Dinner</option>
-                  <option value="Snack">Snack</option>
-                  <option value="Pre-Workout">Pre-Workout</option>
-                  <option value="Post-Workout">Post-Workout</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-6 sm:grid-cols-5 gap-2">
-              <div className="col-span-2 sm:col-span-1">
-                <label className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">
-                  Calories
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  inputMode="numeric"
-                  data-testid="calories-input"
-                  value={manualCalories}
-                  onChange={(e) => setManualCalories(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder="0"
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
-                  required
-                />
-              </div>
-              <div className="col-span-2 sm:col-span-1">
-                <label className="block text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-1">
-                  Protein (g)
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  inputMode="decimal"
-                  data-testid="protein-input"
-                  value={manualProtein}
-                  onChange={(e) => setManualProtein(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder="0"
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
-                  required
-                />
-              </div>
-              <div className="col-span-2 sm:col-span-1">
-                <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">
-                  Carbs (g)
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  inputMode="decimal"
-                  data-testid="carbs-input"
-                  value={manualCarbs}
-                  onChange={(e) => setManualCarbs(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder="0"
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
-                  required
-                />
-              </div>
-              <div className="col-span-3 sm:col-span-1">
-                <label className="block text-[10px] font-bold text-violet-400 uppercase tracking-wider mb-1">
-                  Fat (g)
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  inputMode="decimal"
-                  data-testid="fat-input"
-                  value={manualFat}
-                  onChange={(e) => setManualFat(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder="0"
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
-                  required
-                />
-              </div>
-              <div className="col-span-3 sm:col-span-1">
-                <label className="block text-[10px] font-bold text-teal-400 uppercase tracking-wider mb-1">
-                  Fiber (g)
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  inputMode="decimal"
-                  data-testid="fiber-input"
-                  value={manualFiber}
-                  onChange={(e) => setManualFiber(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder="0"
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                  Serving Size
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  inputMode="decimal"
-                  value={manualServingSize}
-                  onChange={(e) => setManualServingSize(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono focus:border-cyan-500 outline-none text-center"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                  Serving Unit
-                </label>
-                <input
-                  type="text"
-                  value={manualServingUnit}
-                  onChange={(e) => setManualServingUnit(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none text-center"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={mutation.isPending}
-              className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black py-3 min-h-[44px] rounded-xl uppercase tracking-wider text-xs shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 transition disabled:opacity-50"
-            >
-              {mutation.isPending ? 'Logging...' : 'Log Meal'}
-            </button>
-          </form>
-        )}
-
-        {status && !isRateLimited && (
-          <div
-            data-testid="status-message"
-            className={`p-3 rounded-xl text-xs flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 ${
-              isError
-                ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
-                : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-            }`}
-          >
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              {isError ? (
-                <AlertCircle className="w-4 h-4 shrink-0" />
-              ) : (
-                <CheckCircle2 className="w-4 h-4 shrink-0" />
-              )}
-              <span className="break-words">{status}</span>
-            </div>
-            {isError && (
-              <button
-                type="button"
-                data-testid="retry-analysis-button"
-                onClick={handleAnalyze}
-                disabled={isAnalyzing}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-rose-300 bg-rose-500/20 hover:bg-rose-500/30 active:scale-95 rounded-lg transition-all min-h-[44px] min-w-[44px] touch-manipulation cursor-pointer shrink-0 disabled:opacity-50"
-              >
-                <RotateCcw className="w-3.5 h-3.5 shrink-0" />
-                <span>Retry Analysis</span>
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+      <ManualMealForm
+        show={showManualForm}
+        onClose={() => setShowManualForm(false)}
+        selectedPhoto={ai.selectedPhoto}
+        onRemovePhoto={ai.handleRemovePhoto}
+        manualName={manualDishName}
+        onManualNameChange={setManualDishName}
+        manualMealType={manualMealType}
+        onManualMealTypeChange={setManualMealType}
+        manualCalories={manualCalories}
+        onManualCaloriesChange={setManualCalories}
+        manualProtein={manualProtein}
+        onManualProteinChange={setManualProtein}
+        manualCarbs={manualCarbs}
+        onManualCarbsChange={setManualCarbs}
+        manualFat={manualFat}
+        onManualFatChange={setManualFat}
+        manualFiber={manualFiber}
+        onManualFiberChange={setManualFiber}
+        manualServingSize={manualServingSize}
+        onManualServingSizeChange={setManualServingSize}
+        manualServingUnit={manualServingUnit}
+        onManualServingUnitChange={setManualServingUnit}
+        onSubmit={handleManualSubmit}
+        isPending={mutation.isPending}
+      />
 
       {/* Logged Meals Timeline */}
       <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-5 shadow-2xl space-y-3">
@@ -1981,7 +450,37 @@ export const NutritionEngine: React.FC = () => {
           </div>
         </div>
 
-        {todayLogs.length === 0 ? (
+        {isReadError ? (
+          <div
+            data-testid="nutrition-read-error"
+            className="bg-rose-500/15 border border-rose-500/40 text-rose-300 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-lg"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <AlertCircle className="w-5 h-5 shrink-0 text-rose-400" />
+              <div className="min-w-0">
+                <div className="font-bold text-white text-sm">Failed to load nutrition logs</div>
+                <div className="text-rose-300/90 text-xs">
+                  {readError instanceof Error
+                    ? readError.message
+                    : typeof readError === 'string'
+                    ? readError
+                    : (readError as any)?.message || 'Unable to load nutrition data. Please try again.'}
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                void refetchRead();
+              }}
+              data-testid="retry-nutrition-btn"
+              className="flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-rose-200 bg-rose-500/20 hover:bg-rose-500/30 active:scale-95 border border-rose-500/40 rounded-xl transition touch-manipulation min-h-[44px] min-w-[44px] shrink-0 cursor-pointer"
+            >
+              <RotateCcw className="w-4 h-4 shrink-0" />
+              <span>Retry</span>
+            </button>
+          </div>
+        ) : todayLogs.length === 0 ? (
           <div className="p-6 text-center text-zinc-500 text-xs">
             No meals logged for this date yet.
           </div>
@@ -1992,10 +491,22 @@ export const NutritionEngine: React.FC = () => {
                 key={log.id}
                 log={log}
                 onEdit={setEditingMealLog}
-                onDelete={(l) => deleteMutation.mutate(l.id)}
-                // mutateAsync, not mutate: the row rolls its optimistic
-                // components back when this promise rejects. The rejection is
-                // handled there, so it never escapes as an unhandled one.
+                onDelete={(l) => {
+                  if (window.confirm(`Delete "${l.food_name}" from today's log?`)) {
+                    void (async () => {
+                      try {
+                        const { error } = await supabase.from('nutrition_logs').delete().eq('id', l.id);
+                        if (error) throw error;
+                        queryClient.invalidateQueries({ queryKey: ['nutrition_logs', targetUserId] });
+                        setStatus('Meal deleted');
+                        setIsError(false);
+                      } catch (err: any) {
+                        setStatus('Failed to delete meal: ' + err.message);
+                        setIsError(true);
+                      }
+                    })();
+                  }
+                }}
                 onItemsChange={(l, items) => scaleLogMutation.mutateAsync({ log: l, items })}
               />
             ))}
@@ -2003,244 +514,31 @@ export const NutritionEngine: React.FC = () => {
         )}
       </div>
 
-      {/* Custom Dishes Modal */}
-      {showDishModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div
-            ref={dishModalRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="dish-modal-title"
-            data-testid="custom-dish-modal"
-            className="bg-zinc-900 border border-zinc-800 rounded-t-3xl sm:rounded-3xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom,1.25rem))] max-w-md w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto"
-          >
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-              <h3 id="dish-modal-title" className="text-base font-black text-white flex items-center gap-2">
-                <Star className="w-4 h-4 text-amber-400" />
-                {editingDish ? 'Edit Custom Dish' : 'New Custom Dish'}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowDishModal(false)}
-                aria-label="Close dialog"
-                className="text-zinc-400 hover:text-white min-w-[44px] min-h-[44px] flex items-center justify-center"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveCustomDishModal} className="space-y-3">
-              <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                  Dish Name
-                </label>
-                <input
-                  type="text"
-                  value={dishModalName}
-                  onChange={(e) => setDishModalName(e.target.value)}
-                  placeholder="e.g. Protein Oatmeal"
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none"
-                  required
-                />
-              </div>
-
-              {/* Once a dish has a real breakdown its totals are Σ(components);
-                  showing editable parent macros would invite a value the DB
-                  sum constraint then rejects. */}
-              {dishModalItems.length <= 1 && (
-                <div className="grid grid-cols-6 sm:grid-cols-5 gap-2">
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">
-                    Calories
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    inputMode="numeric"
-                    value={dishModalCalories === '' ? '' : roundTo1Decimal(dishModalCalories)}
-                    onChange={(e) =>
-                      setDishModalCalories(e.target.value === '' ? '' : roundTo1Decimal(Number(e.target.value)))
-                    }
-                    placeholder="0"
-                    className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
-                    required
-                  />
-                </div>
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-1">
-                    Protein (g)
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    inputMode="decimal"
-                    value={dishModalProtein === '' ? '' : roundTo1Decimal(dishModalProtein)}
-                    onChange={(e) =>
-                      setDishModalProtein(e.target.value === '' ? '' : roundTo1Decimal(Number(e.target.value)))
-                    }
-                    placeholder="0"
-                    className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
-                    required
-                  />
-                </div>
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">
-                    Carbs (g)
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    inputMode="decimal"
-                    value={dishModalCarbs === '' ? '' : roundTo1Decimal(dishModalCarbs)}
-                    onChange={(e) =>
-                      setDishModalCarbs(e.target.value === '' ? '' : roundTo1Decimal(Number(e.target.value)))
-                    }
-                    placeholder="0"
-                    className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
-                    required
-                  />
-                </div>
-                <div className="col-span-3 sm:col-span-1">
-                  <label className="block text-[10px] font-bold text-violet-400 uppercase tracking-wider mb-1">
-                    Fat (g)
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    inputMode="decimal"
-                    value={dishModalFat === '' ? '' : roundTo1Decimal(dishModalFat)}
-                    onChange={(e) =>
-                      setDishModalFat(e.target.value === '' ? '' : roundTo1Decimal(Number(e.target.value)))
-                    }
-                    placeholder="0"
-                    className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
-                    required
-                  />
-                </div>
-                <div className="col-span-3 sm:col-span-1">
-                  <label className="block text-[10px] font-bold text-teal-400 uppercase tracking-wider mb-1">
-                    Fiber (g)
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    inputMode="decimal"
-                    value={dishModalFiber === '' ? '' : roundTo1Decimal(dishModalFiber)}
-                    onChange={(e) =>
-                      setDishModalFiber(e.target.value === '' ? '' : roundTo1Decimal(Number(e.target.value)))
-                    }
-                    placeholder="0"
-                    className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
-                  />
-                </div>
-                </div>
-              )}
-
-              <CustomDishEditor items={dishModalItems} onChange={setDishModalItems} />
-
-              <div className="flex items-center justify-between pt-3 border-t border-zinc-800">
-                {editingDish ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (window.confirm(`Delete "${editingDish.name}" from your custom dishes?`)) {
-                        deleteCustomDishMutation.mutate(editingDish.id);
-                      }
-                    }}
-                    data-testid="modal-delete-dish-btn"
-                    disabled={deleteCustomDishMutation.isPending}
-                    className="px-4 py-2 min-h-[44px] rounded-xl text-xs font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition flex items-center gap-1.5 touch-manipulation disabled:opacity-50"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    <span>{deleteCustomDishMutation.isPending ? 'Deleting...' : 'Delete Dish'}</span>
-                  </button>
-                ) : (
-                  <div />
-                )}
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowDishModal(false);
-                      setEditingDish(null);
-                      resetDishModalFields();
-                    }}
-                    className="px-4 py-2 min-h-[44px] rounded-xl text-xs font-bold text-zinc-400 hover:bg-zinc-800 transition touch-manipulation"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saveCustomDishMutation.isPending}
-                    className="px-5 py-2 min-h-[44px] rounded-xl text-xs font-black bg-cyan-500 hover:bg-cyan-400 text-black shadow-neon-cyan transition disabled:opacity-50 touch-manipulation"
-                  >
-                    {saveCustomDishMutation.isPending ? 'Saving...' : 'Save Dish'}
-                  </button>
-                </div>
-              </div>
-            </form>
-
-            {/* List of existing custom dishes */}
-            {customDishes.length > 0 && (
-              <div className="border-t border-zinc-800 pt-3 space-y-2">
-                <span className="text-[10px] font-extrabold uppercase text-zinc-500 tracking-wider block">
-                  Saved Dishes ({customDishes.length})
-                </span>
-                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                  {customDishes.map((dish) => (
-                    <div
-                      key={dish.id}
-                      className="bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 flex items-center justify-between text-xs"
-                    >
-                      <div className="min-w-0 pr-2">
-                        <div className="font-bold text-white truncate flex items-center gap-2">
-                          <div className="w-5 h-5 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0">
-                            {getDishIcon(dish.name)}
-                          </div>
-                          <span>{dish.name}</span>
-                        </div>
-                        <div className="text-[10px] font-mono text-zinc-400 mt-0.5">
-                          <span className="text-amber-400 font-bold">{formatCalories(dish.calories)} kcal</span>
-                          <span> • </span>
-                          <span className="text-cyan-400">P: {formatMacro(dish.protein)}g</span>
-                          <span> • </span>
-                          <span className="text-emerald-400">C: {formatMacro(dish.carbs)}g</span>
-                          <span> • </span>
-                          <span className="text-violet-400">F: {formatMacro(dish.fat)}g</span>
-                          <span> • </span>
-                          <span className="text-teal-400">Fib: {formatMacro(dish.fiber)}g</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEditDishModal(dish)}
-                          className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-cyan-300 hover:bg-zinc-800 rounded-lg transition touch-manipulation"
-                          title="Edit"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (window.confirm(`Delete "${dish.name}" from your custom dishes?`)) {
-                              deleteCustomDishMutation.mutate(dish.id);
-                            }
-                          }}
-                          className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition touch-manipulation"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <CustomDishesModal
+        isOpen={dishModal.showDishModal}
+        onClose={dishModal.handleCloseDishModal}
+        editingDish={dishModal.editingDish}
+        dishModalName={dishModal.dishModalName}
+        setDishModalName={dishModal.setDishModalName}
+        dishModalCalories={dishModal.dishModalCalories}
+        setDishModalCalories={dishModal.setDishModalCalories}
+        dishModalProtein={dishModal.dishModalProtein}
+        setDishModalProtein={dishModal.setDishModalProtein}
+        dishModalCarbs={dishModal.dishModalCarbs}
+        setDishModalCarbs={dishModal.setDishModalCarbs}
+        dishModalFat={dishModal.dishModalFat}
+        setDishModalFat={dishModal.setDishModalFat}
+        dishModalFiber={dishModal.dishModalFiber}
+        setDishModalFiber={dishModal.setDishModalFiber}
+        dishModalItems={dishModal.dishModalItems}
+        setDishModalItems={dishModal.setDishModalItems}
+        onSaveDish={dishModal.handleSaveCustomDishModal}
+        onDeleteDish={dishModal.handleDeleteCustomDish}
+        isSaving={saveCustomDishMutation.isPending}
+        isDeleting={deleteCustomDishMutation.isPending}
+        customDishes={customDishes}
+        onOpenEditDishModal={dishModal.handleOpenEditDishModal}
+      />
 
       {/* Floating Quick-Log Toast */}
       {activeToast && (
@@ -2291,14 +589,10 @@ export const NutritionEngine: React.FC = () => {
         onSelectNutrient={setBreakdownNutrient}
         logs={todayLogs}
         dailyTotals={dailyTotals}
-        targets={{
-          calories: targetCalories,
-          protein: targetProtein,
-          carbs: targetCarbs,
-          fat: targetFat,
-          fiber: targetFiber,
-        }}
+        targets={targets}
       />
     </div>
   );
 };
+
+export default NutritionEngine;

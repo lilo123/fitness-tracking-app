@@ -1,0 +1,1 @@
+CSP check passed: No deprecated X-XSS-Protection headers and no banned loopback origins in connect-src.

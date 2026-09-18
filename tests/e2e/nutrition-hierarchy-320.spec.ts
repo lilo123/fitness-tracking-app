@@ -25,8 +25,16 @@ const NARROW = 320;
 /** A deliberately long, non-ASCII name: the real data that breaks these rows. */
 const UNICODE_MEAL = 'Vietnamese Steamed Egg Meatloaf (Chả trứng hấp) with Pickled Veggies';
 
+async function safeGoto(page: Page, url: string) {
+  try {
+    await page.goto(url);
+  } catch {
+    await page.goto(url);
+  }
+}
+
 async function login(page: Page) {
-  await page.goto('/login');
+  await safeGoto(page, '/login');
   await page.fill('input[type="email"]', 'athlete@cybergym.io');
   await page.fill('input[type="password"]', 'password123');
   await page.click('button[type="submit"]');
@@ -136,9 +144,13 @@ test.describe('Nutrition hierarchy at 320px', () => {
       (testInfo.project.use.viewport?.width ?? 9999) > NARROW,
       'Only meaningful at the narrowest supported viewport.'
     );
+    // Automatically accept window.confirm dialogs (e.g. meal deletion confirmation)
+    page.on('dialog', async (dialog) => {
+      await dialog.accept().catch(() => {});
+    });
     await stubAnalysis(page);
     await login(page);
-    await page.goto('/nutrition');
+    await safeGoto(page, '/nutrition');
     await page.waitForSelector("text=Today's Nutrition");
   });
 

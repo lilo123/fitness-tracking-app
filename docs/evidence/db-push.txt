@@ -1,0 +1,13 @@
+=== COMMAND: npx supabase db push --dry-run --linked ===
+Initialising login role...
+DRY RUN: migrations will *not* be pushed to the database.
+Connecting to remote database...
+Would push these migrations:
+ • 20260914150000_index_coverage_optimization.sql
+ • 20260914220000_drop_unused_partial_indexes.sql
+ • 20260916160000_nutrition_has_components.sql
+ • 20260916215500_history_session_and_exercise_rpcs.sql
+ • 20260916230000_get_ghost_sets_rpc.sql
+ • 20260916233000_get_ghost_sets_per_exercise_cap.sql
+{"upToDate":false,"dryRun":true,"migrations":["20260914150000_index_coverage_optimization.sql","20260914220000_drop_unused_partial_indexes.sql","20260916160000_nutrition_has_components.sql","20260916215500_history_session_and_exercise_rpcs.sql","20260916230000_get_ghost_sets_rpc.sql","20260916233000_get_ghost_sets_per_exercise_cap.sql"],"seeds":[],"roles":[],"message":"Finished supabase db push."}
+DBPUSH-DRYRUN EXIT: 0

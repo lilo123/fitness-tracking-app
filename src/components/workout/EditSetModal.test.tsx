@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { EditSetModal } from './EditSetModal';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
+import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory } from '../../test/supabaseBuilderMock';
 import type { Exercise, WorkoutSet } from '../../types/database';
 
 vi.mock('../../lib/supabase', () => ({
@@ -43,22 +44,53 @@ describe('EditSetModal', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUpdateEq.mockReturnValue({
-      select: vi.fn().mockResolvedValue({ data: [{ id: 'set-123' }], error: null }),
+    clearMockHistory();
+    const updateResult = { data: [{ id: 'set-123' }], error: null };
+    const updateBuilder = Object.assign(Promise.resolve(updateResult), {
+      select: vi.fn().mockResolvedValue(updateResult),
     });
+    mockUpdateEq.mockReturnValue(updateBuilder);
     mockUpdate.mockReturnValue({ eq: mockUpdateEq });
 
-    mockDeleteEq.mockResolvedValue({ error: null });
+    const deleteResult = { data: null, error: null };
+    const deleteBuilder = Object.assign(Promise.resolve(deleteResult), {
+      select: vi.fn().mockResolvedValue(deleteResult),
+    });
+    mockDeleteEq.mockReturnValue(deleteBuilder);
     mockDelete.mockReturnValue({ eq: mockDeleteEq });
 
     (supabase.from as any).mockImplementation((table: string) => {
+      const builder = createSupabaseBuilder(table, [{ id: 'set-123' }]);
       if (table === 'sets') {
         return {
-          update: mockUpdate,
-          delete: mockDelete,
+          update: (...args: any[]) => {
+            mockUpdate(...args);
+            return {
+              eq: (...eqArgs: [string, any]) => {
+                builder.eq(...eqArgs);
+                const res = mockUpdateEq(...eqArgs);
+                return {
+                  ...res,
+                  select: (projection?: string) => {
+                    builder.select(projection);
+                    return res.select ? res.select(projection) : res;
+                  },
+                };
+              },
+            };
+          },
+          delete: (...args: any[]) => {
+            mockDelete(...args);
+            return {
+              eq: (...eqArgs: [string, any]) => {
+                builder.eq(...eqArgs);
+                return mockDeleteEq(...eqArgs);
+              },
+            };
+          },
         };
       }
-      return {};
+      return builder;
     });
 
     queryClient = new QueryClient({
@@ -157,6 +189,12 @@ describe('EditSetModal', () => {
       expect(mockUpdateEq).toHaveBeenCalledWith('id', 'set-123');
       expect(onClose).toHaveBeenCalled();
       expect(onSuccess).toHaveBeenCalled();
+    });
+
+    expect(getRecordedTables()).toContain('sets');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'sets',
+      projection: 'WILDCARD_MUTATION_RETURN',
     });
   });
 
@@ -266,9 +304,11 @@ describe('EditSetModal', () => {
   });
 
   it('displays mutation error message if update fails', async () => {
-    mockUpdateEq.mockReturnValueOnce({
-      select: vi.fn().mockResolvedValue({ data: null, error: { message: 'Database connection error' } }),
+    const errResult = { data: null, error: { message: 'Database connection error' } };
+    const errBuilder = Object.assign(Promise.resolve(errResult), {
+      select: vi.fn().mockResolvedValue(errResult),
     });
+    mockUpdateEq.mockReturnValueOnce(errBuilder);
 
     renderModal();
     fireEvent.click(screen.getByTestId('save-set-btn'));

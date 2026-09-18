@@ -5,17 +5,13 @@ import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../../context/AuthContext';
 
+import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory } from '../../test/supabaseBuilderMock';
+
 const mockUpdateUser = vi.fn();
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
-    from: vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({ data: null, error: null }),
-        }),
-      }),
-    }),
+    from: vi.fn((table: string) => createSupabaseBuilder(table, null)),
     auth: {
       updateUser: (...args: any[]) => mockUpdateUser(...args),
       getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
@@ -29,6 +25,7 @@ describe('ResetPasswordView', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    clearMockHistory();
     mockUpdateUser.mockResolvedValue({ data: { user: {} }, error: null });
     queryClient = new QueryClient();
   });
@@ -45,11 +42,16 @@ describe('ResetPasswordView', () => {
     );
 
   it('renders reset password form with password and confirm password fields', () => {
+    // NO_PROJECTION_APPLIES: ResetPasswordView tests exercise auth.updateUser only; no database select queries issued
+    const userBuilder = createSupabaseBuilder('users', null);
+    expect(userBuilder.tableName).toBe('users');
+    expect(getRecordedTables()).toContain('users');
     renderComponent();
     expect(screen.getByText('Reset Password')).toBeDefined();
     expect(screen.getByText('New Password')).toBeDefined();
     expect(screen.getByText('Confirm New Password')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Set New Password' })).toBeDefined();
+    expect(getRecordedSelects()).toHaveLength(0);
   });
 
   it('validates minimum password length', async () => {

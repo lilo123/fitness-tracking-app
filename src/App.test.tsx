@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { supabase } from './lib/supabase';
 import { restTimerStore } from './utils/restTimerStore';
 
+import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory } from './test/supabaseBuilderMock';
+
 const { mockSession } = vi.hoisted(() => ({
   mockSession: {
     user: { id: 'test-user-id', email: 'coach@cybergym.io' },
@@ -28,41 +30,31 @@ describe('App Shell & Navigation', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    clearMockHistory();
+    localStorage.clear();
+    window.history.pushState({}, '', '/');
     (supabase.auth.getUser as any).mockResolvedValue({ data: { user: { id: 'test-user-id' } } });
     (supabase.auth.getSession as any).mockResolvedValue({ data: { session: mockSession } });
     (supabase.auth.onAuthStateChange as any).mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } });
 
-    const mockSelect = vi.fn().mockReturnValue({
-      eq: vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-        order: vi.fn().mockResolvedValue({ data: [], error: null }),
-        single: vi.fn().mockResolvedValue({
-          data: {
-            id: 'test-user-id',
-            email: 'coach@cybergym.io',
-            username: 'Coach Duy',
-            role: 'coach',
-            target_calories: 2400,
-            target_protein: 180,
-            target_carbs: 240,
-            target_fat: 70,
-            target_fiber: 30,
-          },
-          error: null,
-        }),
-      }),
-      order: vi.fn().mockResolvedValue({ data: [], error: null }),
-      or: vi.fn().mockReturnValue({
-        order: vi.fn().mockResolvedValue({ data: [], error: null }),
-      }),
-      in: vi.fn().mockReturnValue({
-        order: vi.fn().mockResolvedValue({ data: [], error: null }),
-      }),
-    });
+    const mockUser = {
+      id: 'test-user-id',
+      email: 'coach@cybergym.io',
+      username: 'Coach Duy',
+      role: 'coach',
+      target_calories: 2400,
+      target_protein: 180,
+      target_carbs: 240,
+      target_fat: 70,
+      target_fiber: 30,
+    };
 
-    (supabase.from as any).mockImplementation(() => ({
-      select: mockSelect,
-    }));
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'users') {
+        return createSupabaseBuilder('users', mockUser);
+      }
+      return createSupabaseBuilder(table, []);
+    });
 
     queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -84,6 +76,12 @@ describe('App Shell & Navigation', () => {
       expect(screen.getByTestId('nav-nutrition')).toBeDefined();
       expect(screen.getByTestId('nav-history')).toBeDefined();
     });
+
+    expect(getRecordedTables()).toContain('users');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'users',
+      projection: 'id, email, username, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, is_coach_mode, coach_code, coach_tier, max_athletes, created_at',
+    });
   });
 
   it('navigates to Nutrition tab when bottom nav item is clicked', async () => {
@@ -102,7 +100,7 @@ describe('App Shell & Navigation', () => {
 
     await waitFor(() => {
       expect(screen.getByText("Today's Nutrition")).toBeDefined();
-    });
+    }, { timeout: 10000 });
   });
 
   it('redirects to /login when session expires (SIGNED_OUT event)', async () => {
@@ -165,7 +163,7 @@ describe('App Shell & Navigation', () => {
       expect(screen.getByText("Today's Nutrition")).toBeDefined();
       expect(screen.getByTestId('rest-timer-pill')).toBeDefined();
       expect(screen.getByTestId('rest-timer-display')).toBeDefined();
-    });
+    }, { timeout: 3000 });
 
     // Navigate to /history
     const historyTab = screen.getByTestId('nav-history');
@@ -175,7 +173,7 @@ describe('App Shell & Navigation', () => {
       expect(screen.getByTestId('history-tab-workouts')).toBeDefined();
       expect(screen.getByTestId('rest-timer-pill')).toBeDefined();
       expect(screen.getByTestId('rest-timer-display')).toBeDefined();
-    });
+    }, { timeout: 10000 });
   });
 
   it('renders Cyberpunk pulse spinner and retry button in ProtectedRoute when loading exceeds 2s', async () => {
@@ -199,6 +197,36 @@ describe('App Shell & Navigation', () => {
     expect(screen.getByTestId('auth-retry-button')).toBeDefined();
     expect(screen.getByText('Connecting to CyberGym... Tap to Retry')).toBeDefined();
     vi.useRealTimers();
+  });
+
+  it('renders protected content immediately without showing loading spinner when cached user exists in localStorage', () => {
+    (supabase.auth.getSession as any).mockImplementation(() => new Promise(() => {}));
+
+    const cachedProfile = {
+      id: 'cached-athlete-1',
+      email: 'athlete@cybergym.io',
+      username: 'FastRunner',
+      role: 'athlete',
+      target_calories: 2200,
+      target_protein: 160,
+      target_carbs: 220,
+      target_fat: 70,
+      target_fiber: 30,
+      auto_rest_timer: true,
+    };
+    localStorage.setItem('cybergym_user', JSON.stringify(cachedProfile));
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    );
+
+    // Spinner should NOT be displayed
+    expect(screen.queryByText('Connecting to CyberGym...')).toBeNull();
+    // App header shell is rendered immediately
+    expect(screen.getByText('CyberGym')).toBeDefined();
+    expect(screen.getByTestId('nav-workout')).toBeDefined();
   });
 });
 

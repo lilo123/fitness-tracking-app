@@ -36,8 +36,13 @@ dist-ssr
 !.env.example
 status.json
 supabase/.env
+supabase/.env.*
 !supabase/.env.example
 
 # Production data snapshots (Phase 0 integrity backups).
 # These contain real user rows and must never leave this machine.
+snapshots/
 /snapshots/
+*.sql.bak
+*.dump
+scripts/.db-snapshot-*.json

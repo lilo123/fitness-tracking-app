@@ -1,0 +1,6 @@
+====================================================
+🔍 CyberGym Supabase Query Bounds Checker (RFIX-22)
+====================================================
+
+✅ PASS: All Supabase user-data .select() query sites carry explicit row bounds.
+

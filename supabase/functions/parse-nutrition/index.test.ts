@@ -2391,3 +2391,141 @@ Deno.test("reconcileParentWithItems leaves malformed or item-less payloads untou
     assertEquals(reconcileParentWithItems('{"calories":100}'), '{"calories":100}');
     assertEquals(reconcileParentWithItems('{"calories":100,"items":[]}'), '{"calories":100,"items":[]}');
 });
+
+Deno.test("parse-nutrition CORS: preflight OPTIONS returns 200 with dynamic origin for allowed origins", async () => {
+    const allowed = [
+        "https://cybergym.app",
+        "capacitor://localhost",
+        "http://localhost:5173",
+        "http://127.0.0.1:3000",
+    ];
+
+    for (const origin of allowed) {
+        const req = new Request("http://localhost/parse-nutrition", {
+            method: "OPTIONS",
+            headers: { "Origin": origin },
+        });
+        const res = await app.fetch(req);
+        assertEquals(res.status, 200);
+        assertEquals(res.headers.get("Access-Control-Allow-Origin"), origin);
+        assertEquals(res.headers.get("Vary"), "Origin");
+        assertEquals(res.headers.get("Access-Control-Expose-Headers"), "Retry-After");
+        assertEquals(
+            res.headers.get("Access-Control-Allow-Headers"),
+            "authorization, x-client-info, apikey, content-type"
+        );
+    }
+});
+
+Deno.test("parse-nutrition CORS: preflight OPTIONS returns 403 and omits allow-origin for disallowed origins", async () => {
+    const disallowed = [
+        "https://malicious.evil.com",
+        "https://cybergym.app.attacker.com",
+        "http://localhost.attacker.com",
+        "http://127.0.0.1.attacker.com",
+        "https://another-domain.com",
+        "null",
+    ];
+
+    for (const origin of disallowed) {
+        const req = new Request("http://localhost/parse-nutrition", {
+            method: "OPTIONS",
+            headers: { "Origin": origin },
+        });
+        const res = await app.fetch(req);
+        assertEquals(res.status, 403);
+        assertEquals(res.headers.get("Access-Control-Allow-Origin"), null);
+        assertEquals(res.headers.get("Vary"), "Origin");
+        const body = await res.json();
+        assertEquals(body.error, "CORS origin not allowed");
+    }
+});
+
+Deno.test("parse-nutrition CORS: POST request with disallowed origin is rejected with 403 without processing", async () => {
+    const req = new Request("http://localhost/parse-nutrition", {
+        method: "POST",
+        headers: {
+            "Origin": "https://malicious-website.com",
+            "Authorization": "Bearer some-token",
+        },
+        body: JSON.stringify({ input: "3 eggs and avocado" }),
+    });
+
+    const res = await app.fetch(req);
+    assertEquals(res.status, 403);
+    assertEquals(res.headers.get("Access-Control-Allow-Origin"), null);
+    assertEquals(res.headers.get("Vary"), "Origin");
+    const body = await res.json();
+    assertEquals(body.error, "CORS origin not allowed");
+});
+
+Deno.test("parse-nutrition CORS: POST request with allowed origin returns response with Access-Control-Allow-Origin and Vary", async () => {
+    const req = new Request("http://localhost/parse-nutrition", {
+        method: "POST",
+        headers: {
+            "Origin": "https://cybergym.app",
+        },
+        body: JSON.stringify({ input: "3 eggs" }),
+    });
+
+    const res = await app.fetch(req);
+    // Unauthenticated request returns 401, with CORS headers for allowed origin
+    assertEquals(res.status, 401);
+    assertEquals(res.headers.get("Access-Control-Allow-Origin"), "https://cybergym.app");
+    assertEquals(res.headers.get("Vary"), "Origin");
+});
+
+Deno.test("parse-nutrition CORS: production environment denies localhost origins and permits production origins", async () => {
+    Deno.env.set("DENO_ENV", "production");
+    try {
+        const reqLocalhost = new Request("http://localhost/parse-nutrition", {
+            method: "OPTIONS",
+            headers: { "Origin": "http://localhost:5173" },
+        });
+        const resLocalhost = await app.fetch(reqLocalhost);
+        assertEquals(resLocalhost.status, 403);
+        assertEquals(resLocalhost.headers.get("Access-Control-Allow-Origin"), null);
+
+        const reqProd = new Request("http://localhost/parse-nutrition", {
+            method: "OPTIONS",
+            headers: { "Origin": "https://cybergym.app" },
+        });
+        const resProd = await app.fetch(reqProd);
+        assertEquals(resProd.status, 200);
+        assertEquals(resProd.headers.get("Access-Control-Allow-Origin"), "https://cybergym.app");
+
+        const reqCap = new Request("http://localhost/parse-nutrition", {
+            method: "OPTIONS",
+            headers: { "Origin": "capacitor://localhost" },
+        });
+        const resCap = await app.fetch(reqCap);
+        assertEquals(resCap.status, 200);
+        assertEquals(resCap.headers.get("Access-Control-Allow-Origin"), "capacitor://localhost");
+    } finally {
+        Deno.env.delete("DENO_ENV");
+    }
+});
+
+Deno.test("parse-nutrition CORS: ENVIRONMENT=production also enforces production origins", async () => {
+    Deno.env.set("ENVIRONMENT", "production");
+    try {
+        const reqLocalhost = new Request("http://localhost/parse-nutrition", {
+            method: "OPTIONS",
+            headers: { "Origin": "http://localhost:5173" },
+        });
+        const resLocalhost = await app.fetch(reqLocalhost);
+        assertEquals(resLocalhost.status, 403);
+        assertEquals(resLocalhost.headers.get("Access-Control-Allow-Origin"), null);
+
+        const reqProd = new Request("http://localhost/parse-nutrition", {
+            method: "OPTIONS",
+            headers: { "Origin": "https://cybergym.app" },
+        });
+        const resProd = await app.fetch(reqProd);
+        assertEquals(resProd.status, 200);
+        assertEquals(resProd.headers.get("Access-Control-Allow-Origin"), "https://cybergym.app");
+    } finally {
+        Deno.env.delete("ENVIRONMENT");
+    }
+});
+

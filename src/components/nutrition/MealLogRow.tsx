@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { NutritionLog } from '../../types/database';
 import { getDishIcon } from '../../utils/dishIcons';
@@ -11,6 +11,7 @@ import {
   type NutritionItem,
 } from '../../utils/itemModel';
 import { friendlyError } from '../../utils/nutritionErrors';
+import { supabase } from '../../lib/supabase';
 import { OverflowMenu, type OverflowMenuItem } from '../common/OverflowMenu';
 import { ComponentRow } from './ComponentRow';
 
@@ -69,10 +70,20 @@ export const MealLogRow: React.FC<MealLogRowProps> = ({
   const panelId = useId();
   const [expanded, setExpanded] = useState(false);
 
-  const baseItems = useMemo(() => normalizeItems(log.items), [log.items]);
+  const baseItems = useMemo(
+    () => (log.items !== undefined ? normalizeItems(log.items) : undefined),
+    [log.items]
+  );
+  const [onDemandItems, setOnDemandItems] = useState<NutritionItem[] | null | undefined>(baseItems);
   const [workingItems, setWorkingItems] = useState<NutritionItem[] | null>(null);
   // Set when a persist is rejected; cleared when the next one is attempted.
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (log.items !== undefined) {
+      setOnDemandItems(normalizeItems(log.items));
+    }
+  }, [log.items]);
 
   // The last component set the database actually accepted, and therefore the
   // value a rejected write must fall back to. `null` means "nothing of ours has
@@ -109,8 +120,36 @@ export const MealLogRow: React.FC<MealLogRowProps> = ({
     lastPersistedSeq.current = 0;
   }, [log.items]);
 
-  const items = (refreshed ? null : workingItems) ?? baseItems;
-  const expandable = isLevel1(baseItems);
+  const effectiveBaseItems = onDemandItems !== undefined ? onDemandItems : baseItems;
+  const items = (refreshed ? null : workingItems) ?? effectiveBaseItems ?? null;
+  const expandable =
+    effectiveBaseItems !== undefined
+      ? isLevel1(effectiveBaseItems)
+      : Boolean(log.has_components);
+
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const fetchItemsOnDemand = useCallback(async () => {
+    setFetchError(null);
+    try {
+      // payload-gate: detail-fetch — loaded on demand only on user expand or scale action
+      const { data, error: fetchErr } = await supabase
+        .from('nutrition_logs')
+        .select('id, items')
+        .eq('id', log.id)
+        .maybeSingle();
+      if (fetchErr) {
+        throw new Error(fetchErr.message || 'Failed to load meal components');
+      }
+      const resolved = data?.items ? normalizeItems(data.items) : null;
+      setOnDemandItems(resolved);
+      return resolved;
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to load meal components';
+      setFetchError(msg);
+      throw err;
+    }
+  }, [log.id]);
 
   // Every mutating affordance is behind this. A coach inspecting an athlete can
   // SELECT the row but not UPDATE it, so offering an editor would give them
@@ -146,11 +185,27 @@ export const MealLogRow: React.FC<MealLogRowProps> = ({
   // row its scaling reference, and a render-phase ref read is not safe under
   // concurrent rendering.
   const [anchorItems, setAnchorItems] = useState<NutritionItem[] | null>(null);
-  const anchor = anchorItems ?? baseItems;
+  const anchor = anchorItems ?? effectiveBaseItems ?? null;
 
-  const toggleExpanded = () => {
-    if (!expanded) setAnchorItems(baseItems);
-    setExpanded((v) => !v);
+  const toggleExpanded = async () => {
+    if (!expanded) {
+      let current = effectiveBaseItems;
+      if (current === undefined) {
+        try {
+          current = await fetchItemsOnDemand();
+        } catch {
+          return;
+        }
+      }
+      setAnchorItems(current);
+      if (current && isLevel1(current)) {
+        setExpanded(true);
+      } else {
+        setExpanded(false);
+      }
+      return;
+    }
+    setExpanded(false);
   };
 
   const persist = (next: NutritionItem[]) => {
@@ -202,10 +257,21 @@ export const MealLogRow: React.FC<MealLogRowProps> = ({
     );
   };
 
-  const applyScale = (factor: number) => {
-    if (!anchor) return;
+  const applyScale = async (factor: number) => {
+    let currentAnchor = anchor;
+    if (!currentAnchor && effectiveBaseItems === undefined) {
+      try {
+        currentAnchor = await fetchItemsOnDemand();
+        if (currentAnchor) {
+          setAnchorItems(currentAnchor);
+        }
+      } catch {
+        return;
+      }
+    }
+    if (!currentAnchor) return;
     persist(
-      scaleItems(anchor, factor).map((it) => ({
+      scaleItems(currentAnchor, factor).map((it) => ({
         ...it,
         quantity: roundTo1Decimal(it.quantity),
         calories: roundTo1Decimal(it.calories),
@@ -267,7 +333,7 @@ export const MealLogRow: React.FC<MealLogRowProps> = ({
             data-testid="meal-log-count-badge"
             className="shrink-0 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-1.5 py-0.5 text-[10px] font-black text-cyan-300"
           >
-            {baseItems?.length}
+            {effectiveBaseItems ? effectiveBaseItems.length : '...'}
           </span>
         </button>
       ) : (
@@ -313,6 +379,32 @@ export const MealLogRow: React.FC<MealLogRowProps> = ({
         >
           {error}
         </p>
+      )}
+
+      {/* On-demand fetch failures surface an error state with a retry button */}
+      {fetchError && (
+        <div
+          role="alert"
+          data-testid="meal-log-fetch-error"
+          className="mt-1.5 flex items-center justify-between gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1 text-[10px] font-bold text-red-300"
+        >
+          <span className="truncate">{fetchError}</span>
+          <button
+            type="button"
+            data-testid="meal-log-fetch-retry"
+            onClick={() => {
+              void fetchItemsOnDemand().then((loadedItems) => {
+                if (loadedItems && isLevel1(loadedItems)) {
+                  setAnchorItems(loadedItems);
+                  setExpanded(true);
+                }
+              }).catch(() => {});
+            }}
+            className="shrink-0 rounded border border-red-400/40 bg-red-500/20 px-1.5 py-0.5 text-[10px] font-bold text-red-200 hover:bg-red-500/30"
+          >
+            Retry
+          </button>
+        </div>
       )}
 
       {/* Expanded panel — whole-dish scale, then the components. */}

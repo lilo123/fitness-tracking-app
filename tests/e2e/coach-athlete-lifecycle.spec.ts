@@ -104,8 +104,8 @@ test.describe('Coach-Athlete Code Linking & Lifecycle E2E', () => {
     await expect(page.locator('text=Daily Macro Goals')).toBeVisible();
 
     // Calories input should now reflect 2550
-    const athleteCalInput = page.locator('input[value="2550"]');
-    await expect(athleteCalInput).toBeVisible();
+    const athleteCalInput = page.locator('input[type="number"]').first();
+    await expect(athleteCalInput).toHaveValue('2550');
 
     // 12. Athlete disconnects from coach
     const finalDisconnectBtn = page.locator('[data-testid="disconnect-coach-btn"]');

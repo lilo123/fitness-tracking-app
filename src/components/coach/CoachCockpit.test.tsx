@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../../context/AuthContext';
 import { CoachProvider } from '../../context/CoachContext';
 import { supabase } from '../../lib/supabase';
+import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory } from '../../test/supabaseBuilderMock';
+import { COACH_SETS_PER_WORKOUT_LIMIT } from '../workout/useWorkoutQueries';
 
 const { mockSession } = vi.hoisted(() => ({
   mockSession: {
@@ -27,39 +29,45 @@ vi.mock('../../lib/supabase', () => ({
 describe('CoachCockpit', () => {
   let queryClient: QueryClient;
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    (supabase.auth.getUser as any).mockResolvedValue({ data: { user: { id: 'coach-id' } } });
-    (supabase.auth.getSession as any).mockResolvedValue({ data: { session: mockSession } });
-    (supabase.auth.onAuthStateChange as any).mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } });
+  const athleteLinksData = [
+    {
+      athlete_id: 'ath-1',
+      status: 'active',
+      linked_at: '2026-09-01T00:00:00Z',
+      athlete: { id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' },
+    },
+  ];
 
-    const athleteLinksData = [
-      {
-        athlete_id: 'ath-1',
-        status: 'active',
-        linked_at: '2026-09-01T00:00:00Z',
-        athlete: { id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' },
-      },
-    ];
+  const defaultExercises = [
+    { id: 'ex-1', name: 'Leg Extension Machine', body_part: 'Legs', is_master: true },
+    { id: 'ex-2', name: 'Incline Bench Press', body_part: 'Chest', is_master: true },
+  ];
 
-    const mockSelect = vi.fn().mockReturnValue({
-      eq: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          order: vi.fn().mockResolvedValue({
-            data: athleteLinksData,
-            error: null,
-          }),
-          single: vi.fn().mockResolvedValue({
-            data: athleteLinksData[0],
-            error: null,
-          }),
-        }),
-        order: vi.fn().mockResolvedValue({
-          data: [{ id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' }],
-          error: null,
-        }),
-        single: vi.fn().mockResolvedValue({
-          data: {
+  const defaultMock = (table: string) => {
+    if (table === 'coach_athlete_links') {
+      return createSupabaseBuilder('coach_athlete_links', {
+        data: athleteLinksData,
+        error: null,
+      });
+    }
+    if (table === 'users') {
+      return createSupabaseBuilder('users', {
+        resolver: (b: any) => {
+          const idFilter = b.filters.find((f: any) => f.column === 'id');
+          if (idFilter && idFilter.value === 'ath-1') {
+            return {
+              id: 'ath-1',
+              email: 'alex@example.com',
+              username: 'Alex Johnson',
+              role: 'athlete',
+              target_calories: 2200,
+              target_protein: 160,
+              target_carbs: 220,
+              target_fat: 70,
+              target_fiber: 30,
+            };
+          }
+          return {
             id: 'coach-id',
             email: 'coach@cybergym.io',
             username: 'Coach Duy',
@@ -70,27 +78,41 @@ describe('CoachCockpit', () => {
             target_carbs: 220,
             target_fat: 70,
             target_fiber: 30,
-          },
-          error: null,
-        }),
-      }),
-      order: vi.fn().mockResolvedValue({
-        data: [
-          { id: 'ex-1', name: 'Leg Extension Machine', body_part: 'Legs', is_master: true },
-          { id: 'ex-2', name: 'Incline Bench Press', body_part: 'Chest', is_master: true },
-        ],
+          };
+        },
+      });
+    }
+    if (table === 'exercises') {
+      return createSupabaseBuilder('exercises', {
+        data: defaultExercises,
         error: null,
-      }),
-    });
-
-    (supabase.from as any).mockImplementation(() => ({
-      select: mockSelect,
-      insert: vi.fn().mockReturnValue({
+      });
+    }
+    if (table === 'routine_templates') {
+      const b = createSupabaseBuilder('routine_templates', { data: [], error: null });
+      b.insert = vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
           single: vi.fn().mockResolvedValue({ data: { id: 'tpl-1' }, error: null }),
         }),
-      }),
-    }));
+      });
+      return b;
+    }
+    if (table === 'template_exercises') {
+      const b = createSupabaseBuilder('template_exercises', { data: [], error: null });
+      b.insert = vi.fn().mockResolvedValue({ error: null });
+      return b;
+    }
+    return createSupabaseBuilder(table, { data: [], error: null });
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearMockHistory();
+    (supabase.auth.getUser as any).mockResolvedValue({ data: { user: { id: 'coach-id' } } });
+    (supabase.auth.getSession as any).mockResolvedValue({ data: { session: mockSession } });
+    (supabase.auth.onAuthStateChange as any).mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } });
+
+    (supabase.from as any).mockImplementation((table: string) => defaultMock(table));
 
     queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -112,8 +134,40 @@ describe('CoachCockpit', () => {
     renderComponent();
     await waitFor(() => {
       expect(screen.getByText('Coach Dashboard')).toBeDefined();
+      expect(screen.getByText('Alex Johnson')).toBeDefined();
     });
     expect(screen.getByText('Workout Template Builder')).toBeDefined();
+
+    expect(getRecordedTables()).toContain('users');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'users',
+      projection: 'id, email, username, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, is_coach_mode, coach_code, coach_tier, max_athletes, created_at',
+    });
+    expect(getRecordedTables()).toContain('coach_athlete_links');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'coach_athlete_links',
+      projection: 'athlete_id, status, linked_at, athlete:users!athlete_id(id, username, email, role, created_at)',
+    });
+    expect(getRecordedTables()).toContain('exercises');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'exercises',
+      projection: 'id, name, body_part, is_master',
+    });
+    expect(getRecordedTables()).toContain('workouts');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'workouts',
+      projection: 'id, date, name, sets(id, reps, weight, set_index, created_at, exercise_id)',
+    });
+    expect(getRecordedTables()).toContain('routine_templates');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'routine_templates',
+      projection: 'id, user_id, name, is_master, assigned_to, days_of_week, created_at, exercises:template_exercises(id, template_id, exercise_id, order_index, target_sets, target_reps)',
+    });
+    expect(getRecordedTables()).toContain('nutrition_logs');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'nutrition_logs',
+      projection: 'id, user_id, food_name, calories, protein, carbs, fat, fiber, logged_at',
+    });
   });
 
   it('allows adding exercises and customizing target sets and reps in template builder', async () => {
@@ -125,54 +179,11 @@ describe('CoachCockpit', () => {
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'routine_templates' || table === 'template_exercises') {
-        return {
-          insert: mockInsert,
-          select: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        };
+        const b = defaultMock(table);
+        b.insert = mockInsert;
+        return b;
       }
-      if (table === 'exercises') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [
-                  { id: 'ex-1', name: 'Leg Extension Machine', body_part: 'Legs', is_master: true },
-                  { id: 'ex-2', name: 'Incline Bench Press', body_part: 'Chest', is_master: true },
-                ],
-                error: null,
-              }),
-            }),
-            order: vi.fn().mockResolvedValue({
-              data: [
-                { id: 'ex-1', name: 'Leg Extension Machine', body_part: 'Legs', is_master: true },
-                { id: 'ex-2', name: 'Incline Bench Press', body_part: 'Chest', is_master: true },
-              ],
-              error: null,
-            }),
-          }),
-        };
-      }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({
-              data: [{ id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' }],
-              error: null,
-            }),
-            order: vi.fn().mockResolvedValue({
-              data: [{ id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' }],
-              error: null,
-            }),
-            single: vi.fn().mockResolvedValue({
-              data: { id: 'coach-id', email: 'coach@cybergym.io', username: 'Coach Duy', role: 'coach' },
-              error: null,
-            }),
-          }),
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-      };
+      return defaultMock(table);
     });
 
     renderComponent();
@@ -204,53 +215,23 @@ describe('CoachCockpit', () => {
 
     await waitFor(() => {
       expect(mockInsert).toHaveBeenCalled();
+      // template_exercises is mutation-only (insert); NO_PROJECTION_APPLIES
+      expect(getRecordedTables()).toContain('template_exercises');
     });
   });
 
   it('renders athlete recent workouts with formatted short dates', async () => {
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'workouts') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [
-                  { id: 'w-1', name: 'Push Day Alpha', date: '2026-09-08T00:00:00+00:00' },
-                  { id: 'w-2', name: 'Pull Day Bravo', date: '2026-09-06' },
-                ],
-                error: null,
-              }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder('workouts', {
+          data: [
+            { id: 'w-1', name: 'Push Day Alpha', date: '2026-09-08T00:00:00+00:00' },
+            { id: 'w-2', name: 'Pull Day Bravo', date: '2026-09-06' },
+          ],
+          error: null,
+        });
       }
-      const athleteLinksData = [
-        {
-          athlete_id: 'ath-1',
-          status: 'active',
-          linked_at: '2026-09-01T00:00:00Z',
-          athlete: { id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' },
-        },
-      ];
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: athleteLinksData, error: null }),
-              single: vi.fn().mockResolvedValue({ data: athleteLinksData[0], error: null }),
-            }),
-            order: vi.fn().mockResolvedValue({
-              data: [{ id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' }],
-              error: null,
-            }),
-            single: vi.fn().mockResolvedValue({
-              data: { id: 'coach-id', email: 'coach@cybergym.io', username: 'Coach Duy', role: 'coach', is_coach_mode: true },
-              error: null,
-            }),
-          }),
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-      };
+      return defaultMock(table);
     });
 
     renderComponent();
@@ -395,107 +376,47 @@ describe('CoachCockpit', () => {
   it('renders activity timeline with exercise volume drilldowns and nutrition compliance badges', async () => {
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'workouts') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [
-                  { id: 'w-1', name: 'Upper Body Blast', date: '2026-09-08T10:00:00Z' },
-                ],
-                error: null,
-              }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder('workouts', {
+          data: [
+            { id: 'w-1', name: 'Upper Body Blast', date: '2026-09-08T10:00:00Z' },
+          ],
+          error: null,
+        });
       }
       if (table === 'sets') {
-        return {
-          select: vi.fn().mockReturnValue({
-            in: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [
-                  {
-                    id: 's-1',
-                    workout_id: 'w-1',
-                    exercise_id: 'ex-2',
-                    reps: 10,
-                    weight_lbs: 200,
-                    exercise: { id: 'ex-2', name: 'Incline Bench Press', body_part: 'Chest' },
-                  },
-                ],
-                error: null,
-              }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder('sets', {
+          data: [
+            {
+              id: 's-1',
+              workout_id: 'w-1',
+              exercise_id: 'ex-2',
+              reps: 10,
+              weight: 200,
+              exercise: { id: 'ex-2', name: 'Incline Bench Press', body_part: 'Chest' },
+            },
+          ],
+          error: null,
+        });
       }
       if (table === 'nutrition_logs') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [
-                  {
-                    id: 'nl-1',
-                    user_id: 'ath-1',
-                    food_name: 'Salmon & Quinoa',
-                    calories: 2250,
-                    protein: 165,
-                    carbs: 215,
-                    fat: 70,
-                    fiber: 30,
-                    logged_at: '2026-09-08T18:00:00Z',
-                  },
-                ],
-                error: null,
-              }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder('nutrition_logs', {
+          data: [
+            {
+              id: 'nl-1',
+              user_id: 'ath-1',
+              food_name: 'Salmon & Quinoa',
+              calories: 2250,
+              protein: 165,
+              carbs: 215,
+              fat: 70,
+              fiber: 30,
+              logged_at: '2026-09-08T18:00:00Z',
+            },
+          ],
+          error: null,
+        });
       }
-      const athleteLinksData = [
-        {
-          athlete_id: 'ath-1',
-          status: 'active',
-          linked_at: '2026-09-01T00:00:00Z',
-          athlete: { id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' },
-        },
-      ];
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: athleteLinksData, error: null }),
-              single: vi.fn().mockResolvedValue({ data: athleteLinksData[0], error: null }),
-            }),
-            order: vi.fn().mockResolvedValue({
-              data: [{ id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' }],
-              error: null,
-            }),
-            single: vi.fn().mockResolvedValue({
-              data: {
-                id: 'ath-1',
-                email: 'alex@example.com',
-                username: 'Alex Johnson',
-                role: 'athlete',
-                target_calories: 2200,
-                target_protein: 160,
-                target_carbs: 220,
-                target_fat: 70,
-                target_fiber: 30,
-              },
-              error: null,
-            }),
-          }),
-          order: vi.fn().mockResolvedValue({
-            data: [
-              { id: 'ex-1', name: 'Leg Extension Machine', body_part: 'Legs', is_master: true },
-              { id: 'ex-2', name: 'Incline Bench Press', body_part: 'Chest', is_master: true },
-            ],
-            error: null,
-          }),
-        }),
-      };
+      return defaultMock(table);
     });
 
     renderComponent();
@@ -521,57 +442,25 @@ describe('CoachCockpit', () => {
     // Verify Load Older Days button is rendered
     expect(screen.getByTestId('load-older-days-btn')).toBeDefined();
     fireEvent.click(screen.getByTestId('load-older-days-btn'));
+
+    expect(getRecordedTables()).toContain('sets');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'sets',
+      projection: 'id, workout_id, reps, weight, set_index, exercise_id, exercise:exercises(id, name, body_part)',
+    });
   });
 
   it('renders Load Older Days button in activity timeline and triggers range expansion', async () => {
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'workouts') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [
-                  { id: 'w-1', name: 'Leg Day Alpha', date: '2026-09-02' },
-                ],
-                error: null,
-              }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder('workouts', {
+          data: [
+            { id: 'w-1', name: 'Leg Day Alpha', date: '2026-09-02' },
+          ],
+          error: null,
+        });
       }
-      const athleteLinksData = [
-        {
-          athlete_id: 'ath-1',
-          status: 'active',
-          linked_at: '2026-09-01T00:00:00Z',
-          athlete: { id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' },
-        },
-      ];
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: athleteLinksData, error: null }),
-              single: vi.fn().mockResolvedValue({ data: athleteLinksData[0], error: null }),
-            }),
-            order: vi.fn().mockResolvedValue({
-              data: [{ id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' }],
-              error: null,
-            }),
-            single: vi.fn().mockResolvedValue({
-              data: {
-                id: 'ath-1',
-                email: 'alex@example.com',
-                username: 'Alex Johnson',
-                role: 'athlete',
-                target_calories: 2200,
-              },
-              error: null,
-            }),
-          }),
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-      };
+      return defaultMock(table);
     });
 
     renderComponent();
@@ -648,48 +537,9 @@ describe('CoachCockpit', () => {
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'routine_templates') {
-        const queryPromise = Promise.resolve({ data: mockTemplates, error: null });
-        return {
-          select: vi.fn().mockReturnValue(
-            Object.assign(queryPromise, {
-              order: vi.fn().mockResolvedValue({ data: mockTemplates, error: null }),
-            })
-          ),
-        };
+        return createSupabaseBuilder('routine_templates', { data: mockTemplates, error: null });
       }
-      const athleteLinksData = [
-        {
-          athlete_id: 'ath-1',
-          status: 'active',
-          linked_at: '2026-09-01T00:00:00Z',
-          athlete: { id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' },
-        },
-      ];
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: athleteLinksData, error: null }),
-              single: vi.fn().mockResolvedValue({ data: athleteLinksData[0], error: null }),
-            }),
-            order: vi.fn().mockResolvedValue({
-              data: [{ id: 'ath-1', username: 'Alex Johnson', email: 'alex@example.com', role: 'athlete' }],
-              error: null,
-            }),
-            single: vi.fn().mockResolvedValue({
-              data: {
-                id: 'coach-id',
-                email: 'coach@cybergym.io',
-                username: 'Coach Duy',
-                role: 'coach',
-                is_coach_mode: true,
-              },
-              error: null,
-            }),
-          }),
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-      };
+      return defaultMock(table);
     });
 
     renderComponent();
@@ -704,6 +554,194 @@ describe('CoachCockpit', () => {
 
     const masterBadge = screen.getByText('Master');
     expect(masterBadge.className).toContain('shrink-0');
+  });
+
+  describe('DIR-B3 single round-trip PostgREST resource embedding', () => {
+    it('fetches workouts and embedded sets in a single query without issuing a second sets query', async () => {
+      let capturedWorkoutsSelect: string | null = null;
+      let setsTableQueried = false;
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'sets') {
+          setsTableQueried = true;
+          return createSupabaseBuilder('sets', { data: [], error: null });
+        }
+        if (table === 'workouts') {
+          const b = createSupabaseBuilder('workouts', {
+            data: [
+              {
+                id: 'w-embedded-1',
+                name: 'Consolidated Push Day',
+                date: '2026-09-08T00:00:00Z',
+                sets: [
+                  {
+                    id: 's-1',
+                    workout_id: 'w-embedded-1',
+                    exercise_id: 'ex-2',
+                    reps: 12,
+                    weight: 225,
+                    exercise: { id: 'ex-2', name: 'Incline Bench Press', body_part: 'Chest' },
+                  },
+                ],
+              },
+            ],
+            error: null,
+          });
+          const origSelect = b.select.bind(b);
+          b.select = vi.fn().mockImplementation((cols: string) => {
+            capturedWorkoutsSelect = cols;
+            return origSelect(cols);
+          });
+          return b;
+        }
+        return defaultMock(table);
+      });
+
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByText('Consolidated Push Day')).toBeDefined();
+      });
+
+      expect(capturedWorkoutsSelect).toContain('sets(');
+      expect(setsTableQueried).toBe(false);
+    });
+
+    // W-10. The embedded sets(...) must be capped per parent workout, not just per
+    // response. PostgREST sends `limit=100&sets.limit=200` as two distinct query
+    // parameters; measured on the payload-stress fixture, dropping the embedded cap
+    // takes /coach from 119,215 B to 176,395 B, over the 153,600 B ceiling. Asserting
+    // on limitCalls rather than limitValue is deliberate: limitValue is last-write-wins
+    // and would report 200 even if the top-level limit had been deleted.
+    it('caps embedded sets per workout so one huge session cannot blow the /coach payload ceiling', async () => {
+      let workoutsBuilder: any = null;
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'workouts') {
+          workoutsBuilder = createSupabaseBuilder('workouts', {
+            data: [{ id: 'w-1', name: 'Push Day', date: '2026-09-08T00:00:00Z', sets: [] }],
+            error: null,
+          });
+          return workoutsBuilder;
+        }
+        return defaultMock(table);
+      });
+
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByText('Push Day')).toBeDefined();
+      });
+
+      const embedded = workoutsBuilder.limitCalls.filter(
+        (c: any) => c.referencedTable === 'sets'
+      );
+      expect(embedded).toHaveLength(1);
+      expect(embedded[0].count).toBe(COACH_SETS_PER_WORKOUT_LIMIT);
+      expect(COACH_SETS_PER_WORKOUT_LIMIT).toBeLessThanOrEqual(200);
+
+      const topLevel = workoutsBuilder.limitCalls.filter((c: any) => c.referencedTable === undefined);
+      expect(topLevel).toHaveLength(1);
+      expect(topLevel[0].count).toBe(100);
+    });
+
+    it('warns the coach when a session is truncated rather than showing a partial history silently', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const cappedSets = Array.from({ length: COACH_SETS_PER_WORKOUT_LIMIT }, (_, i) => ({
+        id: `s-${i}`,
+        exercise_id: 'ex-2',
+        reps: 10,
+        weight: 100,
+        set_index: i,
+      }));
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'workouts') {
+          return createSupabaseBuilder('workouts', {
+            data: [{ id: 'w-huge', name: 'Marathon Day', date: '2026-09-08T00:00:00Z', sets: cappedSets }],
+            error: null,
+          });
+        }
+        return defaultMock(table);
+      });
+
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByText('Marathon Day')).toBeDefined();
+      });
+
+      const messages = warn.mock.calls.map((c) => String(c[0]));
+      expect(messages.some((m) => m.includes('w-huge') && m.includes('per-workout cap'))).toBe(true);
+      warn.mockRestore();
+    });
+
+    it('queries athlete nutrition logs with precise ISO start-of-day timestamp from getDayBounds to avoid boundary clipping', async () => {
+      let capturedNutritionGte: string | null = null;
+      let capturedNutritionColumn: string | null = null;
+
+      vi.mocked(supabase.from).mockImplementation((table: string) => {
+        if (table === 'nutrition_logs') {
+          const b = createSupabaseBuilder('nutrition_logs', { data: [], error: null });
+          const origGte = b.gte.bind(b);
+          b.gte = vi.fn().mockImplementation((col: string, val: string) => {
+            capturedNutritionColumn = col;
+            capturedNutritionGte = val;
+            return origGte(col, val);
+          });
+          return b;
+        }
+        return defaultMock(table);
+      });
+
+      renderComponent();
+
+      await waitFor(() => {
+        expect(capturedNutritionColumn).toBe('logged_at');
+        expect(capturedNutritionGte).not.toBeNull();
+      });
+
+      // Verification: must be full ISO timestamp ending with Z, not raw YYYY-MM-DD
+      expect(capturedNutritionGte).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+      expect(capturedNutritionGte!.length).toBeGreaterThan(10);
+    });
+  });
+
+  it('surfaces visible error state with retry button on athlete workouts query failure and refetches on click (FIX-12)', async () => {
+    let failWorkouts = true;
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'workouts') {
+        return createSupabaseBuilder('workouts', {
+          resolver: () => {
+            if (failWorkouts) {
+              return { data: null, error: new Error('PostgREST 400 Bad Request: Network failure') };
+            }
+            return { data: [], error: null };
+          },
+        });
+      }
+      return defaultMock(table);
+    });
+
+    renderComponent();
+
+    // Verify error banner and Retry button render in DOM
+    await waitFor(() => {
+      expect(screen.getByTestId('coach-timeline-error')).toBeDefined();
+      expect(screen.getByText('Failed to load athlete workouts')).toBeDefined();
+      expect(screen.getByText(/Network failure/i)).toBeDefined();
+      expect(screen.getByTestId('retry-athlete-workouts-btn')).toBeDefined();
+    });
+
+    // Clicking retry triggers a refetch
+    failWorkouts = false;
+    fireEvent.click(screen.getByTestId('retry-athlete-workouts-btn'));
+
+    // Verify error banner clears upon successful refetch
+    await waitFor(() => {
+      expect(screen.queryByTestId('coach-timeline-error')).toBeNull();
+    });
   });
 });
 

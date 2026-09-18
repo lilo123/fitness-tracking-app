@@ -4,16 +4,22 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { EditMealModal, friendlyError } from './EditMealModal';
 import type { NutritionLog } from '../../types/database';
 import type { NutritionItem } from '../../utils/itemModel';
-import { supabase } from '../../lib/supabase';
+import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory } from '../../test/supabaseBuilderMock';
+
+const mockUpdate = vi.fn();
 
 vi.mock('../../lib/supabase', () => ({
-  supabase: { from: vi.fn() },
+  supabase: {
+    from: vi.fn((table: string) => {
+      const builder = createSupabaseBuilder(table, [{ id: 'log-1' }]);
+      builder.update = vi.fn((payload: any) => {
+        mockUpdate(payload);
+        return createSupabaseBuilder(table, [{ id: 'log-1' }]);
+      }) as any;
+      return builder;
+    }),
+  },
 }));
-
-const mockEq = vi.fn();
-// The parameter is declared so `mock.calls[0][0]` is typed; vi.fn(() => ...)
-// infers a zero-arity signature and the payload assertions stop compiling.
-const mockUpdate = vi.fn((_payload: Record<string, unknown>) => ({ eq: mockEq }));
 
 function component(over: Partial<NutritionItem> = {}): NutritionItem {
   return {
@@ -61,8 +67,7 @@ function renderModal(m: NutritionLog) {
 describe('EditMealModal with a stored breakdown', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockEq.mockResolvedValue({ data: [{}], error: null });
-    (supabase.from as any).mockReturnValue({ update: mockUpdate });
+    clearMockHistory();
   });
 
   const items = [
@@ -102,6 +107,12 @@ describe('EditMealModal with a stored breakdown', () => {
     expect(payload.protein).toBe(35);
     // The modal must not touch `items`; a partial write is what breaks the row.
     expect('items' in payload).toBe(false);
+
+    expect(getRecordedTables()).toContain('nutrition_logs');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'nutrition_logs',
+      projection: 'WILDCARD_MUTATION_RETURN',
+    });
   });
 
   it('still allows free macro editing when there is no breakdown', async () => {

@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory } from '../../test/supabaseBuilderMock';
 
 const { mockSession } = vi.hoisted(() => ({
   mockSession: {
@@ -31,44 +32,34 @@ describe('SettingsView', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    clearMockHistory();
     localStorage.clear();
     (supabase.auth.getSession as any).mockResolvedValue({ data: { session: mockSession } });
     (supabase.rpc as any).mockResolvedValue({ data: { success: true }, error: null });
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'users') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({
-                data: {
-                  id: 'test-coach-id',
-                  email: 'coach@cybergym.io',
-                  username: 'Coach Duy',
-                  role: 'coach',
-                  is_coach_mode: true,
-                  coach_code: 'CYBER-DEMO01',
-                  coach_tier: 'pro',
-                  max_athletes: 10,
-                  target_calories: 2400,
-                  target_protein: 180,
-                  target_carbs: 240,
-                  target_fat: 70,
-                  target_fiber: 35,
-                },
-                error: null,
-              }),
-            }),
-          }),
-          upsert: mockUpsert,
-        };
+        const b = createSupabaseBuilder('users', {
+          data: {
+            id: 'test-coach-id',
+            email: 'coach@cybergym.io',
+            username: 'Coach Duy',
+            role: 'coach',
+            is_coach_mode: true,
+            coach_code: 'CYBER-DEMO01',
+            coach_tier: 'pro',
+            max_athletes: 10,
+            target_calories: 2400,
+            target_protein: 180,
+            target_carbs: 240,
+            target_fat: 70,
+            target_fiber: 35,
+          },
+          error: null,
+        });
+        b.upsert = mockUpsert;
+        return b;
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     queryClient = new QueryClient({
@@ -97,6 +88,12 @@ describe('SettingsView', () => {
     expect(screen.getByText('Fat (g)')).toBeDefined();
     expect(screen.getByText('Fiber (g)')).toBeDefined();
     expect(screen.getByRole('button', { name: /Save Goals/i })).toBeDefined();
+
+    expect(getRecordedTables()).toContain('users');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'users',
+      projection: 'id, email, username, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, is_coach_mode, coach_code, coach_tier, max_athletes, created_at',
+    });
   });
 
   it('allows updating all 5 macro targets and saves goals', async () => {
@@ -253,34 +250,23 @@ describe('SettingsView', () => {
   it('displays free tier badge when coach_tier is not set', async () => {
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'users') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({
-                data: {
-                  id: 'test-coach-id',
-                  email: 'coach@cybergym.io',
-                  username: 'Coach Duy',
-                  role: 'coach',
-                  is_coach_mode: true,
-                  coach_code: 'CYBER-DEMO01',
-                  coach_tier: null,
-                  max_athletes: 3,
-                },
-                error: null,
-              }),
-            }),
-          }),
-          upsert: mockUpsert,
-        };
+        const b = createSupabaseBuilder('users', {
+          data: {
+            id: 'test-coach-id',
+            email: 'coach@cybergym.io',
+            username: 'Coach Duy',
+            role: 'coach',
+            is_coach_mode: true,
+            coach_code: 'CYBER-DEMO01',
+            coach_tier: null,
+            max_athletes: 3,
+          },
+          error: null,
+        });
+        b.upsert = mockUpsert;
+        return b;
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: [], error: null });
     });
 
     renderComponent();
@@ -320,39 +306,28 @@ describe('SettingsView', () => {
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'users') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({
-                data: {
-                  id: 'test-coach-id',
-                  email: 'coach@cybergym.io',
-                  username: 'Coach Duy',
-                  role: 'coach',
-                  is_coach_mode: true,
-                  coach_code: 'CYBER-DEMO01',
-                  coach_tier: 'pro',
-                  max_athletes: 10,
-                  target_calories: 2400,
-                  target_protein: 180,
-                  target_carbs: 240,
-                  target_fat: 70,
-                  target_fiber: 35,
-                },
-                error: null,
-              }),
-            }),
-          }),
-          upsert: mockUpsert,
-        };
+        const b = createSupabaseBuilder('users', {
+          data: {
+            id: 'test-coach-id',
+            email: 'coach@cybergym.io',
+            username: 'Coach Duy',
+            role: 'coach',
+            is_coach_mode: true,
+            coach_code: 'CYBER-DEMO01',
+            coach_tier: 'pro',
+            max_athletes: 10,
+            target_calories: 2400,
+            target_protein: 180,
+            target_carbs: 240,
+            target_fat: 70,
+            target_fiber: 35,
+          },
+          error: null,
+        });
+        b.upsert = mockUpsert;
+        return b;
       }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ data: linkedCoachData, error: null }),
-          }),
-        }),
-      };
+      return createSupabaseBuilder(table, { data: linkedCoachData, error: null });
     });
 
     vi.spyOn(window, 'confirm').mockReturnValue(true);
