@@ -12,6 +12,7 @@ import {
   Utensils,
 } from 'lucide-react';
 import { formatFileSize, type CompressedImage } from '../../utils/imageCompression';
+import { CameraSource } from '@capacitor/camera';
 
 export interface NutritionAiInputProps {
   nlInput: string;
@@ -19,7 +20,7 @@ export interface NutritionAiInputProps {
   selectedPhoto: CompressedImage | null;
   onRemovePhoto: () => void;
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onPickPhoto: (source: any) => void;
+  onPickPhoto: (source: CameraSource) => void;
   isAnalyzing: boolean;
   onAnalyze: () => void;
   showManualForm: boolean;
@@ -155,7 +156,7 @@ export const NutritionAiInput: React.FC<NutritionAiInputProps> = memo(({
             <button
               type="button"
               data-testid="camera-trigger"
-              onClick={() => onPickPhoto(1)} // CameraSource.Camera
+              onClick={() => onPickPhoto(CameraSource.Camera)}
               disabled={isAnalyzing}
               className="p-2.5 min-h-[44px] min-w-[44px] rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-cyan-400 border border-zinc-800 transition flex items-center justify-center gap-1.5 text-xs font-bold disabled:opacity-50 touch-manipulation"
               title="Take Photo"
@@ -167,7 +168,7 @@ export const NutritionAiInput: React.FC<NutritionAiInputProps> = memo(({
             <button
               type="button"
               data-testid="gallery-trigger"
-              onClick={() => onPickPhoto(0)} // CameraSource.Photos
+              onClick={() => onPickPhoto(CameraSource.Photos)}
               disabled={isAnalyzing}
               className="p-2.5 min-h-[44px] min-w-[44px] rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-cyan-400 border border-zinc-800 transition flex items-center justify-center gap-1.5 text-xs font-bold disabled:opacity-50 touch-manipulation"
               title="Photo Gallery"

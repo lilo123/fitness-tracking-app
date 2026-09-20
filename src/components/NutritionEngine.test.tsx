@@ -1333,6 +1333,58 @@ Total Fiber: 1 g`;
     expect(analyzeBtn).toBeDisabled();
   });
 
+  it('passes CameraSource.Photos ("PHOTOS") to Camera.getPhoto when gallery trigger is clicked', async () => {
+    const { Camera, CameraSource } = await import('@capacitor/camera');
+    (Camera.getPhoto as any).mockResolvedValue({
+      base64String: 'dGVzdC1nYWxsZXJ5LXBob3Rv',
+      format: 'jpeg',
+    });
+
+    renderComponent();
+
+    const galleryBtn = screen.getByTestId('gallery-trigger');
+    fireEvent.click(galleryBtn);
+
+    await waitFor(() => {
+      expect(Camera.getPhoto).toHaveBeenCalledTimes(1);
+    });
+
+    expect(Camera.getPhoto).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'PHOTOS',
+      })
+    );
+    const callArgs = (Camera.getPhoto as any).mock.calls[0][0];
+    expect(callArgs.source).toBe('PHOTOS');
+    expect(callArgs.source).toBe(CameraSource.Photos);
+  });
+
+  it('passes CameraSource.Camera ("CAMERA") to Camera.getPhoto when camera trigger is clicked', async () => {
+    const { Camera, CameraSource } = await import('@capacitor/camera');
+    (Camera.getPhoto as any).mockResolvedValue({
+      base64String: 'dGVzdC1jYW1lcmEtcGhvdG8=',
+      format: 'jpeg',
+    });
+
+    renderComponent();
+
+    const cameraBtn = screen.getByTestId('camera-trigger');
+    fireEvent.click(cameraBtn);
+
+    await waitFor(() => {
+      expect(Camera.getPhoto).toHaveBeenCalledTimes(1);
+    });
+
+    expect(Camera.getPhoto).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'CAMERA',
+      })
+    );
+    const callArgs = (Camera.getPhoto as any).mock.calls[0][0];
+    expect(callArgs.source).toBe('CAMERA');
+    expect(callArgs.source).toBe(CameraSource.Camera);
+  });
+
   it('unwraps HTTP 429 from error.context and renders 15 RPM cooldown warning banner with switch to manual entry button', async () => {
     (supabase.functions.invoke as any).mockResolvedValue({
       data: null,
