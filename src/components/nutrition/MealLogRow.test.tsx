@@ -590,6 +590,47 @@ describe('MealLogRow', () => {
     expect(screen.queryAllByTestId('meal-log-accordion-trigger')).toHaveLength(0);
     expect(screen.queryAllByTestId('meal-log-count-badge')).toHaveLength(0);
   });
+
+  it('propagates re-anchoring to anchorItems so subsequent whole-dish scale uses new anchor', () => {
+    const items = [
+      component({ id: 'c1', name: 'Eggs', quantity: 1, unit: 'unit', calories: 600, protein: 30, carbs: 40, fat: 20, fiber: 5 }),
+      component({ id: 'c2', name: 'Toast', quantity: 50, unit: 'g', calories: 150, protein: 5, carbs: 25, fat: 2, fiber: 2 }),
+    ];
+    const onItemsChange = vi.fn();
+    render(
+      <MealLogRow log={log(items)} onEdit={noop} onDelete={noop} onItemsChange={onItemsChange} />
+    );
+
+    fireEvent.click(screen.getByTestId('meal-log-accordion-trigger'));
+
+    // Re-anchor the first item from 1 unit -> 540g
+    const unitChips = screen.getAllByTestId('component-unit-chip');
+    fireEvent.click(unitChips[0]);
+    fireEvent.click(screen.getByTestId('unit-option-g'));
+
+    const quantityInputs = screen.getAllByTestId('component-quantity-input');
+    fireEvent.change(quantityInputs[0], { target: { value: '540' } });
+    fireEvent.blur(quantityInputs[0]);
+
+    expect(onItemsChange).toHaveBeenCalledTimes(1);
+    const reanchoredList = onItemsChange.mock.calls[0][1] as NutritionItem[];
+    expect(reanchoredList[0].quantity).toBe(540);
+    expect(reanchoredList[0].unit).toBe('g');
+    expect(reanchoredList[0].calories).toBe(600);
+
+    // Now apply whole-dish scale x2
+    fireEvent.click(screen.getByRole('button', { name: /×2/ }));
+
+    expect(onItemsChange).toHaveBeenCalledTimes(2);
+    const scaledList = onItemsChange.mock.calls[1][1] as NutritionItem[];
+    // First item must scale from 540g -> 1080g (600 -> 1200 kcal), NOT from 1 unit -> 2 unit
+    expect(scaledList[0].quantity).toBe(1080);
+    expect(scaledList[0].unit).toBe('g');
+    expect(scaledList[0].calories).toBe(1200);
+    // Second item also scaled by 2 (50g -> 100g, 150 -> 300 kcal)
+    expect(scaledList[1].quantity).toBe(100);
+    expect(scaledList[1].calories).toBe(300);
+  });
 });
 
 

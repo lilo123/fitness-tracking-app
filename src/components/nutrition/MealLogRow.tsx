@@ -293,6 +293,17 @@ export const MealLogRow: React.FC<MealLogRowProps> = ({
     persist(current.map((it, i) => (i === index ? next : it)));
   };
 
+  const applyItemReanchor = (index: number, next: NutritionItem) => {
+    const current = items;
+    if (!current) return;
+    const nextItems = current.map((it, i) => (i === index ? next : it));
+    setAnchorItems((prev) => {
+      const base = prev ?? effectiveBaseItems ?? current;
+      return base.map((it, i) => (i === index ? next : it));
+    });
+    persist(nextItems);
+  };
+
   const identity = (
     <>
       <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900">
@@ -444,6 +455,7 @@ export const MealLogRow: React.FC<MealLogRowProps> = ({
               // compounds on the last.
               reference={anchor?.[index] ?? item}
               onChange={editable ? (next) => applyItemChange(index, next) : undefined}
+              onReanchor={editable ? (next) => applyItemReanchor(index, next) : undefined}
               readOnly={!editable}
             />
           ))}

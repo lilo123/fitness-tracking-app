@@ -61,6 +61,38 @@ export function stagedReference(it: StagedItem): NutritionItem {
   };
 }
 
+/**
+ * Re-anchor a staged component to a new unit and quantity.
+ * All base* fields are rewritten so that subsequent portion adjustments
+ * scale relative to this new anchor.
+ */
+export function reanchorStagedItem(item: StagedItem, next: NutritionItem): StagedItem {
+  const q = roundTo1Decimal(next.quantity);
+  const c = roundTo1Decimal(next.calories);
+  const p = roundTo1Decimal(next.protein);
+  const cb = roundTo1Decimal(next.carbs);
+  const f = roundTo1Decimal(next.fat);
+  const fib = roundTo1Decimal(next.fiber);
+  return {
+    ...item,
+    name: next.name,
+    quantity: q,
+    unit: next.unit,
+    calories: c,
+    protein: p,
+    carbs: cb,
+    fat: f,
+    fiber: fib,
+    baseQuantity: q,
+    baseCalories: c,
+    baseProtein: p,
+    baseCarbs: cb,
+    baseFat: f,
+    baseFiber: fib,
+    portionMultiplier: 1,
+  };
+}
+
 export interface StagedMeal {
   name: string;
   mealType: string;

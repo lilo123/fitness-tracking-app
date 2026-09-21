@@ -12,7 +12,7 @@
  *   * parent macros are never rounded on persist; rounding happens at render
  */
 
-import { convertPortion, type CanonicalUnit } from './unitConverter';
+import { convertPortion, parseQuantityInput, type CanonicalUnit } from './unitConverter';
 import type { Json } from '../types/supabase';
 
 export interface NutritionItem {
@@ -256,6 +256,31 @@ export function scaleItemToQuantity(reference: NutritionItem, nextQuantity: numb
     return { ...reference, quantity: q };
   }
   return scaleItem(reference, q / reference.quantity);
+}
+
+/**
+ * Re-express a component in a new unit without changing how much food it is.
+ * Macros are preserved exactly.
+ */
+export function reanchorItemTo(
+  item: NutritionItem,
+  nextQuantity: number,
+  nextUnit: CanonicalUnit
+): NutritionItem {
+  const parsed = parseQuantityInput(nextQuantity);
+  if (parsed === null) {
+    return item;
+  }
+  return {
+    ...item,
+    quantity: parsed,
+    unit: nextUnit,
+    calories: item.calories,
+    protein: item.protein,
+    carbs: item.carbs,
+    fat: item.fat,
+    fiber: item.fiber,
+  };
 }
 
 export function scaleItems(items: NutritionItem[], factor: number): NutritionItem[] {

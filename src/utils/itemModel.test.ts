@@ -6,6 +6,7 @@ import {
   itemsForPersist,
   sumItems,
   parentMatchesItems,
+  reanchorItemTo,
   MAX_ITEMS,
   SUM_EPSILON_PER_ITEM,
   type NutritionItem,
@@ -168,5 +169,58 @@ describe('constants match the database', () => {
   it('mirrors the shape CHECK ceiling and the epsilon', () => {
     expect(MAX_ITEMS).toBe(50);
     expect(SUM_EPSILON_PER_ITEM).toBe(0.05);
+  });
+});
+
+describe('reanchorItemTo', () => {
+  it('re-expresses item in new unit and quantity without scaling macros', () => {
+    const original = item({ quantity: 1, unit: 'unit', calories: 600, protein: 30, carbs: 40, fat: 20, fiber: 5 });
+    const reanchored = reanchorItemTo(original, 540, 'g');
+
+    expect(reanchored.quantity).toBe(540);
+    expect(reanchored.unit).toBe('g');
+    expect(reanchored.calories).toBe(600);
+    expect(reanchored.protein).toBe(30);
+    expect(reanchored.carbs).toBe(40);
+    expect(reanchored.fat).toBe(20);
+    expect(reanchored.fiber).toBe(5);
+    expect(reanchored.id).toBe(original.id);
+    expect(reanchored.name).toBe(original.name);
+  });
+
+  it('preserves unrounded macro values exactly (R-02 invariant)', () => {
+    const original = item({
+      quantity: 1,
+      unit: 'unit',
+      calories: 182.3456,
+      protein: 12.789,
+      carbs: 3.1415,
+      fat: 13.999,
+      fiber: 1.0001,
+    });
+    const reanchored = reanchorItemTo(original, 250, 'g');
+
+    expect(reanchored.calories).toBe(182.3456);
+    expect(reanchored.protein).toBe(12.789);
+    expect(reanchored.carbs).toBe(3.1415);
+    expect(reanchored.fat).toBe(13.999);
+    expect(reanchored.fiber).toBe(1.0001);
+  });
+
+  it('rejects invalid quantities and returns the item as-is', () => {
+    const original = item({ quantity: 1, unit: 'unit', calories: 600 });
+
+    expect(reanchorItemTo(original, -5, 'g')).toBe(original);
+    expect(reanchorItemTo(original, NaN, 'g')).toBe(original);
+    expect(reanchorItemTo(original, Infinity, 'g')).toBe(original);
+    expect(reanchorItemTo(original, 100001, 'g')).toBe(original);
+  });
+
+  it('accepts 0 quantity', () => {
+    const original = item({ quantity: 1, unit: 'unit', calories: 600 });
+    const result = reanchorItemTo(original, 0, 'ml');
+    expect(result.quantity).toBe(0);
+    expect(result.unit).toBe('ml');
+    expect(result.calories).toBe(600);
   });
 });

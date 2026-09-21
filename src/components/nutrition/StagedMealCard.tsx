@@ -6,6 +6,8 @@ import { ComponentRow } from './ComponentRow';
 import {
   stagedToItem,
   stagedReference,
+  reanchorStagedItem,
+  recomputeStagedTotals,
   type StagedItem,
   type StagedMeal,
 } from './nutritionEngineHelpers';
@@ -94,6 +96,17 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
               item={stagedToItem(item)}
               reference={stagedReference(item)}
               onChange={(next) => onApplyStagedItemChange(item.id, next)}
+              onReanchor={(next) => {
+                const updatedItems = stagedMeal.items.map((it) =>
+                  it.id === item.id ? reanchorStagedItem(it, next) : it
+                );
+                const totals = recomputeStagedTotals(updatedItems);
+                onUpdateStagedMeal({
+                  ...stagedMeal,
+                  items: updatedItems,
+                  ...totals,
+                });
+              }}
               onRemove={() => onDeleteItem(item.id)}
               onSaveToQuickLog={() => onSaveItemAsCustomDish(item)}
             />
