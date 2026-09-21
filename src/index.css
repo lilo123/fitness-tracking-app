@@ -1,5 +1,49 @@
 @import "tailwindcss";
 
+@theme {
+  /* Macronutrient identity */
+  --color-macro-calories: #f59e0b;
+  --color-macro-calories-text: #fbbf24;
+  --color-macro-protein: #06b6d4;
+  --color-macro-protein-text: #22d3ee;
+  --color-macro-carbs: #10b981;
+  --color-macro-carbs-text: #34d399;
+  --color-macro-fat: #8b5cf6;
+  --color-macro-fat-text: #a78bfa;
+  --color-macro-fiber: #14b8a6;
+  --color-macro-fiber-text: #2dd4bf;
+
+  /* Semantic dark surfaces */
+  --color-surface-base: #09090b;
+  --color-surface-card: #18181b;
+  --color-surface-elevated: #27272a;
+
+  /* Boundary system (WCAG SC 1.4.11) */
+  --color-border-subtle: #27272a;
+  --color-border-boundary: #52525b;
+  --color-border-interactive: #71717a;
+  --color-border-focus: #06b6d4;
+
+  /* Micro-typography */
+  --text-2xs: 0.6875rem;
+  --text-3xs: 0.625rem;
+
+  /* Missing shade (NEW-29) */
+  --color-zinc-850: #1f1f23;
+}
+
+@utility input-text-xs {
+  font-size: 1rem;
+  min-height: 44px;
+  @media (width >= 40rem) { font-size: 0.75rem; }
+}
+
+@utility input-text-sm {
+  font-size: 1rem;
+  min-height: 44px;
+  @media (width >= 40rem) { font-size: 0.875rem; }
+}
+
 @layer base {
   :root {
     color-scheme: dark;
