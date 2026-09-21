@@ -14,6 +14,7 @@ export const LoginView: React.FC = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [infoMsg, setInfoMsg] = useState('');
   const [loading, setLoading] = useState(false);
@@ -180,10 +181,14 @@ export const LoginView: React.FC = () => {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5">
+              <label
+                htmlFor="login-email"
+                className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5"
+              >
                 Email Address
               </label>
               <input
+                id="login-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -196,23 +201,28 @@ export const LoginView: React.FC = () => {
 
             {(mode === 'signin' || mode === 'register') && (
               <div>
-                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5">
+                <label
+                  htmlFor="login-password"
+                  className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5"
+                >
                   Password
                 </label>
                 <div className="relative">
                   <input
+                    id="login-password"
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     autoComplete={mode === 'register' ? "new-password" : "current-password"}
-                    className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 pr-10 text-base sm:text-sm font-semibold focus:border-cyan-500 outline-none transition"
+                    className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 pr-12 text-base sm:text-sm font-semibold focus:border-cyan-500 outline-none transition"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 min-h-[44px] min-w-[44px] flex items-center justify-center text-zinc-500 hover:text-zinc-300 transition touch-manipulation"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -222,25 +232,30 @@ export const LoginView: React.FC = () => {
 
             {mode === 'register' && (
               <div>
-                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5">
+                <label
+                  htmlFor="login-confirm-password"
+                  className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5"
+                >
                   Confirm Password
                 </label>
                 <div className="relative">
                   <input
-                    type={showPassword ? 'text' : 'password'}
+                    id="login-confirm-password"
+                    type={showConfirmPassword ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="••••••••"
                     autoComplete="new-password"
-                    className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 pr-10 text-base sm:text-sm font-semibold focus:border-cyan-500 outline-none transition"
+                    className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 pr-12 text-base sm:text-sm font-semibold focus:border-cyan-500 outline-none transition"
                     required
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 min-h-[44px] min-w-[44px] flex items-center justify-center text-zinc-500 hover:text-zinc-300 transition touch-manipulation"
                   >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>

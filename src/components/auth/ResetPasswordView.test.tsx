@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../../context/AuthContext';
 
 import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory } from '../../test/supabaseBuilderMock';
+import { expectNoA11yViolations } from '../../test/a11y';
 
 const mockUpdateUser = vi.fn();
 
@@ -94,5 +95,40 @@ describe('ResetPasswordView', () => {
     });
 
     expect(await screen.findByText('Password Updated Successfully!')).toBeDefined();
+  });
+
+  it('has accessible label associations and independent password reveal toggles meeting WCAG target size', async () => {
+    const { container } = renderComponent();
+
+    // Verify label associations for new password and confirm new password
+    const newPasswordInput = screen.getByLabelText(/^new password/i, { selector: 'input' }) as HTMLInputElement;
+    expect(newPasswordInput).toBeDefined();
+
+    const confirmPasswordInput = screen.getByLabelText(/confirm new password/i, { selector: 'input' }) as HTMLInputElement;
+    expect(confirmPasswordInput).toBeDefined();
+
+    expect(newPasswordInput.type).toBe('password');
+    expect(confirmPasswordInput.type).toBe('password');
+
+    // Verify both password reveal toggles have distinct accessible names and 44x44 target sizes
+    const passwordToggle = screen.getByRole('button', { name: /^show password$/i });
+    const confirmToggle = screen.getByRole('button', { name: /show confirm password/i });
+
+    expect(passwordToggle).toBeDefined();
+    expect(confirmToggle).toBeDefined();
+    expect(passwordToggle.className).toContain('min-h-[44px]');
+    expect(passwordToggle.className).toContain('min-w-[44px]');
+    expect(confirmToggle.className).toContain('min-h-[44px]');
+    expect(confirmToggle.className).toContain('min-w-[44px]');
+
+    // Regression guard for state split: toggling confirm button updates ONLY confirm input
+    fireEvent.click(confirmToggle);
+    expect(confirmPasswordInput.type).toBe('text');
+    expect(newPasswordInput.type).toBe('password');
+    expect(screen.getByRole('button', { name: /hide confirm password/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /^show password$/i })).toBeDefined();
+
+    // axe-core check
+    await expectNoA11yViolations(container);
   });
 });

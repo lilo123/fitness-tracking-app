@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../../context/AuthContext';
 
 import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory } from '../../test/supabaseBuilderMock';
+import { expectNoA11yViolations } from '../../test/a11y';
 
 const mockSignInWithPassword = vi.fn();
 const mockSignUp = vi.fn();
@@ -129,6 +130,71 @@ describe('LoginView', () => {
       'athlete@cybergym.io',
       expect.objectContaining({ redirectTo: expect.stringContaining('/reset-password') })
     );
+  });
+
+  it('has accessible label associations and password reveal toggle in signin mode', async () => {
+    const { container } = renderComponent();
+
+    // Verify label associations for email and password
+    const emailInput = screen.getByLabelText(/email address/i);
+    expect(emailInput).toBeDefined();
+
+    const passwordInput = screen.getByLabelText(/^password/i);
+    expect(passwordInput).toBeDefined();
+
+    // Verify password toggle accessible name and hit area (WCAG SC 2.5.8 & 4.1.2)
+    const toggleBtn = screen.getByRole('button', { name: /show password/i });
+    expect(toggleBtn).toBeDefined();
+    expect(toggleBtn.className).toContain('min-h-[44px]');
+    expect(toggleBtn.className).toContain('min-w-[44px]');
+
+    // Toggling state updates accessible name to 'Hide password'
+    const { fireEvent } = await import('@testing-library/react');
+    fireEvent.click(toggleBtn);
+    expect(screen.getByRole('button', { name: /hide password/i })).toBeDefined();
+
+    // axe-core check
+    await expectNoA11yViolations(container);
+  });
+
+  it('has accessible label associations and independent password reveal toggles in register mode', async () => {
+    const { container } = renderComponent();
+    const { fireEvent } = await import('@testing-library/react');
+
+    const registerTab = screen.getByRole('button', { name: 'Register' });
+    fireEvent.click(registerTab);
+
+    // Verify label associations in register mode
+    const emailInput = screen.getByLabelText(/email address/i, { selector: 'input' });
+    const passwordInput = screen.getByLabelText(/^password/i, { selector: 'input' }) as HTMLInputElement;
+    const confirmInput = screen.getByLabelText(/confirm password/i, { selector: 'input' }) as HTMLInputElement;
+
+    expect(emailInput).toBeDefined();
+    expect(passwordInput).toBeDefined();
+    expect(confirmInput).toBeDefined();
+    expect(passwordInput.type).toBe('password');
+    expect(confirmInput.type).toBe('password');
+
+    // Verify both password reveal toggles have distinct accessible names and 44x44 target sizes
+    const passwordToggle = screen.getByRole('button', { name: /^show password$/i });
+    const confirmToggle = screen.getByRole('button', { name: /show confirm password/i });
+
+    expect(passwordToggle).toBeDefined();
+    expect(confirmToggle).toBeDefined();
+    expect(passwordToggle.className).toContain('min-h-[44px]');
+    expect(passwordToggle.className).toContain('min-w-[44px]');
+    expect(confirmToggle.className).toContain('min-h-[44px]');
+    expect(confirmToggle.className).toContain('min-w-[44px]');
+
+    // Regression guard for state split: toggling confirm button updates ONLY confirm input
+    fireEvent.click(confirmToggle);
+    expect(confirmInput.type).toBe('text');
+    expect(passwordInput.type).toBe('password');
+    expect(screen.getByRole('button', { name: /hide confirm password/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /^show password$/i })).toBeDefined();
+
+    // axe-core check
+    await expectNoA11yViolations(container);
   });
 });
 
