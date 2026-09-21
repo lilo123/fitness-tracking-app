@@ -127,6 +127,12 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
       </QueryClientProvider>
     );
 
+  it('has accessible label association for Exercise Name', async () => {
+    renderComponent();
+    await screen.findByText('Barbell Squat');
+    expect(screen.getByLabelText(/exercise name/i)).toBeDefined();
+  });
+
   it('renders exercise library with Master badges and isolates delete permission', async () => {
     renderComponent();
 

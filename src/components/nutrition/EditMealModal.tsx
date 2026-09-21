@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import type { NutritionLog } from '../../types/database';
@@ -35,6 +35,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
   targetUserId,
   onSuccess,
 }) => {
+  const formId = useId();
   const queryClient = useQueryClient();
 
   const initialMealType = (() => {
@@ -200,10 +201,14 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
 
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div>
-            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
+            <label
+              htmlFor={`${formId}-food-name`}
+              className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1"
+            >
               Meal Name
             </label>
             <input
+              id={`${formId}-food-name`}
               type="text"
               value={foodName}
               onChange={(e) => setFoodName(e.target.value)}
@@ -215,10 +220,14 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
           </div>
 
           <div>
-            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
+            <label
+              htmlFor={`${formId}-meal-type`}
+              className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1"
+            >
               Meal Type
             </label>
             <select
+              id={`${formId}-meal-type`}
               value={mealType}
               onChange={(e) => setMealType(e.target.value)}
               data-testid="edit-meal-type-select"
@@ -237,10 +246,14 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
+              <label
+                htmlFor={`${formId}-serving-size`}
+                className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1"
+              >
                 Serving Size
               </label>
               <input
+                id={`${formId}-serving-size`}
                 type="number"
                 step="any"
                 min="0.01"
@@ -253,10 +266,14 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
+              <label
+                htmlFor={`${formId}-serving-unit`}
+                className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1"
+              >
                 Serving Unit
               </label>
               <input
+                id={`${formId}-serving-unit`}
                 type="text"
                 value={servingUnit}
                 onChange={(e) => setServingUnit(e.target.value)}
@@ -279,10 +296,14 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
 
           <div className="grid grid-cols-6 sm:grid-cols-5 gap-2">
             <div className="col-span-2 sm:col-span-1">
-              <label className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">
+              <label
+                htmlFor={`${formId}-calories`}
+                className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1"
+              >
                 Calories
               </label>
               <input
+                id={`${formId}-calories`}
                 type="number"
                 step="any"
                 min="0"
@@ -298,10 +319,14 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
               />
             </div>
             <div className="col-span-2 sm:col-span-1">
-              <label className="block text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-1">
+              <label
+                htmlFor={`${formId}-protein`}
+                className="block text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-1"
+              >
                 Protein (g)
               </label>
               <input
+                id={`${formId}-protein`}
                 type="number"
                 step="any"
                 min="0"
@@ -316,10 +341,14 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
               />
             </div>
             <div className="col-span-2 sm:col-span-1">
-              <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">
+              <label
+                htmlFor={`${formId}-carbs`}
+                className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1"
+              >
                 Carbs (g)
               </label>
               <input
+                id={`${formId}-carbs`}
                 type="number"
                 step="any"
                 min="0"
@@ -334,10 +363,14 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
               />
             </div>
             <div className="col-span-3 sm:col-span-1">
-              <label className="block text-[10px] font-bold text-violet-400 uppercase tracking-wider mb-1">
+              <label
+                htmlFor={`${formId}-fat`}
+                className="block text-[10px] font-bold text-violet-400 uppercase tracking-wider mb-1"
+              >
                 Fat (g)
               </label>
               <input
+                id={`${formId}-fat`}
                 type="number"
                 step="any"
                 min="0"
@@ -352,10 +385,14 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
               />
             </div>
             <div className="col-span-3 sm:col-span-1">
-              <label className="block text-[10px] font-bold text-teal-400 uppercase tracking-wider mb-1">
+              <label
+                htmlFor={`${formId}-fiber`}
+                className="block text-[10px] font-bold text-teal-400 uppercase tracking-wider mb-1"
+              >
                 Fiber (g)
               </label>
               <input
+                id={`${formId}-fiber`}
                 type="number"
                 step="any"
                 min="0"

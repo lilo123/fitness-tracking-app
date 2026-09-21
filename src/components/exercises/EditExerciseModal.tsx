@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import { X, Dumbbell, AlertCircle, Check } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
@@ -32,6 +32,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const exerciseNameId = useId();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
@@ -173,25 +174,29 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
 
           {/* Exercise Name Input */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider">
+            <label
+              htmlFor={exerciseNameId}
+              className="block text-xs font-bold text-zinc-300 uppercase tracking-wider"
+            >
               Exercise Name
             </label>
             <input
+              id={exerciseNameId}
               type="text"
               data-testid="edit-exercise-name-input"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Incline Bench Press"
-              className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-sm font-semibold focus:border-cyan-500 outline-none transition"
+              className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 input-text-sm font-semibold focus:border-cyan-500 outline-none transition"
             />
           </div>
 
           {/* Target Muscle Groups Multi-select */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider">
+              <span className="block text-xs font-bold text-zinc-300 uppercase tracking-wider">
                 Target Muscle Groups <span className="text-zinc-500 font-normal">(Tap multiple)</span>
-              </label>
+              </span>
               <button
                 type="button"
                 onClick={() => setSelectedBodyParts([])}

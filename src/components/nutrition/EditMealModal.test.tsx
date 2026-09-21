@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { EditMealModal, friendlyError } from './EditMealModal';
+import { expectNoA11yViolations } from '../../test/a11y';
 import type { NutritionLog } from '../../types/database';
 import type { NutritionItem } from '../../utils/itemModel';
 import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory } from '../../test/supabaseBuilderMock';
@@ -152,6 +153,11 @@ describe('EditMealModal with a stored breakdown', () => {
     // Summary bar should display derived values and colored text
     expect(screen.getByText(/420 kcal/)).toBeDefined();
     expect(screen.getByText(/35g P/)).toBeDefined();
+  });
+
+  it('has no a11y violations', async () => {
+    const { container } = renderModal(meal(null));
+    await expectNoA11yViolations(container);
   });
 });
 

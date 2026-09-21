@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useId } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
@@ -31,6 +31,7 @@ const MUSCLE_TAXONOMY = {
 const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export const ExercisesView: React.FC = () => {
+  const customExerciseNameId = useId();
   const { user } = useAuth();
   const { selectedAthleteId, isCoach } = useCoach();
   const queryClient = useQueryClient();
@@ -258,8 +259,14 @@ export const ExercisesView: React.FC = () => {
             </h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-zinc-400 mb-1.5 uppercase tracking-wider">Exercise Name</label>
+                <label
+                  htmlFor={customExerciseNameId}
+                  className="block text-xs font-bold text-zinc-400 mb-1.5 uppercase tracking-wider"
+                >
+                  Exercise Name
+                </label>
                 <input
+                  id={customExerciseNameId}
                   type="text"
                   value={exerciseName}
                   onChange={(e) => setExerciseName(e.target.value)}
@@ -270,7 +277,9 @@ export const ExercisesView: React.FC = () => {
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider">Target Muscle Groups <span className="text-zinc-500 font-normal">(Tap multiple)</span></label>
+                  <span className="block text-xs font-bold text-zinc-400 uppercase tracking-wider">
+                    Target Muscle Groups <span className="text-zinc-500 font-normal">(Tap multiple)</span>
+                  </span>
                   <button type="button" onClick={() => setSelectedBodyParts([])} className="text-xs font-bold text-zinc-500 hover:text-zinc-300 transition min-h-[44px] px-2 flex items-center touch-manipulation">Clear</button>
                 </div>
                 <div className="flex flex-wrap gap-1.5 p-2 bg-zinc-950/80 border border-zinc-800/80 rounded-xl">

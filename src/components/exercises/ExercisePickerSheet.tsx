@@ -58,7 +58,7 @@ export const ExercisePickerSheet: React.FC<ExercisePickerSheetProps> = ({
           placeholder="Search exercise library..."
           value={searchQuery}
           onChange={(e) => onSearchQueryChange(e.target.value)}
-          className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl pl-9 pr-3 py-2.5 text-xs focus:border-violet-500 outline-none"
+          className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl pl-9 pr-3 py-2.5 input-text-xs focus:border-violet-500 outline-none"
         />
       </div>
 

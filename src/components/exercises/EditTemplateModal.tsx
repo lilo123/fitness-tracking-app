@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useId } from 'react';
 import type { Exercise, RoutineTemplate } from '../../types/database';
 import { supabase } from '../../lib/supabase';
 import {
@@ -42,6 +42,7 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const templateNameId = useId();
   const [name, setName] = useState('');
   const [days, setDays] = useState<string[]>([]);
   const [templateExercises, setTemplateExercises] = useState<EditableTemplateExercise[]>([]);
@@ -403,25 +404,29 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
             <>
               {/* Template Name */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
+                <label
+                  htmlFor={templateNameId}
+                  className="text-xs font-bold text-zinc-300 uppercase tracking-wider"
+                >
                   Template Name
                 </label>
                 <input
+                  id={templateNameId}
                   type="text"
                   data-testid="template-name-input"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g., Push Day - Hypertrophy"
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-violet-500 outline-none"
+                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 input-text-sm focus:border-violet-500 outline-none"
                 />
               </div>
 
               {/* Scheduled Days */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
                   <Calendar className="w-3.5 h-3.5 text-violet-400" />
                   <span>Scheduled Days</span>
-                </label>
+                </span>
                 <div className="flex flex-wrap gap-1.5">
                   {DAYS_OF_WEEK.map((d) => {
                     const active = days.includes(d);
