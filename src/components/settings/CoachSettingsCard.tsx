@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useId } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import type { UserProfile } from '../../types/database';
@@ -21,6 +21,8 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
   hasCoachCapability,
   refreshProfile,
 }) => {
+  const vanityCodeId = useId();
+
   // Coach active athlete count
   const { data: activeAthleteCount = 0 } = useQuery({
     queryKey: ['coach_active_athletes_count', profile?.id],
@@ -179,11 +181,12 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
         </div>
 
         <form onSubmit={handleSaveVanityCode} className="space-y-2">
-          <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+          <label htmlFor={vanityCodeId} className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
             Custom Vanity Code
           </label>
           <div className="flex gap-2">
             <input
+              id={vanityCodeId}
               type="text"
               value={customCoachCode}
               onChange={(e) => setCustomCoachCode(e.target.value.toUpperCase())}

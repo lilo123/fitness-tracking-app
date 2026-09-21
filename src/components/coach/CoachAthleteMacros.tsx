@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { Target, CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface CoachAthleteMacrosProps {
@@ -34,6 +34,13 @@ export const CoachAthleteMacros: React.FC<CoachAthleteMacrosProps> = ({
   macroStatus,
   onUpdateAthleteMacros,
 }) => {
+  const baseId = useId();
+  const calId = `${baseId}-cal`;
+  const proId = `${baseId}-pro`;
+  const carbId = `${baseId}-carb`;
+  const fatId = `${baseId}-fat`;
+  const fiberId = `${baseId}-fiber`;
+
   return (
     <form
       onSubmit={onUpdateAthleteMacros}
@@ -55,13 +62,14 @@ export const CoachAthleteMacros: React.FC<CoachAthleteMacrosProps> = ({
         {/* Tier 1: Full-Width Hero Daily Calorie Target */}
         <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <label className="block text-[11px] font-black text-amber-400 uppercase tracking-wider mb-0.5">
+            <label htmlFor={calId} className="block text-[11px] font-black text-amber-400 uppercase tracking-wider mb-0.5">
               Daily Calorie Target
             </label>
             <p className="text-[11px] text-zinc-400 font-medium">Total caloric energy ceiling per day</p>
           </div>
           <div className="flex items-center gap-2">
             <input
+              id={calId}
               type="number"
               inputMode="numeric"
               min="0"
@@ -81,10 +89,11 @@ export const CoachAthleteMacros: React.FC<CoachAthleteMacrosProps> = ({
           {/* Protein */}
           <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-3">
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-[10px] font-black text-cyan-400 uppercase tracking-wider">Protein</label>
+              <label htmlFor={proId} className="text-[10px] font-black text-cyan-400 uppercase tracking-wider">Protein</label>
               <span className="text-[10px] font-mono text-zinc-400 font-bold">grams</span>
             </div>
             <input
+              id={proId}
               type="number"
               inputMode="decimal"
               min="0"
@@ -99,10 +108,11 @@ export const CoachAthleteMacros: React.FC<CoachAthleteMacrosProps> = ({
           {/* Carbs */}
           <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-3">
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-[10px] font-black text-emerald-400 uppercase tracking-wider">Carbs</label>
+              <label htmlFor={carbId} className="text-[10px] font-black text-emerald-400 uppercase tracking-wider">Carbs</label>
               <span className="text-[10px] font-mono text-zinc-400 font-bold">grams</span>
             </div>
             <input
+              id={carbId}
               type="number"
               inputMode="decimal"
               min="0"
@@ -117,10 +127,11 @@ export const CoachAthleteMacros: React.FC<CoachAthleteMacrosProps> = ({
           {/* Fat */}
           <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-3">
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-[10px] font-black text-violet-400 uppercase tracking-wider">Fat</label>
+              <label htmlFor={fatId} className="text-[10px] font-black text-violet-400 uppercase tracking-wider">Fat</label>
               <span className="text-[10px] font-mono text-zinc-400 font-bold">grams</span>
             </div>
             <input
+              id={fatId}
               type="number"
               inputMode="decimal"
               min="0"
@@ -135,10 +146,11 @@ export const CoachAthleteMacros: React.FC<CoachAthleteMacrosProps> = ({
           {/* Fiber */}
           <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-3">
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-[10px] font-black text-teal-400 uppercase tracking-wider">Fiber</label>
+              <label htmlFor={fiberId} className="text-[10px] font-black text-teal-400 uppercase tracking-wider">Fiber</label>
               <span className="text-[10px] font-mono text-zinc-400 font-bold">grams</span>
             </div>
             <input
+              id={fiberId}
               type="number"
               inputMode="decimal"
               min="0"

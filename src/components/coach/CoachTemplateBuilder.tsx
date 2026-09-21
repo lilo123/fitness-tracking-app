@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import type { Exercise, RoutineTemplate } from '../../types/database';
 import { Layers, Plus, Trash2, CheckCircle2 } from 'lucide-react';
 
@@ -48,6 +48,8 @@ export const CoachTemplateBuilder: React.FC<CoachTemplateBuilderProps> = ({
   onUpdateTargetReps,
   onSaveTemplate,
 }) => {
+  const templateNameId = useId();
+
   return (
     <div className="space-y-6 min-w-0">
       {/* Routine Template Builder */}
@@ -61,10 +63,11 @@ export const CoachTemplateBuilder: React.FC<CoachTemplateBuilderProps> = ({
 
         <div className="space-y-3">
           <div>
-            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
+            <label htmlFor={templateNameId} className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
               Template Name
             </label>
             <input
+              id={templateNameId}
               type="text"
               value={templateName}
               onChange={(e) => setTemplateName(e.target.value)}
@@ -91,6 +94,7 @@ export const CoachTemplateBuilder: React.FC<CoachTemplateBuilderProps> = ({
             <select
               value={exerciseToAdd}
               onChange={(e) => setExerciseToAdd(e.target.value)}
+              aria-label="Choose exercise to add"
               className="flex-1 min-w-0 max-w-full truncate cursor-pointer bg-zinc-950 border border-zinc-800 text-white rounded-xl px-3 py-2 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none min-h-[44px]"
               data-testid="template-exercise-select"
             >

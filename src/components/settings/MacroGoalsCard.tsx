@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { Target, CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface MacroGoalsCardProps {
@@ -32,6 +32,13 @@ export const MacroGoalsCard: React.FC<MacroGoalsCardProps> = ({
   status,
   onSave,
 }) => {
+  const baseId = useId();
+  const caloriesId = `${baseId}-calories`;
+  const proteinId = `${baseId}-protein`;
+  const carbsId = `${baseId}-carbs`;
+  const fatId = `${baseId}-fat`;
+  const fiberId = `${baseId}-fiber`;
+
   return (
     <form
       onSubmit={onSave}
@@ -46,10 +53,11 @@ export const MacroGoalsCard: React.FC<MacroGoalsCardProps> = ({
 
       <div className="grid grid-cols-6 sm:grid-cols-5 gap-3">
         <div className="col-span-2 sm:col-span-1">
-          <label className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">
+          <label htmlFor={caloriesId} className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">
             Calories (kcal)
           </label>
           <input
+            id={caloriesId}
             type="number"
             inputMode="numeric"
             value={targetCalories}
@@ -59,10 +67,11 @@ export const MacroGoalsCard: React.FC<MacroGoalsCardProps> = ({
           />
         </div>
         <div className="col-span-2 sm:col-span-1">
-          <label className="block text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-1">
+          <label htmlFor={proteinId} className="block text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-1">
             Protein (g)
           </label>
           <input
+            id={proteinId}
             type="number"
             inputMode="decimal"
             value={targetProtein}
@@ -72,10 +81,11 @@ export const MacroGoalsCard: React.FC<MacroGoalsCardProps> = ({
           />
         </div>
         <div className="col-span-2 sm:col-span-1">
-          <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">
+          <label htmlFor={carbsId} className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">
             Carbs (g)
           </label>
           <input
+            id={carbsId}
             type="number"
             inputMode="decimal"
             value={targetCarbs}
@@ -85,10 +95,11 @@ export const MacroGoalsCard: React.FC<MacroGoalsCardProps> = ({
           />
         </div>
         <div className="col-span-3 sm:col-span-1">
-          <label className="block text-[10px] font-bold text-violet-400 uppercase tracking-wider mb-1">
+          <label htmlFor={fatId} className="block text-[10px] font-bold text-violet-400 uppercase tracking-wider mb-1">
             Fat (g)
           </label>
           <input
+            id={fatId}
             type="number"
             inputMode="decimal"
             value={targetFat}
@@ -98,10 +109,11 @@ export const MacroGoalsCard: React.FC<MacroGoalsCardProps> = ({
           />
         </div>
         <div className="col-span-3 sm:col-span-1">
-          <label className="block text-[10px] font-bold text-teal-400 uppercase tracking-wider mb-1">
+          <label htmlFor={fiberId} className="block text-[10px] font-bold text-teal-400 uppercase tracking-wider mb-1">
             Fiber (g)
           </label>
           <input
+            id={fiberId}
             type="number"
             inputMode="decimal"
             value={targetFiber}

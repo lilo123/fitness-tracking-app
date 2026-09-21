@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useId } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import type { UserProfile, UserRole } from '../../types/database';
 import {
@@ -42,6 +42,8 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
   });
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  const displayNameId = useId();
+  const restTimerLabelId = useId();
 
   // Coach Mode capability
   const hasCoachCapability = Boolean(profile?.role === 'coach' || profile?.is_coach_mode || isCoachMode);
@@ -105,23 +107,21 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
         </div>
 
         <div className="space-y-3">
-          <div>
-            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
+          <dl>
+            <dt className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
               Email Address
-            </label>
-            <input
-              type="email"
-              value={profile?.email || ''}
-              disabled
-              className="w-full bg-zinc-950/50 border border-zinc-850 text-zinc-400 rounded-xl p-2.5 text-xs font-mono"
-            />
-          </div>
+            </dt>
+            <dd className="text-sm font-mono text-zinc-300 ml-0 py-1">
+              {profile?.email || ''}
+            </dd>
+          </dl>
 
           <div>
-            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
+            <label htmlFor={displayNameId} className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
               Display Name
             </label>
             <input
+              id={displayNameId}
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -193,7 +193,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
 
         <div className="flex items-center justify-between gap-4 p-3 bg-zinc-950/80 border border-zinc-800/80 rounded-2xl">
           <div className="space-y-0.5">
-            <div className="text-xs font-bold text-white">Auto-start Rest Timer on Set Log</div>
+            <div id={restTimerLabelId} className="text-xs font-bold text-white">Auto-start Rest Timer on Set Log</div>
             <div className="text-[11px] text-zinc-400 leading-relaxed">
               Automatically start the 90s countdown timer when logging any set.
             </div>
@@ -203,6 +203,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
             type="button"
             role="switch"
             aria-checked={autoRestTimer}
+            aria-labelledby={restTimerLabelId}
             data-testid="toggle-auto-timer"
             onClick={handleToggleAutoTimer}
             className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${

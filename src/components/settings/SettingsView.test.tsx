@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory } from '../../test/supabaseBuilderMock';
+import { expectNoA11yViolations } from '../../test/a11y';
 
 const { mockSession } = vi.hoisted(() => ({
   mockSession: {
@@ -347,4 +348,34 @@ describe('SettingsView', () => {
 
     expect(await screen.findByText('Successfully disconnected from coach.')).toBeDefined();
   });
+
+  it('renders auto-start rest timer toggle switch with an accessible name (NEW-25)', async () => {
+    renderComponent();
+    await screen.findByDisplayValue('Coach Duy');
+    expect(screen.getByRole('switch', { name: /auto-start rest timer/i })).toBeDefined();
+  });
+
+  it('renders email address as read-only text rather than a disabled input (D5)', async () => {
+    renderComponent();
+    await screen.findByDisplayValue('Coach Duy');
+    expect(screen.queryByRole('textbox', { name: /email address/i })).toBeNull();
+    expect(screen.queryByDisplayValue('coach@cybergym.io')).toBeNull();
+    const emailEl = screen.getByText('coach@cybergym.io');
+    expect(emailEl.tagName).toBe('DD');
+  });
+
+  it('associates label with Display Name input', async () => {
+    renderComponent();
+    await screen.findByDisplayValue('Coach Duy');
+    const input = screen.getByLabelText(/Display Name/i);
+    expect(input).toBeDefined();
+    expect(input.getAttribute('value')).toBe('Coach Duy');
+  });
+
+  it('passes axe accessibility audits with no violations', async () => {
+    const { container } = renderComponent();
+    await screen.findByDisplayValue('Coach Duy');
+    await expectNoA11yViolations(container);
+  });
 });
+
