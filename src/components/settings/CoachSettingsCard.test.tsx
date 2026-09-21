@@ -61,4 +61,63 @@ describe('CoachSettingsCard accessibility', () => {
     const { container } = renderCard();
     await expectNoA11yViolations(container);
   });
+
+  it('mounts live regions while idle and mutates in place on vanity code status (hasCoachCapability=true) (WCAG SC 4.1.3)', async () => {
+    const { container } = renderCard();
+
+    const polite = container.querySelector('[role="status"]');
+    const assertive = container.querySelector('[role="alert"]');
+
+    expect(polite).not.toBeNull();
+    expect(assertive).not.toBeNull();
+    expect(polite!.textContent).toBe('');
+    expect(assertive!.textContent).toBe('');
+    expect(screen.queryByTestId('coach-code-status')).toBeNull();
+
+    // Trigger validation error by typing 2-char code
+    const input = screen.getByTestId('vanity-code-input');
+    const form = input.closest('form')!;
+
+    const { fireEvent } = await import('@testing-library/react');
+    fireEvent.change(input, { target: { value: 'AB' } });
+    fireEvent.submit(form);
+
+    expect(container.querySelector('[role="status"]')).toBe(polite);
+    expect(container.querySelector('[role="alert"]')).toBe(assertive);
+    expect(assertive!.textContent).toContain('Code must be 4-20 characters long');
+    expect(polite!.textContent).toBe('');
+
+    const statusBanner = screen.getByTestId('coach-code-status');
+    expect(statusBanner.textContent).toContain('Code must be 4-20 characters long');
+  });
+
+  it('mounts live regions while idle and mutates in place when unactivated (hasCoachCapability=false) (WCAG SC 4.1.3)', async () => {
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <CoachSettingsCard
+          profile={mockProfile}
+          hasCoachCapability={false}
+        />
+      </QueryClientProvider>
+    );
+
+    const polite = container.querySelector('[role="status"]');
+    const assertive = container.querySelector('[role="alert"]');
+
+    expect(polite).not.toBeNull();
+    expect(assertive).not.toBeNull();
+    expect(polite!.textContent).toBe('');
+    expect(assertive!.textContent).toBe('');
+
+    const input = container.querySelector('input[type="text"]')!;
+    const form = input.closest('form')!;
+
+    const { fireEvent } = await import('@testing-library/react');
+    fireEvent.change(input, { target: { value: 'AB' } });
+    fireEvent.submit(form);
+
+    expect(container.querySelector('[role="status"]')).toBe(polite);
+    expect(container.querySelector('[role="alert"]')).toBe(assertive);
+    expect(assertive!.textContent).toContain('Code must be 4-20 characters long');
+  });
 });

@@ -1,6 +1,8 @@
 import React from 'react';
 import { AlertCircle, Layers, ChevronDown, Timer, RotateCcw } from 'lucide-react';
+import { StatusBanner } from '../common/StatusBanner';
 import { restTimerStore } from '../../utils/restTimerStore';
+
 import { workoutSessionStore } from '../../utils/workoutSessionStore';
 
 export interface WorkoutHeaderProps {
@@ -25,12 +27,11 @@ export const WorkoutHeader: React.FC<WorkoutHeaderProps> = ({
   return (
     <>
       {/* Mutation Error Notification */}
-      {mutationError && (
-        <div className="bg-rose-500/15 border border-rose-500/40 text-rose-300 rounded-2xl p-3 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
-            <span>{mutationError}</span>
-          </div>
+      <StatusBanner
+        message={mutationError}
+        tone="error"
+        icon={<AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />}
+        action={
           <button
             type="button"
             onClick={onClearMutationError}
@@ -38,8 +39,9 @@ export const WorkoutHeader: React.FC<WorkoutHeaderProps> = ({
           >
             ✕
           </button>
-        </div>
-      )}
+        }
+      />
+
 
       {/* Routine & Date Control Banner */}
       <div className="bg-gradient-to-b from-zinc-900 to-zinc-900/80 border border-zinc-800/80 rounded-2xl p-4 shadow-xl overflow-hidden">

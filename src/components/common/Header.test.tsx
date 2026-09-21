@@ -155,5 +155,23 @@ describe('Header connection status badge', () => {
     // Verify accessibility with axe-core
     await expectNoA11yViolations(container);
   });
+
+  it('exposes role="status" on the persistent connection badge and mutates content in place (WCAG SC 4.1.3)', () => {
+    renderHeader();
+
+    const badge = screen.getByTestId('connection-status');
+    expect(badge.getAttribute('role')).toBe('status');
+
+    // Live region exists while online
+    expect(badge.textContent).toContain('Online');
+
+    // When transitioning offline, content mutates on the exact same element
+    act(() => {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, writable: true, value: false });
+      window.dispatchEvent(new Event('offline'));
+    });
+    expect(screen.getByTestId('connection-status')).toBe(badge);
+    expect(badge.textContent).toContain('Offline');
+  });
 });
 

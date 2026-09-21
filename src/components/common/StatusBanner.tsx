@@ -43,6 +43,18 @@ import React from 'react';
 export type StatusTone = 'success' | 'error' | 'info';
 
 export interface StatusBannerProps {
+  /**
+   * Optional bold headline rendered above `message`.
+   *
+   * Several call sites are two-tier: a short headline that names what broke
+   * ("Failed to load history data") over a subdued line carrying the
+   * underlying error text. Collapsing those into one string loses the visual
+   * hierarchy that makes the banner scannable, so the two tiers stay separate
+   * in the markup. The live region still announces them as a single sentence,
+   * `"{title}: {message}"`, because assistive technology reads the region's
+   * text content in one go and two sentences would be read as one anyway.
+   */
+  title?: string | null;
   /** The message to show and announce. `null`/`''` renders nothing visible and announces nothing. */
   message?: string | null;
   /** Drives both the colour and which live region is used. Errors are assertive; everything else is polite. */
@@ -64,6 +76,7 @@ const TONE_STYLES: Record<StatusTone, string> = {
 };
 
 export const StatusBanner: React.FC<StatusBannerProps> = ({
+  title,
   message,
   tone = 'info',
   icon,
@@ -71,13 +84,27 @@ export const StatusBanner: React.FC<StatusBannerProps> = ({
   className = '',
   testId,
 }) => {
-  const text = message ?? '';
+  const heading = title ?? '';
+  const detail = message ?? '';
   const isError = tone === 'error';
+  const hasContent = Boolean(heading || detail);
+
+  // The two tiers are separate elements on screen but one utterance to a
+  // screen reader, which reads the region's whole text content in one pass.
+  const announcement = heading && detail ? `${heading}: ${detail}` : heading || detail;
 
   // Both regions are always mounted and empty when idle. Do not make either of
   // these conditional — that is the bug this component exists to prevent.
-  const politeText = !isError ? text : '';
-  const assertiveText = isError ? text : '';
+  const politeText = !isError ? announcement : '';
+  const assertiveText = isError ? announcement : '';
+
+  // Two-tier banners carry more text, so they get the roomier box the call
+  // sites used before they were migrated, including stacking the action below
+  // the message under 640px. A Retry button held on the same row as a headline
+  // plus an error string crushes the text at 320px.
+  const layout = heading
+    ? 'flex flex-col gap-3 rounded-2xl border p-4 text-xs font-bold sm:flex-row sm:items-center sm:justify-between'
+    : 'flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold';
 
   return (
     <>
@@ -98,13 +125,24 @@ export const StatusBanner: React.FC<StatusBannerProps> = ({
         {assertiveText}
       </div>
 
-      {text ? (
-        <div
-          data-testid={testId}
-          className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold ${TONE_STYLES[tone]} ${className}`}
-        >
-          {icon}
-          <span className="min-w-0 flex-1 break-words">{text}</span>
+      {hasContent ? (
+        <div data-testid={testId} className={`${layout} ${TONE_STYLES[tone]} ${className}`}>
+          {heading ? (
+            <div className="flex min-w-0 items-center gap-2.5">
+              {icon}
+              <div className="min-w-0">
+                <div className="text-sm font-bold text-white">{heading}</div>
+                {detail ? (
+                  <div className="text-xs font-normal break-words opacity-90">{detail}</div>
+                ) : null}
+              </div>
+            </div>
+          ) : (
+            <>
+              {icon}
+              <span className="min-w-0 flex-1 break-words">{detail}</span>
+            </>
+          )}
           {action}
         </div>
       ) : null}

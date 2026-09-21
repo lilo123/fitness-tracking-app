@@ -42,7 +42,9 @@ export const Header: React.FC = () => {
         {/* Right Action Badges */}
         <div className="flex items-center gap-2 shrink-0">
           {/* Online / Offline Status Badge */}
+          {/* oxlint-disable-next-line jsx-a11y/prefer-tag-over-role */}
           <div
+            role="status"
             className={`text-xs font-bold px-2.5 py-1 rounded-full border flex items-center gap-1.5 select-none ${
               isOnline
                 ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.15)]'

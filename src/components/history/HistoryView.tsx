@@ -11,6 +11,8 @@ import { NutritionHistoryTimeline, type NutritionDaySummary } from './NutritionH
 import { WorkoutSessionHistory } from './WorkoutSessionHistory';
 import { WorkoutExerciseHistory, type ExerciseStat } from './WorkoutExerciseHistory';
 import { useHistoryData, useExerciseStats, fetchSessionSets, type HistorySet } from './useHistoryData';
+import { StatusBanner } from '../common/StatusBanner';
+
 
 export const HistoryView: React.FC = () => {
   const { user, isCoachMode } = useAuth();
@@ -321,15 +323,12 @@ export const HistoryView: React.FC = () => {
   return (
     <div className="space-y-5">
       {/* Mutation Error Notification */}
-      {mutationError && (
-        <div
-          className="bg-rose-500/15 border border-rose-500/40 text-rose-300 rounded-2xl p-3 flex items-center justify-between text-xs"
-          data-testid="history-mutation-error"
-        >
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
-            <span>{mutationError}</span>
-          </div>
+      <StatusBanner
+        message={mutationError}
+        tone="error"
+        testId="history-mutation-error"
+        icon={<AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />}
+        action={
           <button
             type="button"
             onClick={() => setMutationError(null)}
@@ -337,8 +336,9 @@ export const HistoryView: React.FC = () => {
           >
             ✕
           </button>
-        </div>
-      )}
+        }
+      />
+
 
       {isCoachMode && selectedAthleteId && (
         <div
@@ -503,20 +503,14 @@ export const HistoryView: React.FC = () => {
       </div>
 
       {/* History Domain Content */}
-      {isReadError ? (
-        <div
-          data-testid="history-read-error"
-          className="bg-rose-500/15 border border-rose-500/40 text-rose-300 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-lg mb-4"
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <AlertCircle className="w-5 h-5 shrink-0 text-rose-400" />
-            <div className="min-w-0">
-              <div className="font-bold text-white text-sm">Failed to load history data</div>
-              <div className="text-rose-300/90 text-xs">
-                {readErrorMessage}
-              </div>
-            </div>
-          </div>
+      <StatusBanner
+        title={isReadError ? 'Failed to load history data' : null}
+        message={isReadError ? readErrorMessage : null}
+        tone="error"
+        testId="history-read-error"
+        className="mb-4"
+        icon={<AlertCircle className="w-5 h-5 shrink-0 text-rose-400" aria-hidden="true" />}
+        action={
           <button
             type="button"
             onClick={handleRetryHistory}
@@ -526,42 +520,46 @@ export const HistoryView: React.FC = () => {
             <RotateCcw className="w-4 h-4 shrink-0" />
             <span>Retry</span>
           </button>
-        </div>
-      ) : historyDomain === 'nutrition' ? (
-        <NutritionHistoryTimeline
-          filteredNutritionDays={filteredNutritionDays}
-          timeRange={timeRange}
-          isInspectingAthlete={isInspectingAthlete}
-          onEditMeal={setEditingMealLog}
-          onDeleteMeal={(id) => deleteMealMutation.mutate(id)}
-          onScaleMeal={(m, items) => scaleMealMutation.mutateAsync({ log: m, items })}
-        />
-      ) : viewMode === 'session' ? (
-        <WorkoutSessionHistory
-          displayedSessions={displayedSessionsWithSets}
-          filteredSessionsCount={filteredSessions.length}
-          exercises={exercises}
-          timeRange={timeRange}
-          isInspectingAthlete={isInspectingAthlete}
-          onEditSet={setEditingSet}
-          onLoadMore={loadMoreWorkouts}
-          hasMore={hasMoreWorkouts}
-          isLoadingMore={isLoadingMore}
-          expandedSessionIds={expandedSessionIds}
-          onToggleExpand={handleToggleExpand}
-          loadingSessionIds={loadingSessionIds}
-        />
-      ) : (
-        <WorkoutExerciseHistory
-          exerciseStats={exerciseStats}
-          searchQuery={searchQuery}
-          onSearchQueryChange={setSearchQuery}
-          selectedCategory={selectedCategory}
-          onSelectedCategoryChange={setSelectedCategory}
-          isInspectingAthlete={isInspectingAthlete}
-          onEditSet={setEditingSet}
-        />
+        }
+      />
+      {!isReadError && (
+        historyDomain === 'nutrition' ? (
+          <NutritionHistoryTimeline
+            filteredNutritionDays={filteredNutritionDays}
+            timeRange={timeRange}
+            isInspectingAthlete={isInspectingAthlete}
+            onEditMeal={setEditingMealLog}
+            onDeleteMeal={(id) => deleteMealMutation.mutate(id)}
+            onScaleMeal={(m, items) => scaleMealMutation.mutateAsync({ log: m, items })}
+          />
+        ) : viewMode === 'session' ? (
+          <WorkoutSessionHistory
+            displayedSessions={displayedSessionsWithSets}
+            filteredSessionsCount={filteredSessions.length}
+            exercises={exercises}
+            timeRange={timeRange}
+            isInspectingAthlete={isInspectingAthlete}
+            onEditSet={setEditingSet}
+            onLoadMore={loadMoreWorkouts}
+            hasMore={hasMoreWorkouts}
+            isLoadingMore={isLoadingMore}
+            expandedSessionIds={expandedSessionIds}
+            onToggleExpand={handleToggleExpand}
+            loadingSessionIds={loadingSessionIds}
+          />
+        ) : (
+          <WorkoutExerciseHistory
+            exerciseStats={exerciseStats}
+            searchQuery={searchQuery}
+            onSearchQueryChange={setSearchQuery}
+            selectedCategory={selectedCategory}
+            onSelectedCategoryChange={setSelectedCategory}
+            isInspectingAthlete={isInspectingAthlete}
+            onEditSet={setEditingSet}
+          />
+        )
       )}
+
 
       {/* Edit Meal Modal */}
       <EditMealModal

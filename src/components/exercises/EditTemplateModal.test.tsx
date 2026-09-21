@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { EditTemplateModal } from './EditTemplateModal';
 import { expectNoA11yViolationsForRules } from '../../test/a11y';
 import type { Exercise, RoutineTemplate } from '../../types/database';
@@ -42,4 +42,23 @@ describe('EditTemplateModal', () => {
     const { container } = render(<EditTemplateModal {...mockProps} />);
     await expectNoA11yViolationsForRules(container, ['label']);
   });
+
+  it('mounts template-error live region empty while idle and retains same node on error (NEW-15)', () => {
+    const { container } = render(<EditTemplateModal {...mockProps} />);
+
+    // Live region exists and is empty while idle
+    const alert = container.querySelector('[role="alert"]');
+    expect(alert).not.toBeNull();
+    expect(alert?.textContent).toBe('');
+
+    // Trigger save with no exercises
+    fireEvent.click(screen.getByTestId('save-template-btn'));
+
+    expect(alert?.textContent).toBe('Please add at least one exercise to the template.');
+    expect(screen.getByTestId('template-error')).toBeDefined();
+
+    // Live region DOM node remains identical
+    expect(container.querySelector('[role="alert"]')).toBe(alert);
+  });
 });
+

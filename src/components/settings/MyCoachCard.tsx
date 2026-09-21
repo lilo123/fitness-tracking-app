@@ -9,6 +9,7 @@ import {
   AlertCircle,
   CheckCircle2,
 } from 'lucide-react';
+import { StatusBanner } from '../common/StatusBanner';
 
 interface MyCoachCardProps {
   profile: UserProfile | null;
@@ -183,23 +184,18 @@ export const MyCoachCard: React.FC<MyCoachCardProps> = ({
         </form>
       )}
 
-      {linkStatus && (
-        <div
-          data-testid="link-coach-status"
-          className={`p-2.5 rounded-xl text-xs flex items-center gap-2 ${
-            linkStatus.type === 'error'
-              ? 'bg-rose-500/15 border border-rose-500/30 text-rose-300'
-              : 'bg-cyan-500/15 border border-cyan-500/30 text-cyan-300'
-          }`}
-        >
-          {linkStatus.type === 'error' ? (
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+      <StatusBanner
+        testId="link-coach-status"
+        message={linkStatus?.message}
+        tone={linkStatus?.type === 'error' ? 'error' : 'success'}
+        icon={
+          linkStatus?.type === 'error' ? (
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />
           ) : (
-            <CheckCircle2 className="w-4 h-4 shrink-0" />
-          )}
-          <span>{linkStatus.message}</span>
-        </div>
-      )}
+            <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />
+          )
+        }
+      />
     </div>
   );
 };

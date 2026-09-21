@@ -155,6 +155,26 @@ describe('EditMealModal with a stored breakdown', () => {
     expect(screen.getByText(/35g P/)).toBeDefined();
   });
 
+  it('mounts an idle live region that persists and populates when validation fails', async () => {
+    const { container } = renderModal(meal(null));
+
+    // Idle: role="alert" live region exists from the start and is silent
+    const alertRegion = container.querySelector('[role="alert"]');
+    expect(alertRegion).not.toBeNull();
+    expect(alertRegion).toHaveTextContent('');
+    expect(screen.queryByTestId('edit-meal-error')).toBeNull();
+
+    // Trigger error by clearing name and saving
+    fireEvent.change(screen.getByTestId('edit-meal-name-input'), {
+      target: { value: '   ' },
+    });
+    fireEvent.click(screen.getByTestId('save-edit-meal-btn'));
+
+    // Same live region now holds the error message
+    expect(alertRegion).toHaveTextContent('Meal name is required');
+    expect(screen.getByTestId('edit-meal-error')).toBeDefined();
+  });
+
   it('has no a11y violations', async () => {
     const { container } = renderModal(meal(null));
     await expectNoA11yViolations(container);

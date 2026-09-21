@@ -16,6 +16,8 @@ import { WorkoutHeader } from './WorkoutHeader';
 import { RoutinePickerModal } from './RoutinePickerModal';
 import { RestDayView } from './RestDayView';
 import { ExerciseCard } from './ExerciseCard';
+import { StatusBanner } from '../common/StatusBanner';
+
 
 export const WorkoutEngine: React.FC = () => {
   const { user, profile } = useAuth();
@@ -291,24 +293,23 @@ export const WorkoutEngine: React.FC = () => {
         onClearWorkout={handleClearWorkout}
       />
 
-      {isLogsError && (
-        <div
-          data-testid="workout-logs-error"
-          className="bg-rose-500/15 border border-rose-500/40 text-rose-300 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-lg"
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <AlertCircle className="w-5 h-5 shrink-0 text-rose-400" />
-            <div className="min-w-0">
-              <div className="font-bold text-white text-sm">Failed to load workout history</div>
-              <div className="text-rose-300/90 text-xs">
-                {logsError instanceof Error
-                  ? logsError.message
-                  : typeof logsError === 'string'
-                  ? logsError
-                  : (logsError as unknown as { message?: string })?.message || 'Unable to load previous sets and ghost benchmarks. Please try again.'}
-              </div>
-            </div>
-          </div>
+      {/* Logs Read Error Banner */}
+      <StatusBanner
+        title={isLogsError ? 'Failed to load workout history' : null}
+        message={
+          isLogsError
+            ? logsError instanceof Error
+              ? logsError.message
+              : typeof logsError === 'string'
+              ? logsError
+              : (logsError as unknown as { message?: string })?.message ||
+                'Unable to load previous sets and ghost benchmarks. Please try again.'
+            : null
+        }
+        tone="error"
+        testId="workout-logs-error"
+        icon={<AlertCircle className="w-5 h-5 shrink-0 text-rose-400" aria-hidden="true" />}
+        action={
           <button
             type="button"
             onClick={() => refetchLogs()}
@@ -318,8 +319,9 @@ export const WorkoutEngine: React.FC = () => {
             <RotateCcw className="w-4 h-4 shrink-0" />
             <span>Retry</span>
           </button>
-        </div>
-      )}
+        }
+      />
+
 
       <RoutinePickerModal
         isOpen={showRoutineModal}

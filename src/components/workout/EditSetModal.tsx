@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import type { WorkoutSet, Exercise, SetType } from '../../types/database';
 import { X, Dumbbell, Trash2, AlertCircle } from 'lucide-react';
+import { StatusBanner } from '../common/StatusBanner';
 
 export interface EditSetModalProps {
   isOpen: boolean;
@@ -247,12 +248,12 @@ const EditSetForm: React.FC<EditSetFormProps> = ({
           </button>
         </div>
 
-        {errorMessage && (
-          <div className="bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs rounded-xl p-3 flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{errorMessage}</span>
-          </div>
-        )}
+        <StatusBanner
+          message={errorMessage}
+          tone="error"
+          icon={<AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />}
+        />
+
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Exercise Selector */}

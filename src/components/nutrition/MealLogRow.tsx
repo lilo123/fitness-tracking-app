@@ -14,6 +14,7 @@ import { friendlyError } from '../../utils/nutritionErrors';
 import { supabase } from '../../lib/supabase';
 import { OverflowMenu, type OverflowMenuItem } from '../common/OverflowMenu';
 import { ComponentRow } from './ComponentRow';
+import { StatusBanner } from '../common/StatusBanner';
 
 export interface MealLogRowProps {
   log: NutritionLog & { items?: unknown };
@@ -382,41 +383,39 @@ export const MealLogRow: React.FC<MealLogRowProps> = ({
       {/* A rejected write has already been rolled back above; this says why.
           role="alert" because the value on screen just changed back under the
           user without them touching anything. */}
-      {error && (
-        <p
-          role="alert"
-          data-testid="meal-log-error"
-          className="mt-1.5 break-words rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1 text-[10px] font-bold text-red-300"
-        >
-          {error}
-        </p>
-      )}
+      <StatusBanner
+        message={error}
+        tone="error"
+        testId="meal-log-error"
+        className="mt-1.5"
+      />
 
       {/* On-demand fetch failures surface an error state with a retry button */}
-      {fetchError && (
-        <div
-          role="alert"
-          data-testid="meal-log-fetch-error"
-          className="mt-1.5 flex items-center justify-between gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1 text-[10px] font-bold text-red-300"
-        >
-          <span className="truncate">{fetchError}</span>
-          <button
-            type="button"
-            data-testid="meal-log-fetch-retry"
-            onClick={() => {
-              void fetchItemsOnDemand().then((loadedItems) => {
-                if (loadedItems && isLevel1(loadedItems)) {
-                  setAnchorItems(loadedItems);
-                  setExpanded(true);
-                }
-              }).catch(() => {});
-            }}
-            className="shrink-0 rounded border border-red-400/40 bg-red-500/20 px-1.5 py-0.5 text-[10px] font-bold text-red-200 hover:bg-red-500/30"
-          >
-            Retry
-          </button>
-        </div>
-      )}
+      <StatusBanner
+        message={fetchError}
+        tone="error"
+        testId="meal-log-fetch-error"
+        className="mt-1.5"
+        action={
+          fetchError && (
+            <button
+              type="button"
+              data-testid="meal-log-fetch-retry"
+              onClick={() => {
+                void fetchItemsOnDemand().then((loadedItems) => {
+                  if (loadedItems && isLevel1(loadedItems)) {
+                    setAnchorItems(loadedItems);
+                    setExpanded(true);
+                  }
+                }).catch(() => {});
+              }}
+              className="shrink-0 rounded border border-rose-400/40 bg-rose-500/20 px-1.5 py-0.5 text-[10px] font-bold text-rose-200 hover:bg-rose-500/30"
+            >
+              Retry
+            </button>
+          )
+        }
+      />
 
       {/* Expanded panel — whole-dish scale, then the components. */}
       {expandable && expanded && (

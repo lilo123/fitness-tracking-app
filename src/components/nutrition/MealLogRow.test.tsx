@@ -259,6 +259,35 @@ describe('MealLogRow', () => {
     expect(screen.queryByTestId('meal-log-error')).toBeNull();
   });
 
+  it('maintains an idle live region that persists across optimistic rollback', async () => {
+    const items = [component(), component({ id: 'c2', name: 'Whey', calories: 120, protein: 25 })];
+    const onItemsChange = vi
+      .fn()
+      .mockRejectedValueOnce({
+        message: 'new row for relation "nutrition_logs" violates check constraint "chk_nl_parent_equals_items_sum"',
+      });
+    const { container } = render(
+      <MealLogRow log={log(items)} onEdit={noop} onDelete={noop} onItemsChange={onItemsChange} />
+    );
+
+    // Idle: role="alert" live regions exist from mount and are empty
+    const alertRegions = container.querySelectorAll('[role="alert"]');
+    expect(alertRegions.length).toBeGreaterThan(0);
+    alertRegions.forEach((r) => expect(r).toHaveTextContent(''));
+    expect(screen.queryByTestId('meal-log-error')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('meal-log-accordion-trigger'));
+    fireEvent.click(screen.getByTestId('dish-scale-0.5'));
+
+    // Once rejected, an alert region contains the error message
+    await screen.findByTestId('meal-log-error');
+    const activeAlerts = Array.from(container.querySelectorAll('[role="alert"]')).filter(
+      (r) => r.textContent !== ''
+    );
+    expect(activeAlerts.length).toBe(1);
+    expect(activeAlerts[0].textContent).toMatch(/no longer match its components/);
+  });
+
   it('rolls back to the last persisted set, not to the stored row, after a partial sequence', async () => {
     const items = [component(), component({ id: 'c2', name: 'Whey', calories: 120, protein: 25 })];
     const onItemsChange = vi
@@ -517,7 +546,7 @@ describe('MealLogRow', () => {
       return createSupabaseBuilder(table, { data: null, error: null });
     });
 
-    render(<MealLogRow log={rowWithComponents} onEdit={noop} onDelete={noop} />);
+    const { container } = render(<MealLogRow log={rowWithComponents} onEdit={noop} onDelete={noop} />);
 
     // 0 queries on mount
     expect(getRecordedSelects().filter((s) => s.table === 'nutrition_logs').length).toBe(0);
@@ -526,10 +555,14 @@ describe('MealLogRow', () => {
     const trigger = screen.getByTestId('meal-log-accordion-trigger');
     fireEvent.click(trigger);
 
-    // Must surface error state with role="alert" and data-testid="meal-log-fetch-error"
+    // Must surface error state with role="alert" in persistent live region and data-testid="meal-log-fetch-error"
     const errorAlert = await screen.findByTestId('meal-log-fetch-error');
-    expect(errorAlert.getAttribute('role')).toBe('alert');
     expect(errorAlert.textContent).toContain('Network timeout loading components');
+    const alertRegions = container.querySelectorAll('[role="alert"]');
+    const speakingAlert = Array.from(alertRegions).find((r) =>
+      r.textContent?.includes('Network timeout loading components')
+    );
+    expect(speakingAlert).toBeDefined();
 
     // Must provide retry button
     const retryBtn = screen.getByTestId('meal-log-fetch-retry');

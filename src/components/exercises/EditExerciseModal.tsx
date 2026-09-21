@@ -5,6 +5,8 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { workoutSessionStore } from '../../utils/workoutSessionStore';
 import type { Exercise } from '../../types/database';
+import { StatusBanner } from '../common/StatusBanner';
+
 
 const MUSCLE_GROUPS = [
   'Chest',
@@ -162,15 +164,13 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
 
         {/* Single Fluid Scroll Body */}
         <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-5 space-y-5">
-          {error && (
-            <div
-              data-testid="edit-exercise-error"
-              className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs flex items-center gap-2"
-            >
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
+          <StatusBanner
+            message={error}
+            tone="error"
+            testId="edit-exercise-error"
+            icon={<AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />}
+          />
+
 
           {/* Exercise Name Input */}
           <div className="space-y-1.5">

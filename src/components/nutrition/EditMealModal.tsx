@@ -6,6 +6,7 @@ import { X, Utensils, AlertCircle } from 'lucide-react';
 import { formatCalories, formatMacro, roundTo1Decimal } from '../../utils/nutrition';
 import { isLevel1, normalizeItems, sumItems } from '../../utils/itemModel';
 import { friendlyError } from '../../utils/nutritionErrors';
+import { StatusBanner } from '../common/StatusBanner';
 
 export interface EditMealModalProps {
   isOpen: boolean;
@@ -189,15 +190,12 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
           </button>
         </div>
 
-        {errorMessage && (
-          <div
-            className="bg-rose-500/15 border border-rose-500/40 text-rose-300 rounded-2xl p-3 flex items-center gap-2 text-xs"
-            data-testid="edit-meal-error"
-          >
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
-            <span>{errorMessage}</span>
-          </div>
-        )}
+        <StatusBanner
+          message={errorMessage}
+          tone="error"
+          testId="edit-meal-error"
+          icon={<AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />}
+        />
 
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div>

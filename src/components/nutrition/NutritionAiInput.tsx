@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { formatFileSize, type CompressedImage } from '../../utils/imageCompression';
 import { CameraSource } from '@capacitor/camera';
+import { StatusBanner } from '../common/StatusBanner';
 
 export interface NutritionAiInputProps {
   nlInput: string;
@@ -192,6 +193,7 @@ export const NutritionAiInput: React.FC<NutritionAiInputProps> = memo(({
             data-testid="analyze-meal-button"
             onClick={onAnalyze}
             disabled={isAnalyzing || (!nlInput.trim() && !selectedPhoto)}
+            aria-busy={isAnalyzing ? 'true' : undefined}
             className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black text-xs px-4 py-2.5 min-h-[44px] min-w-[44px] rounded-xl shadow-neon-cyan active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-1.5 touch-manipulation"
           >
             <Sparkles className="w-3.5 h-3.5" />
@@ -201,55 +203,49 @@ export const NutritionAiInput: React.FC<NutritionAiInputProps> = memo(({
       </div>
 
       {/* Rate Limit 429 Cooldown Warning Banner */}
-      {isRateLimited && (
-        <div
-          data-testid="rate-limit-banner"
-          className="bg-amber-500/15 border border-amber-500/40 rounded-2xl p-4 space-y-3 shadow-lg"
-        >
-          <div className="flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-            <div className="space-y-1 flex-1">
-              <h4 className="text-xs font-black text-amber-400 uppercase tracking-wider">
-                Rate Limit Exceeded (15 RPM)
-              </h4>
-              <p className="text-xs text-zinc-300">
+      <StatusBanner
+        message={isRateLimited ? 'Rate Limit Exceeded (15 RPM)' : null}
+        tone="error"
+        testId="rate-limit-banner"
+        className="space-y-3 shadow-lg flex-wrap sm:flex-nowrap"
+        icon={<AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />}
+        action={
+          isRateLimited && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+              <p className="text-xs text-zinc-300 font-normal">
                 Gemini rate limit exceeded (15 RPM). Please wait 15 seconds or switch to manual entry.
               </p>
+              <div className="flex items-center justify-end gap-2 pt-1 border-t sm:border-t-0 border-amber-500/20">
+                <button
+                  type="button"
+                  data-testid="switch-to-manual-btn"
+                  onClick={onSwitchToManual}
+                  className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-black text-xs px-3.5 py-2.5 min-h-[44px] min-w-[44px] rounded-xl transition active:scale-95 flex items-center justify-center gap-1.5 shadow-sm touch-manipulation shrink-0"
+                >
+                  <Utensils className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Switch to Manual Entry</span>
+                </button>
+              </div>
             </div>
-          </div>
+          )
+        }
+      />
 
-          <div className="flex items-center justify-end gap-2 pt-1 border-t border-amber-500/20">
-            <button
-              type="button"
-              data-testid="switch-to-manual-btn"
-              onClick={onSwitchToManual}
-              className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-black text-xs px-3.5 py-2.5 min-h-[44px] min-w-[44px] rounded-xl transition active:scale-95 flex items-center justify-center gap-1.5 shadow-sm touch-manipulation"
-            >
-              <Utensils className="w-3.5 h-3.5" />
-              <span>Switch to Manual Entry</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {status && !isRateLimited && (
-        <div
-          data-testid="status-message"
-          className={`p-3 rounded-xl text-xs flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 ${
-            isError
-              ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
-              : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-          }`}
-        >
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            {isError ? (
-              <AlertCircle className="w-4 h-4 shrink-0" />
-            ) : (
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
-            )}
-            <span className="break-words">{status}</span>
-          </div>
-          {isError && (
+      {/* Dynamic Status / Error Message */}
+      <StatusBanner
+        message={!isRateLimited && status ? status : null}
+        tone={isError ? 'error' : 'info'}
+        testId="status-message"
+        className="shadow-lg"
+        icon={
+          isError ? (
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" aria-hidden="true" />
+          )
+        }
+        action={
+          isError && onAnalyze ? (
             <button
               type="button"
               data-testid="retry-analysis-button"
@@ -257,12 +253,12 @@ export const NutritionAiInput: React.FC<NutritionAiInputProps> = memo(({
               disabled={isAnalyzing}
               className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-rose-300 bg-rose-500/20 hover:bg-rose-500/30 active:scale-95 rounded-lg transition-all min-h-[44px] min-w-[44px] touch-manipulation cursor-pointer shrink-0 disabled:opacity-50"
             >
-              <RotateCcw className="w-3.5 h-3.5 shrink-0" />
+              <RotateCcw className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
               <span>Retry Analysis</span>
             </button>
-          )}
-        </div>
-      )}
+          ) : null
+        }
+      />
     </div>
   );
 });

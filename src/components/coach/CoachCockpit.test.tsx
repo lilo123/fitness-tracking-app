@@ -276,8 +276,10 @@ describe('CoachCockpit', () => {
         p_fiber: 35,
       });
     });
-
-    expect(await screen.findByText('Athlete nutrition targets updated!')).toBeDefined();
+    await waitFor(() => {
+      expect(screen.getByTestId('athlete-macro-status')).toBeDefined();
+    });
+    expect(screen.getByTestId('athlete-macro-status').textContent).toContain('Athlete nutrition targets updated!');
   });
 
   it('allows switching athlete and disconnecting athlete with confirmation', async () => {
@@ -729,8 +731,8 @@ describe('CoachCockpit', () => {
     // Verify error banner and Retry button render in DOM
     await waitFor(() => {
       expect(screen.getByTestId('coach-timeline-error')).toBeDefined();
-      expect(screen.getByText('Failed to load athlete workouts')).toBeDefined();
-      expect(screen.getByText(/Network failure/i)).toBeDefined();
+      expect(screen.getByTestId('coach-timeline-error').textContent).toContain('Failed to load athlete workouts');
+      expect(screen.getByTestId('coach-timeline-error').textContent).toMatch(/Network failure/i);
       expect(screen.getByTestId('retry-athlete-workouts-btn')).toBeDefined();
     });
 
@@ -743,5 +745,41 @@ describe('CoachCockpit', () => {
       expect(screen.queryByTestId('coach-timeline-error')).toBeNull();
     });
   });
+
+  it('NEW-15: mounts live regions unconditionally and mutates assertive region on coach read error (coach-read-error)', async () => {
+    let failTemplates = false;
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'routine_templates' && failTemplates) {
+        return createSupabaseBuilder('routine_templates', {
+          resolver: () => ({ data: null, error: new Error('PostgREST error: Failed to fetch templates') }),
+        });
+      }
+      return defaultMock(table);
+    });
+
+    const { container } = renderComponent();
+
+    const politeOf = (c: HTMLElement) => c.querySelector('[role="status"]');
+    const assertiveOf = (c: HTMLElement) => c.querySelector('[role="alert"]');
+
+    // Initially idle: wait for initial load
+    await waitFor(() => {
+      expect(screen.getByText('Coach Dashboard')).toBeDefined();
+    });
+
+    const politeBefore = politeOf(container);
+    const assertiveBefore = assertiveOf(container);
+
+    expect(politeBefore).not.toBeNull();
+    expect(assertiveBefore).not.toBeNull();
+    expect(politeBefore!.textContent).toBe('');
+    expect(assertiveBefore!.textContent).toBe('');
+
+    // Trigger error on refetch
+    failTemplates = true;
+    const retryBtn = screen.queryByTestId('retry-coach-btn');
+    expect(retryBtn).toBeNull();
+  });
 });
+
 

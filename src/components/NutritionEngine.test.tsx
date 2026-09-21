@@ -399,7 +399,7 @@ describe('NutritionEngine', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('status-message')).toBeDefined();
-      expect(screen.getByText('AI service unavailable: Network error')).toBeDefined();
+      expect(within(screen.getByTestId('status-message')).getByText('AI service unavailable: Network error')).toBeDefined();
     });
 
     // Verify manual form is automatically opened
@@ -426,7 +426,7 @@ describe('NutritionEngine', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('status-message')).toBeDefined();
-      expect(screen.getByText('AI service unavailable: Model quota exceeded. Please try again later.')).toBeDefined();
+      expect(within(screen.getByTestId('status-message')).getByText('AI service unavailable: Model quota exceeded. Please try again later.')).toBeDefined();
     });
 
     // Verify manual form is automatically opened with dish name pre-populated
@@ -451,7 +451,7 @@ describe('NutritionEngine', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('status-message')).toBeDefined();
-      expect(screen.getByText('AI service unavailable: Invalid parsed response: missing nutrition data')).toBeDefined();
+      expect(within(screen.getByTestId('status-message')).getByText('AI service unavailable: Invalid parsed response: missing nutrition data')).toBeDefined();
     });
 
     expect(screen.getByTestId('dish-name-input')).toBeDefined();
@@ -1040,7 +1040,7 @@ Total Fiber: 1 g`;
 
     await waitFor(() => {
       expect(screen.getByTestId('edit-meal-error')).toBeDefined();
-      expect(screen.getByText('Network connection failed')).toBeDefined();
+      expect(within(screen.getByTestId('edit-meal-error')).getByText('Network connection failed')).toBeDefined();
     });
   });
 
@@ -1088,7 +1088,7 @@ Total Fiber: 1 g`;
     fireEvent.click(screen.getByTestId('save-edit-meal-btn'));
 
     expect(screen.getByTestId('edit-meal-error')).toBeDefined();
-    expect(screen.getByText('Meal name is required')).toBeDefined();
+    expect(within(screen.getByTestId('edit-meal-error')).getByText('Meal name is required')).toBeDefined();
     expect(mockUpdate).not.toHaveBeenCalled();
 
     // Close on Escape
@@ -1417,7 +1417,7 @@ Total Fiber: 1 g`;
 
     await waitFor(() => {
       expect(screen.getByTestId('rate-limit-banner')).toBeDefined();
-      expect(screen.getByText('Rate Limit Exceeded (15 RPM)')).toBeDefined();
+      expect(within(screen.getByTestId('rate-limit-banner')).getByText('Rate Limit Exceeded (15 RPM)')).toBeDefined();
     });
 
     const switchToManualBtn = screen.getByTestId('switch-to-manual-btn');
@@ -1759,7 +1759,7 @@ Total Fiber: 1 g`;
     await waitFor(() => {
       expect(screen.queryByTestId('photo-preview-container')).toBeNull();
       expect(screen.getByTestId('status-message')).toBeDefined();
-      expect(screen.getByText(/Could not process selected image/i)).toBeDefined();
+      expect(within(screen.getByTestId('status-message')).getByText(/Could not process selected image/i)).toBeDefined();
     });
   });
 
@@ -1820,7 +1820,7 @@ Total Fiber: 1 g`;
     fireEvent.click(screen.getByText('Analyze Meal'));
 
     await waitFor(() => {
-      expect(screen.getByText(/Input text or meal photo is required for nutrition parsing/i)).toBeDefined();
+      expect(within(screen.getByTestId('status-message')).getByText(/Input text or meal photo is required for nutrition parsing/i)).toBeDefined();
     });
 
     expect(screen.queryByText(/non-2xx/i)).toBeNull();
@@ -1851,7 +1851,7 @@ Total Fiber: 1 g`;
     fireEvent.click(screen.getByText('Analyze Meal'));
 
     await waitFor(() => {
-      expect(screen.getByText(/No food detected in input or image/i)).toBeDefined();
+      expect(within(screen.getByTestId('status-message')).getByText(/No food detected in input or image/i)).toBeDefined();
     });
   });
 
@@ -1881,7 +1881,7 @@ Total Fiber: 1 g`;
     fireEvent.click(screen.getByText('Analyze Meal'));
 
     await waitFor(() => {
-      expect(screen.getByText(/AI model capacity is temporarily exhausted/i)).toBeDefined();
+      expect(within(screen.getByTestId('status-message')).getByText(/AI model capacity is temporarily exhausted/i)).toBeDefined();
     });
   });
 
@@ -1907,7 +1907,7 @@ Total Fiber: 1 g`;
       await act(async () => {
         vi.advanceTimersByTime(2000);
       });
-      expect(screen.getByText(/Edge function timeout after 30s/i)).toBeDefined();
+      expect(within(screen.getByTestId('status-message')).getByText(/Edge function timeout after 30s/i)).toBeDefined();
     } finally {
       vi.useRealTimers();
     }
@@ -1944,7 +1944,7 @@ Total Fiber: 1 g`;
       await act(async () => {
         vi.advanceTimersByTime(11000);
       });
-      expect(screen.getByText(/Edge function timeout after 45s/i)).toBeDefined();
+      expect(within(screen.getByTestId('status-message')).getByText(/Edge function timeout after 45s/i)).toBeDefined();
     } finally {
       vi.useRealTimers();
     }
@@ -2080,7 +2080,7 @@ Total Fiber: 1 g`;
     fireEvent.click(screen.getByText('Analyze Meal'));
 
     await waitFor(() => {
-      expect(screen.getByText(/Direct context error message without clone/i)).toBeDefined();
+      expect(within(screen.getByTestId('status-message')).getByText(/Direct context error message without clone/i)).toBeDefined();
     });
   });
 
@@ -2264,7 +2264,7 @@ Total Fiber: 1 g`;
       return createSupabaseBuilder(table, { data: [], error: null });
     });
 
-    renderComponent();
+    const { container } = renderComponent();
 
     await waitFor(() => {
       expect(screen.getByTestId('custom-dish-card-dish-err-1')).toBeDefined();
@@ -2275,8 +2275,14 @@ Total Fiber: 1 g`;
 
     const errorAlert = await screen.findByTestId('dish-fetch-error');
     expect(errorAlert).toBeDefined();
-    expect(errorAlert.getAttribute('role')).toBe('alert');
+    // StatusBanner places role="alert" on the sr-only persistent live region, not on the visible banner
+    expect(errorAlert.getAttribute('role')).toBeNull();
     expect(errorAlert.textContent).toContain('Network error loading dish details');
+    const alertRegions = container.querySelectorAll('[role="alert"]');
+    const speakingAlert = Array.from(alertRegions).find((r) =>
+      r.textContent?.includes('Network error loading dish details')
+    );
+    expect(speakingAlert).toBeDefined();
 
     const retryBtn = screen.getByTestId('dish-fetch-retry');
     expect(retryBtn).toBeDefined();
@@ -2515,7 +2521,7 @@ Total Fiber: 1 g`;
       return b;
     });
 
-    renderComponent();
+    const { container } = renderComponent();
 
     await waitFor(() => {
       expect(screen.getByTestId('quick-log-btn-dish-toast-1')).toBeDefined();
@@ -2528,10 +2534,16 @@ Total Fiber: 1 g`;
     });
 
     const toast = screen.getByTestId('quick-log-toast');
-    expect(toast.getAttribute('role')).toBe('status');
-    expect(toast.getAttribute('aria-live')).toBe('polite');
+    // StatusBanner places role="status" and aria-live="polite" on the sr-only live region
+    expect(toast.getAttribute('role')).toBeNull();
+    expect(toast.getAttribute('aria-live')).toBeNull();
     expect(within(toast).getByText('Power Bowl')).toBeDefined();
     expect(within(toast).getByText('+550 kcal')).toBeDefined();
+    const statusRegions = container.querySelectorAll('[role="status"]');
+    const speakingStatus = Array.from(statusRegions).find((r) =>
+      r.textContent?.includes('Power Bowl')
+    );
+    expect(speakingStatus).toBeDefined();
   });
 
   it('auto-dismisses floating Quick-Log Toast widget after 2.8s', async () => {
@@ -2891,6 +2903,22 @@ Total Fiber: 1 g`;
       expect(screen.getByText('Steamed Egg Meatloaf')).toBeDefined();
       expect(screen.getByText('Cooking Oil')).toBeDefined();
       expect(screen.getByText('Cucumber & Tomato Pickles')).toBeDefined();
+    });
+  });
+
+  describe('NEW-15: StatusBanner persistent live region integration', () => {
+    it('mounts persistent live regions for dish fetch error and quick-log toast while idle', async () => {
+      const { container } = renderComponent();
+
+      // Idle: live regions exist from initial render and have empty text content
+      const politeRegions = container.querySelectorAll('[role="status"]');
+      const alertRegions = container.querySelectorAll('[role="alert"]');
+
+      expect(politeRegions.length).toBeGreaterThan(0);
+      expect(alertRegions.length).toBeGreaterThan(0);
+
+      expect(screen.queryByTestId('dish-fetch-error')).toBeNull();
+      expect(screen.queryByTestId('quick-log-toast')).toBeNull();
     });
   });
 });

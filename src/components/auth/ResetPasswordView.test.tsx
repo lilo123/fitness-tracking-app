@@ -64,7 +64,7 @@ describe('ResetPasswordView', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Set New Password' }));
 
-    expect(await screen.findByText('Password must be at least 6 characters')).toBeDefined();
+    expect(await screen.findAllByText('Password must be at least 6 characters')).toBeDefined();
     expect(mockUpdateUser).not.toHaveBeenCalled();
   });
 
@@ -77,7 +77,7 @@ describe('ResetPasswordView', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Set New Password' }));
 
-    expect(await screen.findByText('Passwords do not match')).toBeDefined();
+    expect(await screen.findAllByText('Passwords do not match')).toBeDefined();
     expect(mockUpdateUser).not.toHaveBeenCalled();
   });
 
@@ -94,7 +94,7 @@ describe('ResetPasswordView', () => {
       expect(mockUpdateUser).toHaveBeenCalledWith({ password: 'newpassword123' });
     });
 
-    expect(await screen.findByText('Password Updated Successfully!')).toBeDefined();
+    expect(await screen.findAllByText('Password Updated Successfully!')).toBeDefined();
   });
 
   it('has accessible label associations and independent password reveal toggles meeting WCAG target size', async () => {
@@ -130,5 +130,42 @@ describe('ResetPasswordView', () => {
 
     // axe-core check
     await expectNoA11yViolations(container);
+  });
+
+  it('mounts live regions while idle and mutates in place on error and success (WCAG SC 4.1.3)', async () => {
+    const { container } = renderComponent();
+
+    const polite = container.querySelector('[role="status"]');
+    const assertive = container.querySelector('[role="alert"]');
+
+    expect(polite).not.toBeNull();
+    expect(assertive).not.toBeNull();
+    expect(polite!.textContent).toBe('');
+    expect(assertive!.textContent).toBe('');
+
+    // Trigger validation error
+    const [pwdInput, confirmPwdInput] = screen.getAllByPlaceholderText('••••••••');
+    fireEvent.change(pwdInput, { target: { value: 'password123' } });
+    fireEvent.change(confirmPwdInput, { target: { value: 'different123' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Set New Password' }));
+
+    // Node identity preserved across error transition
+    expect(container.querySelector('[role="status"]')).toBe(polite);
+    expect(container.querySelector('[role="alert"]')).toBe(assertive);
+    expect(assertive!.textContent).toContain('Passwords do not match');
+    expect(polite!.textContent).toBe('');
+
+    // Trigger success
+    fireEvent.change(confirmPwdInput, { target: { value: 'password123' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Set New Password' }));
+
+    await waitFor(() => {
+      expect(mockUpdateUser).toHaveBeenCalledWith({ password: 'password123' });
+    });
+
+    // Node identity preserved across success transition
+    expect(container.querySelector('[role="status"]')).toBe(polite);
+    expect(container.querySelector('[role="alert"]')).toBe(assertive);
+    expect(polite!.textContent).toContain('Password Updated Successfully!');
   });
 });

@@ -208,7 +208,7 @@ describe('EditSetModal', () => {
     fireEvent.click(screen.getByTestId('save-set-btn'));
 
     await waitFor(() => {
-      expect(screen.getByText('Please enter a weight (0 for bodyweight).')).toBeDefined();
+      expect(screen.getByRole('alert')).toHaveTextContent('Please enter a weight (0 for bodyweight).');
     });
     expect(mockUpdate).not.toHaveBeenCalled();
   });
@@ -222,7 +222,7 @@ describe('EditSetModal', () => {
     fireEvent.click(screen.getByTestId('save-set-btn'));
 
     await waitFor(() => {
-      expect(screen.getByText('Please enter reps.')).toBeDefined();
+      expect(screen.getByRole('alert')).toHaveTextContent('Please enter reps.');
     });
     expect(mockUpdate).not.toHaveBeenCalled();
   });
@@ -237,8 +237,9 @@ describe('EditSetModal', () => {
     fireEvent.click(screen.getByTestId('save-set-btn'));
 
     await waitFor(() => {
-      expect(screen.getByText('RPE must be between 1 and 10.')).toBeDefined();
+      expect(screen.getByRole('alert')).toHaveTextContent('RPE must be between 1 and 10.');
     });
+
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
@@ -314,9 +315,10 @@ describe('EditSetModal', () => {
     fireEvent.click(screen.getByTestId('save-set-btn'));
 
     await waitFor(() => {
-      expect(screen.getByText('Database connection error')).toBeDefined();
+      expect(screen.getByRole('alert')).toHaveTextContent('Database connection error');
     });
   });
+
 
   it('resets internal form state when a different set is passed to the modal', () => {
     const { rerender } = renderModal();
@@ -347,4 +349,31 @@ describe('EditSetModal', () => {
     const updatedWeightInput = screen.getByTestId('edit-set-weight-input') as HTMLInputElement;
     expect(updatedWeightInput.value).toBe('275');
   });
+
+  it('mounts live regions empty while idle and retains same DOM node on error mutation (NEW-15)', async () => {
+    const { container } = renderModal();
+
+    const assertiveBefore = container.querySelector('[role="alert"]');
+    const politeBefore = container.querySelector('[role="status"]');
+
+    expect(assertiveBefore).not.toBeNull();
+    expect(politeBefore).not.toBeNull();
+    expect(assertiveBefore!.textContent).toBe('');
+    expect(politeBefore!.textContent).toBe('');
+
+    // Trigger validation error
+    const weightInput = screen.getByTestId('edit-set-weight-input');
+    await userEvent.clear(weightInput);
+    fireEvent.click(screen.getByTestId('save-set-btn'));
+
+    await waitFor(() => {
+      expect(assertiveBefore!.textContent).toBe('Please enter a weight (0 for bodyweight).');
+    });
+
+    const assertiveAfter = container.querySelector('[role="alert"]');
+    expect(assertiveAfter).toBe(assertiveBefore);
+    expect(assertiveAfter!.textContent).toBe('Please enter a weight (0 for bodyweight).');
+  });
+
 });
+

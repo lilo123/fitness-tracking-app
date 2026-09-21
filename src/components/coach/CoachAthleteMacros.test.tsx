@@ -35,4 +35,45 @@ describe('CoachAthleteMacros accessibility', () => {
     const { container } = render(<CoachAthleteMacros {...defaultProps} />);
     await expectNoA11yViolations(container);
   });
+
+  it('NEW-15: mounts live regions unconditionally and mutates text in place on status changes', () => {
+    const politeOf = (c: HTMLElement) => c.querySelector('[role="status"]');
+    const assertiveOf = (c: HTMLElement) => c.querySelector('[role="alert"]');
+
+    const { container, rerender } = render(<CoachAthleteMacros {...defaultProps} macroStatus={null} />);
+    const politeBefore = politeOf(container);
+    const assertiveBefore = assertiveOf(container);
+
+    expect(politeBefore).not.toBeNull();
+    expect(assertiveBefore).not.toBeNull();
+    expect(politeBefore!.textContent).toBe('');
+    expect(assertiveBefore!.textContent).toBe('');
+
+    // Success transition
+    rerender(
+      <CoachAthleteMacros
+        {...defaultProps}
+        macroStatus={{ type: 'success', message: 'Athlete nutrition targets updated!' }}
+      />
+    );
+    const politeAfter = politeOf(container);
+    const assertiveAfter = assertiveOf(container);
+
+    expect(politeAfter).toBe(politeBefore);
+    expect(assertiveAfter).toBe(assertiveBefore);
+    expect(politeAfter!.textContent).toBe('Athlete nutrition targets updated!');
+    expect(assertiveAfter!.textContent).toBe('');
+
+    // Error transition
+    rerender(
+      <CoachAthleteMacros
+        {...defaultProps}
+        macroStatus={{ type: 'error', message: 'Failed to update targets' }}
+      />
+    );
+    expect(politeOf(container)).toBe(politeBefore);
+    expect(assertiveOf(container)).toBe(assertiveBefore);
+    expect(politeOf(container)!.textContent).toBe('');
+    expect(assertiveOf(container)!.textContent).toBe('Failed to update targets');
+  });
 });

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+
 import userEvent from '@testing-library/user-event';
 import { WorkoutEngine } from './WorkoutEngine';
 import { HistoryView } from '../history/HistoryView';
@@ -506,8 +507,9 @@ describe('WorkoutEngine', () => {
     fireEvent.click(commitBtn);
 
     await waitFor(() => {
-      expect(screen.getByText('Database connection failed')).toBeDefined();
+      expect(screen.getAllByText('Database connection failed').length).toBeGreaterThanOrEqual(1);
     });
+
   });
 
   it('supports decimal weight input precision (e.g. 22.5 lbs)', async () => {
@@ -572,8 +574,9 @@ describe('WorkoutEngine', () => {
 
     // Should NOT commit and show error
     expect(mockInsert).not.toHaveBeenCalled();
-    expect(screen.getByText('Please enter weight and reps or use previous set values.')).toBeDefined();
+    expect(screen.getAllByText('Please enter weight and reps or use previous set values.').length).toBeGreaterThanOrEqual(1);
   });
+
 
   it('displays mutation error when batch logging an exercise that cannot be resolved to a UUID', async () => {
     (supabase.from as any).mockImplementation((table: string) => {
@@ -624,9 +627,10 @@ describe('WorkoutEngine', () => {
     fireEvent.click(batchBtn);
 
     await waitFor(() => {
-      expect(screen.getByText(/cannot be resolved to a valid UUID/i)).toBeDefined();
+      expect(screen.getAllByText(/cannot be resolved to a valid UUID/i).length).toBeGreaterThanOrEqual(1);
     });
   });
+
 
   it('preserves uncompleted exercises when existing logged sets exist for today', async () => {
     const today = getLocalDateStr(new Date());
@@ -993,8 +997,9 @@ describe('WorkoutEngine', () => {
     fireEvent.click(commitBtn);
 
     expect(mockInsert).not.toHaveBeenCalled();
-    expect(screen.getByText('Please enter weight and reps or use previous set values.')).toBeDefined();
+    expect(screen.getAllByText('Please enter weight and reps or use previous set values.').length).toBeGreaterThanOrEqual(1);
   });
+
 
   it('clamps stepper decrement so target sets cannot drop below already logged sets count', async () => {
     const todaySets = [
@@ -1162,9 +1167,10 @@ describe('WorkoutEngine', () => {
     fireEvent.click(commitBtn);
 
     await waitFor(() => {
-      expect(screen.getByText('Please enter weight and reps or use previous set values.')).toBeDefined();
+      expect(screen.getAllByText('Please enter weight and reps or use previous set values.').length).toBeGreaterThanOrEqual(1);
     });
     expect(mockInsert).not.toHaveBeenCalled();
+
   });
 
   it('renders 0 instead of lbs in placeholder and BW in PR badge when ghost set weight is 0', async () => {
@@ -2349,11 +2355,14 @@ describe('WorkoutEngine', () => {
 
         // Verify error banner and Retry button render in DOM
         await waitFor(() => {
-          expect(screen.getByTestId('workout-logs-error')).toBeDefined();
-          expect(screen.getByText('Failed to load workout history')).toBeDefined();
-          expect(screen.getByText(/Database connection failed/i)).toBeDefined();
+          const banner = screen.getByTestId('workout-logs-error');
+          expect(banner).toBeDefined();
+          expect(within(banner).getByText(/Failed to load workout history/)).toBeDefined();
+          expect(within(banner).getByText(/Database connection failed/i)).toBeDefined();
           expect(screen.getByTestId('retry-logs-btn')).toBeDefined();
         });
+
+
 
         // Allow retry to succeed
         failWorkouts = false;
@@ -2364,6 +2373,47 @@ describe('WorkoutEngine', () => {
           expect(screen.queryByTestId('workout-logs-error')).toBeNull();
         });
       });
+
+      it('mounts workout-logs-error live region empty while idle and retains same DOM node on error (NEW-15)', async () => {
+        let failWorkouts = true;
+        (supabase.from as any).mockImplementation((table: string) => {
+          if (table === 'workouts') {
+            return createSupabaseBuilder('workouts', {
+              resolver: () => {
+                if (failWorkouts) {
+                  return { data: null, error: new Error('Database connection failed (HTTP 500)') };
+                }
+                return { data: [], error: null };
+              },
+            });
+          }
+          return createSupabaseBuilder(table, { data: [], error: null });
+        });
+
+        const { container } = renderComponent();
+
+        // 2 live regions must be mounted: WorkoutHeader + WorkoutEngine logs banner
+        const alerts = container.querySelectorAll('[role="alert"]');
+        expect(alerts.length).toBe(2);
+        const logsAlert = alerts[1];
+
+        // On error, logsAlert contains error message
+        await waitFor(() => {
+          expect(logsAlert.textContent).toContain('Failed to load workout history');
+        });
+
+        // After retry succeeds, logsAlert is still the exact same DOM node and is empty
+        failWorkouts = false;
+        fireEvent.click(screen.getByTestId('retry-logs-btn'));
+
+        await waitFor(() => {
+          expect(screen.queryByTestId('workout-logs-error')).toBeNull();
+        });
+
+        expect(container.querySelectorAll('[role="alert"]')[1]).toBe(logsAlert);
+        expect(logsAlert.textContent).toBe('');
+      });
+
 
       it('disambiguates 90-day workout history cache from all-time history cache without cross-pollution (FIX-05)', async () => {
         const targetUserId = '00000000-0000-4000-8000-000000000001';

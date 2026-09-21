@@ -517,10 +517,62 @@ describe('HistoryView', () => {
     openMealAction('log-1', 'delete');
 
     await waitFor(() => {
-      expect(screen.getByTestId('history-mutation-error')).toBeDefined();
-      expect(screen.getByText('Database deletion failed')).toBeDefined();
+      const banner = screen.getByTestId('history-mutation-error');
+      expect(banner).toBeDefined();
+      expect(within(banner).getByText('Database deletion failed')).toBeDefined();
     });
   });
+
+  it('mounts history-mutation-error live region empty while idle and updates on mutation failure (NEW-15)', async () => {
+    mockDeleteEq.mockResolvedValueOnce({ error: { message: 'Database deletion failed' } });
+
+    const { container } = renderComponent();
+
+    const alerts = container.querySelectorAll('[role="alert"]');
+    expect(alerts.length).toBeGreaterThanOrEqual(2);
+    const mutationAlert = alerts[0];
+    expect(mutationAlert.textContent).toBe('');
+
+    fireEvent.click(screen.getByTestId('history-tab-nutrition'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('meal-actions-log-1')).toBeDefined();
+    });
+
+    openMealAction('log-1', 'delete');
+
+    await waitFor(() => {
+      expect(mutationAlert.textContent).toContain('Database deletion failed');
+    });
+
+    expect(screen.getByTestId('history-mutation-error')).toBeDefined();
+    expect(container.querySelectorAll('[role="alert"]')[0]).toBe(mutationAlert);
+  });
+
+  it('mounts history-read-error live region empty while idle and updates on read failure (NEW-15)', async () => {
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'workouts') {
+        const b = createSupabaseBuilder('workouts', { data: null, error: { message: 'Network connection lost' } });
+        return b;
+      }
+      return createSupabaseBuilder(table, { data: [], error: null });
+    });
+
+    const { container } = renderComponent();
+
+    const alerts = container.querySelectorAll('[role="alert"]');
+    expect(alerts.length).toBeGreaterThanOrEqual(2);
+    const readAlert = alerts[1];
+    expect(readAlert.textContent).toBe('');
+
+    await waitFor(() => {
+      expect(readAlert.textContent).toContain('Failed to load history data');
+    });
+
+    expect(screen.getByTestId('history-read-error')).toBeDefined();
+    expect(container.querySelectorAll('[role="alert"]')[1]).toBe(readAlert);
+  });
+
 
   it('opens Edit Meal modal pre-filled with meal values when Edit button is clicked in nutrition history', async () => {
     renderComponent();
@@ -630,10 +682,12 @@ describe('HistoryView', () => {
     fireEvent.click(screen.getByTestId('save-edit-meal-btn'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('edit-meal-error')).toBeDefined();
-      expect(screen.getByText('Database update failed')).toBeDefined();
+      const banner = screen.getByTestId('edit-meal-error');
+      expect(banner).toBeDefined();
+      expect(within(banner).getByText('Database update failed')).toBeDefined();
     });
   });
+
 
   it('allows canceling edit modal without submitting update', async () => {
     renderComponent();
@@ -675,10 +729,12 @@ describe('HistoryView', () => {
 
     fireEvent.click(screen.getByTestId('save-edit-meal-btn'));
 
-    expect(screen.getByTestId('edit-meal-error')).toBeDefined();
-    expect(screen.getByText('Meal name is required')).toBeDefined();
+    const banner = screen.getByTestId('edit-meal-error');
+    expect(banner).toBeDefined();
+    expect(within(banner).getByText('Meal name is required')).toBeDefined();
     expect(mockUpdate).not.toHaveBeenCalled();
   });
+
 
   it('clamps negative numbers and defaults invalid serving size when updating', async () => {
     renderComponent();

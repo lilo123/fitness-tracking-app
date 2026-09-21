@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   AlertCircle,
 } from 'lucide-react';
+import { StatusBanner } from '../common/StatusBanner';
 
 interface CoachSettingsCardProps {
   profile: UserProfile | null;
@@ -115,22 +116,17 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
               {isSavingCode ? 'Activating...' : 'Activate Mode'}
             </button>
           </div>
-          {coachCodeStatus && (
-            <div
-              className={`p-2.5 rounded-xl text-xs flex items-center gap-2 ${
-                coachCodeStatus.type === 'error'
-                  ? 'bg-rose-500/15 border border-rose-500/30 text-rose-300'
-                  : 'bg-cyan-500/15 border border-cyan-500/30 text-cyan-300'
-              }`}
-            >
-              {coachCodeStatus.type === 'error' ? (
-                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+          <StatusBanner
+            message={coachCodeStatus?.message}
+            tone={coachCodeStatus?.type === 'error' ? 'error' : 'success'}
+            icon={
+              coachCodeStatus?.type === 'error' ? (
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />
               ) : (
-                <CheckCircle2 className="w-4 h-4 shrink-0" />
-              )}
-              <span>{coachCodeStatus.message}</span>
-            </div>
-          )}
+                <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />
+              )
+            }
+          />
         </form>
       </div>
     );
@@ -205,23 +201,18 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
             </button>
           </div>
 
-          {coachCodeStatus && (
-            <div
-              data-testid="coach-code-status"
-              className={`p-2.5 rounded-xl text-xs flex items-center gap-2 ${
-                coachCodeStatus.type === 'error'
-                  ? 'bg-rose-500/15 border border-rose-500/30 text-rose-300'
-                  : 'bg-cyan-500/15 border border-cyan-500/30 text-cyan-300'
-              }`}
-            >
-              {coachCodeStatus.type === 'error' ? (
-                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+          <StatusBanner
+            testId="coach-code-status"
+            message={coachCodeStatus?.message}
+            tone={coachCodeStatus?.type === 'error' ? 'error' : 'success'}
+            icon={
+              coachCodeStatus?.type === 'error' ? (
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />
               ) : (
-                <CheckCircle2 className="w-4 h-4 shrink-0" />
-              )}
-              <span>{coachCodeStatus.message}</span>
-            </div>
-          )}
+                <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />
+              )
+            }
+          />
         </form>
       </div>
     </div>

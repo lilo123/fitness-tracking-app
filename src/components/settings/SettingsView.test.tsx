@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { SettingsView } from './SettingsView';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -105,7 +105,11 @@ describe('SettingsView', () => {
     fireEvent.click(saveBtn);
 
     await waitFor(() => {
-      expect(screen.getByText('Settings saved')).toBeDefined();
+      // Scoped to the banner: StatusBanner deliberately renders the message in
+      // both its permanently-mounted sr-only live region and the visible
+      // banner, so an unscoped getByText matches two nodes.
+      const banner = screen.getByTestId('settings-status-banner');
+      expect(within(banner).getByText('Settings saved')).toBeDefined();
     });
   });
 
@@ -184,7 +188,9 @@ describe('SettingsView', () => {
       const banner = screen.getByTestId('settings-status-banner');
       expect(banner).toBeDefined();
       expect(banner.className).toContain('text-rose-300');
-      expect(screen.getByText(/Failed to save settings: Database write error/i)).toBeDefined();
+      expect(
+        within(banner).getByText(/Failed to save settings: Database write error/i)
+      ).toBeDefined();
     });
   });
 
@@ -214,7 +220,11 @@ describe('SettingsView', () => {
       expect(supabase.rpc).toHaveBeenCalledWith('set_coach_code', { custom_code: 'COACH-TEST' });
     });
 
-    expect(await screen.findByText('Coach code updated successfully!')).toBeDefined();
+    expect(
+      within(await screen.findByTestId('coach-code-status')).getByText(
+        'Coach code updated successfully!'
+      )
+    ).toBeDefined();
   });
 
   it('rejects vanity code shorter than 4 characters with client-side validation error', async () => {
@@ -227,7 +237,11 @@ describe('SettingsView', () => {
     const saveBtn = screen.getByTestId('save-vanity-code-btn');
     fireEvent.click(saveBtn);
 
-    expect(await screen.findByText(/Code must be 4-20 characters long/)).toBeDefined();
+    expect(
+      within(await screen.findByTestId('coach-code-status')).getByText(
+        /Code must be 4-20 characters long/
+      )
+    ).toBeDefined();
     expect(supabase.rpc).not.toHaveBeenCalledWith('set_coach_code', expect.anything());
   });
 
@@ -245,7 +259,11 @@ describe('SettingsView', () => {
       expect(supabase.rpc).toHaveBeenCalledWith('set_coach_code', { custom_code: 'COACH_DUY' });
     });
 
-    expect(await screen.findByText('Coach code updated successfully!')).toBeDefined();
+    expect(
+      within(await screen.findByTestId('coach-code-status')).getByText(
+        'Coach code updated successfully!'
+      )
+    ).toBeDefined();
   });
 
   it('displays free tier badge when coach_tier is not set', async () => {
@@ -292,7 +310,11 @@ describe('SettingsView', () => {
       expect(supabase.rpc).toHaveBeenCalledWith('link_to_coach', { input_code: 'CYBER-DEMO01' });
     });
 
-    expect(await screen.findByText('Successfully linked to coach!')).toBeDefined();
+    expect(
+      within(await screen.findByTestId('link-coach-status')).getByText(
+        'Successfully linked to coach!'
+      )
+    ).toBeDefined();
   });
 
   it('allows disconnecting from coach via disconnect_coach RPC when linked', async () => {
@@ -346,7 +368,13 @@ describe('SettingsView', () => {
       expect(supabase.rpc).toHaveBeenCalledWith('disconnect_coach');
     });
 
-    expect(await screen.findByText('Successfully disconnected from coach.')).toBeDefined();
+    // StatusBanner renders the copy twice: once in the always-mounted sr-only
+    // live region and once in the visible banner, so scope to the banner.
+    expect(
+      within(await screen.findByTestId('link-coach-status')).getByText(
+        'Successfully disconnected from coach.'
+      )
+    ).toBeDefined();
   });
 
   it('renders auto-start rest timer toggle switch with an accessible name (NEW-25)', async () => {

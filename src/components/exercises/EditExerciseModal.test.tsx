@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { EditExerciseModal } from './EditExerciseModal';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { expectNoA11yViolationsForRules } from '../../test/a11y';
+import { supabase } from '../../lib/supabase';
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
@@ -48,4 +49,35 @@ describe('EditExerciseModal', () => {
     );
     await expectNoA11yViolationsForRules(container, ['label']);
   });
+
+  it('mounts edit-exercise-error live region empty while idle and retains same node on error (NEW-15)', async () => {
+    (supabase.from as any).mockReturnValue({
+      update: vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: new Error('Failed to update exercise in DB') }),
+      }),
+    });
+
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <EditExerciseModal {...mockProps} />
+      </QueryClientProvider>
+    );
+
+    // Live region exists and is empty while idle
+    const alert = container.querySelector('[role="alert"]');
+    expect(alert).not.toBeNull();
+    expect(alert?.textContent).toBe('');
+
+    // Trigger save failure
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(alert?.textContent).toBe('Failed to update exercise in DB');
+      expect(screen.getByTestId('edit-exercise-error')).toBeDefined();
+    });
+
+    // Alert DOM node is identical
+    expect(container.querySelector('[role="alert"]')).toBe(alert);
+  });
 });
+

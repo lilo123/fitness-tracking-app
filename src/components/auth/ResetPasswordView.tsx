@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { Lock, AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react';
+import { StatusBanner } from '../common/StatusBanner';
 
 export const ResetPasswordView: React.FC = () => {
   const { resetPassword } = useAuth();
@@ -53,19 +54,21 @@ export const ResetPasswordView: React.FC = () => {
       </div>
 
       <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-6 shadow-2xl backdrop-blur-xl">
-        {error && (
-          <div className="mb-4 p-3 bg-rose-500/15 border border-rose-500/30 rounded-xl text-rose-400 text-xs flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
+        <StatusBanner
+          message={error || (success ? 'Password Updated Successfully!' : null)}
+          tone={error ? 'error' : 'success'}
+          icon={
+            error ? (
+              <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
+            ) : (
+              <CheckCircle2 className="w-5 h-5 shrink-0" aria-hidden="true" />
+            )
+          }
+          className={`mb-4 ${success ? 'justify-center' : ''}`}
+        />
 
         {success ? (
           <div className="space-y-6 text-center">
-            <div className="mb-4 p-3 bg-emerald-500/15 border border-emerald-500/30 rounded-xl text-emerald-400 text-xs flex items-center justify-center gap-2">
-              <CheckCircle2 className="w-5 h-5 shrink-0" />
-              <span className="font-bold text-sm">Password Updated Successfully!</span>
-            </div>
             <p className="text-zinc-400 text-xs uppercase tracking-wider">Redirecting you to the app...</p>
           </div>
         ) : (

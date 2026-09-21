@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { ExercisePickerSheet } from './ExercisePickerSheet';
 import { TemplateExerciseItem } from './TemplateExerciseItem';
+import { StatusBanner } from '../common/StatusBanner';
+
 
 const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -375,15 +377,14 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
         )}
 
         {/* Error Banner */}
-        {error && (
-          <div
-            data-testid="template-error"
-            className="mx-6 mt-3 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs flex items-center gap-2 shrink-0"
-          >
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
+        <StatusBanner
+          message={error}
+          tone="error"
+          testId="template-error"
+          className="mx-6 mt-3 shrink-0"
+          icon={<AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />}
+        />
+
 
         {/* Single Fluid Scroll Body (NO NESTED SCROLL TRAPS) */}
         <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-5 space-y-5">

@@ -12,6 +12,7 @@ import {
   AlertCircle,
   RotateCcw,
 } from 'lucide-react';
+import { StatusBanner } from '../common/StatusBanner';
 import { FALLBACK_WINDOW } from '../history/virtualizationConstants';
 
 export interface CoachWorkoutSet {
@@ -327,6 +328,13 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
     );
   };
 
+  const athleteErrorMessage = activeError instanceof Error
+    ? activeError.message
+    : typeof activeError === 'string'
+    ? activeError
+    : (activeError as unknown as { message?: string })?.message || 'Unable to load athlete workout history. Please try again.';
+  const showTimelineError = Boolean(selectedAthleteId && hasError);
+
   return (
     <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-5 shadow-2xl space-y-4">
       <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
@@ -341,29 +349,14 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
         )}
       </div>
 
-      {!selectedAthleteId ? (
-        <div className="p-6 text-center text-zinc-400 text-xs">
-          Select an athlete above to view their training history and nutrition timeline.
-        </div>
-      ) : hasError ? (
-        <div
-          data-testid="coach-timeline-error"
-          className="bg-rose-500/15 border border-rose-500/40 text-rose-300 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-lg"
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <AlertCircle className="w-5 h-5 shrink-0 text-rose-400" />
-            <div className="min-w-0">
-              <div className="font-bold text-white text-sm">Failed to load athlete workouts</div>
-              <div className="text-rose-300/90 text-xs">
-                {activeError instanceof Error
-                  ? activeError.message
-                  : typeof activeError === 'string'
-                  ? activeError
-                  : (activeError as unknown as { message?: string })?.message || 'Unable to load athlete workout history. Please try again.'}
-              </div>
-            </div>
-          </div>
-          {handleRetry && (
+      <StatusBanner
+        title={showTimelineError ? 'Failed to load athlete workouts' : null}
+        message={showTimelineError ? athleteErrorMessage : null}
+        tone="error"
+        testId="coach-timeline-error"
+        icon={<AlertCircle className="w-5 h-5 shrink-0 text-rose-400" aria-hidden="true" />}
+        action={
+          handleRetry ? (
             <button
               type="button"
               onClick={handleRetry}
@@ -373,9 +366,15 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
               <RotateCcw className="w-4 h-4 shrink-0" />
               <span>Retry</span>
             </button>
-          )}
+          ) : undefined
+        }
+      />
+
+      {!selectedAthleteId ? (
+        <div className="p-6 text-center text-zinc-400 text-xs">
+          Select an athlete above to view their training history and nutrition timeline.
         </div>
-      ) : timelineDays.length === 0 ? (
+      ) : hasError ? null : timelineDays.length === 0 ? (
         <div className="p-6 text-center text-zinc-400 text-xs">
           No workouts or nutrition logged for this athlete yet.
         </div>

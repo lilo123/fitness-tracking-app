@@ -24,6 +24,7 @@ import { CustomDishesModal } from './CustomDishesModal';
 import { Utensils, CheckCircle2, AlertCircle, RotateCcw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useQueryClient } from '@tanstack/react-query';
+import { StatusBanner } from '../common/StatusBanner';
 
 export { type StagedItem, stagedToItem, stagedReference, type StagedMeal } from './nutritionEngineHelpers';
 
@@ -347,31 +348,30 @@ export const NutritionEngine: React.FC = () => {
         onDismissToast={dismissToast}
       />
 
-      {(dishFetchError || dishModal.dishFetchError) && (
-        <div
-          role="alert"
-          data-testid="dish-fetch-error"
-          className="flex items-center justify-between gap-2 rounded-xl border border-rose-500/30 bg-rose-500/15 p-3 text-xs font-bold text-rose-300 shadow-lg"
-        >
-          <span className="truncate">
-            {dishFetchError?.message || dishModal.dishFetchError?.message}
-          </span>
-          <button
-            type="button"
-            data-testid="dish-fetch-retry"
-            onClick={() => {
-              if (dishFetchError) {
-                dishFetchError.retry();
-              } else if (dishModal.dishFetchError) {
-                dishModal.dishFetchError.retry();
-              }
-            }}
-            className="shrink-0 rounded border border-rose-400/40 bg-rose-500/20 px-2.5 py-1 text-xs font-bold text-rose-200 hover:bg-rose-500/30 touch-manipulation"
-          >
-            Retry
-          </button>
-        </div>
-      )}
+      <StatusBanner
+        message={dishFetchError?.message || dishModal.dishFetchError?.message || null}
+        tone="error"
+        testId="dish-fetch-error"
+        className="shadow-lg"
+        action={
+          (dishFetchError || dishModal.dishFetchError) && (
+            <button
+              type="button"
+              data-testid="dish-fetch-retry"
+              onClick={() => {
+                if (dishFetchError) {
+                  dishFetchError.retry();
+                } else if (dishModal.dishFetchError) {
+                  dishModal.dishFetchError.retry();
+                }
+              }}
+              className="shrink-0 rounded border border-rose-400/40 bg-rose-500/20 px-2.5 py-1 text-xs font-bold text-rose-200 hover:bg-rose-500/30 touch-manipulation"
+            >
+              Retry
+            </button>
+          )
+        }
+      />
 
       <NutritionAiInput
         nlInput={ai.nlInput}
@@ -450,41 +450,44 @@ export const NutritionEngine: React.FC = () => {
           </div>
         </div>
 
-        {isReadError ? (
-          <div
-            data-testid="nutrition-read-error"
-            className="bg-rose-500/15 border border-rose-500/40 text-rose-300 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-lg"
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <AlertCircle className="w-5 h-5 shrink-0 text-rose-400" />
-              <div className="min-w-0">
-                <div className="font-bold text-white text-sm">Failed to load nutrition logs</div>
-                <div className="text-rose-300/90 text-xs">
-                  {readError instanceof Error
+        <StatusBanner
+          message={
+            isReadError
+              ? `Failed to load nutrition logs: ${
+                  readError instanceof Error
                     ? readError.message
                     : typeof readError === 'string'
                     ? readError
-                    : (readError as any)?.message || 'Unable to load nutrition data. Please try again.'}
-                </div>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                void refetchRead();
-              }}
-              data-testid="retry-nutrition-btn"
-              className="flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-rose-200 bg-rose-500/20 hover:bg-rose-500/30 active:scale-95 border border-rose-500/40 rounded-xl transition touch-manipulation min-h-[44px] min-w-[44px] shrink-0 cursor-pointer"
-            >
-              <RotateCcw className="w-4 h-4 shrink-0" />
-              <span>Retry</span>
-            </button>
-          </div>
-        ) : todayLogs.length === 0 ? (
+                    : (readError as any)?.message || 'Unable to load nutrition data. Please try again.'
+                }`
+              : null
+          }
+          tone="error"
+          testId="nutrition-read-error"
+          className="rounded-2xl p-4 flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg"
+          icon={<AlertCircle className="w-5 h-5 shrink-0 text-rose-400" aria-hidden="true" />}
+          action={
+            isReadError && (
+              <button
+                type="button"
+                onClick={() => {
+                  void refetchRead();
+                }}
+                data-testid="retry-nutrition-btn"
+                className="flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-rose-200 bg-rose-500/20 hover:bg-rose-500/30 active:scale-95 border border-rose-500/40 rounded-xl transition touch-manipulation min-h-[44px] min-w-[44px] shrink-0 cursor-pointer"
+              >
+                <RotateCcw className="w-4 h-4 shrink-0" aria-hidden="true" />
+                <span>Retry</span>
+              </button>
+            )
+          }
+        />
+
+        {!isReadError && todayLogs.length === 0 ? (
           <div className="p-6 text-center text-zinc-500 text-xs">
             No meals logged for this date yet.
           </div>
-        ) : (
+        ) : !isReadError ? (
           <div className="space-y-2">
             {todayLogs.map((log) => (
               <MealLogRow
@@ -511,7 +514,7 @@ export const NutritionEngine: React.FC = () => {
               />
             ))}
           </div>
-        )}
+        ) : null}
       </div>
 
       <CustomDishesModal
@@ -541,33 +544,38 @@ export const NutritionEngine: React.FC = () => {
       />
 
       {/* Floating Quick-Log Toast */}
-      {activeToast && (
-        <div
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-          data-testid="quick-log-toast"
-          onClick={dismissToast}
+      <div
+        onClick={activeToast ? dismissToast : undefined}
+        className={activeToast ? undefined : 'contents'}
+      >
+        <StatusBanner
+          message={activeToast ? activeToast.name : null}
+          tone="success"
+          testId="quick-log-toast"
           className={`fixed ${
             isTimerActive
               ? 'bottom-[calc(9.25rem+env(safe-area-inset-bottom,0px))]'
               : 'bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))]'
           } left-1/2 -translate-x-1/2 z-50 max-w-sm w-[calc(100%-2rem)] bg-zinc-900/95 border border-cyan-500/50 backdrop-blur-xl shadow-2xl shadow-cyan-500/20 rounded-2xl p-3.5 flex items-center justify-between gap-3 text-xs font-bold text-white transition-all duration-200 animate-in fade-in slide-in-from-bottom-3 cursor-pointer touch-manipulation select-none`}
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-            </div>
-            <div className="truncate min-w-0">
-              <span className="text-zinc-400 font-medium">Logged: </span>
-              <span className="text-white font-bold">{activeToast.name}</span>
-            </div>
-          </div>
-          <div className="shrink-0 px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-400 font-mono text-[11px] font-black">
-            +{activeToast.calories} kcal
-          </div>
-        </div>
-      )}
+          icon={
+            activeToast && (
+              <div className="flex items-center gap-2.5 min-w-0 shrink-0">
+                <div className="w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
+                </div>
+                <span className="text-zinc-400 font-medium">Logged:&nbsp;</span>
+              </div>
+            )
+          }
+          action={
+            activeToast && (
+              <div className="shrink-0 px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-400 font-mono text-[11px] font-black">
+                +{activeToast.calories} kcal
+              </div>
+            )
+          }
+        />
+      </div>
 
       {/* Edit Meal Modal */}
       <EditMealModal

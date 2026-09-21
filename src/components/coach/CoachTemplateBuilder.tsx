@@ -1,6 +1,7 @@
 import React, { useId } from 'react';
 import type { Exercise, RoutineTemplate } from '../../types/database';
 import { Layers, Plus, Trash2, CheckCircle2 } from 'lucide-react';
+import { StatusBanner } from '../common/StatusBanner';
 
 interface SelectedTemplateExercise {
   exerciseId: string;
@@ -197,12 +198,11 @@ export const CoachTemplateBuilder: React.FC<CoachTemplateBuilderProps> = ({
             {isSaving ? 'Saving Template...' : 'Save Template'}
           </button>
 
-          {status && (
-            <div className="p-3 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs flex items-center gap-2 min-w-0">
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span className="min-w-0 flex-1 break-words">{status}</span>
-            </div>
-          )}
+          <StatusBanner
+            message={status || null}
+            tone="success"
+            icon={<CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />}
+          />
         </div>
       </div>
 

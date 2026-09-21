@@ -18,6 +18,8 @@ import {
 import { EditTemplateModal } from './EditTemplateModal';
 import { EditExerciseModal } from './EditExerciseModal';
 import { isValidUUID } from '../workout/workoutEngineHelpers';
+import { StatusBanner } from '../common/StatusBanner';
+
 
 const MUSCLE_TAXONOMY = {
   "Chest": ["chest", "pecs", "pectoral", "upper chest", "lower chest"],
@@ -219,26 +221,26 @@ export const ExercisesView: React.FC = () => {
       </div>
  
       {/* Read Error Banner */}
-      {isReadError && (
-        <div
-          data-testid="exercises-read-error"
-          className="bg-rose-500/15 border border-rose-500/40 text-rose-300 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-lg mb-4"
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <AlertCircle className="w-5 h-5 shrink-0 text-rose-400" />
-            <div className="min-w-0">
-              <div className="font-bold text-white text-sm">
-                Failed to load {activeTab === 'exercises' ? 'exercises' : 'routine templates'}
-              </div>
-              <div className="text-rose-300/90 text-xs">
-                {readError instanceof Error
-                  ? readError.message
-                  : typeof readError === 'string'
-                  ? readError
-                  : (readError as any)?.message || 'Unable to load exercise data. Please try again.'}
-              </div>
-            </div>
-          </div>
+      <StatusBanner
+        title={
+          isReadError
+            ? `Failed to load ${activeTab === 'exercises' ? 'exercises' : 'routine templates'}`
+            : null
+        }
+        message={
+          isReadError
+            ? readError instanceof Error
+              ? readError.message
+              : typeof readError === 'string'
+              ? readError
+              : (readError as any)?.message || 'Unable to load exercise data. Please try again.'
+            : null
+        }
+        tone="error"
+        testId="exercises-read-error"
+        className="mb-4"
+        icon={<AlertCircle className="w-5 h-5 shrink-0 text-rose-400" aria-hidden="true" />}
+        action={
           <button
             type="button"
             onClick={handleRetryExercises}
@@ -248,8 +250,9 @@ export const ExercisesView: React.FC = () => {
             <RotateCcw className="w-4 h-4 shrink-0" />
             <span>Retry</span>
           </button>
-        </div>
-      )}
+        }
+      />
+
 
       {activeTab === 'exercises' && (
         <div className="space-y-6">
@@ -309,12 +312,14 @@ export const ExercisesView: React.FC = () => {
             <h3 className="font-black text-white text-base mb-3 flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-cyan-400" /> Exercise Library ({exercises.length})
             </h3>
-            {deleteError && (
-              <div className="mb-3 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-400 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{deleteError}</span>
-              </div>
-            )}
+            {/* Delete Error Banner */}
+            <StatusBanner
+              message={deleteError}
+              tone="error"
+              className="mb-3"
+              icon={<AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />}
+            />
+
             <div className="space-y-2">
               {!isReadError && exercises.length === 0 && (
                 <div className="p-8 text-center bg-zinc-900/40 border border-zinc-800/60 rounded-2xl text-xs text-zinc-500">

@@ -12,6 +12,7 @@ import { CoachAthleteSwitcher } from './CoachAthleteSwitcher';
 import { CoachAthleteTimeline, type TimelineDay, type CoachWorkoutSet } from './CoachAthleteTimeline';
 import { CoachAthleteMacros } from './CoachAthleteMacros';
 import { CoachTemplateBuilder } from './CoachTemplateBuilder';
+import { StatusBanner } from '../common/StatusBanner';
 
 const SETS_PAGE_LIMIT = 500;
 
@@ -422,6 +423,11 @@ export const CoachCockpit: React.FC = () => {
 
   const isCoachReadError = isExercisesError || isTemplatesError || isAthleteNutritionError || isAthleteProfileError;
   const coachReadError = exercisesError || templatesError || athleteNutritionError || athleteProfileError;
+  const coachReadErrorMessage = coachReadError instanceof Error
+    ? coachReadError.message
+    : typeof coachReadError === 'string'
+    ? coachReadError
+    : (coachReadError as unknown as { message?: string })?.message || 'Unable to load coach data. Please try again.';
   const handleRetryCoachRead = () => {
     void refetchExercises();
     void refetchTemplates();
@@ -454,24 +460,14 @@ export const CoachCockpit: React.FC = () => {
       </div>
 
       {/* Coach Read Error Banner */}
-      {isCoachReadError && (
-        <div
-          data-testid="coach-read-error"
-          className="bg-rose-500/15 border border-rose-500/40 text-rose-300 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-lg mb-4"
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <AlertCircle className="w-5 h-5 shrink-0 text-rose-400" />
-            <div className="min-w-0">
-              <div className="font-bold text-white text-sm">Failed to load coach dashboard data</div>
-              <div className="text-rose-300/90 text-xs">
-                {coachReadError instanceof Error
-                  ? coachReadError.message
-                  : typeof coachReadError === 'string'
-                  ? coachReadError
-                  : (coachReadError as any)?.message || 'Unable to load coach data. Please try again.'}
-              </div>
-            </div>
-          </div>
+      <StatusBanner
+        title={isCoachReadError ? 'Failed to load coach dashboard data' : null}
+        message={isCoachReadError ? coachReadErrorMessage : null}
+        tone="error"
+        testId="coach-read-error"
+        className="mb-4"
+        icon={<AlertCircle className="w-5 h-5 shrink-0 text-rose-400" aria-hidden="true" />}
+        action={
           <button
             type="button"
             onClick={handleRetryCoachRead}
@@ -481,8 +477,8 @@ export const CoachCockpit: React.FC = () => {
             <RotateCcw className="w-4 h-4 shrink-0" />
             <span>Retry</span>
           </button>
-        </div>
-      )}
+        }
+      />
 
       {/* Segmented Tab Controls (Visible only on mobile <640px) */}
       <div className="flex sm:hidden bg-zinc-900 p-1 rounded-2xl border border-zinc-800 gap-1">

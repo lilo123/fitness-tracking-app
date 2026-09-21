@@ -88,7 +88,7 @@ describe('LoginView', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Create Account' }));
 
-    expect(await screen.findByText('Password must be at least 6 characters')).toBeDefined();
+    expect(await screen.findAllByText('Password must be at least 6 characters')).toBeDefined();
     expect(mockSignUp).not.toHaveBeenCalled();
   });
 
@@ -107,7 +107,7 @@ describe('LoginView', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Create Account' }));
 
-    expect(await screen.findByText('Passwords do not match')).toBeDefined();
+    expect(await screen.findAllByText('Passwords do not match')).toBeDefined();
     expect(mockSignUp).not.toHaveBeenCalled();
   });
 
@@ -125,7 +125,7 @@ describe('LoginView', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Send Reset Link' }));
 
-    expect(await screen.findByText('Password reset link sent! Check your inbox.')).toBeDefined();
+    expect(await screen.findAllByText('Password reset link sent! Check your inbox.')).toBeDefined();
     expect(mockResetPasswordForEmail).toHaveBeenCalledWith(
       'athlete@cybergym.io',
       expect.objectContaining({ redirectTo: expect.stringContaining('/reset-password') })
@@ -195,6 +195,38 @@ describe('LoginView', () => {
 
     // axe-core check
     await expectNoA11yViolations(container);
+  });
+
+  it('mounts live regions while idle and mutates in place on auth error and info messages (WCAG SC 4.1.3)', async () => {
+    const { container } = renderComponent();
+
+    const politeRegions = container.querySelectorAll('[role="status"]');
+    const assertiveRegions = container.querySelectorAll('[role="alert"]');
+
+    // Live regions must be mounted and empty while idle
+    expect(politeRegions.length).toBeGreaterThanOrEqual(1);
+    expect(assertiveRegions.length).toBeGreaterThanOrEqual(1);
+    expect(politeRegions[0].textContent).toBe('');
+    expect(assertiveRegions[0].textContent).toBe('');
+
+    // Trigger validation error on register
+    const { fireEvent } = await import('@testing-library/react');
+    const registerTab = screen.getByRole('button', { name: 'Register' });
+    fireEvent.click(registerTab);
+
+    const emailInput = screen.getByPlaceholderText('athlete@cybergym.io');
+    const [passwordInput, confirmInput] = screen.getAllByPlaceholderText('••••••••');
+    const submitBtn = screen.getByRole('button', { name: 'Create Account' });
+
+    fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
+    fireEvent.change(passwordInput, { target: { value: '123' } });
+    fireEvent.change(confirmInput, { target: { value: '123' } });
+    fireEvent.click(submitBtn);
+
+    // Assert assertive live region received error text on the SAME element
+    const updatedAssertive = container.querySelectorAll('[role="alert"]')[0];
+    expect(updatedAssertive).toBe(assertiveRegions[0]);
+    expect(updatedAssertive.textContent).toContain('Password must be at least 6 characters');
   });
 });
 

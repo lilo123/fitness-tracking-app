@@ -113,4 +113,62 @@ describe('StatusBanner', () => {
     const erroring = render(<StatusBanner message="Something broke" tone="error" testId="b" />);
     await expectNoA11yViolations(erroring.container);
   });
+  it('renders title and message as two visible tiers but announces them as one sentence', () => {
+    const { container } = render(
+      <StatusBanner
+        title="Failed to load history data"
+        message="Network request failed"
+        tone="error"
+        testId="two-tier"
+      />
+    );
+
+    const banner = container.querySelector('[data-testid="two-tier"]')!;
+
+    // Two tiers on screen: the headline is its own node, so it can be bold and
+    // white while the detail stays subdued. If someone re-flattens this into a
+    // single string, the headline stops being a separate element and this fails.
+    const headline = Array.from(banner.querySelectorAll('div')).find(
+      (el) => el.textContent === 'Failed to load history data'
+    );
+    expect(headline).toBeDefined();
+    expect(headline!.className).toContain('font-bold');
+
+    const detailNode = Array.from(banner.querySelectorAll('div')).find(
+      (el) => el.textContent === 'Network request failed'
+    );
+    expect(detailNode).toBeDefined();
+    expect(detailNode!.className).toContain('font-normal');
+
+    // One utterance, not two fragments.
+    expect(assertiveOf(container)!.textContent).toBe(
+      'Failed to load history data: Network request failed'
+    );
+    expect(politeOf(container)!.textContent).toBe('');
+  });
+
+  it('keeps the live regions mounted across the idle -> two-tier transition', () => {
+    const { container, rerender } = render(<StatusBanner tone="error" />);
+    const assertiveBefore = assertiveOf(container);
+    expect(assertiveBefore!.textContent).toBe('');
+
+    rerender(<StatusBanner title="Failed to load" message="Boom" tone="error" />);
+
+    expect(assertiveOf(container)).toBe(assertiveBefore);
+    expect(assertiveBefore!.textContent).toBe('Failed to load: Boom');
+  });
+
+  it('renders a title on its own, with no trailing separator in the announcement', () => {
+    const { container } = render(<StatusBanner title="Offline" tone="info" testId="t" />);
+
+    expect(container.querySelector('[data-testid="t"]')).not.toBeNull();
+    expect(politeOf(container)!.textContent).toBe('Offline');
+  });
+
+  it('has no axe violations in the two-tier variant', async () => {
+    const { container } = render(
+      <StatusBanner title="Failed to load" message="Boom" tone="error" testId="b2" />
+    );
+    await expectNoA11yViolations(container);
+  });
 });

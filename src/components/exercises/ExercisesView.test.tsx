@@ -691,5 +691,81 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
       expect(mockOr).not.toHaveBeenCalled();
     });
   });
+
+  it('mounts exercises-read-error live region empty while idle and retains same node on error (NEW-15)', async () => {
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'exercises') {
+        return createSupabaseBuilder('exercises', {
+          resolver: () => ({ data: null, error: new Error('Failed to fetch exercises') }),
+        });
+      }
+      return createSupabaseBuilder(table, { data: [], error: null });
+    });
+
+    const { container } = renderComponent();
+
+    // Live regions exist while loading/idle
+    const alerts = container.querySelectorAll('[role="alert"]');
+    expect(alerts.length).toBeGreaterThanOrEqual(1);
+    const readAlert = alerts[0];
+
+    // When query fails, readAlert receives error text
+    await waitFor(() => {
+      expect(readAlert.textContent).toContain('Failed to load exercises');
+      expect(readAlert.textContent).toContain('Failed to fetch exercises');
+      expect(screen.getByTestId('exercises-read-error')).toBeDefined();
+      expect(screen.getByTestId('retry-exercises-btn')).toBeDefined();
+    });
+
+    // Alert DOM node is identical (permanent live region)
+    expect(container.querySelectorAll('[role="alert"]')[0]).toBe(readAlert);
+  });
+
+  it('mounts deleteError live region empty while idle and updates on delete failure (NEW-15)', async () => {
+    mockCoachState.isCoach = true;
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'exercises') {
+        const b = createSupabaseBuilder('exercises', {
+          data: [{ id: 'ex-custom-1', name: 'My Athlete Curl', body_part: 'Arms', is_master: false, user_id: 'a0000000-0000-4000-8000-000000000123', is_archived: false }],
+          error: null,
+        });
+        b.update = vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ error: { message: 'Update failed' } }),
+        });
+        b.delete = vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ error: { message: 'Delete failed' } }),
+        });
+        return b;
+      }
+
+      return createSupabaseBuilder(table, { data: [], error: null });
+    });
+
+
+
+    const { container } = renderComponent();
+    await screen.findByText('My Athlete Curl');
+
+    const alerts = container.querySelectorAll('[role="alert"]');
+    expect(alerts.length).toBe(2);
+    const deleteAlert = alerts[1];
+    expect(deleteAlert.textContent).toBe('');
+
+    await waitFor(() => {
+      expect(screen.getAllByTitle('Delete').length).toBe(1);
+    });
+
+    const deleteBtn = screen.getByTitle('Delete');
+    fireEvent.click(deleteBtn);
+
+    await waitFor(() => {
+      expect(deleteAlert.textContent).toContain('Cannot delete exercise because workout logs reference it.');
+    });
+
+    expect(container.querySelectorAll('[role="alert"]')[1]).toBe(deleteAlert);
+  });
 });
+
+
+
 

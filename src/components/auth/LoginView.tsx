@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { Zap, AlertCircle, Eye, EyeOff, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { StatusBanner } from '../common/StatusBanner';
 
 type AuthMode = 'signin' | 'register' | 'check_email' | 'forgot_password';
 
@@ -141,19 +142,25 @@ export const LoginView: React.FC = () => {
           </div>
         )}
 
-        {error && (
-          <div className="mb-4 p-3 bg-rose-500/15 border border-rose-500/30 rounded-xl text-rose-400 text-xs flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
+        <StatusBanner
+          message={error || null}
+          tone="error"
+          icon={<AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />}
+          className="mb-4"
+        />
 
-        {infoMsg && (
-          <div className="mb-4 p-3 bg-emerald-500/15 border border-emerald-500/30 rounded-xl text-emerald-400 text-xs flex items-center gap-2">
-            {mode === 'check_email' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
-            <span>{infoMsg}</span>
-          </div>
-        )}
+        <StatusBanner
+          message={infoMsg || null}
+          tone="info"
+          icon={
+            mode === 'check_email' ? (
+              <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />
+            ) : (
+              <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
+            )
+          }
+          className="mb-4"
+        />
 
         {mode === 'check_email' ? (
           <div className="space-y-6 text-center">

@@ -1,5 +1,6 @@
 import React, { useId } from 'react';
 import { Target, CheckCircle2, AlertCircle } from 'lucide-react';
+import { StatusBanner } from '../common/StatusBanner';
 
 interface CoachAthleteMacrosProps {
   selectedAthlete: { name?: string } | null;
@@ -174,23 +175,18 @@ export const CoachAthleteMacros: React.FC<CoachAthleteMacrosProps> = ({
         {isUpdatingMacros ? 'Updating Targets...' : 'Update Athlete Targets'}
       </button>
 
-      {macroStatus && (
-        <div
-          data-testid="athlete-macro-status"
-          className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
-            macroStatus.type === 'error'
-              ? 'bg-rose-500/15 border border-rose-500/30 text-rose-300'
-              : 'bg-cyan-500/15 border border-cyan-500/30 text-cyan-300'
-          }`}
-        >
-          {macroStatus.type === 'error' ? (
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+      <StatusBanner
+        message={macroStatus?.message ?? null}
+        tone={macroStatus?.type === 'error' ? 'error' : 'success'}
+        testId="athlete-macro-status"
+        icon={
+          macroStatus?.type === 'error' ? (
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />
           ) : (
-            <CheckCircle2 className="w-4 h-4 shrink-0" />
-          )}
-          <span>{macroStatus.message}</span>
-        </div>
-      )}
+            <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />
+          )
+        }
+      />
     </form>
   );
 };

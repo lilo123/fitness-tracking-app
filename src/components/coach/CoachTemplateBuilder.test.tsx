@@ -34,4 +34,28 @@ describe('CoachTemplateBuilder accessibility', () => {
     const { container } = render(<CoachTemplateBuilder {...defaultProps} />);
     await expectNoA11yViolations(container);
   });
+
+  it('NEW-15: mounts live regions unconditionally and mutates text in place on status changes', () => {
+    const politeOf = (c: HTMLElement) => c.querySelector('[role="status"]');
+    const assertiveOf = (c: HTMLElement) => c.querySelector('[role="alert"]');
+
+    const { container, rerender } = render(<CoachTemplateBuilder {...defaultProps} status="" />);
+    const politeBefore = politeOf(container);
+    const assertiveBefore = assertiveOf(container);
+
+    expect(politeBefore).not.toBeNull();
+    expect(assertiveBefore).not.toBeNull();
+    expect(politeBefore!.textContent).toBe('');
+    expect(assertiveBefore!.textContent).toBe('');
+
+    // Success transition
+    rerender(<CoachTemplateBuilder {...defaultProps} status="Template saved successfully!" />);
+    const politeAfter = politeOf(container);
+    const assertiveAfter = assertiveOf(container);
+
+    expect(politeAfter).toBe(politeBefore);
+    expect(assertiveAfter).toBe(assertiveBefore);
+    expect(politeAfter!.textContent).toBe('Template saved successfully!');
+    expect(assertiveAfter!.textContent).toBe('');
+  });
 });
