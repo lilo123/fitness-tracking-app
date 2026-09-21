@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../../context/AuthContext';
 import { CoachProvider } from '../../context/CoachContext';
+import { expectNoA11yViolations } from '../../test/a11y';
 
 import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory } from '../../test/supabaseBuilderMock';
 
@@ -122,4 +123,37 @@ describe('Header connection status badge', () => {
     expect(badge.getAttribute('title')).toBe('Online');
     expect(badge.textContent).toContain('Online');
   });
+
+  it('renders role switch button with min 44x44px target, accessible name, and unified max-w-xl container', async () => {
+    const { container } = renderHeader();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('role-switch-button')).toBeDefined();
+    });
+
+    const roleButton = screen.getByTestId('role-switch-button');
+    expect(roleButton).toBeDefined();
+
+    // Verify accessible name reflects current state and action
+    const accessibleName = roleButton.getAttribute('aria-label');
+    expect(accessibleName).toBe('Coach mode active. Switch to Athlete mode.');
+
+    // WCAG SC 2.5.3 (Label in Name, Level A) regression guard:
+    // Accessible name MUST contain the visible text for voice control and screen reader consistency
+    const visibleLabel = roleButton.textContent?.trim() || '';
+    expect(visibleLabel).toBe('Coach');
+    expect(accessibleName).toContain(visibleLabel);
+
+    // Verify touch target is at least 44x44px (WCAG 2.5.5 / 2.5.8)
+    expect(roleButton.className).toContain('min-h-[44px]');
+    expect(roleButton.className).toContain('min-w-[44px]');
+
+    // Verify Header container is max-w-xl for shell region unification (B3)
+    const innerContainer = container.querySelector('header > div');
+    expect(innerContainer?.className).toContain('max-w-xl');
+
+    // Verify accessibility with axe-core
+    await expectNoA11yViolations(container);
+  });
 });
+

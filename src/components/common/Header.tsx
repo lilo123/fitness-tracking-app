@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { Zap, Shield, LogOut } from 'lucide-react';
@@ -7,12 +7,23 @@ import { Zap, Shield, LogOut } from 'lucide-react';
 export const Header: React.FC = () => {
   const { user, profile, role, signOut, switchRole } = useAuth();
   const isOnline = useOnlineStatus();
+  const navigate = useNavigate();
 
   const isVerifiedCoach = profile?.role === 'coach';
 
+  const handleToggleRole = () => {
+    const nextRole = role === 'coach' ? 'athlete' : 'coach';
+    switchRole(nextRole);
+    if (nextRole === 'coach') {
+      navigate('/coach');
+    } else {
+      navigate('/workout');
+    }
+  };
+
   return (
     <header className="bg-zinc-900/90 backdrop-blur-xl border-b border-zinc-800/80 sticky top-0 z-30 px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 shadow-lg">
-      <div className="max-w-4xl mx-auto flex items-center justify-between">
+      <div className="max-w-xl mx-auto flex items-center justify-between">
         {/* Brand */}
         <Link to="/workout" className="flex items-center gap-2.5 min-w-0 group">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-[0_0_15px_rgba(6,182,212,0.4)] shrink-0 group-hover:scale-105 transition-transform">
@@ -52,22 +63,29 @@ export const Header: React.FC = () => {
           {user && (
             isVerifiedCoach ? (
               <button
-                onClick={() => switchRole(role === 'coach' ? 'athlete' : 'coach')}
-                className={`text-xs font-bold px-3 py-1.5 min-h-[36px] sm:min-h-[28px] rounded-full border flex items-center gap-1.5 transition ${
+                type="button"
+                onClick={handleToggleRole}
+                data-testid="role-switch-button"
+                aria-label={
+                  role === 'coach'
+                    ? 'Coach mode active. Switch to Athlete mode.'
+                    : 'Athlete mode active. Switch to Coach mode.'
+                }
+                title={role === 'coach' ? 'Switch to Athlete mode' : 'Switch to Coach mode'}
+                className={`text-xs font-bold px-3.5 py-2 min-h-[44px] min-w-[44px] rounded-full border flex items-center justify-center gap-1.5 transition touch-manipulation focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-zinc-900 ${
                   role === 'coach'
                     ? 'text-cyan-300 bg-cyan-500/15 border-cyan-500/40 shadow-[0_0_10px_rgba(6,182,212,0.2)]'
                     : 'text-zinc-400 bg-zinc-800 border-zinc-700'
                 }`}
-                title="Click to toggle Coach/Athlete view mode"
               >
                 {role === 'coach' ? (
                   <>
-                    <Shield className="w-3.5 h-3.5 text-cyan-400" />
+                    <Shield className="w-3.5 h-3.5 text-cyan-400" aria-hidden="true" />
                     <span>Coach</span>
                   </>
                 ) : (
                   <>
-                    <Zap className="w-3.5 h-3.5 text-zinc-400" />
+                    <Zap className="w-3.5 h-3.5 text-zinc-400" aria-hidden="true" />
                     <span>Athlete</span>
                   </>
                 )}
@@ -77,7 +95,7 @@ export const Header: React.FC = () => {
                 className="text-xs font-bold px-2.5 py-1 rounded-full border text-zinc-400 bg-zinc-800/80 border-zinc-700/80 flex items-center gap-1.5 select-none"
                 title="Athlete Account"
               >
-                <Zap className="w-3.5 h-3.5 text-cyan-400" />
+                <Zap className="w-3.5 h-3.5 text-cyan-400" aria-hidden="true" />
                 <span>Athlete</span>
               </div>
             )
@@ -86,11 +104,13 @@ export const Header: React.FC = () => {
           {/* User / Sign Out */}
           {user && (
             <button
+              type="button"
               onClick={() => signOut()}
-              className="text-zinc-400 hover:text-rose-400 min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-lg hover:bg-rose-500/10 transition"
+              className="text-zinc-400 hover:text-rose-400 min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-lg hover:bg-rose-500/10 transition focus:outline-none focus:ring-2 focus:ring-rose-500"
               title="Sign Out"
+              aria-label="Sign Out"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-4 h-4" aria-hidden="true" />
             </button>
           )}
         </div>

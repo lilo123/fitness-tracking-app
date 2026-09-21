@@ -228,5 +228,57 @@ describe('App Shell & Navigation', () => {
     expect(screen.getByText('CyberGym')).toBeDefined();
     expect(screen.getByTestId('nav-workout')).toBeDefined();
   });
+
+  it('renders exactly 5 tabs in BottomNav with Coach absent, and reaches Coach view via Header mode switch', async () => {
+    localStorage.setItem('cybergym_view_mode', 'athlete');
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    );
+
+    // Wait for auth initialization
+    await waitFor(() => {
+      expect(screen.getByText('CyberGym')).toBeDefined();
+      expect(screen.getByTestId('role-switch-button')).toBeDefined();
+    });
+
+    // Assert rendered bottom nav tab count is 5
+    const navItems = screen.getAllByTestId(/^nav-/);
+    expect(navItems).toHaveLength(5);
+    expect(screen.getByTestId('nav-workout')).toBeDefined();
+    expect(screen.getByTestId('nav-nutrition')).toBeDefined();
+    expect(screen.getByTestId('nav-exercises')).toBeDefined();
+    expect(screen.getByTestId('nav-history')).toBeDefined();
+    expect(screen.getByTestId('nav-settings')).toBeDefined();
+
+    // Coach entry must be absent from bottom nav
+    expect(screen.queryByTestId('nav-coach')).toBeNull();
+
+    // Initially in Athlete mode
+    const roleButton = screen.getByTestId('role-switch-button');
+    expect(roleButton.getAttribute('aria-label')).toBe('Athlete mode active. Switch to Coach mode.');
+    expect(roleButton.getAttribute('aria-label')).toContain(roleButton.textContent?.trim() || '');
+
+    // Toggle to Coach mode -> navigates to /coach and renders Coach view
+    fireEvent.click(roleButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Coach Dashboard')).toBeDefined();
+      expect(roleButton.getAttribute('aria-label')).toBe('Coach mode active. Switch to Athlete mode.');
+      expect(roleButton.getAttribute('aria-label')).toContain(roleButton.textContent?.trim() || '');
+    }, { timeout: 10000 });
+
+    // Toggle back to Athlete mode -> navigates to /workout
+    fireEvent.click(roleButton);
+
+    await waitFor(() => {
+      expect(roleButton.getAttribute('aria-label')).toBe('Athlete mode active. Switch to Coach mode.');
+      expect(roleButton.getAttribute('aria-label')).toContain(roleButton.textContent?.trim() || '');
+      expect(screen.queryByText('Coach Dashboard')).toBeNull();
+    }, { timeout: 10000 });
+  });
 });
+
 
