@@ -28,7 +28,7 @@ describe('ComponentRow', () => {
     expect(screen.getByTestId('component-name').textContent).toBe(item.name);
 
     // Zone 2: Portion chip + 5 macros
-    expect(screen.getByTestId('component-portion-chip').textContent).toBe(item.displayPortion);
+    expect(screen.getByTestId('component-portion-chip').textContent).toBe('150 g');
     expect(screen.getByText(/182 kcal/)).toBeDefined();
     expect(screen.getByText(/P 12.5/)).toBeDefined();
     expect(screen.getByText(/C 3.2/)).toBeDefined();
@@ -39,6 +39,20 @@ describe('ComponentRow', () => {
     expect(screen.getByTestId('component-quantity-input')).toBeDefined();
     expect((screen.getByTestId('component-quantity-input') as HTMLInputElement).value).toBe('150');
     expect(screen.getByTestId('component-unit-chip')).toBeDefined();
+  });
+
+  it('renders only the canonical amount in the portion chip and drops the raw portion string', () => {
+    const item = component({
+      quantity: 540,
+      unit: 'g',
+      displayPortion: '1 serving',
+    });
+    render(<ComponentRow item={item} reference={item} onChange={() => {}} />);
+
+    const chip = screen.getByTestId('component-portion-chip');
+    expect(chip.textContent).toBe('540 g');
+    expect(chip.textContent).not.toContain('1 serving');
+    expect(screen.queryByText('1 serving')).toBeNull();
   });
 
   it('steps quantity up and down and scales macros linearly', () => {

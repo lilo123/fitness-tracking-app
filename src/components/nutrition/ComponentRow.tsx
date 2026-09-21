@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { formatCalories, formatMacro, roundTo1Decimal } from '../../utils/nutrition';
-import { parseQuantityInput, type CanonicalUnit } from '../../utils/unitConverter';
+import { parseQuantityInput, shortUnitLabel, type CanonicalUnit } from '../../utils/unitConverter';
 import { scaleItemToQuantity, reanchorItemTo, type NutritionItem } from '../../utils/itemModel';
 import { OverflowMenu, type OverflowMenuItem } from '../common/OverflowMenu';
 import { UnitChip } from './UnitChip';
@@ -185,14 +185,12 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
 
       {/* Zone 2 — portion chip, then all five macros */}
       <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono text-zinc-400">
-        {item.displayPortion && (
-          <span
-            data-testid="component-portion-chip"
-            className="whitespace-nowrap rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400"
-          >
-            {item.displayPortion}
-          </span>
-        )}
+        <span
+          data-testid="component-portion-chip"
+          className="whitespace-nowrap rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400"
+        >
+          {roundTo1Decimal(item.quantity)} {shortUnitLabel(item.unit)}
+        </span>
         <span className="whitespace-nowrap font-bold text-amber-400">
           {formatCalories(item.calories)} kcal
         </span>

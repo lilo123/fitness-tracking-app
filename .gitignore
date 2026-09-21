@@ -46,3 +46,8 @@ snapshots/
 *.sql.bak
 *.dump
 scripts/.db-snapshot-*.json
+
+# Local UX research/audit working documents (not part of the codebase).
+UX_RESEARCH_PROMPT.md
+UX_UI_FULL_AUDIT.md
+UX_BEST_PRACTICE_RECOMMENDATIONS.md

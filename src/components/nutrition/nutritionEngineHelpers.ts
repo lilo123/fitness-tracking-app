@@ -164,6 +164,12 @@ export function buildStagedItem(raw: {
       }
     : current;
 
+  const mult = Number(raw.portionMultiplier);
+  const baseQuantity =
+    raw.base && Number.isFinite(mult) && mult > 0
+      ? quantity / mult
+      : quantity;
+
   return {
     id: generateItemId(),
     name: raw.name,
@@ -171,7 +177,7 @@ export function buildStagedItem(raw: {
     portionMultiplier: Number.isFinite(Number(raw.portionMultiplier)) ? Number(raw.portionMultiplier) : 1,
     quantity: roundTo1Decimal(quantity),
     unit,
-    baseQuantity: roundTo1Decimal(derived.quantity),
+    baseQuantity: roundTo1Decimal(baseQuantity),
     baseCalories: base.calories,
     baseProtein: base.protein,
     baseCarbs: base.carbs,
