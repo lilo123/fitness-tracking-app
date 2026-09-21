@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useId } from 'react';
 import { X } from 'lucide-react';
 import type { CompressedImage } from '../../utils/imageCompression';
 
@@ -55,6 +55,17 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
   onSubmit,
   isPending,
 }) => {
+  const baseId = useId();
+  const nameId = `${baseId}-dish-name`;
+  const mealTypeId = `${baseId}-meal-type`;
+  const caloriesId = `${baseId}-calories`;
+  const proteinId = `${baseId}-protein`;
+  const carbsId = `${baseId}-carbs`;
+  const fatId = `${baseId}-fat`;
+  const fiberId = `${baseId}-fiber`;
+  const servingSizeId = `${baseId}-serving-size`;
+  const servingUnitId = `${baseId}-serving-unit`;
+
   if (!show) return null;
 
   return (
@@ -106,10 +117,14 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div>
-          <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
+          <label
+            htmlFor={nameId}
+            className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1"
+          >
             Dish / Meal Name *
           </label>
           <input
+            id={nameId}
             type="text"
             data-testid="dish-name-input"
             value={manualName}
@@ -120,10 +135,14 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
           />
         </div>
         <div>
-          <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
+          <label
+            htmlFor={mealTypeId}
+            className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1"
+          >
             Meal Type
           </label>
           <select
+            id={mealTypeId}
             value={manualMealType}
             onChange={(e) => onManualMealTypeChange(e.target.value)}
             className="w-full bg-zinc-950 border border-zinc-800 text-zinc-300 rounded-xl p-2 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none"
@@ -140,10 +159,14 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
 
       <div className="grid grid-cols-6 sm:grid-cols-5 gap-2">
         <div className="col-span-2 sm:col-span-1">
-          <label className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">
+          <label
+            htmlFor={caloriesId}
+            className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1"
+          >
             Calories *
           </label>
           <input
+            id={caloriesId}
             type="number"
             step="any"
             inputMode="numeric"
@@ -156,10 +179,14 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
           />
         </div>
         <div className="col-span-2 sm:col-span-1">
-          <label className="block text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-1">
+          <label
+            htmlFor={proteinId}
+            className="block text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-1"
+          >
             Protein (g)
           </label>
           <input
+            id={proteinId}
             type="number"
             step="any"
             inputMode="decimal"
@@ -172,10 +199,14 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
           />
         </div>
         <div className="col-span-2 sm:col-span-1">
-          <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">
+          <label
+            htmlFor={carbsId}
+            className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1"
+          >
             Carbs (g)
           </label>
           <input
+            id={carbsId}
             type="number"
             step="any"
             inputMode="decimal"
@@ -188,10 +219,14 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
           />
         </div>
         <div className="col-span-3 sm:col-span-1">
-          <label className="block text-[10px] font-bold text-violet-400 uppercase tracking-wider mb-1">
+          <label
+            htmlFor={fatId}
+            className="block text-[10px] font-bold text-violet-400 uppercase tracking-wider mb-1"
+          >
             Fat (g)
           </label>
           <input
+            id={fatId}
             type="number"
             step="any"
             inputMode="decimal"
@@ -204,10 +239,14 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
           />
         </div>
         <div className="col-span-3 sm:col-span-1">
-          <label className="block text-[10px] font-bold text-teal-400 uppercase tracking-wider mb-1">
+          <label
+            htmlFor={fiberId}
+            className="block text-[10px] font-bold text-teal-400 uppercase tracking-wider mb-1"
+          >
             Fiber (g)
           </label>
           <input
+            id={fiberId}
             type="number"
             step="any"
             inputMode="decimal"
@@ -222,10 +261,14 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
 
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
+          <label
+            htmlFor={servingSizeId}
+            className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1"
+          >
             Serving Size
           </label>
           <input
+            id={servingSizeId}
             type="number"
             step="any"
             inputMode="decimal"
@@ -235,10 +278,14 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
           />
         </div>
         <div>
-          <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
+          <label
+            htmlFor={servingUnitId}
+            className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1"
+          >
             Serving Unit
           </label>
           <input
+            id={servingUnitId}
             type="text"
             value={manualServingUnit}
             onChange={(e) => onManualServingUnitChange(e.target.value)}

@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useId } from 'react';
 import { Utensils, Calculator, Check, Star, X } from 'lucide-react';
 import { roundTo1Decimal, formatCalories } from '../../utils/nutrition';
 import type { NutritionItem } from '../../utils/itemModel';
@@ -35,6 +35,13 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
   onDiscardStagedMeal,
   isPending,
 }) => {
+  const baseId = useId();
+  const caloriesId = `${baseId}-calories`;
+  const proteinId = `${baseId}-protein`;
+  const carbsId = `${baseId}-carbs`;
+  const fatId = `${baseId}-fat`;
+  const fiberId = `${baseId}-fiber`;
+
   return (
     <div data-testid="staged-meal-card" className="bg-zinc-900/90 border border-cyan-500/50 rounded-3xl p-5 shadow-[0_0_30px_rgba(6,182,212,0.15)] space-y-4 animate-in fade-in">
       {/* Header row: Dish Name & Meal Type */}
@@ -68,9 +75,10 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
 
         <div className="flex items-center gap-2">
           <select
+            aria-label="Meal type"
             value={stagedMeal.mealType}
             onChange={(e) => onUpdateStagedMeal({ ...stagedMeal, mealType: e.target.value })}
-            className="bg-zinc-950 border border-zinc-800 text-zinc-300 text-xs font-semibold rounded-xl px-2.5 py-2 focus:border-cyan-500 outline-none"
+            className="bg-zinc-950 border border-zinc-800 text-zinc-300 input-text-xs font-semibold rounded-xl px-2.5 py-2 focus:border-cyan-500 outline-none"
           >
             <option value="Breakfast">Breakfast</option>
             <option value="Lunch">Lunch</option>
@@ -127,10 +135,14 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
       {/* Macro Summary Row & Editable Fields */}
       <div className="grid grid-cols-6 sm:grid-cols-5 gap-2 pt-1">
         <div className="col-span-2 sm:col-span-1">
-          <label className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">
+          <label
+            htmlFor={caloriesId}
+            className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1"
+          >
             Calories
           </label>
           <input
+            id={caloriesId}
             type="number"
             step="any"
             inputMode="numeric"
@@ -146,10 +158,14 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
           />
         </div>
         <div className="col-span-2 sm:col-span-1">
-          <label className="block text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-1">
+          <label
+            htmlFor={proteinId}
+            className="block text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-1"
+          >
             Protein (g)
           </label>
           <input
+            id={proteinId}
             type="number"
             step="any"
             inputMode="decimal"
@@ -165,10 +181,14 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
           />
         </div>
         <div className="col-span-2 sm:col-span-1">
-          <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">
+          <label
+            htmlFor={carbsId}
+            className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1"
+          >
             Carbs (g)
           </label>
           <input
+            id={carbsId}
             type="number"
             step="any"
             inputMode="decimal"
@@ -184,10 +204,14 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
           />
         </div>
         <div className="col-span-3 sm:col-span-1">
-          <label className="block text-[10px] font-bold text-violet-400 uppercase tracking-wider mb-1">
+          <label
+            htmlFor={fatId}
+            className="block text-[10px] font-bold text-violet-400 uppercase tracking-wider mb-1"
+          >
             Fat (g)
           </label>
           <input
+            id={fatId}
             type="number"
             step="any"
             inputMode="decimal"
@@ -203,10 +227,14 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
           />
         </div>
         <div className="col-span-3 sm:col-span-1">
-          <label className="block text-[10px] font-bold text-teal-400 uppercase tracking-wider mb-1">
+          <label
+            htmlFor={fiberId}
+            className="block text-[10px] font-bold text-teal-400 uppercase tracking-wider mb-1"
+          >
             Fiber (g)
           </label>
           <input
+            id={fiberId}
             type="number"
             step="any"
             inputMode="decimal"

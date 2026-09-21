@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { CustomDishEditor } from './CustomDishEditor';
 import type { NutritionItem } from '../../utils/itemModel';
+import { expectNoA11yViolations } from '../../test/a11y';
 
 function item(over: Partial<NutritionItem> = {}): NutritionItem {
   return {
@@ -161,5 +162,25 @@ describe('CustomDishEditor', () => {
     expect(onChange).toHaveBeenCalled();
     const updated = onChange.mock.calls[0][0] as NutritionItem[];
     expect(updated[0].quantity).toBe(45.7);
+  });
+
+  it('associates Qty label with quantity input', () => {
+    render(
+      <CustomDishEditor
+        items={[item()]}
+        onChange={() => {}}
+      />
+    );
+    expect(screen.getByLabelText('Qty')).toBe(screen.getByTestId('dish-item-quantity'));
+  });
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(
+      <CustomDishEditor
+        items={[item()]}
+        onChange={() => {}}
+      />
+    );
+    await expectNoA11yViolations(container);
   });
 });

@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useId } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { formatCalories, formatMacro, roundTo1Decimal } from '../../utils/nutrition';
 import { parseQuantityInput, shortUnitLabel, type CanonicalUnit } from '../../utils/unitConverter';
@@ -39,6 +39,7 @@ const MACRO_FIELDS = [
  * there is already one nested scroller in it.
  */
 export const CustomDishEditor: React.FC<CustomDishEditorProps> = ({ items, onChange }) => {
+  const baseId = useId();
   const listRef = useRef<HTMLDivElement>(null);
   const addRef = useRef<HTMLButtonElement>(null);
   const totals = sumItems(items);
@@ -104,86 +105,98 @@ export const CustomDishEditor: React.FC<CustomDishEditorProps> = ({ items, onCha
       </div>
 
       <div ref={listRef} className="space-y-2">
-        {items.map((item, index) => (
-          <div
-            key={item.id}
-            data-testid="dish-item-row"
-            className="space-y-1.5 rounded-xl border border-zinc-800 border-l-2 border-l-cyan-500/40 bg-zinc-950 p-2.5"
-          >
-            <div className="flex items-center gap-1.5">
-              <input
-                type="text"
-                data-testid="dish-item-name"
-                aria-label={`Component ${index + 1} name`}
-                value={item.name}
-                onChange={(e) => patch(index, { name: e.target.value })}
-                placeholder="e.g. Rolled oats"
-                className="min-h-[44px] w-full min-w-0 flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-2 text-base font-semibold text-white outline-none focus:border-cyan-500 sm:text-xs"
-              />
-              <button
-                type="button"
-                onClick={() => remove(index)}
-                aria-label={`Remove component ${index + 1}`}
-                data-testid="dish-item-remove"
-                className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-rose-500/10 hover:text-rose-400 touch-manipulation"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-6 gap-1.5">
-              <div className="col-span-2">
-                <label className="mb-0.5 block text-[9px] font-bold uppercase tracking-wider text-zinc-500">
-                  Qty
-                </label>
+        {items.map((item, index) => {
+          const itemKey = item.id || String(index);
+          const qtyId = `${baseId}-item-${itemKey}-qty`;
+          return (
+            <div
+              key={item.id}
+              data-testid="dish-item-row"
+              className="space-y-1.5 rounded-xl border border-zinc-800 border-l-2 border-l-cyan-500/40 bg-zinc-950 p-2.5"
+            >
+              <div className="flex items-center gap-1.5">
                 <input
-                  type="number"
-                  step="any"
-                  min="0"
-                  inputMode="decimal"
-                  data-testid="dish-item-quantity"
-                  aria-label={`Component ${index + 1} quantity`}
-                  value={roundTo1Decimal(item.quantity)}
-                  onChange={(e) => {
-                    const parsed = parseQuantityInput(e.target.value);
-                    patch(index, { quantity: parsed != null ? roundTo1Decimal(parsed) : 0 });
-                  }}
-                  className="min-h-[44px] w-full rounded-lg border border-zinc-800 bg-zinc-900 p-1 text-center text-base font-mono font-bold text-white outline-none focus:border-cyan-500 sm:text-xs"
+                  type="text"
+                  data-testid="dish-item-name"
+                  aria-label={`Component ${index + 1} name`}
+                  value={item.name}
+                  onChange={(e) => patch(index, { name: e.target.value })}
+                  placeholder="e.g. Rolled oats"
+                  className="min-h-[44px] w-full min-w-0 flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-2 text-base font-semibold text-white outline-none focus:border-cyan-500 sm:text-xs"
                 />
+                <button
+                  type="button"
+                  onClick={() => remove(index)}
+                  aria-label={`Remove component ${index + 1}`}
+                  data-testid="dish-item-remove"
+                  className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-rose-500/10 hover:text-rose-400 touch-manipulation"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
               </div>
-              <div className="col-span-2">
-                <label className="mb-0.5 block text-[9px] font-bold uppercase tracking-wider text-zinc-500">
-                  Unit
-                </label>
-                <div className="flex min-h-[44px] items-center">
-                  <UnitChip
-                    value={item.unit}
-                    onChange={(unit: CanonicalUnit) => patch(index, { unit })}
-                    testId="dish-item-unit"
-                  />
-                </div>
-              </div>
-              {MACRO_FIELDS.map((field) => (
-                <div key={field.key} className="col-span-2">
+
+              <div className="grid grid-cols-6 gap-1.5">
+                <div className="col-span-2">
                   <label
-                    className={`mb-0.5 block text-[9px] font-bold uppercase tracking-wider ${field.tone}`}
+                    htmlFor={qtyId}
+                    className="mb-0.5 block text-[9px] font-bold uppercase tracking-wider text-zinc-500"
                   >
-                    {field.label}
+                    Qty
                   </label>
                   <input
+                    id={qtyId}
                     type="number"
                     step="any"
                     min="0"
-                    inputMode={field.mode}
-                    data-testid={`dish-item-${field.key}`}
-                    aria-label={`Component ${index + 1} ${field.label}`}
-                    value={roundTo1Decimal(item[field.key])}
-                    onChange={(e) => patchMacro(index, field.key, e.target.value)}
+                    inputMode="decimal"
+                    data-testid="dish-item-quantity"
+                    aria-label={`Component ${index + 1} quantity`}
+                    value={roundTo1Decimal(item.quantity)}
+                    onChange={(e) => {
+                      const parsed = parseQuantityInput(e.target.value);
+                      patch(index, { quantity: parsed != null ? roundTo1Decimal(parsed) : 0 });
+                    }}
                     className="min-h-[44px] w-full rounded-lg border border-zinc-800 bg-zinc-900 p-1 text-center text-base font-mono font-bold text-white outline-none focus:border-cyan-500 sm:text-xs"
                   />
                 </div>
-              ))}
-            </div>
+                <div className="col-span-2">
+                  <span className="mb-0.5 block text-[9px] font-bold uppercase tracking-wider text-zinc-500">
+                    Unit
+                  </span>
+                  <div className="flex min-h-[44px] items-center">
+                    <UnitChip
+                      value={item.unit}
+                      onChange={(unit: CanonicalUnit) => patch(index, { unit })}
+                      testId="dish-item-unit"
+                    />
+                  </div>
+                </div>
+                {MACRO_FIELDS.map((field) => {
+                  const macroId = `${baseId}-item-${itemKey}-${field.key}`;
+                  return (
+                    <div key={field.key} className="col-span-2">
+                      <label
+                        htmlFor={macroId}
+                        className={`mb-0.5 block text-[9px] font-bold uppercase tracking-wider ${field.tone}`}
+                      >
+                        {field.label}
+                      </label>
+                      <input
+                        id={macroId}
+                        type="number"
+                        step="any"
+                        min="0"
+                        inputMode={field.mode}
+                        data-testid={`dish-item-${field.key}`}
+                        aria-label={`Component ${index + 1} ${field.label}`}
+                        value={roundTo1Decimal(item[field.key])}
+                        onChange={(e) => patchMacro(index, field.key, e.target.value)}
+                        className="min-h-[44px] w-full rounded-lg border border-zinc-800 bg-zinc-900 p-1 text-center text-base font-mono font-bold text-white outline-none focus:border-cyan-500 sm:text-xs"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
 
             {item.displayPortion && (
               <span className="block font-mono text-[10px] text-zinc-500">
@@ -191,8 +204,9 @@ export const CustomDishEditor: React.FC<CustomDishEditorProps> = ({ items, onCha
                 {shortUnitLabel(item.unit)}
               </span>
             )}
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
 
       {items.length > 0 && (

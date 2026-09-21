@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { StagedMealCard } from './StagedMealCard';
 import type { StagedMeal } from './nutritionEngineHelpers';
+import { expectNoA11yViolations, expectNoA11yViolationsForRules } from '../../test/a11y';
 
 function makeStagedMeal(): StagedMeal {
   return {
@@ -115,5 +116,54 @@ describe('StagedMealCard', () => {
     expect(scaled.unit).toBe('g');
     expect(scaled.calories).toBe(660);
     expect(scaled.protein).toBe(33);
+  });
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(
+      <StagedMealCard
+        stagedMeal={makeStagedMeal()}
+        onUpdateStagedMeal={vi.fn()}
+        onApplyStagedItemChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onSaveItemAsCustomDish={vi.fn()}
+        onLogStagedMeal={vi.fn()}
+        onSaveStagedAsCustomDish={vi.fn()}
+        onDiscardStagedMeal={vi.fn()}
+        isPending={false}
+      />
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('renders two StagedMealCards simultaneously without duplicate id violations', async () => {
+    const meal1 = makeStagedMeal();
+    const meal2 = { ...makeStagedMeal(), name: 'Lunch Meal' };
+    const { container } = render(
+      <div>
+        <StagedMealCard
+          stagedMeal={meal1}
+          onUpdateStagedMeal={vi.fn()}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={vi.fn()}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={false}
+        />
+        <StagedMealCard
+          stagedMeal={meal2}
+          onUpdateStagedMeal={vi.fn()}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={vi.fn()}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={false}
+        />
+      </div>
+    );
+    await expectNoA11yViolationsForRules(container, ['duplicate-id', 'label']);
   });
 });

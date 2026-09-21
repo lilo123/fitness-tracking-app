@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useId } from 'react';
 import type { CustomDish } from '../../types/database';
 import type { NutritionItem } from '../../utils/itemModel';
 import { roundTo1Decimal, formatCalories, formatMacro } from '../../utils/nutrition';
@@ -58,6 +58,14 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
   customDishes,
   onOpenEditDishModal,
 }) => {
+  const baseId = useId();
+  const nameId = `${baseId}-dish-name`;
+  const calId = `${baseId}-calories`;
+  const proteinId = `${baseId}-protein`;
+  const carbsId = `${baseId}-carbs`;
+  const fatId = `${baseId}-fat`;
+  const fiberId = `${baseId}-fiber`;
+
   const dishModalRef = useModalA11y(isOpen, onClose);
 
   if (!isOpen) return null;
@@ -89,10 +97,14 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
 
         <form onSubmit={onSaveDish} className="space-y-3">
           <div>
-            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
+            <label
+              htmlFor={nameId}
+              className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1"
+            >
               Dish Name
             </label>
             <input
+              id={nameId}
               type="text"
               value={dishModalName}
               onChange={(e) => setDishModalName(e.target.value)}
@@ -108,10 +120,14 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
           {dishModalItems.length <= 1 && (
             <div className="grid grid-cols-6 sm:grid-cols-5 gap-2">
               <div className="col-span-2 sm:col-span-1">
-                <label className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">
+                <label
+                  htmlFor={calId}
+                  className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1"
+                >
                   Calories
                 </label>
                 <input
+                  id={calId}
                   type="number"
                   step="any"
                   inputMode="numeric"
@@ -125,10 +141,14 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
                 />
               </div>
               <div className="col-span-2 sm:col-span-1">
-                <label className="block text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-1">
+                <label
+                  htmlFor={proteinId}
+                  className="block text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-1"
+                >
                   Protein (g)
                 </label>
                 <input
+                  id={proteinId}
                   type="number"
                   step="any"
                   inputMode="decimal"
@@ -142,10 +162,14 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
                 />
               </div>
               <div className="col-span-2 sm:col-span-1">
-                <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">
+                <label
+                  htmlFor={carbsId}
+                  className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1"
+                >
                   Carbs (g)
                 </label>
                 <input
+                  id={carbsId}
                   type="number"
                   step="any"
                   inputMode="decimal"
@@ -159,10 +183,14 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
                 />
               </div>
               <div className="col-span-3 sm:col-span-1">
-                <label className="block text-[10px] font-bold text-violet-400 uppercase tracking-wider mb-1">
+                <label
+                  htmlFor={fatId}
+                  className="block text-[10px] font-bold text-violet-400 uppercase tracking-wider mb-1"
+                >
                   Fat (g)
                 </label>
                 <input
+                  id={fatId}
                   type="number"
                   step="any"
                   inputMode="decimal"
@@ -176,10 +204,14 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
                 />
               </div>
               <div className="col-span-3 sm:col-span-1">
-                <label className="block text-[10px] font-bold text-teal-400 uppercase tracking-wider mb-1">
+                <label
+                  htmlFor={fiberId}
+                  className="block text-[10px] font-bold text-teal-400 uppercase tracking-wider mb-1"
+                >
                   Fiber (g)
                 </label>
                 <input
+                  id={fiberId}
                   type="number"
                   step="any"
                   inputMode="decimal"
