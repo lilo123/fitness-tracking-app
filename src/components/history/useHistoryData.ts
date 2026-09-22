@@ -5,6 +5,11 @@ import type { WorkoutSet, Exercise, NutritionLog } from '../../types/database';
 import { DEFAULT_EXERCISES_LIST } from '../../utils/ghostSets';
 import { roundTo1Decimal } from '../../utils/nutrition';
 import { itemsForPersist, normalizeItems, sumItems, type NutritionItem } from '../../utils/itemModel';
+import {
+  setCachedLogItems,
+  deleteCachedLogItems,
+  rehydrateLogWithCachedItems,
+} from '../nutrition/useNutritionData';
 
 export interface HistorySet extends WorkoutSet {
   workout_date: string;
@@ -241,13 +246,14 @@ export function useHistoryData(targetUserId: string, onMutationError?: (msg: str
 
       if (error) throw error;
       if (!data) return [];
-      return data as NutritionLog[];
+      return (data as NutritionLog[]).map(rehydrateLogWithCachedItems);
     },
   });
 
   // Delete nutrition log mutation
   const deleteMealMutation = useMutation({
     mutationFn: async (logId: string) => {
+      deleteCachedLogItems(logId);
       const { error } = await supabase.from('nutrition_logs').delete().eq('id', logId);
       if (error) throw error;
     },
@@ -305,6 +311,7 @@ export function useHistoryData(targetUserId: string, onMutationError?: (msg: str
         })
         .eq('id', log.id);
       if (error) throw error;
+      setCachedLogItems(log.id, activeItems);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['nutrition_logs', targetUserId] });

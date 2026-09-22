@@ -28,8 +28,30 @@ import {
   sumItems,
   type NutritionItem,
 } from '../../utils/itemModel';
+export const logItemsMemoryCache = new Map<string, any>();
 
-const logItemsMemoryCache = new Map<string, any>();
+export function getCachedLogItems(logId: string): any {
+  return logItemsMemoryCache.get(logId);
+}
+
+export function setCachedLogItems(logId: string, items: any): void {
+  logItemsMemoryCache.set(logId, items);
+}
+
+export function deleteCachedLogItems(logId: string): void {
+  logItemsMemoryCache.delete(logId);
+}
+
+export function clearLogItemsMemoryCache(): void {
+  logItemsMemoryCache.clear();
+}
+
+export function rehydrateLogWithCachedItems<T extends { id: string; items?: any }>(log: T): T {
+  if (!log.items && logItemsMemoryCache.has(log.id)) {
+    return { ...log, items: logItemsMemoryCache.get(log.id) };
+  }
+  return log;
+}
 
 export interface UseNutritionDataOptions {
   targetUserId: string;
@@ -107,12 +129,7 @@ export function useNutritionData({
 
       if (error) throw error;
       if (!data) return [];
-      return (data as NutritionLog[]).map((log) => {
-        if (!log.items && logItemsMemoryCache.has(log.id)) {
-          return { ...log, items: logItemsMemoryCache.get(log.id) };
-        }
-        return log;
-      });
+      return (data as NutritionLog[]).map(rehydrateLogWithCachedItems);
     },
     enabled: Boolean(targetUserId && selectedDate),
   });
