@@ -1,0 +1,78 @@
+import { normalizeDateStr } from './date';
+import type { TimelineDay, CoachWorkoutSession, CoachNutritionLog } from '../components/coach/CoachAthleteTimeline';
+
+/**
+ * Checks if a date string or Date object represents a civil date stored at UTC midnight.
+ * Bare date strings ('YYYY-MM-DD') or ISO timestamps with 00:00:00[.000] at UTC (+00:00 / Z).
+ */
+export function isMidnightUtc(val: string | Date | null | undefined): boolean {
+  if (!val) return false;
+  if (typeof val === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return true;
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return false;
+    return (
+      d.getUTCHours() === 0 &&
+      d.getUTCMinutes() === 0 &&
+      d.getUTCSeconds() === 0 &&
+      d.getUTCMilliseconds() === 0
+    );
+  }
+  if (val instanceof Date && !isNaN(val.getTime())) {
+    return (
+      val.getUTCHours() === 0 &&
+      val.getUTCMinutes() === 0 &&
+      val.getUTCSeconds() === 0 &&
+      val.getUTCMilliseconds() === 0
+    );
+  }
+  return false;
+}
+
+/**
+ * Groups workout sessions and nutrition logs into calendar days sorted descending by date.
+ *
+ * - `workouts.date` is treated conditionally:
+ *   - If it is a bare civil date ('YYYY-MM-DD') or UTC midnight timestamp (client-written rows),
+ *     it is NOT shifted by timezone to avoid erroneously moving workouts into adjacent days.
+ *   - If it has a non-midnight time component (e.g. database default `now()`), it is converted
+ *     to the target timezone's calendar day so evening workouts group on the correct local day.
+ * - `nutrition.logged_at` is a true timestamptz instant and MUST be converted to the target timezone's
+ *   calendar day (e.g. 20:00 EDT evening meal stored as UTC next day must group under the local day).
+ */
+export function groupTimelineDays(
+  workouts: CoachWorkoutSession[],
+  nutrition: CoachNutritionLog[],
+  timeZone?: string
+): TimelineDay[] {
+  const dayMap = new Map<string, TimelineDay>();
+
+  // Limitation: if timeZone is omitted/undefined, falls back to the viewer's resolved zone.
+  // This is correct when coach and athlete share a zone, and wrong otherwise.
+  const tz = timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  workouts.forEach((w) => {
+    // If w.date is a bare civil date or UTC midnight timestamp, preserve the date without timezone shifting.
+    // If w.date has a non-midnight time component (e.g. inserted via default timestamp), convert to target timezone.
+    const d =
+      (isMidnightUtc(w.date) ? normalizeDateStr(w.date) : normalizeDateStr(w.date, tz)) ||
+      (w.date ? String(w.date).slice(0, 10) : '');
+    if (!d) return;
+    if (!dayMap.has(d)) {
+      dayMap.set(d, { date: d, workouts: [], nutrition: [] });
+    }
+    dayMap.get(d)!.workouts.push(w);
+  });
+
+  nutrition.forEach((n) => {
+    // n.logged_at is a timestamptz instant; normalizeDateStr with timeZone converts it to local calendar day.
+    const d = normalizeDateStr(n.logged_at, tz) || (n.logged_at ? String(n.logged_at).slice(0, 10) : '');
+    if (!d) return;
+    if (!dayMap.has(d)) {
+      dayMap.set(d, { date: d, workouts: [], nutrition: [] });
+    }
+    dayMap.get(d)!.nutrition.push(n);
+  });
+
+  return Array.from(dayMap.values()).sort((a, b) => b.date.localeCompare(a.date));
+}

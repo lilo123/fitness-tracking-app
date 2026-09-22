@@ -9,10 +9,11 @@ import { getDayBounds, getLocalDateStr } from '../../utils/date';
 import { WORKOUT_WITH_SETS_PROJECTION, COACH_SETS_PER_WORKOUT_LIMIT, warnIfCoachSetsTruncated } from '../workout/useWorkoutQueries';
 import { Shield, AlertCircle, RotateCcw } from 'lucide-react';
 import { CoachAthleteSwitcher } from './CoachAthleteSwitcher';
-import { CoachAthleteTimeline, type TimelineDay, type CoachWorkoutSet } from './CoachAthleteTimeline';
+import { CoachAthleteTimeline, type CoachWorkoutSet } from './CoachAthleteTimeline';
 import { CoachAthleteMacros } from './CoachAthleteMacros';
 import { CoachTemplateBuilder } from './CoachTemplateBuilder';
 import { StatusBanner } from '../common/StatusBanner';
+import { groupTimelineDays } from '../../utils/timelineGrouping';
 
 const SETS_PAGE_LIMIT = 500;
 
@@ -217,30 +218,14 @@ export const CoachCockpit: React.FC = () => {
     },
   });
 
+  // Limitation: no timezone stored on user profile/selectedAthlete. Viewer's resolved zone is
+  // correct whenever coach and athlete share a zone, and wrong otherwise.
+  const athleteTimeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
+
   // Timeline day grouping
   const timelineDays = useMemo(() => {
-    const dayMap = new Map<string, TimelineDay>();
-
-    athleteWorkoutsWithSets.forEach((w) => {
-      const d = normalizeDateStr(w.date) || (w.date ? String(w.date).slice(0, 10) : '');
-      if (!d) return;
-      if (!dayMap.has(d)) {
-        dayMap.set(d, { date: d, workouts: [], nutrition: [] });
-      }
-      dayMap.get(d)!.workouts.push(w);
-    });
-
-    athleteNutrition.forEach((n) => {
-      const d = normalizeDateStr(n.logged_at) || (n.logged_at ? String(n.logged_at).slice(0, 10) : '');
-      if (!d) return;
-      if (!dayMap.has(d)) {
-        dayMap.set(d, { date: d, workouts: [], nutrition: [] });
-      }
-      dayMap.get(d)!.nutrition.push(n);
-    });
-
-    return Array.from(dayMap.values()).sort((a, b) => b.date.localeCompare(a.date));
-  }, [athleteWorkoutsWithSets, athleteNutrition]);
+    return groupTimelineDays(athleteWorkoutsWithSets, athleteNutrition, athleteTimeZone);
+  }, [athleteWorkoutsWithSets, athleteNutrition, athleteTimeZone]);
 
   // Athlete Macro Targets State & Query
   const [athleteCal, setAthleteCal] = useState<number | string>('');
