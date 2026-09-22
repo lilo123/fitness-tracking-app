@@ -2330,9 +2330,19 @@ Total Fiber: 1 g`;
       expect(screen.getByTestId('custom-dish-card-dish-perf-1')).toBeDefined();
     });
 
-    // Verify 10+ dishes are rendered
-    for (let i = 1; i <= 10; i++) {
+    // Verify top 4 dishes are rendered inline in Tier 1 bento grid
+    for (let i = 1; i <= 4; i++) {
       expect(screen.getByTestId(`custom-dish-card-dish-perf-${i}`)).toBeDefined();
+    }
+    // Verify dishes beyond top 4 are NOT rendered inline
+    for (let i = 5; i <= 10; i++) {
+      expect(screen.queryByTestId(`custom-dish-card-dish-perf-${i}`)).toBeNull();
+    }
+
+    // Open Tier 2 bottom sheet and verify remaining dishes are rendered in the catalog
+    fireEvent.click(screen.getByTestId('open-favorites-sheet-btn'));
+    for (let i = 1; i <= 10; i++) {
+      expect(screen.getByTestId(`sheet-dish-card-dish-perf-${i}`)).toBeDefined();
     }
 
     // 0 fetchDishDetail calls so far
@@ -2341,8 +2351,8 @@ Total Fiber: 1 g`;
     );
     expect(detailFetchesBefore.length).toBe(0);
 
-    // Open one dish editor
-    const editBtn = screen.getByTestId('edit-dish-btn-dish-perf-1');
+    // Open one dish editor from the sheet
+    const editBtn = screen.getByTestId('sheet-edit-dish-btn-dish-perf-1');
     fireEvent.click(editBtn);
 
     await waitFor(() => {

@@ -16,7 +16,7 @@ import { useNutritionData } from './useNutritionData';
 import { useNutritionAi } from './useNutritionAi';
 import { useCustomDishModal } from './useCustomDishModal';
 import { NutritionDashboardRings } from './NutritionDashboardRings';
-import { QuickLogCarousel } from './QuickLogCarousel';
+import { QuickLogFavorites } from './QuickLogFavorites';
 import { NutritionAiInput } from './NutritionAiInput';
 import { StagedMealCard } from './StagedMealCard';
 import { ManualMealForm } from './ManualMealForm';
@@ -356,7 +356,7 @@ export const NutritionEngine: React.FC = () => {
         onSelectBreakdownNutrient={setBreakdownNutrient}
       />
 
-      <QuickLogCarousel
+      <QuickLogFavorites
         customDishes={customDishes}
         onOpenNewDishModal={dishModal.handleOpenNewDishModal}
         onStageCustomDish={handleStageCustomDish}
