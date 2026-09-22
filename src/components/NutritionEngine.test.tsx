@@ -293,7 +293,7 @@ describe('NutritionEngine', () => {
     expect(getRecordedTables()).toContain('custom_dishes');
     expect(getRecordedSelects()).toContainEqual({
       table: 'custom_dishes',
-      projection: 'id, user_id, name, calories, protein, carbs, fat, fiber, created_at',
+      projection: 'id, user_id, name, calories, protein, carbs, fat, fiber, created_at, kind, use_count',
     });
   });
 
@@ -384,6 +384,150 @@ describe('NutritionEngine', () => {
     expect(parsedIngredients).toHaveLength(2);
     expect(parsedIngredients[0].name).toBe('Sourdough Toast');
     expect(parsedIngredients[1].name).toBe('Avocado');
+  });
+
+  it('saves a staged 6-item meal as a custom dish with kind="recipe" explicitly', async () => {
+    const mockInsert = vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) });
+    (supabase.from as any).mockImplementation((table: string) => {
+      const b = createSupabaseBuilder(table, { data: [], error: null });
+      if (table === 'custom_dishes') {
+        b.insert = mockInsert;
+      }
+      return b;
+    });
+
+    const sixItems = [
+      { name: 'Oats', portion: '50g', calories: 190, protein: 7, carbs: 34, fat: 3, fiber: 5 },
+      { name: 'Whey Protein', portion: '30g', calories: 120, protein: 24, carbs: 2, fat: 1, fiber: 0 },
+      { name: 'Peanut Butter', portion: '16g', calories: 95, protein: 4, carbs: 3, fat: 8, fiber: 1 },
+      { name: 'Chia Seeds', portion: '10g', calories: 49, protein: 2, carbs: 4, fat: 3, fiber: 3 },
+      { name: 'Blueberries', portion: '50g', calories: 29, protein: 0, carbs: 7, fat: 0, fiber: 1 },
+      { name: 'Almond Milk', portion: '100ml', calories: 15, protein: 1, carbs: 0, fat: 1, fiber: 0 },
+    ];
+
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: {
+        name: 'Power Oatmeal',
+        calories: 498,
+        protein: 38,
+        carbs: 50,
+        fat: 16,
+        fiber: 10,
+        explanation: '498 kcal (Power Oatmeal)',
+        items: sixItems,
+      },
+      error: null,
+    });
+
+    renderComponent();
+
+    const input = screen.getByPlaceholderText(
+      'Describe what you ate (e.g., 3 eggs, 2 slices sourdough, 1 tbsp butter)'
+    );
+    await userEvent.type(input, 'Power oatmeal bowl with 6 ingredients');
+    fireEvent.click(screen.getByText('Analyze Meal'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Save as Custom Dish')).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByText('Save as Custom Dish'));
+
+    await waitFor(() => {
+      expect(mockInsert).toHaveBeenCalled();
+    });
+
+    const payload = mockInsert.mock.calls[0][0][0];
+    expect(payload.name).toBe('Power Oatmeal');
+    expect(payload.kind).toBe('recipe');
+    expect(payload.items).toHaveLength(6);
+  });
+
+  it('increments use_count when a custom dish is staged from the carousel', async () => {
+    const mockUpdate = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: [], error: null }) });
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'custom_dishes') {
+        const b = createSupabaseBuilder('custom_dishes', {
+          data: [
+            {
+              id: 'dish-count-1',
+              name: 'Morning Smoothie',
+              calories: 300,
+              protein: 20,
+              carbs: 40,
+              fat: 5,
+              fiber: 4,
+              kind: 'food',
+              use_count: 3,
+            },
+          ],
+          error: null,
+        });
+        b.update = mockUpdate;
+        return b;
+      }
+      return createSupabaseBuilder(table, { data: [], error: null });
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('Morning Smoothie')).toBeDefined();
+    });
+
+    // Staging the dish by clicking the card
+    fireEvent.click(screen.getByText('Morning Smoothie'));
+
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith({ use_count: 4 });
+    });
+  });
+
+  it('increments use_count when a custom dish is 1-tap quick logged', async () => {
+    const mockUpdate = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: [], error: null }) });
+    const mockInsert = vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) });
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'custom_dishes') {
+        const b = createSupabaseBuilder('custom_dishes', {
+          data: [
+            {
+              id: 'dish-count-2',
+              name: 'Quick Bar',
+              calories: 200,
+              protein: 15,
+              carbs: 20,
+              fat: 6,
+              fiber: 3,
+              kind: 'food',
+              use_count: 7,
+            },
+          ],
+          error: null,
+        });
+        b.update = mockUpdate;
+        return b;
+      }
+      const b = createSupabaseBuilder(table, { data: [], error: null });
+      if (table === 'nutrition_logs') {
+        b.insert = mockInsert;
+      }
+      return b;
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('Quick Bar')).toBeDefined();
+    });
+
+    const quickLogBtn = screen.getByTitle('1-Tap Log Meal');
+    fireEvent.click(quickLogBtn);
+
+    await waitFor(() => {
+      expect(mockInsert).toHaveBeenCalled();
+      expect(mockUpdate).toHaveBeenCalledWith({ use_count: 8 });
+    });
   });
 
   it('falls back to manual entry with error banner when edge function invocation fails', async () => {
@@ -2151,7 +2295,7 @@ Total Fiber: 1 g`;
       if (table === 'custom_dishes') {
         return createSupabaseBuilder('custom_dishes', {
           resolver: (builder: any) => {
-            if (builder.projection === 'id, items, ingredients') {
+            if (builder.projection === 'id, items, ingredients, kind, notes') {
               const idFilter = builder.filters.find((f: any) => f.column === 'id');
               const dishId = idFilter?.value;
               return {
@@ -2193,7 +2337,7 @@ Total Fiber: 1 g`;
 
     // 0 fetchDishDetail calls so far
     const detailFetchesBefore = getRecordedSelects().filter(
-      (s) => s.table === 'custom_dishes' && s.projection === 'id, items, ingredients'
+      (s) => s.table === 'custom_dishes' && s.projection === 'id, items, ingredients, kind, notes'
     );
     expect(detailFetchesBefore.length).toBe(0);
 
@@ -2207,12 +2351,12 @@ Total Fiber: 1 g`;
 
     // Exactly 1 fetchDishDetail call occurred
     const detailFetchesAfter = getRecordedSelects().filter(
-      (s) => s.table === 'custom_dishes' && s.projection === 'id, items, ingredients'
+      (s) => s.table === 'custom_dishes' && s.projection === 'id, items, ingredients, kind, notes'
     );
     expect(detailFetchesAfter.length).toBe(1);
     expect(getRecordedSelects()).toContainEqual({
       table: 'custom_dishes',
-      projection: 'id, items, ingredients',
+      projection: 'id, items, ingredients, kind, notes',
     });
   });
 
@@ -2222,7 +2366,7 @@ Total Fiber: 1 g`;
       if (table === 'custom_dishes') {
         return createSupabaseBuilder('custom_dishes', {
           resolver: (builder: any) => {
-            if (builder.projection === 'id, items, ingredients') {
+            if (builder.projection === 'id, items, ingredients, kind, notes') {
               if (shouldFail) {
                 return { data: null, error: new Error('Network error loading dish details') };
               }
@@ -2307,7 +2451,7 @@ Total Fiber: 1 g`;
       if (table === 'custom_dishes') {
         return createSupabaseBuilder('custom_dishes', {
           resolver: (builder: any) => {
-            if (builder.projection === 'id, items, ingredients') {
+            if (builder.projection === 'id, items, ingredients, kind, notes') {
               return {
                 id: 'dish-legacy-1',
                 items: null,

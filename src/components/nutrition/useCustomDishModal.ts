@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { CustomDish, CustomDishDetail } from '../../types/database';
+import type { CustomDish, CustomDishDetail, CustomDishKind } from '../../types/database';
 import { roundTo1Decimal } from '../../utils/nutrition';
 import {
   itemsForPersist,
@@ -28,6 +28,7 @@ export function useCustomDishModal({
   const [showDishModal, setShowDishModal] = useState(false);
   const [editingDish, setEditingDish] = useState<CustomDishDetail | null>(null);
   const [dishFetchError, setDishFetchError] = useState<{ message: string; retry: () => void } | null>(null);
+  const [dishModalKind, setDishModalKind] = useState<CustomDishKind>('food');
   const [dishModalName, setDishModalName] = useState('');
   const [dishModalCalories, setDishModalCalories] = useState<number | ''>('');
   const [dishModalProtein, setDishModalProtein] = useState<number | ''>('');
@@ -37,6 +38,7 @@ export function useCustomDishModal({
   const [dishModalItems, setDishModalItems] = useState<NutritionItem[]>([]);
 
   const resetDishModalFields = () => {
+    setDishModalKind('food');
     setDishModalName('');
     setDishModalCalories('');
     setDishModalProtein('');
@@ -87,6 +89,9 @@ export function useCustomDishModal({
       normalizeItems(mergedDish.items) ??
       itemsFromLegacyIngredients(mergedDish.id, mergedDish.name, mergedDish.ingredients) ??
       [];
+    const initialKind: CustomDishKind =
+      dish.kind ?? (rawItems.length > 1 ? 'recipe' : 'food');
+    setDishModalKind(initialKind);
     setDishModalItems(
       rawItems.map((it) => ({
         ...it,
@@ -111,6 +116,11 @@ export function useCustomDishModal({
   const handleSaveCustomDishModal = (e: React.FormEvent) => {
     e.preventDefault();
     if (!dishModalName.trim()) return;
+    // A new recipe's totals are Σ(components); with no components there is
+    // nothing to derive and the parent-macro inputs are not rendered, so this
+    // would persist a silent all-zero dish. When editing, the parent macros are
+    // already seeded from the existing row, so there is nothing to corrupt.
+    if (!editingDish && dishModalKind === 'recipe' && dishModalItems.length === 0) return;
 
     const persistItems = itemsForPersist(dishModalItems);
     const totals = persistItems ? sumItems(persistItems) : null;
@@ -119,6 +129,7 @@ export function useCustomDishModal({
     onSaveDish({
       dishPayload: {
         name: dishModalName.trim(),
+        kind: dishModalKind,
         calories: clamp(totals ? totals.calories : Number(dishModalCalories) || 0),
         protein: clamp(totals ? totals.protein : Number(dishModalProtein) || 0),
         carbs: clamp(totals ? totals.carbs : Number(dishModalCarbs) || 0),
@@ -139,6 +150,8 @@ export function useCustomDishModal({
   return {
     showDishModal,
     editingDish,
+    dishModalKind,
+    setDishModalKind,
     dishModalName,
     setDishModalName,
     dishModalCalories,

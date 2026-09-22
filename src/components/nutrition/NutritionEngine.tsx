@@ -185,6 +185,7 @@ export const NutritionEngine: React.FC = () => {
         {
           user_id: targetUserId,
           name: stagedMeal.name,
+          kind: items.length > 1 ? 'recipe' : 'food',
           ingredients: JSON.stringify(stagedMeal.items),
           items: items.length > 1 ? itemsForPersist(items) : null,
           calories: roundTo1Decimal(totals.calories),
@@ -210,6 +211,7 @@ export const NutritionEngine: React.FC = () => {
         {
           user_id: targetUserId,
           name: item.name,
+          kind: 'food',
           ingredients: JSON.stringify([item]),
           items: null,
           calories: roundTo1Decimal(item.calories),
@@ -288,6 +290,14 @@ export const NutritionEngine: React.FC = () => {
       servingSize: 1,
       servingUnit: 'serving',
     });
+
+    void supabase
+      .from('custom_dishes')
+      .update({ use_count: (dish.use_count ?? 0) + 1 })
+      .eq('id', dish.id)
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['custom_dishes', targetUserId] });
+      });
   };
 
   const handleQuickLogCustomDishDirect = (dish: CustomDish, e: React.MouseEvent) => {
@@ -305,6 +315,13 @@ export const NutritionEngine: React.FC = () => {
       logged_at: formatLocalTimestamp(selectedDate),
     };
     mutation.mutate(payload);
+    void supabase
+      .from('custom_dishes')
+      .update({ use_count: (dish.use_count ?? 0) + 1 })
+      .eq('id', dish.id)
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['custom_dishes', targetUserId] });
+      });
     triggerToast(dish);
   };
 
@@ -521,6 +538,8 @@ export const NutritionEngine: React.FC = () => {
         isOpen={dishModal.showDishModal}
         onClose={dishModal.handleCloseDishModal}
         editingDish={dishModal.editingDish}
+        dishModalKind={dishModal.dishModalKind}
+        setDishModalKind={dishModal.setDishModalKind}
         dishModalName={dishModal.dishModalName}
         setDishModalName={dishModal.setDishModalName}
         dishModalCalories={dishModal.dishModalCalories}

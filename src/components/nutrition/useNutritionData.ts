@@ -8,7 +8,7 @@ import type { NutritionLog, CustomDish, CustomDishDetail, UserProfile } from '..
 export async function fetchDishDetail(dishId: string): Promise<CustomDishDetail | null> {
   const { data, error } = await supabase
     .from('custom_dishes')
-    .select('id, items, ingredients')
+    .select('id, items, ingredients, kind, notes')
     .eq('id', dishId)
     .maybeSingle();
 
@@ -93,7 +93,7 @@ export function useNutritionData({
       const { data, error } = await supabase
         .from('custom_dishes')
         .select(
-          'id, user_id, name, calories, protein, carbs, fat, fiber, created_at'
+          'id, user_id, name, calories, protein, carbs, fat, fiber, created_at, kind, use_count'
         )
         .eq('user_id', targetUserId)
         .order('created_at', { ascending: false })
@@ -287,10 +287,14 @@ export function useNutritionData({
   // Custom Dish CRUD mutations
   const saveCustomDishMutation = useMutation({
     mutationFn: async ({ dishPayload, editingDishId }: { dishPayload: Partial<CustomDishDetail>; editingDishId?: string }) => {
+      const payloadWithKind = {
+        ...dishPayload,
+        kind: dishPayload.kind ?? (dishPayload.items && dishPayload.items.length > 1 ? 'recipe' : 'food'),
+      };
       if (editingDishId) {
         const { data, error } = await supabase
           .from('custom_dishes')
-          .update(dishPayload)
+          .update(payloadWithKind)
           .eq('id', editingDishId)
           .select();
         if (error) throw error;
@@ -298,7 +302,7 @@ export function useNutritionData({
       } else {
         const { data, error } = await supabase
           .from('custom_dishes')
-          .insert([{ ...dishPayload, user_id: targetUserId } as Database['public']['Tables']['custom_dishes']['Insert']])
+          .insert([{ ...payloadWithKind, user_id: targetUserId } as Database['public']['Tables']['custom_dishes']['Insert']])
           .select();
         if (error) throw error;
         return data;

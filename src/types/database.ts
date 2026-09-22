@@ -125,16 +125,12 @@ export interface CustomDishRow {
   created_at?: string;
   /**
    * User-declared dish classification: 'food' (atomic food) or 'recipe' (composed meal).
-   * Optional because current SELECT projections do not request it yet;
-   * tightened in the next phase when query projections include it.
    */
-  kind?: CustomDishKind;
+  kind: CustomDishKind;
   /**
    * Total times this custom dish has been logged (>= 0).
-   * Optional because current SELECT projections do not request it yet;
-   * tightened in the next phase when query projections include it.
    */
-  use_count?: number;
+  use_count: number;
   /**
    * Optional user notes or preparation instructions for the custom dish (max 500 characters).
    * Optional because current SELECT projections do not request it yet;

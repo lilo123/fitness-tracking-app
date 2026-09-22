@@ -1,5 +1,5 @@
 import React, { memo, useId } from 'react';
-import type { CustomDish } from '../../types/database';
+import type { CustomDish, CustomDishKind } from '../../types/database';
 import type { NutritionItem } from '../../utils/itemModel';
 import { roundTo1Decimal, formatCalories, formatMacro } from '../../utils/nutrition';
 import { getDishIcon } from '../../utils/dishIcons';
@@ -11,6 +11,8 @@ export interface CustomDishesModalProps {
   isOpen: boolean;
   onClose: () => void;
   editingDish: CustomDish | null;
+  dishModalKind?: CustomDishKind;
+  setDishModalKind?: (val: CustomDishKind) => void;
   dishModalName: string;
   setDishModalName: (val: string) => void;
   dishModalCalories: number | '';
@@ -37,6 +39,8 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
   isOpen,
   onClose,
   editingDish,
+  dishModalKind = 'food',
+  setDishModalKind = () => {},
   dishModalName,
   setDishModalName,
   dishModalCalories,
@@ -67,6 +71,15 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
   const fiberId = `${baseId}-fiber`;
 
   const dishModalRef = useModalA11y(isOpen, onClose);
+
+  const isFoodDisabled = dishModalKind === 'recipe' && dishModalItems.length > 1;
+  const showDirectMacros = dishModalKind !== 'recipe' && dishModalItems.length <= 1;
+  // A new recipe derives its totals from its components, so it renders none of
+  // the `required` parent-macro inputs. With zero components there is nothing to
+  // derive from either, and the form would submit a silent all-zero dish. An
+  // existing dish already has macros seeded, so it stays editable.
+  const recipeNeedsIngredient =
+    !editingDish && dishModalKind === 'recipe' && dishModalItems.length === 0;
 
   if (!isOpen) return null;
 
@@ -114,11 +127,69 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
             />
           </div>
 
+          {/* Dish Type toggle: Food vs Recipe */}
+          <div>
+            <span
+              id={`${baseId}-kind-label`}
+              className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1"
+            >
+              Dish Type
+            </span>
+            <div
+              role="radiogroup"
+              aria-labelledby={`${baseId}-kind-label`}
+              className="grid grid-cols-2 gap-2"
+            >
+              <label
+                className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs font-bold transition ${
+                  isFoodDisabled
+                    ? 'opacity-50 cursor-not-allowed bg-zinc-950/50 border-zinc-800 text-zinc-500'
+                    : dishModalKind === 'food'
+                    ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-300 cursor-pointer'
+                    : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white cursor-pointer'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name={`${baseId}-kind`}
+                  value="food"
+                  checked={dishModalKind === 'food'}
+                  disabled={isFoodDisabled}
+                  onChange={() => setDishModalKind('food')}
+                  className="accent-cyan-500 min-w-[16px] min-h-[16px]"
+                />
+                <span>Food</span>
+              </label>
+              <label
+                className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs font-bold cursor-pointer transition ${
+                  dishModalKind === 'recipe'
+                    ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-300'
+                    : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name={`${baseId}-kind`}
+                  value="recipe"
+                  checked={dishModalKind === 'recipe'}
+                  onChange={() => setDishModalKind('recipe')}
+                  className="accent-cyan-500 min-w-[16px] min-h-[16px]"
+                />
+                <span>Recipe</span>
+              </label>
+            </div>
+            {isFoodDisabled && (
+              <p className="text-[11px] text-zinc-400 mt-1">
+                Remove ingredients first to switch to Food.
+              </p>
+            )}
+          </div>
+
           {/* Once a dish has a real breakdown its totals are Σ(components);
               showing editable parent macros would invite a value the DB
               sum constraint then rejects. */}
-          {dishModalItems.length <= 1 && (
-            <div className="grid grid-cols-6 sm:grid-cols-5 gap-2">
+          {showDirectMacros && (
+            <div data-testid="parent-macros" className="grid grid-cols-6 sm:grid-cols-5 gap-2">
               <div className="col-span-2 sm:col-span-1">
                 <label
                   htmlFor={calId}
@@ -226,7 +297,18 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
             </div>
           )}
 
-          <CustomDishEditor items={dishModalItems} onChange={setDishModalItems} />
+          {dishModalKind === 'recipe' && (
+            <CustomDishEditor items={dishModalItems} onChange={setDishModalItems} />
+          )}
+
+          {recipeNeedsIngredient && (
+            <p
+              data-testid="recipe-needs-ingredient"
+              className="text-[10px] font-bold text-amber-400"
+            >
+              Add at least one ingredient, or switch to Food to enter macros directly.
+            </p>
+          )}
 
           <div className="flex items-center justify-between pt-3 border-t border-zinc-800">
             {editingDish ? (
@@ -257,7 +339,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
               </button>
               <button
                 type="submit"
-                disabled={isSaving}
+                disabled={isSaving || recipeNeedsIngredient}
                 className="px-5 py-2 min-h-[44px] rounded-xl text-xs font-black bg-cyan-500 hover:bg-cyan-400 text-black shadow-neon-cyan transition disabled:opacity-50 touch-manipulation"
               >
                 {isSaving ? 'Saving...' : 'Save Dish'}
