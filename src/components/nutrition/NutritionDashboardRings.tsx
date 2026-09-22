@@ -126,81 +126,56 @@ export const NutritionDashboardRings: React.FC<NutritionDashboardRingsProps> = m
       >
         <span className="text-zinc-500 uppercase text-[10px] font-bold tracking-wider">Remaining Fuel:</span>
         <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.currentTarget.focus();
-              onSelectBreakdownNutrient('calories');
-            }}
+          <div
             data-testid="remaining-fuel-calories"
-            className={`px-2 py-0.5 min-h-[44px] inline-flex items-center justify-center rounded-lg border text-[11px] font-mono font-bold transition-all cursor-pointer touch-manipulation hover:brightness-110 active:scale-95 ${
+            className={`px-2 py-0.5 inline-flex items-center justify-center rounded-lg border text-[11px] font-mono font-bold ${
               remainingFuel.calories.isOver
                 ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
                 : 'bg-amber-500/10 border-amber-500/25 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.1)]'
             }`}
           >
             {remainingFuel.calories.badgeLabel}
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.currentTarget.focus();
-              onSelectBreakdownNutrient('protein');
-            }}
+          </div>
+          <div
             data-testid="remaining-fuel-protein"
-            className={`px-2 py-0.5 min-h-[44px] inline-flex items-center justify-center rounded-lg border text-[11px] font-mono font-bold transition-all cursor-pointer touch-manipulation hover:brightness-110 active:scale-95 ${
+            className={`px-2 py-0.5 inline-flex items-center justify-center rounded-lg border text-[11px] font-mono font-bold ${
               remainingFuel.protein.isOver
                 ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
                 : 'bg-cyan-500/10 border-cyan-500/25 text-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.1)]'
             }`}
           >
             {remainingFuel.protein.badgeLabel}
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.currentTarget.focus();
-              onSelectBreakdownNutrient('carbs');
-            }}
+          </div>
+          <div
             data-testid="remaining-fuel-carbs"
-            className={`px-2 py-0.5 min-h-[44px] inline-flex items-center justify-center rounded-lg border text-[11px] font-mono font-bold transition-all cursor-pointer touch-manipulation hover:brightness-110 active:scale-95 ${
+            className={`px-2 py-0.5 inline-flex items-center justify-center rounded-lg border text-[11px] font-mono font-bold ${
               remainingFuel.carbs.isOver
                 ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
                 : 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.1)]'
             }`}
           >
             {remainingFuel.carbs.badgeLabel}
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.currentTarget.focus();
-              onSelectBreakdownNutrient('fat');
-            }}
+          </div>
+          <div
             data-testid="remaining-fuel-fat"
-            className={`px-2 py-0.5 min-h-[44px] inline-flex items-center justify-center rounded-lg border text-[11px] font-mono font-bold transition-all cursor-pointer touch-manipulation hover:brightness-110 active:scale-95 ${
+            className={`px-2 py-0.5 inline-flex items-center justify-center rounded-lg border text-[11px] font-mono font-bold ${
               remainingFuel.fat.isOver
                 ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
                 : 'bg-violet-500/10 border-violet-500/25 text-violet-400 shadow-[0_0_8px_rgba(139,92,246,0.1)]'
             }`}
           >
             {remainingFuel.fat.badgeLabel}
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.currentTarget.focus();
-              onSelectBreakdownNutrient('fiber');
-            }}
+          </div>
+          <div
             data-testid="remaining-fuel-fiber"
-            className={`px-2 py-0.5 min-h-[44px] inline-flex items-center justify-center rounded-lg border text-[11px] font-mono font-bold transition-all cursor-pointer touch-manipulation hover:brightness-110 active:scale-95 ${
+            className={`px-2 py-0.5 inline-flex items-center justify-center rounded-lg border text-[11px] font-mono font-bold ${
               remainingFuel.fiber.isOver
                 ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
                 : 'bg-teal-500/10 border-teal-500/25 text-teal-400 shadow-[0_0_8px_rgba(20,184,166,0.1)]'
             }`}
           >
             {remainingFuel.fiber.badgeLabel}
-          </button>
+          </div>
         </div>
       </div>
     </div>

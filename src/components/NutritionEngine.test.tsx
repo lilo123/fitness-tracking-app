@@ -2767,36 +2767,25 @@ Total Fiber: 1 g`;
       fireEvent.click(screen.getByTestId('close-breakdown-modal-btn'));
     });
 
-    it('opens breakdown modal when Remaining Fuel chips are clicked', async () => {
+    it('does not open the breakdown modal when Remaining Fuel chips are clicked (6.2)', async () => {
+      // This test used to assert the opposite. The chips and the rings above
+      // them called the same handler with the same argument, so the dashboard
+      // offered 10 tab stops to reach 5 destinations and announced every
+      // nutrient twice as an actionable control. The chips lost their handler;
+      // the rings keep it, and the test directly above still covers all five.
+      // Inverted rather than deleted so re-adding the handler fails here.
       renderComponent();
       await screen.findByText("Today's Nutrition");
 
-      // Click Remaining Fuel calories chip
-      fireEvent.click(screen.getByTestId('remaining-fuel-calories'));
-      expect(screen.getByTestId('nutrient-breakdown-modal')).toBeDefined();
-      expect(screen.getByTestId('nutrient-pill-calories').getAttribute('aria-selected')).toBe('true');
-      fireEvent.click(screen.getByTestId('close-breakdown-modal-btn'));
+      for (const nutrient of ['calories', 'protein', 'carbs', 'fat', 'fiber']) {
+        const chip = screen.getByTestId(`remaining-fuel-${nutrient}`);
+        expect(chip.tagName).toBe('DIV');
+        expect(chip.getAttribute('role')).toBeNull();
+        expect(chip.getAttribute('tabindex')).toBeNull();
 
-      // Click Remaining Fuel protein chip
-      fireEvent.click(screen.getByTestId('remaining-fuel-protein'));
-      expect(screen.getByTestId('nutrient-breakdown-modal')).toBeDefined();
-      expect(screen.getByTestId('nutrient-pill-protein').getAttribute('aria-selected')).toBe('true');
-      fireEvent.click(screen.getByTestId('close-breakdown-modal-btn'));
-
-      // Click Remaining Fuel carbs chip
-      fireEvent.click(screen.getByTestId('remaining-fuel-carbs'));
-      expect(screen.getByTestId('nutrient-pill-carbs').getAttribute('aria-selected')).toBe('true');
-      fireEvent.click(screen.getByTestId('close-breakdown-modal-btn'));
-
-      // Click Remaining Fuel fat chip
-      fireEvent.click(screen.getByTestId('remaining-fuel-fat'));
-      expect(screen.getByTestId('nutrient-pill-fat').getAttribute('aria-selected')).toBe('true');
-      fireEvent.click(screen.getByTestId('close-breakdown-modal-btn'));
-
-      // Click Remaining Fuel fiber chip
-      fireEvent.click(screen.getByTestId('remaining-fuel-fiber'));
-      expect(screen.getByTestId('nutrient-pill-fiber').getAttribute('aria-selected')).toBe('true');
-      fireEvent.click(screen.getByTestId('close-breakdown-modal-btn'));
+        fireEvent.click(chip);
+        expect(screen.queryByTestId('nutrient-breakdown-modal')).toBeNull();
+      }
     });
 
     it('displays Level 1 composite meals with accordion and Level 2 leaf meals in breakdown modal', async () => {
