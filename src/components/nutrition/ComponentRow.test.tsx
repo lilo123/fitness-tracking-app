@@ -371,4 +371,29 @@ describe('ComponentRow', () => {
     expect(applied.quantity).toBe(25);
     expect(applied.calories).toBe(2500);
   });
+
+  it('selects input text on focus for rapid single-tap replacement (defect F3/NEW-01)', () => {
+    const item = component({ quantity: 150 });
+    render(<ComponentRow item={item} reference={item} onChange={() => {}} />);
+    const input = screen.getByTestId('component-quantity-input') as HTMLInputElement;
+    const selectSpy = vi.spyOn(input, 'select');
+    fireEvent.focus(input);
+    expect(selectSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders stepper and unit chip in a unified compound container with embedded styling (Cards B2/E2)', () => {
+    const item = component();
+    render(<ComponentRow item={item} reference={item} onChange={() => {}} />);
+
+    const unitChip = screen.getByTestId('component-unit-chip');
+    // Embedded UnitChip strips border and background
+    expect(unitChip.className).toContain('border-0');
+    expect(unitChip.className).toContain('bg-transparent');
+
+    // Stepper and unit chip share the same compound container
+    const input = screen.getByTestId('component-quantity-input');
+    const compoundContainer = input.closest('div.inline-flex');
+    expect(compoundContainer).not.toBeNull();
+    expect(compoundContainer?.contains(unitChip)).toBe(true);
+  });
 });

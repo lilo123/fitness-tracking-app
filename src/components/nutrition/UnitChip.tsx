@@ -6,6 +6,8 @@ export interface UnitChipProps {
   onChange: (next: CanonicalUnit) => void;
   disabled?: boolean;
   testId?: string;
+  /** When true, outer borders and backgrounds are stripped for nesting inside compound controls (Card E2). */
+  embedded?: boolean;
 }
 
 const FULL_UNIT_NAMES: Record<CanonicalUnit, string> = {
@@ -29,7 +31,13 @@ const FULL_UNIT_NAMES: Record<CanonicalUnit, string> = {
  * There is deliberately no chevron: it costs 16 px, which is 37% of the
  * quantity field next to it at a 320 px viewport.
  */
-export const UnitChip: React.FC<UnitChipProps> = ({ value, onChange, disabled, testId }) => {
+export const UnitChip: React.FC<UnitChipProps> = ({
+  value,
+  onChange,
+  disabled,
+  testId,
+  embedded = false,
+}) => {
   const [open, setOpen] = React.useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -60,7 +68,11 @@ export const UnitChip: React.FC<UnitChipProps> = ({ value, onChange, disabled, t
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen(true)}
-        className="shrink-0 max-w-[64px] truncate min-h-[44px] px-2 rounded-lg border border-zinc-700 bg-zinc-950 text-[12px] font-bold text-cyan-300 transition hover:border-cyan-500 disabled:opacity-50 touch-manipulation"
+        className={`shrink-0 max-w-[64px] truncate min-h-[44px] px-2 text-[12px] font-bold text-cyan-300 transition touch-manipulation disabled:opacity-50 ${
+          embedded
+            ? 'border-0 bg-transparent hover:bg-zinc-800/60 hover:text-cyan-200 rounded-lg'
+            : 'rounded-lg border border-zinc-700 bg-zinc-950 hover:border-cyan-500'
+        }`}
       >
         {shortUnitLabel(value)}
       </button>

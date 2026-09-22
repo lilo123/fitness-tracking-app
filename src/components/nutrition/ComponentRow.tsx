@@ -163,7 +163,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
   return (
     <div
       data-testid="component-row"
-      className="rounded-xl border border-zinc-800 border-l-2 border-l-cyan-500/40 bg-zinc-900/90 p-2.5 space-y-1.5"
+      className="rounded-xl border border-zinc-800 border-l-2 border-l-cyan-500/40 bg-zinc-900/90 p-2 sm:p-2.5 space-y-1.5"
     >
       {/* Zone 1 — identity */}
       <div className="flex items-center gap-1.5">
@@ -200,11 +200,11 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
         <span className="whitespace-nowrap text-teal-400">Fib {formatMacro(item.fiber)}</span>
       </div>
 
-      {/* Zone 3 — quantity pill + unit chip */}
+      {/* Zone 3 — compound quantity stepper + unit chip */}
       {editable && (
         <div className="space-y-1.5">
-          <div className="flex items-center gap-1.5">
-            <div className="inline-flex items-center gap-0.5 rounded-xl border border-zinc-800 bg-zinc-950 p-0.5">
+          <div className="flex items-center">
+            <div className="inline-flex items-center gap-0.5 rounded-xl border border-zinc-800 bg-zinc-950 p-0.5 shadow-sm">
               <button
                 type="button"
                 aria-label={`Decrease quantity of ${item.name}`}
@@ -224,6 +224,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
                 aria-label={`Quantity of ${item.name}`}
                 value={shown}
                 placeholder={pendingUnit ? `amount in ${pendingUnit} for this ${formatCalories(item.calories)} kcal` : undefined}
+                onFocus={(e) => e.target.select()}
                 onChange={(e) => setDraft(e.target.value)}
                 onBlur={(e) => commit(e.target.value)}
                 onKeyDown={(e) => {
@@ -244,12 +245,18 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
               >
                 +
               </button>
+
+              {/* Internal vertical divider separating stepper from unit selector */}
+              <div className="h-6 w-px bg-zinc-800 mx-0.5 shrink-0" aria-hidden="true" />
+
+              {/* Seamless embedded UnitChip */}
+              <UnitChip
+                value={pendingUnit ?? item.unit}
+                onChange={handleUnitChange}
+                testId="component-unit-chip"
+                embedded
+              />
             </div>
-            <UnitChip
-              value={pendingUnit ?? item.unit}
-              onChange={handleUnitChange}
-              testId="component-unit-chip"
-            />
           </div>
           {pendingUnit && (
             <div data-testid="component-reanchor-hint" className="text-[10px] text-zinc-400">
