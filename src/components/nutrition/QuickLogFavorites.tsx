@@ -58,7 +58,7 @@ export const QuickLogFavorites: React.FC<QuickLogFavoritesProps> = ({
           type="button"
           onClick={onOpenNewDishModal}
           data-testid="create-custom-dish-btn"
-          className="text-xs font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition p-1 rounded-lg hover:bg-zinc-800/50 touch-manipulation min-h-[36px] min-w-[36px]"
+          className="text-xs font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition px-2 rounded-lg hover:bg-zinc-800/50 touch-manipulation min-h-[44px] min-w-[44px]"
           title="Create New Custom Dish"
         >
           <Plus className="w-3.5 h-3.5" />

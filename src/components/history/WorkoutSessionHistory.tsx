@@ -196,7 +196,7 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
               aria-expanded={isExpanded}
               aria-label={isExpanded ? `Collapse ${session.name || 'workout'}` : `Expand ${session.name || 'workout'}`}
               data-testid={`expand-session-btn-${session.id}`}
-              className="min-w-[36px] min-h-[36px] rounded-xl bg-zinc-800/60 hover:bg-cyan-500/20 text-zinc-400 hover:text-cyan-300 flex items-center justify-center transition active:scale-95 touch-manipulation cursor-pointer"
+              className="min-w-[44px] min-h-[44px] rounded-xl bg-zinc-800/60 hover:bg-cyan-500/20 text-zinc-400 hover:text-cyan-300 flex items-center justify-center transition active:scale-95 touch-manipulation cursor-pointer"
             >
               {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>

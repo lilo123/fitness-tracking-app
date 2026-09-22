@@ -30,6 +30,19 @@ describe('CoachTemplateBuilder accessibility', () => {
     expect(screen.getByLabelText(/template name/i)).toBeDefined();
   });
 
+  it('satisfies touch-target className contract (min-h-[44px] cursor-pointer) and resolves accessible name via getByLabelText for Master Template checkbox', () => {
+    render(<CoachTemplateBuilder {...defaultProps} />);
+    const checkbox = screen.getByLabelText('Master Template (Available to all athletes)');
+    expect(checkbox).toBeDefined();
+    expect(checkbox).toHaveAttribute('id', 'isMasterCheckbox');
+    expect(checkbox.className).toContain('w-5 h-5');
+    const label = checkbox.closest('label');
+    expect(label).not.toBeNull();
+    expect(label?.getAttribute('for')).toBe('isMasterCheckbox');
+    expect(label?.className).toContain('min-h-[44px]');
+    expect(label?.className).toContain('cursor-pointer');
+  });
+
   it('passes axe accessibility audits with no violations', async () => {
     const { container } = render(<CoachTemplateBuilder {...defaultProps} />);
     await expectNoA11yViolations(container);

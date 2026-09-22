@@ -138,6 +138,10 @@ describe('SettingsView', () => {
     const toggleBtn = screen.getByTestId('toggle-auto-timer');
     expect(toggleBtn).toBeDefined();
     expect(toggleBtn.getAttribute('aria-checked')).toBe('true');
+    expect(toggleBtn.className).toContain('before:absolute');
+    expect(toggleBtn.className).toContain('before:-inset-y-2.5');
+    expect(toggleBtn.className).toContain('before:inset-x-0');
+    expect(toggleBtn.className).toContain("before:content-['']");
   });
 
   it('allows toggling auto-start rest timer preference and persists to localStorage and profile', async () => {

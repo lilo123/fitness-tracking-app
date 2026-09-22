@@ -139,6 +139,10 @@ describe('DIR-C2: List Virtualization with @tanstack/react-virtual', () => {
     expect(editBtn).toBeDefined();
     expect(editBtn).toHaveAttribute('aria-label', 'Edit set 1 of Barbell Bench Press');
 
+    const expandBtn = screen.getByTestId('expand-session-btn-session-focus-test');
+    expect(expandBtn.className).toContain('min-w-[44px]');
+    expect(expandBtn.className).toContain('min-h-[44px]');
+
     // Test keyboard focus
     editBtn.focus();
     expect(document.activeElement).toBe(editBtn);
@@ -192,6 +196,11 @@ describe('DIR-C2: List Virtualization with @tanstack/react-virtual', () => {
     // Two-sided virtualization verification:
     // 1. Lower-bound / presence: initial visible exercise items ARE mounted in the DOM
     expect(screen.getByText('Exercise Variant 1')).toBeDefined();
+
+    // Category filter pills satisfy touch-target className contract (min-h-[44px], shrink-0)
+    const allCatBtn = screen.getByRole('button', { name: 'All' });
+    expect(allCatBtn.className).toContain('min-h-[44px]');
+    expect(allCatBtn.className).toContain('shrink-0');
 
     // 2. Absence: off-screen exercise items are unmounted from the DOM
     expect(screen.queryByText('Exercise Variant 100')).toBeNull();

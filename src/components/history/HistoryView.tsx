@@ -332,7 +332,7 @@ export const HistoryView: React.FC = () => {
           <button
             type="button"
             onClick={() => setMutationError(null)}
-            className="p-1 min-w-[32px] min-h-[32px] text-rose-400 hover:text-white flex items-center justify-center"
+            className="p-1 min-w-[44px] min-h-[44px] text-rose-400 hover:text-white flex items-center justify-center"
           >
             ✕
           </button>

@@ -40,8 +40,10 @@ describe('WorkoutHeader', () => {
     expect(assertiveAfter).toBe(assertiveBefore);
     expect(assertiveAfter!.textContent).toBe('Failed to save workout set');
 
-    // Dismiss button works
+    // Dismiss button works and satisfies touch-target className contract (min-w-[44px] min-h-[44px])
     const dismissBtn = screen.getByRole('button', { name: '✕' });
+    expect(dismissBtn.className).toContain('min-w-[44px]');
+    expect(dismissBtn.className).toContain('min-h-[44px]');
     fireEvent.click(dismissBtn);
     expect(onClear).toHaveBeenCalledTimes(1);
 

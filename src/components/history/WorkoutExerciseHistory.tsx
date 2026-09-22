@@ -181,7 +181,7 @@ export const WorkoutExerciseHistory: React.FC<WorkoutExerciseHistoryProps> = ({
             <button
               key={cat}
               onClick={() => onSelectedCategoryChange(cat)}
-              className={`text-[11px] font-bold px-3 py-1.5 min-h-[36px] flex items-center justify-center rounded-full whitespace-nowrap transition touch-manipulation ${
+              className={`px-3.5 py-2 min-h-[44px] flex items-center justify-center rounded-xl text-xs font-bold shrink-0 transition touch-manipulation ${
                 selectedCategory === cat
                   ? 'bg-cyan-500 text-black shadow-neon-cyan'
                   : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'

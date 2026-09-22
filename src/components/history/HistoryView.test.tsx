@@ -520,6 +520,9 @@ describe('HistoryView', () => {
       const banner = screen.getByTestId('history-mutation-error');
       expect(banner).toBeDefined();
       expect(within(banner).getByText('Database deletion failed')).toBeDefined();
+      const dismissBtn = within(banner).getByRole('button', { name: '✕' });
+      expect(dismissBtn.className).toContain('min-w-[44px]');
+      expect(dismissBtn.className).toContain('min-h-[44px]');
     });
   });
 

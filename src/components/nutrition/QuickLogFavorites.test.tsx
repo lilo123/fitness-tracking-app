@@ -71,6 +71,24 @@ describe('QuickLogFavorites (Phase 5.1 Redesign)', () => {
     expect(screen.queryByTestId('open-favorites-sheet-btn')).toBeNull();
   });
 
+  it('satisfies touch-target className contract (min-h-[44px] min-w-[44px]) on create-custom-dish-btn', () => {
+    render(
+      <QuickLogFavorites
+        customDishes={[]}
+        onOpenNewDishModal={vi.fn()}
+        onStageCustomDish={vi.fn()}
+        onOpenEditDishModal={vi.fn()}
+        onQuickLogCustomDishDirect={vi.fn()}
+        onDismissToast={vi.fn()}
+      />
+    );
+
+    const createBtn = screen.getByTestId('create-custom-dish-btn');
+    expect(createBtn).toBeDefined();
+    expect(createBtn.className).toContain('min-h-[44px]');
+    expect(createBtn.className).toContain('min-w-[44px]');
+  });
+
   it('resolves NEW-10 defect: primary card button carries staging onClick without nested buttons', () => {
     const onStageCustomDish = vi.fn();
     const dish = createMockDish({ id: 'dish-new-10', name: 'Clean Salmon' });

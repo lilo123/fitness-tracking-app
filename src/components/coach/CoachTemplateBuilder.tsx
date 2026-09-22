@@ -77,18 +77,18 @@ export const CoachTemplateBuilder: React.FC<CoachTemplateBuilderProps> = ({
             />
           </div>
 
-          <div className="flex items-center gap-2">
+          <label htmlFor="isMasterCheckbox" className="flex items-center gap-2 min-h-[44px] cursor-pointer">
             <input
               type="checkbox"
               id="isMasterCheckbox"
               checked={isMaster}
               onChange={(e) => setIsMaster(e.target.checked)}
-              className="rounded bg-zinc-950 border-zinc-800 text-cyan-500 focus:ring-0 w-4 h-4 shrink-0"
+              className="rounded bg-zinc-950 border-zinc-800 text-cyan-500 focus:ring-0 w-5 h-5 shrink-0"
             />
-            <label htmlFor="isMasterCheckbox" className="text-xs text-zinc-300 font-bold select-none cursor-pointer">
+            <span className="text-xs text-zinc-300 font-bold select-none">
               Master Template (Available to all athletes)
-            </label>
-          </div>
+            </span>
+          </label>
 
           {/* Exercise Add Selector */}
           <div className="flex gap-2 w-full min-w-0">
