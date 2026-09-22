@@ -377,5 +377,115 @@ describe('CustomDishesModal', () => {
 
     expect(screen.getByTestId('custom-dish-editor')).toBeDefined();
   });
+
+  it('renders line-clamp-1 preview of dish notes in the saved dishes list', () => {
+    const dishes = [
+      {
+        id: 'dish-1',
+        user_id: 'user-1',
+        name: 'Avocado Toast',
+        calories: 320,
+        protein: 8,
+        carbs: 25,
+        fat: 18,
+        fiber: 6,
+        kind: 'food' as const,
+        use_count: 2,
+        notes: 'Toasted whole wheat sourdough with red pepper flakes',
+        created_at: '2026-09-01T12:00:00Z',
+      },
+      {
+        id: 'dish-2',
+        user_id: 'user-1',
+        name: 'Plain Rice',
+        calories: 200,
+        protein: 4,
+        carbs: 45,
+        fat: 0,
+        fiber: 1,
+        kind: 'food' as const,
+        use_count: 1,
+        notes: null,
+        created_at: '2026-09-01T12:00:00Z',
+      },
+    ];
+
+    render(
+      <CustomDishesModal
+        isOpen={true}
+        onClose={vi.fn()}
+        editingDish={null}
+        dishModalName=""
+        setDishModalName={vi.fn()}
+        dishModalCalories=""
+        setDishModalCalories={vi.fn()}
+        dishModalProtein=""
+        setDishModalProtein={vi.fn()}
+        dishModalCarbs=""
+        setDishModalCarbs={vi.fn()}
+        dishModalFat=""
+        setDishModalFat={vi.fn()}
+        dishModalFiber=""
+        setDishModalFiber={vi.fn()}
+        dishModalItems={[]}
+        setDishModalItems={vi.fn()}
+        onSaveDish={vi.fn()}
+        onDeleteDish={vi.fn()}
+        isSaving={false}
+        isDeleting={false}
+        customDishes={dishes}
+        onOpenEditDishModal={vi.fn()}
+      />
+    );
+
+    const noteEl = screen.getByTestId('dish-row-note-dish-1');
+    expect(noteEl).toBeDefined();
+    expect(noteEl.textContent).toBe('Toasted whole wheat sourdough with red pepper flakes');
+    expect(noteEl.className).toContain('line-clamp-1');
+
+    // dish-2 has null notes, so no preview is rendered
+    expect(screen.queryByTestId('dish-row-note-dish-2')).toBeNull();
+  });
+
+  it('integrates NotesField with dishModalNotes and setDishModalNotes', () => {
+    const setDishModalNotes = vi.fn();
+    render(
+      <CustomDishesModal
+        isOpen={true}
+        onClose={vi.fn()}
+        editingDish={null}
+        dishModalName="Testing notes"
+        setDishModalName={vi.fn()}
+        dishModalCalories={250}
+        setDishModalCalories={vi.fn()}
+        dishModalProtein={20}
+        setDishModalProtein={vi.fn()}
+        dishModalCarbs={30}
+        setDishModalCarbs={vi.fn()}
+        dishModalFat={5}
+        setDishModalFat={vi.fn()}
+        dishModalFiber={4}
+        setDishModalFiber={vi.fn()}
+        dishModalNotes="Existing note on dish"
+        setDishModalNotes={setDishModalNotes}
+        dishModalItems={[]}
+        setDishModalItems={vi.fn()}
+        onSaveDish={vi.fn()}
+        onDeleteDish={vi.fn()}
+        isSaving={false}
+        isDeleting={false}
+        customDishes={[]}
+        onOpenEditDishModal={vi.fn()}
+      />
+    );
+
+    const textarea = screen.getByTestId('dish-notes-textarea') as HTMLTextAreaElement;
+    expect(textarea).toBeDefined();
+    expect(textarea.value).toBe('Existing note on dish');
+
+    fireEvent.change(textarea, { target: { value: 'Updated note on dish' } });
+    expect(setDishModalNotes).toHaveBeenCalledWith('Updated note on dish');
+  });
 });
+
 

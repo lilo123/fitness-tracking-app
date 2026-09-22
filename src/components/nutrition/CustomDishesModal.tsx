@@ -5,6 +5,7 @@ import { roundTo1Decimal, formatCalories, formatMacro } from '../../utils/nutrit
 import { getDishIcon } from '../../utils/dishIcons';
 import { Star, X, Trash2, Edit2 } from 'lucide-react';
 import { CustomDishEditor } from './CustomDishEditor';
+import { NotesField } from './NotesField';
 import { useModalA11y } from '../../hooks/useModalA11y';
 
 export interface CustomDishesModalProps {
@@ -25,6 +26,8 @@ export interface CustomDishesModalProps {
   setDishModalFat: (val: number | '') => void;
   dishModalFiber: number | '';
   setDishModalFiber: (val: number | '') => void;
+  dishModalNotes?: string;
+  setDishModalNotes?: (val: string) => void;
   dishModalItems: NutritionItem[];
   setDishModalItems: React.Dispatch<React.SetStateAction<NutritionItem[]>>;
   onSaveDish: (e: React.FormEvent) => void;
@@ -53,6 +56,8 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
   setDishModalFat,
   dishModalFiber,
   setDishModalFiber,
+  dishModalNotes = '',
+  setDishModalNotes = () => {},
   dishModalItems,
   setDishModalItems,
   onSaveDish,
@@ -310,6 +315,11 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
             </p>
           )}
 
+          <NotesField
+            value={dishModalNotes}
+            onChange={setDishModalNotes}
+          />
+
           <div className="flex items-center justify-between pt-3 border-t border-zinc-800">
             {editingDish ? (
               <button
@@ -378,6 +388,14 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
                       <span> • </span>
                       <span className="text-teal-400">Fib: {formatMacro(dish.fiber)}g</span>
                     </div>
+                    {dish.notes && dish.notes.trim().length > 0 && (
+                      <p
+                        className="text-[11px] text-zinc-400 italic line-clamp-1 mt-1"
+                        data-testid={`dish-row-note-${dish.id}`}
+                      >
+                        {dish.notes}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-1">
                     <button

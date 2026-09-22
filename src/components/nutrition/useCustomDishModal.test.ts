@@ -152,4 +152,75 @@ describe('useCustomDishModal', () => {
 
     expect((result.current as any).dishModalKind).toBe('recipe');
   });
+
+  it('populates dishModalNotes on edit and includes trimmed notes in save payload', async () => {
+    const onSaveDish = vi.fn();
+    const { result } = renderHook(() =>
+      useCustomDishModal({
+        onSaveDish,
+        onDeleteDish: vi.fn(),
+        onDismissToast: vi.fn(),
+        fetchDishDetail: vi.fn().mockResolvedValue({ items: null }),
+      })
+    );
+
+    const dishWithNotes: CustomDish = {
+      id: 'dish-note-1',
+      user_id: 'user-1',
+      name: 'Protein Shake',
+      calories: 250,
+      protein: 30,
+      carbs: 10,
+      fat: 3,
+      fiber: 2,
+      kind: 'food',
+      use_count: 5,
+      notes: 'Mix with 300ml unsweetened almond milk',
+    };
+
+    await act(async () => {
+      await result.current.handleOpenEditDishModal(dishWithNotes);
+    });
+
+    expect(result.current.dishModalNotes).toBe('Mix with 300ml unsweetened almond milk');
+
+    act(() => {
+      result.current.setDishModalNotes('  Updated: mix with cold water instead  ');
+    });
+
+    act(() => {
+      result.current.handleSaveCustomDishModal({ preventDefault: vi.fn() } as any);
+    });
+
+    expect(onSaveDish).toHaveBeenCalled();
+    const { dishPayload } = onSaveDish.mock.calls[0][0];
+    expect(dishPayload.notes).toBe('Updated: mix with cold water instead');
+  });
+
+  it('sets notes to null in save payload when dishModalNotes is empty or only whitespace', () => {
+    const onSaveDish = vi.fn();
+    const { result } = renderHook(() =>
+      useCustomDishModal({
+        onSaveDish,
+        onDeleteDish: vi.fn(),
+        onDismissToast: vi.fn(),
+      })
+    );
+
+    act(() => {
+      result.current.handleOpenNewDishModal();
+      result.current.setDishModalName('Plain Rice');
+      result.current.setDishModalCalories(200);
+      result.current.setDishModalNotes('   ');
+    });
+
+    act(() => {
+      result.current.handleSaveCustomDishModal({ preventDefault: vi.fn() } as any);
+    });
+
+    expect(onSaveDish).toHaveBeenCalled();
+    const { dishPayload } = onSaveDish.mock.calls[0][0];
+    expect(dishPayload.notes).toBeNull();
+  });
 });
+

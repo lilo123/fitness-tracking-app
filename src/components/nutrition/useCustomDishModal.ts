@@ -35,6 +35,7 @@ export function useCustomDishModal({
   const [dishModalCarbs, setDishModalCarbs] = useState<number | ''>('');
   const [dishModalFat, setDishModalFat] = useState<number | ''>('');
   const [dishModalFiber, setDishModalFiber] = useState<number | ''>('');
+  const [dishModalNotes, setDishModalNotes] = useState('');
   const [dishModalItems, setDishModalItems] = useState<NutritionItem[]>([]);
 
   const resetDishModalFields = () => {
@@ -45,6 +46,7 @@ export function useCustomDishModal({
     setDishModalCarbs('');
     setDishModalFat('');
     setDishModalFiber('');
+    setDishModalNotes('');
     setDishModalItems([]);
   };
 
@@ -85,6 +87,7 @@ export function useCustomDishModal({
     setDishModalCarbs(dish.carbs != null ? roundTo1Decimal(dish.carbs) : '');
     setDishModalFat(dish.fat != null ? roundTo1Decimal(dish.fat) : '');
     setDishModalFiber(dish.fiber != null ? roundTo1Decimal(dish.fiber) : '');
+    setDishModalNotes(dish.notes ?? '');
     const rawItems =
       normalizeItems(mergedDish.items) ??
       itemsFromLegacyIngredients(mergedDish.id, mergedDish.name, mergedDish.ingredients) ??
@@ -135,6 +138,7 @@ export function useCustomDishModal({
         carbs: clamp(totals ? totals.carbs : Number(dishModalCarbs) || 0),
         fat: clamp(totals ? totals.fat : Number(dishModalFat) || 0),
         fiber: clamp(totals ? totals.fiber : Number(dishModalFiber) || 0),
+        notes: dishModalNotes.trim() ? dishModalNotes.trim().slice(0, 500) : null,
         items: persistItems,
       },
       editingDishId: editingDish?.id,
@@ -164,6 +168,8 @@ export function useCustomDishModal({
     setDishModalFat,
     dishModalFiber,
     setDishModalFiber,
+    dishModalNotes,
+    setDishModalNotes,
     dishModalItems,
     setDishModalItems,
     handleOpenNewDishModal,

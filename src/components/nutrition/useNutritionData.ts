@@ -93,7 +93,7 @@ export function useNutritionData({
       const { data, error } = await supabase
         .from('custom_dishes')
         .select(
-          'id, user_id, name, calories, protein, carbs, fat, fiber, created_at, kind, use_count'
+          'id, user_id, name, calories, protein, carbs, fat, fiber, created_at, kind, use_count, notes'
         )
         .eq('user_id', targetUserId)
         .order('created_at', { ascending: false })

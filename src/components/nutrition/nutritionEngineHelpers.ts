@@ -106,6 +106,7 @@ export interface StagedMeal {
   servingSize: number;
   servingUnit: string;
   photoUrl?: string;
+  notes?: string | null;
 }
 
 let itemSequence = 0;

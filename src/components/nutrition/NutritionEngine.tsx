@@ -172,6 +172,7 @@ export const NutritionEngine: React.FC = () => {
       serving_unit: stagedMeal.servingUnit || 'serving',
       logged_at: formatLocalTimestamp(selectedDate),
       items: items.length > 1 ? itemsForPersist(items) : null,
+      notes: stagedMeal.notes ?? null,
     };
     mutation.mutate(payload);
   };
@@ -193,6 +194,7 @@ export const NutritionEngine: React.FC = () => {
           carbs: roundTo1Decimal(totals.carbs),
           fat: roundTo1Decimal(totals.fat),
           fiber: roundTo1Decimal(totals.fiber),
+          notes: stagedMeal.notes ?? null,
         },
       ]);
       if (error) throw error;
@@ -289,6 +291,7 @@ export const NutritionEngine: React.FC = () => {
       ...tot,
       servingSize: 1,
       servingUnit: 'serving',
+      notes: dish.notes ?? null,
     });
 
     void supabase
@@ -313,6 +316,7 @@ export const NutritionEngine: React.FC = () => {
       serving_size: 1,
       serving_unit: 'serving',
       logged_at: formatLocalTimestamp(selectedDate),
+      notes: dish.notes ?? null,
     };
     mutation.mutate(payload);
     void supabase
@@ -552,6 +556,8 @@ export const NutritionEngine: React.FC = () => {
         setDishModalFat={dishModal.setDishModalFat}
         dishModalFiber={dishModal.dishModalFiber}
         setDishModalFiber={dishModal.setDishModalFiber}
+        dishModalNotes={dishModal.dishModalNotes}
+        setDishModalNotes={dishModal.setDishModalNotes}
         dishModalItems={dishModal.dishModalItems}
         setDishModalItems={dishModal.setDishModalItems}
         onSaveDish={dishModal.handleSaveCustomDishModal}
