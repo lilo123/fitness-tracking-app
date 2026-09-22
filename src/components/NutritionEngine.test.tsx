@@ -3064,6 +3064,63 @@ Total Fiber: 1 g`;
       expect(screen.queryByTestId('quick-log-toast')).toBeNull();
     });
   });
+
+  describe('independent read-error channels', () => {
+    it('keeps rendering loaded meals when only the saved-dishes query fails', async () => {
+      // Regression: useNutritionData exposed `isReadError = isNutritionLogsError ||
+      // isCustomDishesError`, and the meal list was gated on it. A custom_dishes failure therefore
+      // replaced successfully loaded meals with an error about a different table, labelled
+      // "Failed to load nutrition logs". Reported in the field as a `custom_dishes.kind` 42703
+      // against a database missing that migration, on a screen headed "Today's Meals (3)".
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'custom_dishes') {
+          return createSupabaseBuilder(table, {
+            data: null,
+            error: { message: 'column custom_dishes.kind does not exist', code: '42703' },
+          });
+        }
+        if (table === 'nutrition_logs') {
+          return createSupabaseBuilder(table, {
+            data: [
+              {
+                id: 'log-sep-1',
+                user_id: 'test-user-id',
+                food_name: 'Channel Split Pho',
+                meal_type: 'Lunch',
+                calories: 520,
+                protein: 30,
+                carbs: 60,
+                fat: 14,
+                fiber: 4,
+                serving_size: 1,
+                serving_unit: 'bowl',
+                logged_at: new Date().toISOString(),
+                created_at: new Date().toISOString(),
+                has_components: false,
+              },
+            ],
+            error: null,
+          });
+        }
+        return createSupabaseBuilder(table, { data: [], error: null });
+      });
+
+      renderComponent();
+
+      // The meal loaded fine, so it must be on screen.
+      await waitFor(() => {
+        expect(screen.getByText('Channel Split Pho')).toBeDefined();
+      });
+
+      // It must not be accused of being a nutrition-logs failure.
+      expect(screen.queryByTestId('nutrition-read-error')).toBeNull();
+
+      // The dishes failure is still surfaced, in its own banner, named accurately.
+      const dishBanner = await screen.findByTestId('dish-fetch-error');
+      expect(dishBanner.textContent).toContain('Failed to load saved dishes');
+      expect(dishBanner.textContent).toContain('column custom_dishes.kind does not exist');
+    });
+  });
 });
 
 

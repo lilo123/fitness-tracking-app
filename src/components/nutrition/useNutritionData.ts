@@ -406,11 +406,10 @@ export function useNutritionData({
     isNutritionLogsError,
     nutritionLogsError,
     refetchNutritionLogs,
-    isReadError: isNutritionLogsError || isCustomDishesError,
-    readError: nutritionLogsError || customDishesError,
-    refetchRead: async () => {
-      await Promise.all([refetchNutritionLogs(), refetchCustomDishes()]);
-    },
+    // Deliberately no combined isReadError/readError/refetchRead. Merging these two independent
+    // queries meant a custom_dishes failure was rendered as "Failed to load nutrition logs" and,
+    // because the meal list was gated on the combined flag, hid meals that had loaded
+    // successfully. Consume the specific channel you mean.
     fetchDishDetail,
   };
 }

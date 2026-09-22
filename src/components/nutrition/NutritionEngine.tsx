@@ -67,9 +67,12 @@ export const NutritionEngine: React.FC = () => {
     dismissToast,
     triggerToast,
     isTimerActive,
-    isReadError,
-    readError,
-    refetchRead,
+    isNutritionLogsError,
+    nutritionLogsError,
+    refetchNutritionLogs,
+    isCustomDishesError,
+    customDishesError,
+    refetchCustomDishes,
     fetchDishDetail,
   } = useNutritionData({
     targetUserId,
@@ -272,6 +275,17 @@ export const NutritionEngine: React.FC = () => {
     triggerToast(dish);
   };
 
+  // Saved-dish failures surface here, beside Quick Log Favorites, rather than in the nutrition
+  // logs banner. They are independent queries; folding them together reported a custom_dishes
+  // failure as "Failed to load nutrition logs" and hid meals that had loaded perfectly well.
+  const savedDishesErrorMessage = isCustomDishesError
+    ? `Failed to load saved dishes: ${
+        customDishesError instanceof Error
+          ? customDishesError.message
+          : (customDishesError as any)?.message || 'Please try again.'
+      }`
+    : null;
+
   return (
     <div className="space-y-6">
       <NutritionDashboardRings
@@ -293,12 +307,12 @@ export const NutritionEngine: React.FC = () => {
       />
 
       <StatusBanner
-        message={dishFetchError?.message || dishModal.dishFetchError?.message || null}
+        message={dishFetchError?.message || dishModal.dishFetchError?.message || savedDishesErrorMessage}
         tone="error"
         testId="dish-fetch-error"
         className="shadow-lg"
         action={
-          (dishFetchError || dishModal.dishFetchError) && (
+          (dishFetchError || dishModal.dishFetchError || isCustomDishesError) && (
             <button
               type="button"
               data-testid="dish-fetch-retry"
@@ -307,6 +321,8 @@ export const NutritionEngine: React.FC = () => {
                   dishFetchError.retry();
                 } else if (dishModal.dishFetchError) {
                   dishModal.dishFetchError.retry();
+                } else {
+                  void refetchCustomDishes();
                 }
               }}
               className="shrink-0 rounded border border-rose-400/40 bg-rose-500/20 px-2.5 py-1 text-xs font-bold text-rose-200 hover:bg-rose-500/30 touch-manipulation"
@@ -396,13 +412,14 @@ export const NutritionEngine: React.FC = () => {
 
         <StatusBanner
           message={
-            isReadError
+            isNutritionLogsError
               ? `Failed to load nutrition logs: ${
-                  readError instanceof Error
-                    ? readError.message
-                    : typeof readError === 'string'
-                    ? readError
-                    : (readError as any)?.message || 'Unable to load nutrition data. Please try again.'
+                  nutritionLogsError instanceof Error
+                    ? nutritionLogsError.message
+                    : typeof nutritionLogsError === 'string'
+                    ? nutritionLogsError
+                    : (nutritionLogsError as any)?.message ||
+                      'Unable to load nutrition data. Please try again.'
                 }`
               : null
           }
@@ -411,11 +428,11 @@ export const NutritionEngine: React.FC = () => {
           className="rounded-2xl p-4 flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg"
           icon={<AlertCircle className="w-5 h-5 shrink-0 text-rose-400" aria-hidden="true" />}
           action={
-            isReadError && (
+            isNutritionLogsError && (
               <button
                 type="button"
                 onClick={() => {
-                  void refetchRead();
+                  void refetchNutritionLogs();
                 }}
                 data-testid="retry-nutrition-btn"
                 className="flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-rose-200 bg-rose-500/20 hover:bg-rose-500/30 active:scale-95 border border-rose-500/40 rounded-xl transition touch-manipulation min-h-[44px] min-w-[44px] shrink-0 cursor-pointer"
@@ -427,11 +444,11 @@ export const NutritionEngine: React.FC = () => {
           }
         />
 
-        {!isReadError && todayLogs.length === 0 ? (
+        {!isNutritionLogsError && todayLogs.length === 0 ? (
           <div className="p-6 text-center text-zinc-500 text-xs">
             No meals logged for this date yet.
           </div>
-        ) : !isReadError ? (
+        ) : !isNutritionLogsError ? (
           <div className="space-y-2">
             {todayLogs.map((log) => (
               <MealLogRow
