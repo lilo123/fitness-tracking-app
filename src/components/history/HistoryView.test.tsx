@@ -1490,8 +1490,13 @@ describe('HistoryView', () => {
       renderComponent();
       fireEvent.click(screen.getByText('By Exercise'));
 
+      // 'Deadlift' is NOT a signal that the stats RPC has resolved: the catalog
+      // seed at HistoryView.tsx:189-196 renders every exercise with setCount 0
+      // before get_exercise_stats returns (Ruling 5). Awaiting it and then
+      // asserting synchronously on stats-derived text raced the re-render and
+      // failed ~20% of full-suite runs. Await something only the RPC can produce.
       expect(await screen.findByText('Deadlift')).toBeDefined();
-      expect(screen.getByText('Recent Activity (42 sets):')).toBeDefined();
+      expect(await screen.findByText('Recent Activity (42 sets):')).toBeDefined();
       expect(screen.getByText('PR: 405 lbs × 5')).toBeDefined();
     });
 
