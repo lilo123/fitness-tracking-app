@@ -146,7 +146,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
               className="grid grid-cols-2 gap-2"
             >
               <label
-                className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs font-bold transition ${
+                className={`flex items-center justify-center gap-2 p-2.5 min-h-[44px] rounded-xl border text-xs font-bold transition ${
                   isFoodDisabled
                     ? 'opacity-50 cursor-not-allowed bg-zinc-950/50 border-zinc-800 text-zinc-500'
                     : dishModalKind === 'food'
@@ -166,7 +166,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
                 <span>Food</span>
               </label>
               <label
-                className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs font-bold cursor-pointer transition ${
+                className={`flex items-center justify-center gap-2 p-2.5 min-h-[44px] rounded-xl border text-xs font-bold cursor-pointer transition ${
                   dishModalKind === 'recipe'
                     ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-300'
                     : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white'

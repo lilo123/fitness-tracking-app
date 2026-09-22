@@ -154,6 +154,82 @@ describe('CustomDishesModal', () => {
     expect(setDishModalKind).toHaveBeenCalledWith('recipe');
   });
 
+  it('satisfies the touch-target className contract (min-h-[44px]) on food and recipe radio wrapper labels', () => {
+    const { rerender } = render(
+      <CustomDishesModal
+        isOpen={true}
+        onClose={vi.fn()}
+        editingDish={null}
+        dishModalKind="food"
+        setDishModalKind={vi.fn()}
+        dishModalName=""
+        setDishModalName={vi.fn()}
+        dishModalCalories={0}
+        setDishModalCalories={vi.fn()}
+        dishModalProtein={0}
+        setDishModalProtein={vi.fn()}
+        dishModalCarbs={0}
+        setDishModalCarbs={vi.fn()}
+        dishModalFat={0}
+        setDishModalFat={vi.fn()}
+        dishModalFiber={0}
+        setDishModalFiber={vi.fn()}
+        dishModalItems={[]}
+        setDishModalItems={vi.fn()}
+        onSaveDish={vi.fn()}
+        onDeleteDish={vi.fn()}
+        isSaving={false}
+        isDeleting={false}
+        customDishes={[]}
+        onOpenEditDishModal={vi.fn()}
+      />
+    );
+
+    const foodRadio = screen.getByRole('radio', { name: /^food$/i });
+    const recipeRadio = screen.getByRole('radio', { name: /^recipe$/i });
+
+    const foodLabel = foodRadio.closest('label');
+    const recipeLabel = recipeRadio.closest('label');
+
+    expect(foodLabel).not.toBeNull();
+    expect(foodLabel?.className).toContain('min-h-[44px]');
+    expect(recipeLabel).not.toBeNull();
+    expect(recipeLabel?.className).toContain('min-h-[44px]');
+
+    rerender(
+      <CustomDishesModal
+        isOpen={true}
+        onClose={vi.fn()}
+        editingDish={null}
+        dishModalKind="recipe"
+        setDishModalKind={vi.fn()}
+        dishModalName=""
+        setDishModalName={vi.fn()}
+        dishModalCalories={0}
+        setDishModalCalories={vi.fn()}
+        dishModalProtein={0}
+        setDishModalProtein={vi.fn()}
+        dishModalCarbs={0}
+        setDishModalCarbs={vi.fn()}
+        dishModalFat={0}
+        setDishModalFat={vi.fn()}
+        dishModalFiber={0}
+        setDishModalFiber={vi.fn()}
+        dishModalItems={[]}
+        setDishModalItems={vi.fn()}
+        onSaveDish={vi.fn()}
+        onDeleteDish={vi.fn()}
+        isSaving={false}
+        isDeleting={false}
+        customDishes={[]}
+        onOpenEditDishModal={vi.fn()}
+      />
+    );
+
+    expect(foodRadio.closest('label')?.className).toContain('min-h-[44px]');
+    expect(recipeRadio.closest('label')?.className).toContain('min-h-[44px]');
+  });
+
   it('blocks recipe to food transition while items exist and displays explanation', () => {
     const mockItem = {
       id: 'item-1',

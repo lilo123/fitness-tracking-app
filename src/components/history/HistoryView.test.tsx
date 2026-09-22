@@ -1788,6 +1788,23 @@ describe('HistoryView', () => {
       expect(countAfterReExpand).toBe(1);
     });
   });
+
+  it('satisfies the touch-target className contract (min-h-[44px]) on time-range tab buttons', async () => {
+    renderComponent();
+    const rangeAll = await screen.findByTestId('history-range-all');
+    const range90d = screen.getByTestId('history-range-90d');
+    const range30d = screen.getByTestId('history-range-30d');
+    const range1y = screen.getByTestId('history-range-1y');
+
+    expect(rangeAll).toBeDefined();
+    expect(rangeAll.className).toContain('min-h-[44px]');
+    expect(range90d).toBeDefined();
+    expect(range90d.className).toContain('min-h-[44px]');
+    expect(range30d).toBeDefined();
+    expect(range30d.className).toContain('min-h-[44px]');
+    expect(range1y).toBeDefined();
+    expect(range1y.className).toContain('min-h-[44px]');
+  });
 });
 
 

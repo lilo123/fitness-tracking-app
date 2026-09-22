@@ -43,6 +43,27 @@ describe('CoachTemplateBuilder accessibility', () => {
     expect(label?.className).toContain('cursor-pointer');
   });
 
+  it('satisfies the touch-target className contract (min-h-[44px]) on template target sets and reps number inputs', () => {
+    const exerciseProps = {
+      ...defaultProps,
+      selectedExercises: [
+        {
+          exerciseId: 'ex-1',
+          exerciseName: 'Bench Press',
+          targetSets: 3,
+          targetReps: 10,
+        },
+      ],
+    };
+    render(<CoachTemplateBuilder {...exerciseProps} />);
+    const setsInput = screen.getByTestId('template-target-sets-0');
+    const repsInput = screen.getByTestId('template-target-reps-0');
+    expect(setsInput).toBeDefined();
+    expect(setsInput.className).toContain('min-h-[44px]');
+    expect(repsInput).toBeDefined();
+    expect(repsInput.className).toContain('min-h-[44px]');
+  });
+
   it('passes axe accessibility audits with no violations', async () => {
     const { container } = render(<CoachTemplateBuilder {...defaultProps} />);
     await expectNoA11yViolations(container);

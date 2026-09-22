@@ -148,7 +148,7 @@ export const CoachTemplateBuilder: React.FC<CoachTemplateBuilderProps> = ({
                             const val = Number(e.target.value) || 1;
                             onUpdateTargetSets(idx, val);
                           }}
-                          className="w-12 min-h-[36px] bg-zinc-900 border border-zinc-750 text-white rounded-lg px-1 py-0.5 text-center text-base sm:text-xs font-bold shrink-0"
+                          className="w-12 min-h-[44px] bg-zinc-900 border border-zinc-750 text-white rounded-lg px-1 py-0.5 text-center text-base sm:text-xs font-bold shrink-0"
                           title="Target Sets"
                           data-testid={`template-target-sets-${idx}`}
                         />
@@ -166,7 +166,7 @@ export const CoachTemplateBuilder: React.FC<CoachTemplateBuilderProps> = ({
                             const val = Number(e.target.value) || 1;
                             onUpdateTargetReps(idx, val);
                           }}
-                          className="w-14 min-h-[36px] bg-zinc-900 border border-zinc-750 text-white rounded-lg px-1 py-0.5 text-center text-base sm:text-xs font-bold shrink-0"
+                          className="w-14 min-h-[44px] bg-zinc-900 border border-zinc-750 text-white rounded-lg px-1 py-0.5 text-center text-base sm:text-xs font-bold shrink-0"
                           title="Target Reps"
                           data-testid={`template-target-reps-${idx}`}
                         />
