@@ -1,4 +1,5 @@
 import type { WorkoutSet, Exercise } from '../types/database';
+import { resolveExerciseLabel } from './exerciseLabel';
 
 export interface ExerciseGroup<T = WorkoutSet & { workout_date?: string; workout_name?: string }> {
   exerciseId: string;
@@ -31,23 +32,31 @@ export function groupSessionSetsByExercise<T extends {
         (rawExId && (e.id === rawExId || e.name.toLowerCase() === rawExId.toLowerCase())) ||
         (rawExName && e.name.toLowerCase() === rawExName.toLowerCase())
     );
-    const exName = matched ? matched.name : rawExName || rawExId || 'Unknown Exercise';
+    // Group by the resolved name when the exercise is known, which is what this function has
+    // always done -- two rows sharing a name (a custom duplicate of a master exercise, say) must
+    // stay a single card. Unresolved sets key on the raw id instead: their label collapses to
+    // "Unknown Exercise", so keying on the label would merge unrelated exercises into one group.
+    const groupKey = matched ? matched.name : rawExId || rawExName || 'unknown';
+    const exName = resolveExerciseLabel(
+      matched ? matched.name : rawExName || rawExId,
+      'Unknown Exercise'
+    );
     const bodyPart = matched?.body_part || 'Other';
     const volume = (Number(set.weight) || 0) * (Number(set.reps) || 0);
 
-    if (!groupMap.has(exName)) {
+    if (!groupMap.has(groupKey)) {
       const group: ExerciseGroup<T> = {
-        exerciseId: rawExId || (matched ? matched.id : exName),
+        exerciseId: rawExId || (matched ? matched.id : groupKey),
         exerciseName: exName,
         bodyPart,
         sets: [],
         totalVolume: 0,
       };
-      groupMap.set(exName, group);
+      groupMap.set(groupKey, group);
       groups.push(group);
     }
 
-    const group = groupMap.get(exName)!;
+    const group = groupMap.get(groupKey)!;
     group.sets.push(set);
     group.totalVolume += volume;
   });

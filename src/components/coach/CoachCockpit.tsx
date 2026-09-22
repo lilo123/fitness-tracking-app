@@ -15,6 +15,7 @@ import { CoachTemplateBuilder } from './CoachTemplateBuilder';
 import { StatusBanner } from '../common/StatusBanner';
 import { groupTimelineDays } from '../../utils/timelineGrouping';
 import { nutritionRowLimitForRange } from '../../utils/coachQueryBounds';
+import { resolveExerciseLabel } from '../../utils/exerciseLabel';
 
 const SETS_PAGE_LIMIT = 500;
 
@@ -129,12 +130,13 @@ export const CoachCockpit: React.FC = () => {
               workout_id: w.id,
               workout_date: normalizeDateStr(w.date || s.created_at),
               workout_name: w.name || 'Workout Session',
-              exercise_name:
+              exercise_name: resolveExerciseLabel(
                 (s as any).exercise?.name ||
                 exercises.find((e) => e.id === s.exercise_id || e.name === s.exercise_id)?.name ||
                 DEFAULT_EXERCISES_LIST.find((e) => e.id === s.exercise_id || e.name === s.exercise_id)?.name ||
                 (s as { exercise_name?: string }).exercise_name ||
-                s.exercise_id,
+                s.exercise_id
+              ),
               weight: s.weight ?? 0,
             }))
             .sort(

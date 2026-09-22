@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import type { WorkoutSet, Exercise, SetType } from '../../types/database';
+import { resolveExerciseLabel } from '../../utils/exerciseLabel';
 import { X, Dumbbell, Trash2, AlertCircle } from 'lucide-react';
 import { StatusBanner } from '../common/StatusBanner';
 import { AccessibleModal } from '../common/AccessibleModal';
@@ -259,7 +260,7 @@ const EditSetForm: React.FC<EditSetFormProps> = ({
             >
               {!exercises.some((ex) => ex.id === selectedExerciseId) && selectedExerciseId && (
                 <option value={selectedExerciseId}>
-                  {set.exercise_name || set.exercise_id}
+                  {resolveExerciseLabel(set.exercise_name || set.exercise_id)}
                 </option>
               )}
               {exercises.map((ex) => (

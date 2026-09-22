@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useId } from 'react';
 import type { Exercise, RoutineTemplate } from '../../types/database';
+import { resolveExerciseLabel } from '../../utils/exerciseLabel';
 import { supabase } from '../../lib/supabase';
 import {
   X,
@@ -77,11 +78,12 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
           const matched = exercises.find(
             (e) => e.id === item.exercise_id || e.name.toLowerCase() === item.exercise_id.toLowerCase()
           );
-          const exName =
+          const exName = resolveExerciseLabel(
             (item as any).exercise?.name ||
-            (item as any).exercise_name ||
-            matched?.name ||
-            item.exercise_id;
+              (item as any).exercise_name ||
+              matched?.name ||
+              item.exercise_id
+          );
           const bodyPart = (item as any).exercise?.body_part || matched?.body_part || 'Other';
 
           return {

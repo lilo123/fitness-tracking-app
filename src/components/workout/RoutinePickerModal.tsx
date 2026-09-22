@@ -2,6 +2,7 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { isValidUUID } from './workoutEngineHelpers';
+import { resolveExerciseLabel } from '../../utils/exerciseLabel';
 import type { RoutineTemplate, Exercise } from '../../types/database';
 import type { DEFAULT_WORKOUT_TEMPLATES } from '../../utils/ghostSets';
 import { Layers, RotateCcw, Check, Bed } from 'lucide-react';
@@ -185,7 +186,14 @@ export const RoutinePickerModal: React.FC<RoutinePickerModalProps> = ({
                 {tpl.exercises && (
                   <div className="text-[11px] font-normal text-zinc-400 mt-1 truncate">
                     {tpl.exercises
-                      .map((e) => e.exercise?.name || e.exercise_name || exercises.find((ex) => ex.id === e.exercise_id)?.name || e.exercise_id)
+                      .map((e) =>
+                        resolveExerciseLabel(
+                          e.exercise?.name ||
+                            e.exercise_name ||
+                            exercises.find((ex) => ex.id === e.exercise_id)?.name ||
+                            e.exercise_id
+                        )
+                      )
                       .join(', ')}
                   </div>
                 )}

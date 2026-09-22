@@ -12,7 +12,7 @@ import { WorkoutSessionHistory } from './WorkoutSessionHistory';
 import { WorkoutExerciseHistory, type ExerciseStat } from './WorkoutExerciseHistory';
 import { useHistoryData, useExerciseStats, fetchSessionSets, type HistorySet } from './useHistoryData';
 import { StatusBanner } from '../common/StatusBanner';
-
+import { resolveExerciseLabel } from '../../utils/exerciseLabel';
 
 export const HistoryView: React.FC = () => {
   const { user, isCoachMode } = useAuth();
@@ -208,7 +208,7 @@ export const HistoryView: React.FC = () => {
         match.sets = Array.isArray(row.recent_sets) ? row.recent_sets : [];
       } else {
         stats[row.exercise_id] = {
-          exercise: { id: row.exercise_id, name: row.exercise_id, body_part: 'Other' },
+          exercise: { id: row.exercise_id, name: resolveExerciseLabel(row.exercise_id), body_part: 'Other' },
           sets: Array.isArray(row.recent_sets) ? row.recent_sets : [],
           maxWeight: Number(row.max_weight) || 0,
           prReps: Number(row.pr_reps) || 0,
