@@ -20,6 +20,8 @@ import { QuickLogFavorites } from './QuickLogFavorites';
 import { NutritionAiInput } from './NutritionAiInput';
 import { StagedMealCard } from './StagedMealCard';
 import { ManualMealForm } from './ManualMealForm';
+import { useManualMealForm } from './useManualMealForm';
+import { useCustomDishSaving } from './useCustomDishSaving';
 import { CustomDishesModal } from './CustomDishesModal';
 import { Utensils, CheckCircle2, AlertCircle, RotateCcw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -44,15 +46,10 @@ export const NutritionEngine: React.FC = () => {
   const [isError, setIsError] = useState(false);
 
   // Manual Form Fallback State
-  const [manualDishName, setManualDishName] = useState('');
-  const [manualCalories, setManualCalories] = useState<number | ''>('');
-  const [manualProtein, setManualProtein] = useState<number | ''>('');
-  const [manualCarbs, setManualCarbs] = useState<number | ''>('');
-  const [manualFat, setManualFat] = useState<number | ''>('');
-  const [manualFiber, setManualFiber] = useState<number | ''>('');
-  const [manualMealType, setManualMealType] = useState<string>('Breakfast');
-  const [manualServingSize, setManualServingSize] = useState<number | ''>(1);
-  const [manualServingUnit, setManualServingUnit] = useState<string>('serving');
+  const manualMealForm = useManualMealForm({
+    selectedDate,
+    onSubmitLog: (payload) => mutation.mutate(payload),
+  });
 
   const [editingMealLog, setEditingMealLog] = useState<NutritionLog | null>(null);
 
@@ -84,12 +81,7 @@ export const NutritionEngine: React.FC = () => {
       setShowManualForm(false);
       ai.setIsRateLimited(false);
       ai.setNlInput('');
-      setManualDishName('');
-      setManualCalories('');
-      setManualProtein('');
-      setManualCarbs('');
-      setManualFat('');
-      setManualFiber('');
+      manualMealForm.resetManualForm();
     },
     setStatus,
     setIsError,
@@ -105,8 +97,8 @@ export const NutritionEngine: React.FC = () => {
     },
     onFallbackToManual: (dishName) => {
       setShowManualForm(true);
-      if (!manualDishName.trim()) {
-        setManualDishName(dishName);
+      if (!manualMealForm.manualDishName.trim()) {
+        manualMealForm.setManualDishName(dishName);
       }
       setStagedMeal(null);
     },
@@ -177,61 +169,12 @@ export const NutritionEngine: React.FC = () => {
     mutation.mutate(payload);
   };
 
-  const handleSaveStagedAsCustomDish = async () => {
-    if (!stagedMeal) return;
-    try {
-      const items = stagedMeal.items.map(stagedToItem);
-      const totals = sumItems(items);
-      const { error } = await supabase.from('custom_dishes').insert([
-        {
-          user_id: targetUserId,
-          name: stagedMeal.name,
-          kind: items.length > 1 ? 'recipe' : 'food',
-          ingredients: JSON.stringify(stagedMeal.items),
-          items: items.length > 1 ? itemsForPersist(items) : null,
-          calories: roundTo1Decimal(totals.calories),
-          protein: roundTo1Decimal(totals.protein),
-          carbs: roundTo1Decimal(totals.carbs),
-          fat: roundTo1Decimal(totals.fat),
-          fiber: roundTo1Decimal(totals.fiber),
-          notes: stagedMeal.notes ?? null,
-        },
-      ]);
-      if (error) throw error;
-      setStatus('Saved custom dish');
-      setIsError(false);
-      queryClient.invalidateQueries({ queryKey: ['custom_dishes', targetUserId] });
-    } catch (err: any) {
-      setStatus('Failed to save custom dish: ' + err.message);
-      setIsError(true);
-    }
-  };
-
-  const handleSaveItemAsCustomDish = async (item: StagedItem) => {
-    try {
-      const { error } = await supabase.from('custom_dishes').insert([
-        {
-          user_id: targetUserId,
-          name: item.name,
-          kind: 'food',
-          ingredients: JSON.stringify([item]),
-          items: null,
-          calories: roundTo1Decimal(item.calories),
-          protein: roundTo1Decimal(item.protein),
-          carbs: roundTo1Decimal(item.carbs),
-          fat: roundTo1Decimal(item.fat),
-          fiber: roundTo1Decimal(item.fiber),
-        },
-      ]);
-      if (error) throw error;
-      setStatus(`Saved ${item.name} as custom dish`);
-      setIsError(false);
-      queryClient.invalidateQueries({ queryKey: ['custom_dishes', targetUserId] });
-    } catch (err: any) {
-      setStatus('Failed to save custom dish: ' + err.message);
-      setIsError(true);
-    }
-  };
+  const { handleSaveStagedAsCustomDish, handleSaveItemAsCustomDish } = useCustomDishSaving({
+    targetUserId,
+    stagedMeal,
+    setStatus,
+    setIsError,
+  });
 
   const handleStageCustomDish = async (dish: CustomDish) => {
     setDishFetchError(null);
@@ -329,26 +272,6 @@ export const NutritionEngine: React.FC = () => {
     triggerToast(dish);
   };
 
-  const handleManualSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!manualDishName.trim()) return;
-
-    const payload = {
-      food_name: manualDishName,
-      calories: roundTo1Decimal(manualCalories),
-      protein: roundTo1Decimal(manualProtein),
-      carbs: roundTo1Decimal(manualCarbs),
-      fat: roundTo1Decimal(manualFat),
-      fiber: roundTo1Decimal(manualFiber),
-      meal_type: manualMealType,
-      serving_size: Number(manualServingSize) || 1,
-      serving_unit: manualServingUnit,
-      logged_at: formatLocalTimestamp(selectedDate),
-    };
-
-    mutation.mutate(payload);
-  };
-
   return (
     <div className="space-y-6">
       <NutritionDashboardRings
@@ -409,8 +332,8 @@ export const NutritionEngine: React.FC = () => {
         onSwitchToManual={() => {
           setShowManualForm(true);
           ai.setIsRateLimited(false);
-          if (!manualDishName.trim()) {
-            setManualDishName(ai.nlInput.trim() || (ai.selectedPhoto ? 'Meal Photo' : ''));
+          if (!manualMealForm.manualDishName.trim()) {
+            manualMealForm.setManualDishName(ai.nlInput.trim() || (ai.selectedPhoto ? 'Meal Photo' : ''));
           }
         }}
         status={status}
@@ -438,25 +361,25 @@ export const NutritionEngine: React.FC = () => {
         onClose={() => setShowManualForm(false)}
         selectedPhoto={ai.selectedPhoto}
         onRemovePhoto={ai.handleRemovePhoto}
-        manualName={manualDishName}
-        onManualNameChange={setManualDishName}
-        manualMealType={manualMealType}
-        onManualMealTypeChange={setManualMealType}
-        manualCalories={manualCalories}
-        onManualCaloriesChange={setManualCalories}
-        manualProtein={manualProtein}
-        onManualProteinChange={setManualProtein}
-        manualCarbs={manualCarbs}
-        onManualCarbsChange={setManualCarbs}
-        manualFat={manualFat}
-        onManualFatChange={setManualFat}
-        manualFiber={manualFiber}
-        onManualFiberChange={setManualFiber}
-        manualServingSize={manualServingSize}
-        onManualServingSizeChange={setManualServingSize}
-        manualServingUnit={manualServingUnit}
-        onManualServingUnitChange={setManualServingUnit}
-        onSubmit={handleManualSubmit}
+        manualName={manualMealForm.manualDishName}
+        onManualNameChange={manualMealForm.setManualDishName}
+        manualMealType={manualMealForm.manualMealType}
+        onManualMealTypeChange={manualMealForm.setManualMealType}
+        manualCalories={manualMealForm.manualCalories}
+        onManualCaloriesChange={manualMealForm.setManualCalories}
+        manualProtein={manualMealForm.manualProtein}
+        onManualProteinChange={manualMealForm.setManualProtein}
+        manualCarbs={manualMealForm.manualCarbs}
+        onManualCarbsChange={manualMealForm.setManualCarbs}
+        manualFat={manualMealForm.manualFat}
+        onManualFatChange={manualMealForm.setManualFat}
+        manualFiber={manualMealForm.manualFiber}
+        onManualFiberChange={manualMealForm.setManualFiber}
+        manualServingSize={manualMealForm.manualServingSize}
+        onManualServingSizeChange={manualMealForm.setManualServingSize}
+        manualServingUnit={manualMealForm.manualServingUnit}
+        onManualServingUnitChange={manualMealForm.setManualServingUnit}
+        onSubmit={manualMealForm.handleManualSubmit}
         isPending={mutation.isPending}
       />
 
