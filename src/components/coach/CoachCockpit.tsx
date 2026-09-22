@@ -14,6 +14,7 @@ import { CoachAthleteMacros } from './CoachAthleteMacros';
 import { CoachTemplateBuilder } from './CoachTemplateBuilder';
 import { StatusBanner } from '../common/StatusBanner';
 import { groupTimelineDays } from '../../utils/timelineGrouping';
+import { nutritionRowLimitForRange } from '../../utils/coachQueryBounds';
 
 const SETS_PAGE_LIMIT = 500;
 
@@ -204,16 +205,22 @@ export const CoachCockpit: React.FC = () => {
     queryFn: async () => {
       if (!selectedAthleteId) return [];
       const { startOfDay } = getDayBounds(daysAgoStr);
+      const rowLimit = nutritionRowLimitForRange(daysRange);
       const { data, error } = await supabase
         .from('nutrition_logs')
         .select('id, user_id, food_name, calories, protein, carbs, fat, fiber, logged_at')
         .eq('user_id', selectedAthleteId)
         .gte('logged_at', startOfDay)
         .order('logged_at', { ascending: false })
-        .limit(100);
+        .limit(rowLimit);
 
       if (error) throw error;
       if (!data) return [];
+      if (data.length === rowLimit) {
+        console.warn(
+          `[coach] nutrition query hit its ${rowLimit}-row bound for a ${daysRange}-day range; the oldest days may be truncated.`
+        );
+      }
       return data;
     },
   });
