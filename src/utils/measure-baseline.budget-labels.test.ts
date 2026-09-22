@@ -186,13 +186,10 @@ describe('measure-baseline dynamic environment derivation (RFIX-17)', () => {
   });
 
   it('emits explicit (unresolved) marker when a package cannot be resolved (NC-B anti-fabrication oracle)', () => {
-    const envStr = deriveEnvironmentString();
-    // In this environment, lighthouse is not installed in node_modules
-    expect(envStr).toContain('Lighthouse (unresolved)');
-    // Must NEVER fall back to fabricated literal version numbers like 13.4.1
-    expect(envStr).not.toContain('Lighthouse 13.4.1');
-
-    // When require fails for any package, it emits (unresolved)
+    // This asserts against a forced resolution failure rather than the real environment. The
+    // previous version asserted 'Lighthouse (unresolved)' on the live environment string, which
+    // was never true: lighthouse is a declared devDependency, so it resolves wherever devDeps are
+    // installed -- locally and in CI alike.
     const mockRequire = {
       resolve: () => {
         throw new Error('MODULE_NOT_FOUND');
@@ -207,6 +204,10 @@ describe('measure-baseline dynamic environment derivation (RFIX-17)', () => {
     expect(mockEnvStr).toContain('Vite (unresolved)');
     expect(mockEnvStr).toContain('Playwright (unresolved)');
     expect(mockEnvStr).toContain('Lighthouse (unresolved)');
+
+    // Must NEVER fall back to a fabricated literal version when resolution fails.
+    expect(mockEnvStr).not.toContain('Lighthouse 13.4.1');
+    expect(mockEnvStr).not.toMatch(/Lighthouse \d/);
   });
 
   it('derives platform dynamically and applies (Cloudtop) only additively', () => {
