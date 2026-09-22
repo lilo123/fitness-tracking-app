@@ -33,14 +33,50 @@ export const NutritionHistoryTimeline: React.FC<NutritionHistoryTimelineProps> =
   onDeleteMeal,
   onScaleMeal,
 }) => {
-  const parentRef = React.useRef<HTMLDivElement>(null);
+  const parentRef = React.useRef<HTMLDivElement | null>(null);
   const [scrollMargin, setScrollMargin] = React.useState(0);
 
-  React.useLayoutEffect(() => {
+  // We re-measure scrollMargin whenever the container ref attaches to the DOM, when layout shifts,
+  // or when the window resizes. The nutrition timeline sits below dynamic controls (time range pills,
+  // athlete selector, macro summaries) whose conditional rendering shifts the container's offsetTop
+  // after mount. Tracking offsetTop dynamically ensures useWindowVirtualizer computes accurate
+  // window scroll offsets, preventing cards from prematurely unmounting during window scroll.
+  const measureScrollMargin = React.useCallback(() => {
     if (parentRef.current) {
-      setScrollMargin(parentRef.current.offsetTop);
+      const offsetTop = parentRef.current.offsetTop;
+      setScrollMargin((prev) => (prev !== offsetTop ? offsetTop : prev));
     }
   }, []);
+
+  const containerRef = React.useCallback((node: HTMLDivElement | null) => {
+    parentRef.current = node;
+    if (node) {
+      const offsetTop = node.offsetTop;
+      setScrollMargin((prev) => (prev !== offsetTop ? offsetTop : prev));
+    }
+  }, []);
+
+  React.useLayoutEffect(() => {
+    measureScrollMargin();
+  });
+
+  React.useEffect(() => {
+    measureScrollMargin();
+    window.addEventListener('resize', measureScrollMargin);
+    if (typeof ResizeObserver !== 'undefined' && document.body) {
+      const observer = new ResizeObserver(() => {
+        measureScrollMargin();
+      });
+      observer.observe(document.body);
+      return () => {
+        window.removeEventListener('resize', measureScrollMargin);
+        observer.disconnect();
+      };
+    }
+    return () => {
+      window.removeEventListener('resize', measureScrollMargin);
+    };
+  }, [measureScrollMargin]);
 
   const virtualizer = useWindowVirtualizer({
     count: filteredNutritionDays.length,
@@ -193,7 +229,7 @@ export const NutritionHistoryTimeline: React.FC<NutritionHistoryTimelineProps> =
   return (
     <div className="space-y-4">
       {!isVirtual ? (
-        <div ref={parentRef} className="space-y-4">
+        <div ref={containerRef} className="space-y-4">
           {filteredNutritionDays.length > FALLBACK_WINDOW && (
             <div
               data-testid="virtualizer-fallback-notice"
@@ -210,7 +246,7 @@ export const NutritionHistoryTimeline: React.FC<NutritionHistoryTimelineProps> =
         </div>
       ) : (
         <div
-          ref={parentRef}
+          ref={containerRef}
           style={{
             position: 'relative',
             width: '100%',

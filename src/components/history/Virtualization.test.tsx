@@ -316,6 +316,84 @@ describe('DIR-C2: List Virtualization with @tanstack/react-virtual', () => {
     expect(screen.queryByText('Athlete Workout #30')).toBeNull();
   });
 
+  it('CoachAthleteTimeline: regression test - first day card remains mounted when scrolling window with container scrollMargin', () => {
+    let currentOffsetTop = 0;
+    const offsetTopSpy = vi.spyOn(HTMLElement.prototype, 'offsetTop', 'get').mockImplementation(() => currentOffsetTop);
+
+    try {
+      const timelineDays = Array.from({ length: 40 }, (_, idx) => ({
+        date: `2026-01-${String((idx % 28) + 1).padStart(2, '0')}`,
+        workouts: [
+          {
+            id: `coach-w-${idx}`,
+            name: `Athlete Workout #${idx + 1}`,
+            sets: [
+              {
+                id: `coach-s-${idx}`,
+                exercise_id: 'ex-bench',
+                weight: 185,
+                reps: 8,
+                exercise: mockExercises[0],
+              },
+            ],
+          },
+        ],
+        nutrition: [
+          {
+            id: `coach-n-${idx}`,
+            food_name: 'Post-Workout Meal',
+            calories: 450,
+            protein: 35,
+            carbs: 45,
+            fat: 10,
+          },
+        ],
+      }));
+
+      // Render initially with empty data (simulating initial load where container ref has not yet attached)
+      const { rerender } = render(
+        <CoachAthleteTimeline
+          selectedAthleteId="ath-1"
+          selectedAthlete={{ name: 'Alex Johnson' }}
+          timelineDays={[]}
+          athleteWorkoutsWithSets={[]}
+          athleteProfile={{ target_calories: 2400 }}
+          exercises={mockExercises}
+          expandedExercises={{}}
+          onToggleExercise={vi.fn()}
+          onLoadOlderDays={vi.fn()}
+        />
+      );
+
+      // Now timeline data arrives and container is positioned 400px below top of page
+      currentOffsetTop = 400;
+      rerender(
+        <CoachAthleteTimeline
+          selectedAthleteId="ath-1"
+          selectedAthlete={{ name: 'Alex Johnson' }}
+          timelineDays={timelineDays}
+          athleteWorkoutsWithSets={timelineDays.flatMap((d) => d.workouts)}
+          athleteProfile={{ target_calories: 2400 }}
+          exercises={mockExercises}
+          expandedExercises={{}}
+          onToggleExercise={vi.fn()}
+          onLoadOlderDays={vi.fn()}
+        />
+      );
+
+      // Simulate a non-zero window.scrollY (user scrolled down 350px)
+      // Because container is at offsetTop 400px, item 0 starts at 400px (50px below top of viewport, visible)
+      window.scrollY = 350;
+      fireEvent.scroll(window);
+
+      // First day card MUST still be present in the DOM
+      expect(screen.queryByText('Athlete Workout #1')).not.toBeNull();
+    } finally {
+      offsetTopSpy.mockRestore();
+      window.scrollY = 0;
+    }
+  });
+
   it('handles zero-render edge case gracefully without dropping elements', () => {
     const singleSession: HistorySession = {
       id: 'session-fallback-test',

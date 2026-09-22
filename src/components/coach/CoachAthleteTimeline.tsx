@@ -107,14 +107,51 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
   const activeError = workoutsError ?? error;
   const handleRetry = onRetryWorkouts ?? onRetry;
 
-  const parentRef = React.useRef<HTMLDivElement>(null);
+  const parentRef = React.useRef<HTMLDivElement | null>(null);
   const [scrollMargin, setScrollMargin] = React.useState(0);
 
-  React.useLayoutEffect(() => {
+  // We re-measure scrollMargin whenever the container ref attaches to the DOM, when layout shifts,
+  // or when the window resizes. The timeline container is positioned below dynamic sibling content
+  // (such as athlete headers, error/retry banners, and summary cards) whose asynchronous rendering
+  // alters offsetTop after the initial mount. Without dynamic re-measurement, a stale or 0 scrollMargin
+  // causes useWindowVirtualizer to compute incorrect document scroll boundaries and prematurely
+  // unmount visible items near the top of the viewport.
+  const measureScrollMargin = React.useCallback(() => {
     if (parentRef.current) {
-      setScrollMargin(parentRef.current.offsetTop);
+      const offsetTop = parentRef.current.offsetTop;
+      setScrollMargin((prev) => (prev !== offsetTop ? offsetTop : prev));
     }
   }, []);
+
+  const containerRef = React.useCallback((node: HTMLDivElement | null) => {
+    parentRef.current = node;
+    if (node) {
+      const offsetTop = node.offsetTop;
+      setScrollMargin((prev) => (prev !== offsetTop ? offsetTop : prev));
+    }
+  }, []);
+
+  React.useLayoutEffect(() => {
+    measureScrollMargin();
+  });
+
+  React.useEffect(() => {
+    measureScrollMargin();
+    window.addEventListener('resize', measureScrollMargin);
+    if (typeof ResizeObserver !== 'undefined' && document.body) {
+      const observer = new ResizeObserver(() => {
+        measureScrollMargin();
+      });
+      observer.observe(document.body);
+      return () => {
+        window.removeEventListener('resize', measureScrollMargin);
+        observer.disconnect();
+      };
+    }
+    return () => {
+      window.removeEventListener('resize', measureScrollMargin);
+    };
+  }, [measureScrollMargin]);
 
   const virtualizer = useWindowVirtualizer({
     count: timelineDays.length,
@@ -381,7 +418,7 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
       ) : (
         <div className="space-y-4">
           {!isVirtual ? (
-            <div ref={parentRef} className="space-y-4">
+            <div ref={containerRef} className="space-y-4">
               {timelineDays.length > FALLBACK_WINDOW && (
                 <div
                   data-testid="virtualizer-fallback-notice"
@@ -398,7 +435,7 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
             </div>
           ) : (
             <div
-              ref={parentRef}
+              ref={containerRef}
               style={{
                 position: 'relative',
                 width: '100%',

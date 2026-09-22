@@ -34,14 +34,50 @@ export const WorkoutExerciseHistory: React.FC<WorkoutExerciseHistoryProps> = ({
   isInspectingAthlete,
   onEditSet,
 }) => {
-  const parentRef = React.useRef<HTMLDivElement>(null);
+  const parentRef = React.useRef<HTMLDivElement | null>(null);
   const [scrollMargin, setScrollMargin] = React.useState(0);
 
-  React.useLayoutEffect(() => {
+  // We re-measure scrollMargin whenever the container ref attaches to the DOM, when layout shifts,
+  // or when the window resizes. The exercise history list sits below search and category filter bars
+  // whose presence or filtering state shifts the container's offsetTop after mount. Tracking offsetTop
+  // dynamically ensures useWindowVirtualizer computes accurate window scroll offsets, preventing
+  // exercise cards from prematurely unmounting during window scroll.
+  const measureScrollMargin = React.useCallback(() => {
     if (parentRef.current) {
-      setScrollMargin(parentRef.current.offsetTop);
+      const offsetTop = parentRef.current.offsetTop;
+      setScrollMargin((prev) => (prev !== offsetTop ? offsetTop : prev));
     }
   }, []);
+
+  const containerRef = React.useCallback((node: HTMLDivElement | null) => {
+    parentRef.current = node;
+    if (node) {
+      const offsetTop = node.offsetTop;
+      setScrollMargin((prev) => (prev !== offsetTop ? offsetTop : prev));
+    }
+  }, []);
+
+  React.useLayoutEffect(() => {
+    measureScrollMargin();
+  });
+
+  React.useEffect(() => {
+    measureScrollMargin();
+    window.addEventListener('resize', measureScrollMargin);
+    if (typeof ResizeObserver !== 'undefined' && document.body) {
+      const observer = new ResizeObserver(() => {
+        measureScrollMargin();
+      });
+      observer.observe(document.body);
+      return () => {
+        window.removeEventListener('resize', measureScrollMargin);
+        observer.disconnect();
+      };
+    }
+    return () => {
+      window.removeEventListener('resize', measureScrollMargin);
+    };
+  }, [measureScrollMargin]);
 
   const virtualizer = useWindowVirtualizer({
     count: exerciseStats.length,
@@ -163,7 +199,7 @@ export const WorkoutExerciseHistory: React.FC<WorkoutExerciseHistoryProps> = ({
           No exercises found.
         </div>
       ) : !isVirtual ? (
-        <div ref={parentRef} className="space-y-3">
+        <div ref={containerRef} className="space-y-3">
           {exerciseStats.length > FALLBACK_WINDOW && (
             <div
               data-testid="virtualizer-fallback-notice"
@@ -176,7 +212,7 @@ export const WorkoutExerciseHistory: React.FC<WorkoutExerciseHistoryProps> = ({
         </div>
       ) : (
         <div
-          ref={parentRef}
+          ref={containerRef}
           style={{
             position: 'relative',
             width: '100%',
