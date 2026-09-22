@@ -163,8 +163,59 @@ describe('EditSetModal', () => {
     const rpeInput = screen.getByTestId('edit-set-rpe-input') as HTMLInputElement;
     expect(rpeInput.value).toBe('8.5');
 
-    // Press Escape to close
-    fireEvent.keyDown(window, { key: 'Escape' });
+    // Press Escape to close (dispatched on document as required by useModalA11y capturing listener)
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('meets modal accessibility requirements: focus trap, focus restoration, and ARIA attributes', () => {
+    const opener = document.createElement('button');
+    opener.setAttribute('data-testid', 'test-opener');
+    document.body.appendChild(opener);
+    opener.focus();
+    expect(document.activeElement).toBe(opener);
+
+    const { unmount } = renderModal();
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toBeInTheDocument();
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveAttribute('aria-labelledby', 'edit-set-modal-title');
+
+    // Focus must move to the first interactive element inside the modal on open
+    const closeBtn = screen.getByRole('button', { name: 'Close dialog' });
+    expect(document.activeElement).toBe(closeBtn);
+
+    // Focus restoration to opener on unmount/close
+    unmount();
+    expect(document.activeElement).toBe(opener);
+    opener.remove();
+  });
+
+  it('traps Tab key navigation within modal controls', () => {
+    renderModal();
+
+    const closeBtn = screen.getByRole('button', { name: 'Close dialog' });
+    const saveBtn = screen.getByTestId('save-set-btn');
+
+    // First control is focused
+    expect(document.activeElement).toBe(closeBtn);
+
+    // Shift+Tab on first control wraps to last focusable control (save-set-btn)
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(saveBtn);
+
+    // Tab on last control wraps to first focusable control
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(document.activeElement).toBe(closeBtn);
+  });
+
+  it('dismisses modal on backdrop click', () => {
+    renderModal();
+
+    const backdrop = screen.getByTestId('edit-set-modal');
+    fireEvent.click(backdrop);
+
     expect(onClose).toHaveBeenCalled();
   });
 

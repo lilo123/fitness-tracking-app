@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { workoutSessionStore } from '../../utils/workoutSessionStore';
+import { AccessibleModal } from '../common/AccessibleModal';
 import type { Exercise } from '../../types/database';
 import { StatusBanner } from '../common/StatusBanner';
 
@@ -60,19 +61,6 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
     setError(null);
   }, [isOpen, exercise]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
   if (!isOpen || !exercise) return null;
 
   const toggleBodyPart = (part: string) => {
@@ -126,36 +114,36 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
   };
 
   return (
-    <div
-      data-testid="edit-exercise-modal"
-      className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex flex-col justify-end sm:items-center sm:justify-center animate-fade-in"
-      onClick={onClose}
+    <AccessibleModal
+      isOpen={isOpen}
+      onClose={onClose}
+      titleId="edit-exercise-modal-title"
+      overlayTestId="edit-exercise-modal"
+      overlayClassName="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex flex-col justify-end sm:items-center sm:justify-center animate-fade-in"
+      className="bg-zinc-900 border-t sm:border border-zinc-800 rounded-t-3xl sm:rounded-2xl max-h-[92dvh] sm:max-h-[85vh] w-full max-w-lg flex flex-col shadow-2xl overflow-hidden animate-slide-up"
     >
-      <div
-        className="bg-zinc-900 border-t sm:border border-zinc-800 rounded-t-3xl sm:rounded-2xl max-h-[92dvh] sm:max-h-[85vh] w-full max-w-lg flex flex-col shadow-2xl overflow-hidden animate-slide-up"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Mobile Drag Handle */}
-        <div className="w-12 h-1.5 bg-zinc-700 rounded-full mx-auto my-2.5 shrink-0 sm:hidden" />
+      {/* Mobile Drag Handle */}
+      <div className="w-12 h-1.5 bg-zinc-700 rounded-full mx-auto my-2.5 shrink-0 sm:hidden" />
 
-        {/* Safe Area Header */}
-        <div className="px-6 py-3.5 border-b border-zinc-800/80 flex items-center justify-between shrink-0 bg-zinc-900/95 backdrop-blur-md pt-[max(env(safe-area-inset-top),0.875rem)]">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
-              <Dumbbell className="w-4 h-4" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-sm sm:text-base font-black text-white truncate">
-                Edit Exercise
-              </h2>
-              <p className="text-[11px] text-zinc-400 truncate">
-                Update exercise name and target muscle group taxonomy
-              </p>
-            </div>
+      {/* Safe Area Header */}
+      <div className="px-6 py-3.5 border-b border-zinc-800/80 flex items-center justify-between shrink-0 bg-zinc-900/95 backdrop-blur-md pt-[max(env(safe-area-inset-top),0.875rem)]">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
+            <Dumbbell className="w-4 h-4" />
           </div>
+          <div className="min-w-0">
+            <h2 id="edit-exercise-modal-title" className="text-sm sm:text-base font-black text-white truncate">
+              Edit Exercise
+            </h2>
+            <p className="text-[11px] text-zinc-400 truncate">
+              Update exercise name and target muscle group taxonomy
+            </p>
+          </div>
+        </div>
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close dialog"
             className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition shrink-0 touch-manipulation"
           >
             <X className="w-5 h-5" />
@@ -248,7 +236,6 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
             <span>{isSubmitting ? 'Saving...' : 'Save Changes'}</span>
           </button>
         </div>
-      </div>
-    </div>
+    </AccessibleModal>
   );
 };

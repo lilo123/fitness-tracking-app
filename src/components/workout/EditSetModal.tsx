@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import type { WorkoutSet, Exercise, SetType } from '../../types/database';
 import { X, Dumbbell, Trash2, AlertCircle } from 'lucide-react';
 import { StatusBanner } from '../common/StatusBanner';
+import { AccessibleModal } from '../common/AccessibleModal';
 
 export interface EditSetModalProps {
   isOpen: boolean;
@@ -53,17 +54,6 @@ const EditSetForm: React.FC<EditSetFormProps> = ({
   const [rpe, setRpe] = useState(set.rpe !== undefined && set.rpe !== null ? String(set.rpe) : '');
   const [setType, setSetType] = useState<SetType>(set.set_type || 'working');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  // Close on Escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
 
   const updateMutation = useMutation({
     mutationFn: async (payload: {
@@ -217,19 +207,14 @@ const EditSetForm: React.FC<EditSetFormProps> = ({
   const isPending = updateMutation.isPending || deleteMutation.isPending;
 
   return (
-    <div
-      className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4"
-      data-testid="edit-set-modal"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="edit-set-modal-title"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !isPending) {
-          onClose();
-        }
-      }}
+    <AccessibleModal
+      isOpen
+      onClose={onClose}
+      titleId="edit-set-modal-title"
+      overlayTestId="edit-set-modal"
+      dismissible={!isPending}
+      className="bg-zinc-900 border border-zinc-800 rounded-t-3xl sm:rounded-3xl p-6 pb-[max(1.5rem,env(safe-area-inset-bottom,1.5rem))] max-w-md w-full shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto"
     >
-      <div className="bg-zinc-900 border border-zinc-800 rounded-t-3xl sm:rounded-3xl p-6 pb-[max(1.5rem,env(safe-area-inset-bottom,1.5rem))] max-w-md w-full shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
           <div className="flex items-center gap-2 text-cyan-400">
@@ -401,8 +386,7 @@ const EditSetForm: React.FC<EditSetFormProps> = ({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </AccessibleModal>
   );
 };
 

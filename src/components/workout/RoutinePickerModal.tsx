@@ -5,6 +5,7 @@ import { isValidUUID } from './workoutEngineHelpers';
 import type { RoutineTemplate, Exercise } from '../../types/database';
 import type { DEFAULT_WORKOUT_TEMPLATES } from '../../utils/ghostSets';
 import { Layers, RotateCcw, Check, Bed } from 'lucide-react';
+import { AccessibleModal } from '../common/AccessibleModal';
 
 export interface RoutinePickerModalProps {
   isOpen: boolean;
@@ -86,19 +87,26 @@ export const RoutinePickerModal: React.FC<RoutinePickerModalProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 max-w-md w-full shadow-2xl space-y-4">
-        <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-          <h3 className="text-base font-black text-white flex items-center gap-2">
-            <Layers className="w-4 h-4 text-cyan-400" /> Select Routine
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-zinc-400 hover:text-white text-xs font-bold"
-          >
-            Close
-          </button>
-        </div>
+    <AccessibleModal
+      isOpen={isOpen}
+      onClose={onClose}
+      titleId="routine-picker-modal-title"
+      overlayTestId="routine-picker-modal"
+      overlayClassName="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
+      className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 max-w-md w-full shadow-2xl space-y-4"
+    >
+      <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+        <h3 id="routine-picker-modal-title" className="text-base font-black text-white flex items-center gap-2">
+          <Layers className="w-4 h-4 text-cyan-400" /> Select Routine
+        </h3>
+        <button
+          onClick={onClose}
+          aria-label="Close dialog"
+          className="text-zinc-400 hover:text-white text-xs font-bold p-1 min-h-[44px] min-w-[44px] flex items-center justify-center"
+        >
+          Close
+        </button>
+      </div>
 
         <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
           <button
@@ -222,7 +230,6 @@ export const RoutinePickerModal: React.FC<RoutinePickerModalProps> = ({
             </button>
           ))}
         </div>
-      </div>
-    </div>
+    </AccessibleModal>
   );
 };

@@ -784,7 +784,7 @@ describe('HistoryView', () => {
     openMealAction('log-1', 'edit');
     expect(screen.getByTestId('edit-meal-modal')).toBeDefined();
 
-    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.keyDown(document, { key: 'Escape' });
     await waitFor(() => {
       expect(screen.queryByTestId('edit-meal-modal')).toBeNull();
     });

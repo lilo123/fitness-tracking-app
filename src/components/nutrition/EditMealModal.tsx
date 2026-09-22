@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useId } from 'react';
+import React, { useState, useId } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import type { NutritionLog } from '../../types/database';
@@ -7,6 +7,7 @@ import { formatCalories, formatMacro, roundTo1Decimal } from '../../utils/nutrit
 import { isLevel1, normalizeItems, sumItems } from '../../utils/itemModel';
 import { friendlyError } from '../../utils/nutritionErrors';
 import { StatusBanner } from '../common/StatusBanner';
+import { AccessibleModal } from '../common/AccessibleModal';
 
 export interface EditMealModalProps {
   isOpen: boolean;
@@ -64,17 +65,6 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
   const items = normalizeItems(meal.items);
   const hasBreakdown = isLevel1(items);
   const derived = hasBreakdown ? sumItems(items!) : null;
-
-  // Close on Escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
 
   const updateMutation = useMutation({
     mutationFn: async (payload: {
@@ -161,19 +151,13 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4"
-      data-testid="edit-meal-modal"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="edit-meal-modal-title"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
+    <AccessibleModal
+      isOpen
+      onClose={onClose}
+      titleId="edit-meal-modal-title"
+      overlayTestId="edit-meal-modal"
+      className="bg-zinc-900 border border-zinc-800 rounded-t-3xl sm:rounded-3xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom,1.25rem))] max-w-md w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto"
     >
-      <div className="bg-zinc-900 border border-zinc-800 rounded-t-3xl sm:rounded-3xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom,1.25rem))] max-w-md w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
           <h3 id="edit-meal-modal-title" className="text-base font-black text-white flex items-center gap-2">
             <Utensils className="w-4 h-4 text-cyan-400" />
@@ -440,8 +424,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </AccessibleModal>
   );
 };
 

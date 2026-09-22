@@ -1092,7 +1092,7 @@ Total Fiber: 1 g`;
     expect(mockUpdate).not.toHaveBeenCalled();
 
     // Close on Escape
-    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.keyDown(document, { key: 'Escape' });
     await waitFor(() => {
       expect(screen.queryByTestId('edit-meal-modal')).toBeNull();
     });

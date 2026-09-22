@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -219,5 +220,57 @@ describe('friendlyError', () => {
 
   it('falls back to a generic message when there is none', () => {
     expect(friendlyError({})).toBe('Failed to update meal log. Please try again.');
+  });
+
+  describe('accessibility and focus management', () => {
+    it('traps focus, restores focus on close, and closes on Escape', () => {
+      function Wrapper() {
+        const [open, setOpen] = useState(false);
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+        return (
+          <QueryClientProvider client={client}>
+            <button data-testid="opener-btn" onClick={() => setOpen(true)}>
+              Open
+            </button>
+            <EditMealModal
+              isOpen={open}
+              meal={meal(null)}
+              onClose={() => setOpen(false)}
+            />
+          </QueryClientProvider>
+        );
+      }
+
+      render(<Wrapper />);
+      const opener = screen.getByTestId('opener-btn');
+      opener.focus();
+      fireEvent.click(opener);
+
+      // 1. Dialog exists with ARIA attributes
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toBeDefined();
+      expect(dialog).toHaveAttribute('aria-modal', 'true');
+      expect(dialog).toHaveAttribute('aria-labelledby', 'edit-meal-modal-title');
+
+      // 2. Focus moved into dialog
+      const firstFocusable = screen.getByTestId('close-edit-meal-btn');
+      expect(document.activeElement).toBe(firstFocusable);
+
+      // 3. Tab wraps from last focusable to first focusable
+      const saveBtn = screen.getByTestId('save-edit-meal-btn');
+      saveBtn.focus();
+      fireEvent.keyDown(document, { key: 'Tab' });
+      expect(document.activeElement).toBe(firstFocusable);
+
+      // 4. Shift+Tab wraps from first focusable to last focusable
+      firstFocusable.focus();
+      fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+      expect(document.activeElement).toBe(saveBtn);
+
+      // 5. Escape closes the modal and restores focus to opener
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(document.activeElement).toBe(opener);
+    });
   });
 });
