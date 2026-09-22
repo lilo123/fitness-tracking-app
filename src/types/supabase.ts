@@ -86,8 +86,11 @@ export type Database = {
           id: string
           ingredients: string | null
           items: Json | null
+          kind: string
           name: string
+          notes: string | null
           protein: number | null
+          use_count: number
           user_id: string
         }
         Insert: {
@@ -99,8 +102,11 @@ export type Database = {
           id?: string
           ingredients?: string | null
           items?: Json | null
+          kind?: string
           name: string
+          notes?: string | null
           protein?: number | null
+          use_count?: number
           user_id: string
         }
         Update: {
@@ -112,8 +118,11 @@ export type Database = {
           id?: string
           ingredients?: string | null
           items?: Json | null
+          kind?: string
           name?: string
+          notes?: string | null
           protein?: number | null
+          use_count?: number
           user_id?: string
         }
         Relationships: [
@@ -178,6 +187,7 @@ export type Database = {
           items: Json | null
           logged_at: string
           meal_type: string | null
+          notes: string | null
           protein: number | null
           serving_size: number | null
           serving_unit: string | null
@@ -196,6 +206,7 @@ export type Database = {
           items?: Json | null
           logged_at?: string
           meal_type?: string | null
+          notes?: string | null
           protein?: number | null
           serving_size?: number | null
           serving_unit?: string | null
@@ -214,6 +225,7 @@ export type Database = {
           items?: Json | null
           logged_at?: string
           meal_type?: string | null
+          notes?: string | null
           protein?: number | null
           serving_size?: number | null
           serving_unit?: string | null
@@ -463,9 +475,7 @@ export type Database = {
     Functions: {
       disconnect_coach: { Args: { target_athlete_id?: string }; Returns: Json }
       get_exercise_stats: {
-        Args: {
-          p_user_id: string
-        }
+        Args: { p_user_id: string }
         Returns: {
           exercise_id: string
           max_weight: number
@@ -474,12 +484,24 @@ export type Database = {
           set_count: number
         }[]
       }
+      get_ghost_sets: {
+        Args: { p_date: string; p_user_id: string }
+        Returns: {
+          created_at: string
+          exercise_id: string
+          exercise_name: string
+          id: string
+          reps: number
+          set_index: number
+          set_type: string
+          weight: number
+          workout_date: string
+          workout_id: string
+          workout_name: string
+        }[]
+      }
       get_history_sessions: {
-        Args: {
-          p_limit?: number
-          p_offset?: number
-          p_user_id: string
-        }
+        Args: { p_limit?: number; p_offset?: number; p_user_id: string }
         Returns: {
           date: string
           id: string

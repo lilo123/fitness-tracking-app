@@ -103,7 +103,15 @@ export interface NutritionLog {
    * True if items has >= 2 components (level 1 / expandable).
    */
   has_components?: boolean | null;
+  /**
+   * Optional user notes for this logged meal (snapshot copy at log time, max 500 characters).
+   * Optional because current SELECT projections do not request it yet;
+   * tightened in the next phase when query projections include it.
+   */
+  notes?: string | null;
 }
+
+export type CustomDishKind = 'food' | 'recipe';
 
 export interface CustomDishRow {
   id: string;
@@ -115,6 +123,24 @@ export interface CustomDishRow {
   fat: number | null;
   fiber?: number | null;
   created_at?: string;
+  /**
+   * User-declared dish classification: 'food' (atomic food) or 'recipe' (composed meal).
+   * Optional because current SELECT projections do not request it yet;
+   * tightened in the next phase when query projections include it.
+   */
+  kind?: CustomDishKind;
+  /**
+   * Total times this custom dish has been logged (>= 0).
+   * Optional because current SELECT projections do not request it yet;
+   * tightened in the next phase when query projections include it.
+   */
+  use_count?: number;
+  /**
+   * Optional user notes or preparation instructions for the custom dish (max 500 characters).
+   * Optional because current SELECT projections do not request it yet;
+   * tightened in the next phase when query projections include it.
+   */
+  notes?: string | null;
 }
 
 export type CustomDish = CustomDishRow;
