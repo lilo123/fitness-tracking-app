@@ -138,7 +138,7 @@ describe('F-15: In-Flight Promise Deduplication', () => {
     expect(userQueries.length).toBe(1);
     expect(getRecordedSelects()).toContainEqual({
       table: 'users',
-      projection: 'id, email, username, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, is_coach_mode, coach_code, coach_tier, max_athletes, created_at',
+      projection: 'id, email, username, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, is_coach_mode, coach_code, coach_tier, max_athletes, created_at, timezone',
     });
   });
 

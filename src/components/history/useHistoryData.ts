@@ -238,7 +238,7 @@ export function useHistoryData(targetUserId: string, onMutationError?: (msg: str
       const { data, error } = await supabase
         .from('nutrition_logs')
         .select(
-          'id, user_id, food_name, meal_type, calories, protein, carbs, fat, fiber, serving_size, serving_unit, logged_at, created_at, has_components'
+          'id, user_id, food_name, meal_type, calories, protein, carbs, fat, fiber, serving_size, serving_unit, logged_at, logged_date, created_at, has_components'
         )
         .eq('user_id', targetUserId)
         .order('logged_at', { ascending: false })

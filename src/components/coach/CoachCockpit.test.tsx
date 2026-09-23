@@ -141,7 +141,7 @@ describe('CoachCockpit', () => {
     expect(getRecordedTables()).toContain('users');
     expect(getRecordedSelects()).toContainEqual({
       table: 'users',
-      projection: 'id, email, username, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, is_coach_mode, coach_code, coach_tier, max_athletes, created_at',
+      projection: 'id, email, username, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, is_coach_mode, coach_code, coach_tier, max_athletes, created_at, timezone',
     });
     expect(getRecordedTables()).toContain('coach_athlete_links');
     expect(getRecordedSelects()).toContainEqual({
@@ -166,7 +166,7 @@ describe('CoachCockpit', () => {
     expect(getRecordedTables()).toContain('nutrition_logs');
     expect(getRecordedSelects()).toContainEqual({
       table: 'nutrition_logs',
-      projection: 'id, user_id, food_name, calories, protein, carbs, fat, fiber, logged_at',
+      projection: 'id, user_id, food_name, calories, protein, carbs, fat, fiber, logged_at, logged_date',
     });
   });
 

@@ -230,6 +230,19 @@ describe('Canonical Date Utility (src/utils/date.ts)', () => {
       expect(ts).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/);
       expect(isWithinDayBounds(ts, '2026-09-08')).toBe(true);
     });
+
+    it('extracts hours, minutes, and seconds in the specified timeZone via Intl.DateTimeFormat', () => {
+      // 2026-09-23T14:30:00Z: In Asia/Tokyo (UTC+9), clock time is 23:30:00.
+      const instant = new Date('2026-09-23T14:30:00Z');
+      const ts = formatLocalTimestamp('2026-09-23', instant, 'Asia/Tokyo');
+      // Anchoring to 2026-09-23 and clock time 23:30:00 in Tokyo corresponds to 14:30:00Z UTC.
+      expect(ts).toBe('2026-09-23T14:30:00.000Z');
+
+      // In America/New_York (EDT, UTC-4), clock time is 10:30:00.
+      const tsNy = formatLocalTimestamp('2026-09-23', instant, 'America/New_York');
+      // Anchoring to 2026-09-23 and clock time 10:30:00 EDT corresponds to 14:30:00Z UTC.
+      expect(tsNy).toBe('2026-09-23T14:30:00.000Z');
+    });
   });
 
   describe('formatLocalTimestamp and getDayBounds round-trip across timezones and dates', () => {

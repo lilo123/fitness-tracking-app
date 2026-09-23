@@ -78,7 +78,7 @@ describe('Header connection status badge', () => {
       expect(getRecordedTables()).toContain('users');
       expect(getRecordedSelects()).toContainEqual({
         table: 'users',
-        projection: 'id, email, username, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, is_coach_mode, coach_code, coach_tier, max_athletes, created_at',
+        projection: 'id, email, username, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, is_coach_mode, coach_code, coach_tier, max_athletes, created_at, timezone',
       });
       expect(getRecordedTables()).toContain('coach_athlete_links');
       expect(getRecordedSelects()).toContainEqual({

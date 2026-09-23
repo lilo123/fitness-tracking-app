@@ -245,9 +245,9 @@ export const HistoryView: React.FC = () => {
     const now = new Date();
     const days = timeRange === '30d' ? 30 : timeRange === '90d' ? 90 : 365;
     const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-    const cutoffStr = normalizeDateStr(cutoff);
+    const cutoffStr = normalizeDateStr(cutoff, effectiveTimeZone);
     return sessions.filter((s) => s.date >= cutoffStr);
-  }, [sessions, timeRange]);
+  }, [sessions, timeRange, effectiveTimeZone]);
 
   const displayedSessions = filteredSessions;
 
@@ -263,9 +263,9 @@ export const HistoryView: React.FC = () => {
     const now = new Date();
     const days = timeRange === '30d' ? 30 : timeRange === '90d' ? 90 : 365;
     const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-    const cutoffStr = normalizeDateStr(cutoff);
+    const cutoffStr = normalizeDateStr(cutoff, effectiveTimeZone);
     return nutritionDays.filter((d) => d.date >= cutoffStr);
-  }, [nutritionDays, timeRange]);
+  }, [nutritionDays, timeRange, effectiveTimeZone]);
 
   return (
     <div className="space-y-5">

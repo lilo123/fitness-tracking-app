@@ -312,14 +312,41 @@ export function formatLocalTimestamp(
   const validTime = time instanceof Date && !isNaN(time.getTime()) ? time : new Date();
   if (calendarDate && /^\d{4}-\d{2}-\d{2}$/.test(calendarDate)) {
     const [year, month, day] = calendarDate.split('-').map(Number);
+    let hours = validTime.getHours();
+    let minutes = validTime.getMinutes();
+    let seconds = validTime.getSeconds();
+    const ms = validTime.getMilliseconds();
+
+    if (timeZone) {
+      try {
+        const formatter = getDateTimeFormat(timeZone);
+        const parts = formatter.formatToParts(validTime);
+        const map: Record<string, number> = {};
+        for (const p of parts) {
+          if (p.type !== 'literal') map[p.type] = parseInt(p.value, 10);
+        }
+        if (typeof map.hour === 'number') {
+          hours = map.hour === 24 ? 0 : map.hour;
+        }
+        if (typeof map.minute === 'number') {
+          minutes = map.minute;
+        }
+        if (typeof map.second === 'number') {
+          seconds = map.second;
+        }
+      } catch {
+        // Fallback to validTime local hours/minutes/seconds
+      }
+    }
+
     const utcMs = localCivilToUtcMs(
       year,
       month,
       day,
-      validTime.getHours(),
-      validTime.getMinutes(),
-      validTime.getSeconds(),
-      validTime.getMilliseconds(),
+      hours,
+      minutes,
+      seconds,
+      ms,
       timeZone
     );
     return new Date(utcMs).toISOString();

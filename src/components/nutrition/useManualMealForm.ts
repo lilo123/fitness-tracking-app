@@ -44,6 +44,7 @@ export function useManualMealForm({ selectedDate, onSubmitLog }: UseManualMealFo
       serving_size: Number(manualServingSize) || 1,
       serving_unit: manualServingUnit,
       logged_at: formatLocalTimestamp(selectedDate),
+      logged_date: selectedDate,
     };
 
     onSubmitLog(payload);

@@ -223,4 +223,36 @@ describe('groupNutritionDays', () => {
       expect(days[0].meals).toHaveLength(1);
     });
   });
+
+  describe('logged_date precedence and travel stability', () => {
+    it('proves logged_date takes precedence over logged_at timezone conversion and prevents travel from re-bucketing historical meals', () => {
+      // Athlete logged a dinner in New York on Sep 21:
+      // logged_date is '2026-09-21', logged_at is 2026-09-22T01:00:00Z (EDT 21:00 Sep 21).
+      // When traveling to Tokyo (Asia/Tokyo, UTC+9), logged_at alone evaluates to 2026-09-22 10:00.
+      // With logged_date taking precedence, the meal stays bucketed on 2026-09-21.
+      const meal = createLog({
+        id: 'travel-dinner',
+        food_name: 'NYC Dinner',
+        logged_at: '2026-09-22T01:00:00Z',
+        logged_date: '2026-09-21',
+      });
+
+      const result = groupNutritionDays([meal], 'Asia/Tokyo');
+      expect(result).toHaveLength(1);
+      expect(result[0].date).toBe('2026-09-21');
+      expect(result[0].meals[0].id).toBe('travel-dinner');
+
+      // Without logged_date, timezone conversion falls back to logged_at which buckets into Sep 22
+      const mealWithoutLoggedDate = createLog({
+        id: 'travel-dinner-legacy',
+        food_name: 'NYC Dinner (Legacy)',
+        logged_at: '2026-09-22T01:00:00Z',
+        logged_date: undefined,
+      });
+
+      const fallbackResult = groupNutritionDays([mealWithoutLoggedDate], 'Asia/Tokyo');
+      expect(fallbackResult).toHaveLength(1);
+      expect(fallbackResult[0].date).toBe('2026-09-22');
+    });
+  });
 });

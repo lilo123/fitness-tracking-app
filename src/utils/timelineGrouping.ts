@@ -92,8 +92,9 @@ export function groupTimelineDays(
   });
 
   nutrition.forEach((n) => {
-    // n.logged_at is a timestamptz instant; normalizeDateStr with timeZone converts it to local calendar day.
-    const d = normalizeDateStr(n.logged_at, tz) || (n.logged_at ? String(n.logged_at).slice(0, 10) : '');
+    // n.logged_date is the authoritative civil date recorded at log time.
+    // Falls back to converting n.logged_at to the target timezone's calendar day.
+    const d = n.logged_date || normalizeDateStr(n.logged_at, tz) || (n.logged_at ? String(n.logged_at).slice(0, 10) : '');
     if (!d) return;
     if (!dayMap.has(d)) {
       dayMap.set(d, { date: d, workouts: [], nutrition: [] });

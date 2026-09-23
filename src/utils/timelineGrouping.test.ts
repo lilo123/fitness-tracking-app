@@ -189,6 +189,37 @@ describe('groupTimelineDays', () => {
     expect(dayDates).toContain('2026-09-22');
     expect(dayDates).not.toContain('2026-09-21');
   });
+
+  it('proves logged_date takes precedence over logged_at timezone conversion and prevents travel from re-bucketing historical meals', () => {
+    // Athlete logs dinner in New York on Sep 21: logged_date is '2026-09-21', logged_at is 2026-09-22T01:00:00Z.
+    // If the athlete travels to Tokyo (Asia/Tokyo, UTC+9), logged_at conversion alone would shift this to Sep 22 10:00 AM.
+    // logged_date must take precedence and preserve the meal on 2026-09-21.
+    const mealWithLoggedDate: CoachNutritionLog = {
+      id: 'travel-meal-1',
+      food_name: 'NYC Late Dinner',
+      calories: 600,
+      protein: 40,
+      carbs: 50,
+      fat: 20,
+      logged_at: '2026-09-22T01:00:00Z',
+      logged_date: '2026-09-21',
+    };
+
+    // When viewed under Tokyo timezone
+    const resultTokyo = groupTimelineDays([], [mealWithLoggedDate], 'Asia/Tokyo');
+    expect(resultTokyo).toHaveLength(1);
+    expect(resultTokyo[0].date).toBe('2026-09-21');
+    expect(resultTokyo[0].nutrition[0].id).toBe('travel-meal-1');
+
+    // Without logged_date, it falls back to logged_at conversion in Tokyo (Sep 22)
+    const mealWithoutLoggedDate: CoachNutritionLog = {
+      ...mealWithLoggedDate,
+      logged_date: undefined,
+    };
+    const fallbackResult = groupTimelineDays([], [mealWithoutLoggedDate], 'Asia/Tokyo');
+    expect(fallbackResult).toHaveLength(1);
+    expect(fallbackResult[0].date).toBe('2026-09-22');
+  });
 });
 
 describe('isMidnightUtc', () => {

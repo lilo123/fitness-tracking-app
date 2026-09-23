@@ -92,6 +92,7 @@ export interface NutritionLog {
   serving_unit?: string | null;
   healthConnectRecordId?: string | null;
   logged_at: string;
+  logged_date?: string;
   created_at?: string;
   /**
    * Level-2 breakdown. NULL (not `[]`) when the log has no meaningful

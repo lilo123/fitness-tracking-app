@@ -186,6 +186,7 @@ export type Database = {
           id: string
           items: Json | null
           logged_at: string
+          logged_date: string
           meal_type: string | null
           notes: string | null
           protein: number | null
@@ -205,6 +206,7 @@ export type Database = {
           id?: string
           items?: Json | null
           logged_at?: string
+          logged_date?: string
           meal_type?: string | null
           notes?: string | null
           protein?: number | null
@@ -224,6 +226,7 @@ export type Database = {
           id?: string
           items?: Json | null
           logged_at?: string
+          logged_date?: string
           meal_type?: string | null
           notes?: string | null
           protein?: number | null

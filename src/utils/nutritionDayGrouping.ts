@@ -16,7 +16,7 @@ export function groupNutritionDays(
   const tz = timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   logs.forEach((log) => {
-    const date = normalizeDateStr(log.logged_at, tz);
+    const date = log.logged_date || normalizeDateStr(log.logged_at, tz);
     if (!date) return;
     if (!map.has(date)) {
       map.set(date, {

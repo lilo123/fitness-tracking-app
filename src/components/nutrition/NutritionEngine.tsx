@@ -166,6 +166,7 @@ export const NutritionEngine: React.FC = () => {
       serving_size: Number(stagedMeal.servingSize) || 1,
       serving_unit: stagedMeal.servingUnit || 'serving',
       logged_at: formatLocalTimestamp(selectedDate),
+      logged_date: selectedDate,
       items: items.length > 1 ? itemsForPersist(items) : null,
       notes: stagedMeal.notes ?? null,
     };
@@ -262,6 +263,7 @@ export const NutritionEngine: React.FC = () => {
       serving_size: 1,
       serving_unit: 'serving',
       logged_at: formatLocalTimestamp(selectedDate),
+      logged_date: selectedDate,
       notes: dish.notes ?? null,
     };
     mutation.mutate(payload);

@@ -57,32 +57,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isRevalidatingRef = useRef(false);
   const queryClient = useQueryClient();
 
-  const syncUserTimezone = useCallback(async (userId: string) => {
-    try {
-      const deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const storageKey = `cybergym_user_timezone_${userId}`;
-      const cachedZone = typeof window !== 'undefined' && window.localStorage ? localStorage.getItem(storageKey) : null;
-      if (deviceZone && cachedZone !== deviceZone) {
-        supabase
-          .from('users')
-          .update({ timezone: deviceZone })
-          .eq('id', userId)
-          .then(
-            ({ error: tzErr }) => {
-              if (tzErr) {
-                console.warn('[AuthContext] Failed to sync timezone:', tzErr);
-              } else if (typeof window !== 'undefined' && window.localStorage) {
-                localStorage.setItem(storageKey, deviceZone);
-              }
-            },
-            (err: unknown) => {
-              console.warn('[AuthContext] Error syncing timezone:', err);
-            }
-          );
+  const syncUserTimezone = useCallback(async (userId: string, force = false) => {
+    return dedupeInFlight(`timezone:${userId}`, async () => {
+      try {
+        const deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const storageKey = `cybergym_user_timezone_${userId}`;
+        const cachedZone = typeof window !== 'undefined' && window.localStorage ? localStorage.getItem(storageKey) : null;
+        if (deviceZone && (force || cachedZone !== deviceZone)) {
+          const { error: tzErr } = await supabase
+            .from('users')
+            .update({ timezone: deviceZone })
+            .eq('id', userId);
+
+          if (tzErr) {
+            console.warn('[AuthContext] Failed to sync timezone:', tzErr);
+          } else if (typeof window !== 'undefined' && window.localStorage) {
+            localStorage.setItem(storageKey, deviceZone);
+          }
+        }
+      } catch (tzCatchErr) {
+        console.warn('[AuthContext] Could not resolve device timezone:', tzCatchErr);
       }
-    } catch (tzCatchErr) {
-      console.warn('[AuthContext] Could not resolve device timezone:', tzCatchErr);
-    }
+    });
   }, []);
 
   const fetchProfile = useCallback(async (userId: string, email?: string) => {
@@ -90,17 +86,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const { data, error } = await (supabase
           .from('users') as any)
-          .select('id, email, username, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, is_coach_mode, coach_code, coach_tier, max_athletes, created_at')
+          .select('id, email, username, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, is_coach_mode, coach_code, coach_tier, max_athletes, created_at, timezone')
           .eq('id', userId)
           .single();
 
         if (signedOutRef.current) return;
 
         if (data && !error) {
+          let deviceZone: string | undefined;
+          try {
+            deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          } catch {
+            // ignore
+          }
+          if (deviceZone && data.timezone !== deviceZone) {
+            syncUserTimezone(userId, true);
+          }
           const storedTz = typeof window !== 'undefined' && window.localStorage ? localStorage.getItem(`cybergym_user_timezone_${userId}`) : null;
           const userWithTz = {
             ...data,
-            timezone: data.timezone || storedTz || (typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : null),
+            timezone: data.timezone || storedTz || deviceZone || null,
           } as UserProfile;
           setProfile(userWithTz);
           localStorage.setItem('cybergym_user', JSON.stringify(userWithTz));
@@ -141,7 +146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Retain current profile
       }
     });
-  }, []);
+  }, [syncUserTimezone]);
 
   useEffect(() => {
     let mounted = true;
@@ -328,6 +333,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           options: {
             data: {
               username: sanitizedEmail.split('@')[0],
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             },
           },
         });

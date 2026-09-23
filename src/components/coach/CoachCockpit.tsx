@@ -228,7 +228,7 @@ export const CoachCockpit: React.FC = () => {
       const rowLimit = nutritionRowLimitForRange(daysRange);
       const { data, error } = await supabase
         .from('nutrition_logs')
-        .select('id, user_id, food_name, calories, protein, carbs, fat, fiber, logged_at')
+        .select('id, user_id, food_name, calories, protein, carbs, fat, fiber, logged_at, logged_date')
         .eq('user_id', selectedAthleteId)
         .gte('logged_at', startOfDay)
         .order('logged_at', { ascending: false })
