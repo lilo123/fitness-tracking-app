@@ -1,8 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import type { CustomDish } from '../../types/database';
 import { QuickLogDishCard } from './QuickLogDishCard';
-import { QuickLogAllSheet } from './QuickLogAllSheet';
-import { Star, Plus, Search, ChevronRight } from 'lucide-react';
+import { Star, Plus, Search, X, ChevronDown, ChevronUp } from 'lucide-react';
 
 export interface QuickLogFavoritesProps {
   customDishes: (CustomDish & { notes?: string | null })[];
@@ -21,7 +20,8 @@ export const QuickLogFavorites: React.FC<QuickLogFavoritesProps> = ({
   onQuickLogCustomDishDirect,
   onDismissToast,
 }) => {
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Sort dishes: use_count desc, created_at desc
   const sortedDishes = useMemo(() => {
@@ -37,8 +37,63 @@ export const QuickLogFavorites: React.FC<QuickLogFavoritesProps> = ({
     });
   }, [customDishes]);
 
-  const topDishes = useMemo(() => sortedDishes.slice(0, 4), [sortedDishes]);
-  const hasOverflow = sortedDishes.length > 4;
+  const trimmedQuery = searchQuery.trim().toLowerCase();
+  const isSearching = trimmedQuery.length > 0;
+
+  // Search queries the FULL sorted set, never the visible slice (matches name or notes)
+  const filteredDishes = useMemo(() => {
+    if (!isSearching) return sortedDishes;
+    return sortedDishes.filter(
+      (dish) =>
+        dish.name.toLowerCase().includes(trimmedQuery) ||
+        Boolean(dish.notes && dish.notes.toLowerCase().includes(trimmedQuery))
+    );
+  }, [sortedDishes, isSearching, trimmedQuery]);
+
+  // Determine which dishes to render:
+  // - When searching: all matching dishes rendered (bypasses cap)
+  // - When expanded: all dishes rendered
+  // - When collapsed: top 5 rendered (CSS media queries hide rows 4 and 5 depending on viewport height)
+  const dishesToRender = useMemo(() => {
+    if (isSearching) {
+      return filteredDishes;
+    }
+    if (isExpanded) {
+      return sortedDishes;
+    }
+    return sortedDishes.slice(0, 5);
+  }, [isSearching, isExpanded, filteredDishes, sortedDishes]);
+
+  // Adaptive CSS classes for collapsed mode top 5:
+  // >= 800px: 5 rows
+  // 700px-799px: 4 rows (row 5 / index 4 hidden)
+  // < 700px: 3 rows (rows 4 & 5 / indices 3 & 4 hidden)
+  const getAdaptiveRowClass = (index: number) => {
+    if (index === 3) {
+      return '[@media(max-height:699px)]:hidden';
+    }
+    if (index === 4) {
+      return '[@media(max-height:799px)]:hidden';
+    }
+    return undefined;
+  };
+
+  // Adaptive expander visibility (Attack G1):
+  // - > 5 dishes: always render expander
+  // - 5 dishes: render expander, but hide at >=800px where all 5 already show
+  // - 4 dishes: render expander, but hide at >=700px where all 4 already show
+  // - <= 3 dishes: no expander needed
+  const hasOverflow = sortedDishes.length > 3;
+
+  const getExpanderAdaptiveClass = (count: number) => {
+    if (count === 4) {
+      return '[@media(min-height:700px)]:hidden';
+    }
+    if (count === 5) {
+      return '[@media(min-height:800px)]:hidden';
+    }
+    return undefined;
+  };
 
   return (
     <section className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-4 sm:p-5 shadow-2xl space-y-3">
@@ -49,9 +104,14 @@ export const QuickLogFavorites: React.FC<QuickLogFavoritesProps> = ({
           <h3 className="text-xs font-black text-white uppercase tracking-wider">
             Quick Log Favorites
           </h3>
-          <span className="text-[10px] font-mono text-zinc-500">
-            ({customDishes.length})
-          </span>
+          <output
+            aria-live="polite"
+            className="text-[10px] font-mono text-zinc-500"
+          >
+            {isSearching
+              ? `(${filteredDishes.length} of ${sortedDishes.length})`
+              : `(${sortedDishes.length})`}
+          </output>
         </div>
 
         <button
@@ -66,68 +126,107 @@ export const QuickLogFavorites: React.FC<QuickLogFavoritesProps> = ({
         </button>
       </div>
 
-      {/* Tier 1: 2x2 Bento Grid (Top 4 Favorites) */}
-      {customDishes.length === 0 ? (
+      {/* Empty State when no custom dishes exist */}
+      {sortedDishes.length === 0 ? (
         <p className="text-xs text-zinc-500 py-1">
           No saved custom dishes yet. Create a custom dish or save a logged meal to quick-log it later.
         </p>
       ) : (
-        <div className="grid grid-cols-2 gap-2 pt-1">
-          {topDishes.map((dish) => (
-            <QuickLogDishCard
-              key={dish.id}
-              dish={dish}
-              onStageCustomDish={onStageCustomDish}
-              onOpenEditDishModal={onOpenEditDishModal}
-              onQuickLogCustomDishDirect={onQuickLogCustomDishDirect}
-              onDismissToast={onDismissToast}
+        <>
+          {/* Controlled Inline Search Input - always visible when dishes exist */}
+          <div className="relative shrink-0">
+            <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search favorites (e.g. oats, shake, bowl)..."
+              aria-label="Search favorite dishes"
+              data-testid="search-favorites-input"
+              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl pl-10 pr-12 py-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none transition min-h-[44px]"
             />
-          ))}
-        </div>
-      )}
-
-      {/* Tier 2 Trigger: Browse & Search All Button */}
-      {customDishes.length > 0 && (
-        <button
-          type="button"
-          onClick={() => setIsSheetOpen(true)}
-          data-testid="open-favorites-sheet-btn"
-          className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-zinc-950 hover:bg-zinc-850 border border-border-interactive text-xs font-semibold text-zinc-300 hover:text-white transition touch-manipulation min-h-[44px] group shadow-sm"
-        >
-          <div className="flex items-center gap-2">
-            <Search className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
-            <span>
-              {hasOverflow
-                ? `Browse & Search All ${customDishes.length} Favorites`
-                : `View All / Search Dishes`}
-            </span>
+            {searchQuery.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                aria-label="Clear search"
+                className="absolute right-1 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-500 hover:text-zinc-300 touch-manipulation"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
-          <div className="flex items-center gap-1 text-[11px] font-mono text-zinc-500 group-hover:text-cyan-300">
-            <span>Open</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </div>
-        </button>
-      )}
 
-      {/* Tier 2: Accessible Bottom Sheet for Catalog Search & Filter */}
-      <QuickLogAllSheet
-        isOpen={isSheetOpen}
-        onClose={() => setIsSheetOpen(false)}
-        customDishes={sortedDishes}
-        onStageCustomDish={(dish) => {
-          setIsSheetOpen(false);
-          onStageCustomDish(dish);
-        }}
-        onOpenEditDishModal={(dish) => {
-          setIsSheetOpen(false);
-          onOpenEditDishModal(dish);
-        }}
-        onQuickLogCustomDishDirect={onQuickLogCustomDishDirect}
-        onOpenNewDishModal={() => {
-          setIsSheetOpen(false);
-          onOpenNewDishModal();
-        }}
-      />
+          {/* Dish List Container */}
+          {isSearching && filteredDishes.length === 0 ? (
+            <output
+              aria-live="polite"
+              className="block py-8 text-center text-zinc-500 text-xs"
+            >
+              No dishes found matching &quot;{searchQuery}&quot;
+            </output>
+          ) : (
+            <div
+              className={`flex flex-col gap-2 pt-1 ${
+                isExpanded || isSearching
+                  ? 'max-h-[50vh] overflow-y-auto overscroll-contain pr-1'
+                  : ''
+              }`}
+            >
+              {dishesToRender.map((dish, index) => {
+                const adaptiveClass =
+                  !isExpanded && !isSearching
+                    ? getAdaptiveRowClass(index)
+                    : undefined;
+
+                return (
+                  <div
+                    key={dish.id}
+                    data-testid={`favorite-row-${index}`}
+                    className={adaptiveClass}
+                  >
+                    <QuickLogDishCard
+                      dish={dish}
+                      onStageCustomDish={onStageCustomDish}
+                      onOpenEditDishModal={onOpenEditDishModal}
+                      onQuickLogCustomDishDirect={onQuickLogCustomDishDirect}
+                      onDismissToast={onDismissToast}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Progressive Disclosure Expander Button - only when > 3 dishes and not searching */}
+          {hasOverflow && !isSearching && (
+            <button
+              type="button"
+              onClick={() => setIsExpanded((prev) => !prev)}
+              aria-expanded={isExpanded}
+              /* Preserved verbatim: data-testid="open-favorites-sheet-btn" for test backwards compatibility */
+              data-testid="open-favorites-sheet-btn"
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-zinc-950 hover:bg-zinc-850 border border-border-interactive text-xs font-semibold text-zinc-300 hover:text-white transition touch-manipulation min-h-[44px] group shadow-sm ${
+                getExpanderAdaptiveClass(sortedDishes.length) ?? ''
+              }`.trimEnd()}
+            >
+              <span className="text-zinc-300 group-hover:text-white">
+                {isExpanded
+                  ? 'Collapse to top favorites'
+                  : `Show all ${sortedDishes.length} favorites`}
+              </span>
+              <div className="flex items-center gap-1 text-[11px] font-mono text-zinc-500 group-hover:text-cyan-300">
+                <span>{isExpanded ? 'Collapse' : 'Expand'}</span>
+                {isExpanded ? (
+                  <ChevronUp className="w-3.5 h-3.5" />
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5" />
+                )}
+              </div>
+            </button>
+          )}
+        </>
+      )}
     </section>
   );
 };

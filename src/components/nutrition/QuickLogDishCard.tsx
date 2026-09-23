@@ -24,7 +24,7 @@ export const QuickLogDishCard: React.FC<QuickLogDishCardProps> = memo(({
   return (
     <article
       aria-labelledby={`dish-name-${dish.id}`}
-      className="bg-zinc-950 hover:bg-zinc-850 border border-zinc-800 hover:border-cyan-500/40 rounded-2xl p-2.5 flex flex-col justify-between gap-1.5 transition shadow-sm group select-none min-h-[92px]"
+      className="bg-zinc-950 hover:bg-zinc-850 border border-zinc-800 hover:border-cyan-500/40 rounded-2xl p-2 flex items-center justify-between gap-2.5 transition shadow-sm group select-none"
     >
       {/* Primary Hit Zone: Staging the Dish (Semantic Button carrying staging onClick, Resolves NEW-10) */}
       <button
@@ -32,7 +32,7 @@ export const QuickLogDishCard: React.FC<QuickLogDishCardProps> = memo(({
         onClick={() => onStageCustomDish(dish)}
         data-testid={`custom-dish-card-${dish.id}`}
         aria-label={`Stage ${dish.name}, ${dish.calories ?? 0} calories, ${dish.protein ?? 0} grams protein${hasNote ? ', note attached' : ''}`}
-        className="flex items-start gap-2 min-w-0 w-full text-left py-0.5 outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 rounded-xl touch-manipulation flex-1"
+        className="flex items-center gap-2.5 min-w-0 flex-1 text-left py-0.5 outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 rounded-xl touch-manipulation"
       >
         <div className="w-7 h-7 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0 group-hover:border-cyan-500/30 transition-colors">
           {getDishIcon(dish.name)}
@@ -66,7 +66,7 @@ export const QuickLogDishCard: React.FC<QuickLogDishCardProps> = memo(({
       </button>
 
       {/* Action Zone: Edit & 1-Tap Quick-Log Buttons */}
-      <div className="flex items-center justify-end gap-1 shrink-0 pt-1 border-t border-zinc-900">
+      <div className="flex items-center gap-1 shrink-0">
         {onOpenEditDishModal && (
           <button
             type="button"
