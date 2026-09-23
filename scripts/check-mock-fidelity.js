@@ -333,6 +333,50 @@ const SERVICED_QUERIES_REGISTRY = {
       description: 'Deduplicated coach athlete links query',
     },
   ],
+  'src/components/settings/DataExportCard.test.tsx': [
+    {
+      table: 'coach_athlete_links',
+      type: 'EXACT',
+      projection: 'athlete_id, status, linked_at, athlete:users!athlete_id(id, username, email, role, created_at, timezone)',
+      description: 'Lazy query for active linked athletes in coach mode',
+    },
+  ],
+  'src/utils/dataExport.test.ts': [
+    {
+      table: 'workouts',
+      type: 'EXACT',
+      projection: 'id, date, name, sets(id, reps, weight, set_index, rpe, created_at, exercise:exercises(name, body_part))',
+      projectionVar: 'WORKOUT_EXPORT_PROJECTION',
+      description: 'Export workouts page fetch query',
+    },
+    {
+      table: 'nutrition_logs',
+      type: 'EXACT',
+      projection: 'id, user_id, food_name, calories, protein, carbs, fat, fiber, serving_size, serving_unit, logged_at, created_at, notes, items',
+      projectionVar: 'NUTRITION_EXPORT_PROJECTION',
+      description: 'Export nutrition logs page fetch query',
+    },
+    {
+      table: 'custom_dishes',
+      type: 'EXACT',
+      projection: 'id, user_id, name, kind, use_count, calories, protein, carbs, fat, fiber, notes, created_at, items',
+      projectionVar: 'CUSTOM_DISH_EXPORT_PROJECTION',
+      description: 'Export custom dishes page fetch query',
+    },
+    {
+      table: 'routine_templates',
+      type: 'EXACT',
+      projection: 'id, user_id, name, days_of_week, is_master, assigned_to, template_exercises(order_index, target_sets, target_reps, exercise:exercises(name, body_part))',
+      projectionVar: 'ROUTINE_EXPORT_PROJECTION',
+      description: 'Export routine templates page fetch query',
+    },
+    {
+      table: 'users',
+      type: 'EXACT',
+      projection: 'id, username, email, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, timezone',
+      description: 'Export user profile fetch query',
+    },
+  ],
 };
 
 function findTestFiles(dir) {

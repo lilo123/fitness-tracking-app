@@ -409,5 +409,26 @@ describe('SettingsView', () => {
     await screen.findByDisplayValue('Coach Duy');
     await expectNoA11yViolations(container);
   });
+
+  it('renders DataExportCard collapsed by default and expands when clicking Configure Export', async () => {
+    renderComponent();
+    await screen.findByDisplayValue('Coach Duy');
+
+    expect(screen.getByText('Data Extract')).toBeDefined();
+    expect(
+      screen.getByText('Download your workouts, nutrition logs, routines, or full backup.')
+    ).toBeDefined();
+
+    const toggleBtn = screen.getByTestId('toggle-data-export-btn');
+    expect(toggleBtn.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByTestId('download-export-btn')).toBeNull();
+
+    fireEvent.click(toggleBtn);
+
+    expect(toggleBtn.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByTestId('download-export-btn')).toBeDefined();
+    expect(screen.getByTestId('export-format-json')).toBeDefined();
+    expect(screen.getByTestId('export-format-csv')).toBeDefined();
+  });
 });
 

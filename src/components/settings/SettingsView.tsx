@@ -11,6 +11,7 @@ import {
 import { CoachSettingsCard } from './CoachSettingsCard';
 import { MyCoachCard } from './MyCoachCard';
 import { MacroGoalsCard } from './MacroGoalsCard';
+import { DataExportCard } from './DataExportCard';
 
 interface SettingsFormProps {
   profile: UserProfile | null;
@@ -235,6 +236,12 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
         loading={loading}
         status={status}
         onSave={handleSave}
+      />
+
+      {/* Data Export / Backup Card */}
+      <DataExportCard
+        profile={profile}
+        hasCoachCapability={hasCoachCapability}
       />
     </div>
   );
