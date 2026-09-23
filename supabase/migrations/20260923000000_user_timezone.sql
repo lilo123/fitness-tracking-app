@@ -63,3 +63,14 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+-- Backfill existing accounts so Coach Cockpit resolves the athlete's timezone immediately
+UPDATE public.users
+SET timezone = 'Asia/Ho_Chi_Minh'
+WHERE id = '2d444ce2-c0cf-483f-a82e-43c8fb9807b1'
+  AND timezone IS NULL;
+
+UPDATE public.users
+SET timezone = 'America/Los_Angeles'
+WHERE timezone IS NULL;
+
