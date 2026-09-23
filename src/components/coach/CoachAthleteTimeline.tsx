@@ -49,7 +49,7 @@ export interface CoachNutritionLog {
   fat: number | null;
   fiber?: number | null;
   logged_at?: string;
-  logged_date?: string;
+  logged_date?: string | null;
 }
 
 export interface TimelineDay {
