@@ -43,8 +43,12 @@ jobs:
       - name: Run linter (oxlint)
         run: npm run lint
 
+      # --force, not plain `tsc -b`: the incremental cache treats already-clean .test.tsx
+      # files as up to date and has hidden real errors here before (four missing
+      # `beforeEach` imports shipped a red run). Fresh CI checkouts have no .tsbuildinfo
+      # today, so this is belt-and-braces -- but it makes the guarantee explicit.
       - name: TypeScript typecheck
-        run: npx tsc -b
+        run: npx tsc -b --force
 
       - name: Build application
         run: npm run build
@@ -69,8 +73,33 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Only four services are actually exercised by the suite: postgres, kong (the API
+      # gateway VITE_SUPABASE_URL points at), postgrest and gotrue. Excluding the rest
+      # cuts the images pulled from 11 to 4, which both speeds the job up and shrinks the
+      # surface exposed to registry rate limiting. Verified locally: the full test:all
+      # suite passes against exactly this container set with no change in counts.
+      # (`migra`, `deno-relay` and `pgadmin-schema-diff` were previously listed here but
+      # are not valid --exclude names, so they silently did nothing.)
+      #
+      # The retry is a second line of defence: even authenticated pulls hit
+      # "toomanyrequests" when the bucket is saturated, and that failure is transient.
       - name: Start Supabase local emulator
-        run: npx supabase start -x studio,migra,deno-relay,pgadmin-schema-diff
+        run: |
+          set -u
+          EXCLUDE="studio,realtime,storage-api,imgproxy,mailpit,postgres-meta,edge-runtime,logflare,vector,supavisor"
+          for attempt in 1 2 3; do
+            if npx supabase start -x "$EXCLUDE"; then
+              echo "supabase start succeeded on attempt $attempt"
+              exit 0
+            fi
+            echo "::warning::supabase start failed on attempt $attempt/3"
+            if [ "$attempt" -lt 3 ]; then
+              npx supabase stop || true
+              sleep $((attempt * 30))
+            fi
+          done
+          echo "::error::supabase start failed after 3 attempts"
+          exit 1
 
       - name: Reset database and seed
         run: npx supabase db reset
