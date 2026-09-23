@@ -57,6 +57,18 @@ jobs:
         with:
           version: latest
 
+      # `supabase start` pulls its service images from ghcr.io. Anonymous pulls share a
+      # global rate-limit bucket that, when saturated, fails every image with
+      # "toomanyrequests" and takes the whole job down before a single test runs.
+      # Authenticating with the built-in GITHUB_TOKEN moves these pulls onto the
+      # per-user limit. No secret needs to be configured; GITHUB_TOKEN is automatic.
+      - name: Authenticate to ghcr.io for Supabase image pulls
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Start Supabase local emulator
         run: npx supabase start -x studio,migra,deno-relay,pgadmin-schema-diff
 
