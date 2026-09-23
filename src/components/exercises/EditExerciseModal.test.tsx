@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi , beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { EditExerciseModal } from './EditExerciseModal';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
