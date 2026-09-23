@@ -201,7 +201,7 @@ export const LoginView: React.FC = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="athlete@cybergym.io"
                 autoComplete="email"
-                className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-base sm:text-sm font-semibold focus:border-cyan-500 outline-none transition"
+                className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-3 text-base sm:text-sm font-semibold focus:border-cyan-500 outline-none transition"
                 required
               />
             </div>
@@ -222,7 +222,7 @@ export const LoginView: React.FC = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     autoComplete={mode === 'register' ? "new-password" : "current-password"}
-                    className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 pr-12 text-base sm:text-sm font-semibold focus:border-cyan-500 outline-none transition"
+                    className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-3 pr-12 text-base sm:text-sm font-semibold focus:border-cyan-500 outline-none transition"
                     required
                   />
                   <button
@@ -253,7 +253,7 @@ export const LoginView: React.FC = () => {
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="••••••••"
                     autoComplete="new-password"
-                    className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 pr-12 text-base sm:text-sm font-semibold focus:border-cyan-500 outline-none transition"
+                    className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-3 pr-12 text-base sm:text-sm font-semibold focus:border-cyan-500 outline-none transition"
                     required
                   />
                   <button

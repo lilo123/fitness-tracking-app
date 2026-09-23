@@ -172,7 +172,7 @@ export const WorkoutExerciseHistory: React.FC<WorkoutExerciseHistoryProps> = ({
             placeholder="Search exercise library..."
             value={searchQuery}
             onChange={(e) => onSearchQueryChange(e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-2xl pl-10 pr-4 py-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none"
+            className="w-full bg-zinc-900 border border-zinc-500 text-white rounded-2xl pl-10 pr-4 py-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none"
           />
         </div>
 

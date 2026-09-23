@@ -83,7 +83,7 @@ export const WorkoutHeader: React.FC<WorkoutHeaderProps> = ({
                 workoutSessionStore.flushPendingWrites();
                 onDateChange(e.target.value);
               }}
-              className="bg-zinc-950 border border-zinc-800 text-cyan-400 rounded-xl px-2.5 py-1.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none shadow-inner cursor-pointer"
+              className="bg-zinc-950 border border-zinc-500 text-cyan-400 rounded-xl px-2.5 py-1.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none shadow-inner cursor-pointer"
               data-testid="workout-date-input"
             />
             <button

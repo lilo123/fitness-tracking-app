@@ -415,7 +415,7 @@ export const WorkoutEngine: React.FC = () => {
               <select
                 value={selectedExerciseToAdd}
                 onChange={(e) => setSelectedExerciseToAdd(e.target.value)}
-                className="flex-1 min-w-0 bg-zinc-950 border border-zinc-800 text-white rounded-xl px-3 py-2 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none truncate"
+                className="flex-1 min-w-0 bg-zinc-950 border border-zinc-500 text-white rounded-xl px-3 py-2 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none truncate"
                 data-testid="add-exercise-select"
               >
                 <option value="">-- Choose Exercise --</option>

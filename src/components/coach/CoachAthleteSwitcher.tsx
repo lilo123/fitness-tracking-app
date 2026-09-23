@@ -36,7 +36,7 @@ export const CoachAthleteSwitcher: React.FC<CoachAthleteSwitcherProps> = ({
             value={selectedAthleteId}
             onChange={(e) => onSwitchAthlete(e.target.value)}
             data-testid="coach-athlete-select"
-            className="w-full sm:w-64 max-w-full truncate bg-zinc-900 border border-zinc-700 text-white rounded-xl px-3 py-2.5 text-base sm:text-xs font-bold focus:border-cyan-500 outline-none cursor-pointer min-h-[44px]"
+            className="w-full sm:w-64 max-w-full truncate bg-zinc-900 border border-zinc-500 text-white rounded-xl px-3 py-2.5 text-base sm:text-xs font-bold focus:border-cyan-500 outline-none cursor-pointer min-h-[44px]"
           >
             <option value="">-- None --</option>
             {athletes.map((ath) => (

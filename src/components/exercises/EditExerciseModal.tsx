@@ -175,7 +175,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Incline Bench Press"
-              className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 input-text-sm font-semibold focus:border-cyan-500 outline-none transition"
+              className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-3 input-text-sm font-semibold focus:border-cyan-500 outline-none transition"
             />
           </div>
 

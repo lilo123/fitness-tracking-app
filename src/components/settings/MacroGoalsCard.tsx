@@ -63,7 +63,7 @@ export const MacroGoalsCard: React.FC<MacroGoalsCardProps> = ({
             inputMode="numeric"
             value={targetCalories}
             onChange={(e) => setTargetCalories(Number(e.target.value))}
-            className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+            className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
             required
           />
         </div>
@@ -77,7 +77,7 @@ export const MacroGoalsCard: React.FC<MacroGoalsCardProps> = ({
             inputMode="decimal"
             value={targetProtein}
             onChange={(e) => setTargetProtein(Number(e.target.value))}
-            className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+            className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
             required
           />
         </div>
@@ -91,7 +91,7 @@ export const MacroGoalsCard: React.FC<MacroGoalsCardProps> = ({
             inputMode="decimal"
             value={targetCarbs}
             onChange={(e) => setTargetCarbs(Number(e.target.value))}
-            className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+            className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
             required
           />
         </div>
@@ -105,7 +105,7 @@ export const MacroGoalsCard: React.FC<MacroGoalsCardProps> = ({
             inputMode="decimal"
             value={targetFat}
             onChange={(e) => setTargetFat(Number(e.target.value))}
-            className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+            className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
             required
           />
         </div>
@@ -119,7 +119,7 @@ export const MacroGoalsCard: React.FC<MacroGoalsCardProps> = ({
             inputMode="decimal"
             value={targetFiber}
             onChange={(e) => setTargetFiber(Number(e.target.value))}
-            className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+            className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
             required
           />
         </div>

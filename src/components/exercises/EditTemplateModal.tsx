@@ -410,7 +410,7 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g., Push Day - Hypertrophy"
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 input-text-sm focus:border-violet-500 outline-none"
+                  className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-3 input-text-sm focus:border-violet-500 outline-none"
                 />
               </div>
 

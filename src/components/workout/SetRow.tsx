@@ -101,7 +101,7 @@ export const SetRow: React.FC<SetRowProps> = memo((props) => {
           value={draftWeight}
           onChange={(e) => onUpdateDraft(exName, setIndex, 'weight', e.target.value)}
           aria-label={`Set ${setIndex} weight`}
-          className="h-8 w-full max-w-[76px] bg-zinc-800/80 border border-zinc-700/70 rounded-lg text-center font-mono font-bold text-white text-base sm:text-sm focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 outline-none transition"
+          className="h-8 w-full max-w-[76px] bg-zinc-800/80 border border-zinc-500 rounded-lg text-center font-mono font-bold text-white text-base sm:text-sm focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 outline-none transition"
           data-testid={`ghost-weight-${exIndex}-${rowIdx}`}
         />
       </div>
@@ -120,7 +120,7 @@ export const SetRow: React.FC<SetRowProps> = memo((props) => {
           value={draftReps}
           onChange={(e) => onUpdateDraft(exName, setIndex, 'reps', e.target.value)}
           aria-label={`Set ${setIndex} reps`}
-          className="h-8 w-full max-w-[64px] bg-zinc-800/80 border border-zinc-700/70 rounded-lg text-center font-mono font-bold text-white text-base sm:text-sm focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 outline-none transition"
+          className="h-8 w-full max-w-[64px] bg-zinc-800/80 border border-zinc-500 rounded-lg text-center font-mono font-bold text-white text-base sm:text-sm focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 outline-none transition"
           data-testid={`ghost-reps-${exIndex}-${rowIdx}`}
         />
       </div>

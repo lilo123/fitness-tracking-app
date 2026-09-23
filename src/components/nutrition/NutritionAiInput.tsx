@@ -78,7 +78,7 @@ export const NutritionAiInput: React.FC<NutritionAiInputProps> = memo(({
         </button>
       </div>
 
-      <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-3 focus-within:border-cyan-500 transition space-y-2.5">
+      <div className="bg-zinc-950 border border-zinc-500 rounded-2xl p-3 focus-within:border-cyan-500 transition space-y-2.5">
         {selectedPhoto && (
           <div data-testid="photo-preview-container" className="relative flex items-center justify-between p-2.5 bg-zinc-900 border border-zinc-750 rounded-xl">
             <div className="flex items-center gap-3">

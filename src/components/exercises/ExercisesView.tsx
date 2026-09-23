@@ -273,7 +273,7 @@ export const ExercisesView: React.FC = () => {
                   type="text"
                   value={exerciseName}
                   onChange={(e) => setExerciseName(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-base sm:text-sm font-semibold focus:border-cyan-500 outline-none"
+                  className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-3 text-base sm:text-sm font-semibold focus:border-cyan-500 outline-none"
                   placeholder="e.g. Incline Bench Press"
                 />
               </div>

@@ -67,7 +67,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
               data-testid="dish-name-input"
               value={stagedMeal.name}
               onChange={(e) => onUpdateStagedMeal({ ...stagedMeal, name: e.target.value })}
-              className="bg-zinc-950 border border-zinc-800 text-white font-black text-base rounded-xl px-3 py-1.5 w-full focus:border-cyan-500 outline-none"
+              className="bg-zinc-950 border border-zinc-500 text-white font-black text-base rounded-xl px-3 py-1.5 w-full focus:border-cyan-500 outline-none"
               placeholder="Meal name..."
             />
           </div>
@@ -78,7 +78,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
             aria-label="Meal type"
             value={stagedMeal.mealType}
             onChange={(e) => onUpdateStagedMeal({ ...stagedMeal, mealType: e.target.value })}
-            className="bg-zinc-950 border border-zinc-800 text-zinc-300 input-text-xs font-semibold rounded-xl px-2.5 py-2 focus:border-cyan-500 outline-none"
+            className="bg-zinc-950 border border-zinc-500 text-zinc-300 input-text-xs font-semibold rounded-xl px-2.5 py-2 focus:border-cyan-500 outline-none"
           >
             <option value="Breakfast">Breakfast</option>
             <option value="Lunch">Lunch</option>
@@ -154,7 +154,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
                 calories: e.target.value === '' ? 0 : roundTo1Decimal(Number(e.target.value)),
               })
             }
-            className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+            className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
           />
         </div>
         <div className="col-span-2 sm:col-span-1">
@@ -177,7 +177,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
                 protein: e.target.value === '' ? 0 : roundTo1Decimal(Number(e.target.value)),
               })
             }
-            className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+            className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
           />
         </div>
         <div className="col-span-2 sm:col-span-1">
@@ -200,7 +200,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
                 carbs: e.target.value === '' ? 0 : roundTo1Decimal(Number(e.target.value)),
               })
             }
-            className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+            className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
           />
         </div>
         <div className="col-span-3 sm:col-span-1">
@@ -223,7 +223,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
                 fat: e.target.value === '' ? 0 : roundTo1Decimal(Number(e.target.value)),
               })
             }
-            className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+            className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
           />
         </div>
         <div className="col-span-3 sm:col-span-1">
@@ -246,7 +246,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
                 fiber: e.target.value === '' ? 0 : roundTo1Decimal(Number(e.target.value)),
               })
             }
-            className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+            className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
           />
         </div>
       </div>

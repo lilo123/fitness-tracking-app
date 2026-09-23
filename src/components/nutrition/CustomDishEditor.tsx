@@ -122,7 +122,7 @@ export const CustomDishEditor: React.FC<CustomDishEditorProps> = ({ items, onCha
                   value={item.name}
                   onChange={(e) => patch(index, { name: e.target.value })}
                   placeholder="e.g. Rolled oats"
-                  className="min-h-[44px] w-full min-w-0 flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-2 text-base font-semibold text-white outline-none focus:border-cyan-500 sm:text-xs"
+                  className="min-h-[44px] w-full min-w-0 flex-1 rounded-lg border border-zinc-500 bg-zinc-900 px-2 text-base font-semibold text-white outline-none focus:border-cyan-500 sm:text-xs"
                 />
                 <button
                   type="button"
@@ -156,7 +156,7 @@ export const CustomDishEditor: React.FC<CustomDishEditorProps> = ({ items, onCha
                       const parsed = parseQuantityInput(e.target.value);
                       patch(index, { quantity: parsed != null ? roundTo1Decimal(parsed) : 0 });
                     }}
-                    className="min-h-[44px] w-full rounded-lg border border-zinc-800 bg-zinc-900 p-1 text-center text-base font-mono font-bold text-white outline-none focus:border-cyan-500 sm:text-xs"
+                    className="min-h-[44px] w-full rounded-lg border border-zinc-500 bg-zinc-900 p-1 text-center text-base font-mono font-bold text-white outline-none focus:border-cyan-500 sm:text-xs"
                   />
                 </div>
                 <div className="col-span-2">
@@ -191,7 +191,7 @@ export const CustomDishEditor: React.FC<CustomDishEditorProps> = ({ items, onCha
                         aria-label={`Component ${index + 1} ${field.label}`}
                         value={roundTo1Decimal(item[field.key])}
                         onChange={(e) => patchMacro(index, field.key, e.target.value)}
-                        className="min-h-[44px] w-full rounded-lg border border-zinc-800 bg-zinc-900 p-1 text-center text-base font-mono font-bold text-white outline-none focus:border-cyan-500 sm:text-xs"
+                        className="min-h-[44px] w-full rounded-lg border border-zinc-500 bg-zinc-900 p-1 text-center text-base font-mono font-bold text-white outline-none focus:border-cyan-500 sm:text-xs"
                       />
                     </div>
                   );

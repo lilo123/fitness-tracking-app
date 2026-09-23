@@ -78,7 +78,7 @@ export const CoachAthleteMacros: React.FC<CoachAthleteMacrosProps> = ({
               value={athleteCal}
               onChange={(e) => setAthleteCal(e.target.value)}
               data-testid="athlete-macro-cal"
-              className="w-full sm:w-36 min-h-[44px] bg-zinc-900 border border-zinc-700 text-amber-400 rounded-xl p-2.5 text-lg font-mono font-black focus:border-amber-500 outline-none text-center shadow-inner"
+              className="w-full sm:w-36 min-h-[44px] bg-zinc-900 border border-zinc-500 text-amber-400 rounded-xl p-2.5 text-lg font-mono font-black focus:border-amber-500 outline-none text-center shadow-inner"
               required
             />
             <span className="text-xs font-mono font-bold text-zinc-400">kcal</span>
@@ -101,7 +101,7 @@ export const CoachAthleteMacros: React.FC<CoachAthleteMacrosProps> = ({
               value={athletePro}
               onChange={(e) => setAthletePro(e.target.value)}
               data-testid="athlete-macro-pro"
-              className="w-full min-h-[44px] bg-zinc-900 border border-zinc-700 text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+              className="w-full min-h-[44px] bg-zinc-900 border border-zinc-500 text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
               required
             />
           </div>
@@ -120,7 +120,7 @@ export const CoachAthleteMacros: React.FC<CoachAthleteMacrosProps> = ({
               value={athleteCarb}
               onChange={(e) => setAthleteCarb(e.target.value)}
               data-testid="athlete-macro-carb"
-              className="w-full min-h-[44px] bg-zinc-900 border border-zinc-700 text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-emerald-500 outline-none text-center"
+              className="w-full min-h-[44px] bg-zinc-900 border border-zinc-500 text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-emerald-500 outline-none text-center"
               required
             />
           </div>
@@ -139,7 +139,7 @@ export const CoachAthleteMacros: React.FC<CoachAthleteMacrosProps> = ({
               value={athleteFat}
               onChange={(e) => setAthleteFat(e.target.value)}
               data-testid="athlete-macro-fat"
-              className="w-full min-h-[44px] bg-zinc-900 border border-zinc-700 text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-violet-500 outline-none text-center"
+              className="w-full min-h-[44px] bg-zinc-900 border border-zinc-500 text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-violet-500 outline-none text-center"
               required
             />
           </div>
@@ -158,7 +158,7 @@ export const CoachAthleteMacros: React.FC<CoachAthleteMacrosProps> = ({
               value={athleteFiber}
               onChange={(e) => setAthleteFiber(e.target.value)}
               data-testid="athlete-macro-fiber"
-              className="w-full min-h-[44px] bg-zinc-900 border border-zinc-700 text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-teal-500 outline-none text-center"
+              className="w-full min-h-[44px] bg-zinc-900 border border-zinc-500 text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-teal-500 outline-none text-center"
               required
             />
           </div>
