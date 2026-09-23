@@ -13,6 +13,7 @@ export interface UserProfile {
   target_fat: number;
   target_fiber?: number;
   auto_rest_timer?: boolean;
+  timezone?: string | null;
   is_coach_mode?: boolean;
   coach_code?: string | null;
   coach_tier?: 'free' | 'pro' | 'enterprise';

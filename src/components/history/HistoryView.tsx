@@ -231,9 +231,13 @@ export const HistoryView: React.FC = () => {
   }, [exercises, rawExerciseStats, selectedCategory, searchQuery]);
 
   // Group nutrition logs by date with macro distributions
+  const effectiveTimeZone = isInspectingAthlete
+    ? selectedAthlete?.timezone || undefined
+    : undefined;
+
   const nutritionDays = useMemo<NutritionDaySummary[]>(() => {
-    return groupNutritionDays(nutritionLogs);
-  }, [nutritionLogs]);
+    return groupNutritionDays(nutritionLogs, effectiveTimeZone);
+  }, [nutritionLogs, effectiveTimeZone]);
 
   // Bounded window & pagination navigation for HistoryView (DIR-B1)
   const filteredSessions = useMemo(() => {

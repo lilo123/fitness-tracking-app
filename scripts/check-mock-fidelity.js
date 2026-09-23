@@ -48,7 +48,7 @@ const SERVICED_QUERIES_REGISTRY = {
     {
       table: 'coach_athlete_links',
       type: 'EXACT',
-      projection: 'athlete_id, status, linked_at, athlete:users!athlete_id(id, username, email, role, created_at)',
+      projection: 'athlete_id, status, linked_at, athlete:users!athlete_id(id, username, email, role, created_at, timezone)',
       description: 'Coach athlete links query',
     },
     {
@@ -110,7 +110,7 @@ const SERVICED_QUERIES_REGISTRY = {
     {
       table: 'coach_athlete_links',
       type: 'EXACT',
-      projection: 'athlete_id, status, linked_at, athlete:users!athlete_id(id, username, email, role, created_at)',
+      projection: 'athlete_id, status, linked_at, athlete:users!athlete_id(id, username, email, role, created_at, timezone)',
       description: 'Coach badge athlete links query',
     },
   ],
@@ -173,7 +173,7 @@ const SERVICED_QUERIES_REGISTRY = {
     {
       table: 'coach_athlete_links',
       type: 'EXACT',
-      projection: 'athlete_id, status, linked_at, athlete:users!athlete_id(id, username, email, role, created_at)',
+      projection: 'athlete_id, status, linked_at, athlete:users!athlete_id(id, username, email, role, created_at, timezone)',
       description: 'Coach inspection mode athlete links query',
     },
     {
@@ -329,7 +329,7 @@ const SERVICED_QUERIES_REGISTRY = {
     {
       table: 'coach_athlete_links',
       type: 'EXACT',
-      projection: 'athlete_id, status, linked_at, athlete:users!athlete_id(id, username, email, role, created_at)',
+      projection: 'athlete_id, status, linked_at, athlete:users!athlete_id(id, username, email, role, created_at, timezone)',
       description: 'Deduplicated coach athlete links query',
     },
   ],

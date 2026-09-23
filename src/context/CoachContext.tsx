@@ -48,7 +48,7 @@ export const CoachProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       try {
         const { data, error } = await supabase
           .from('coach_athlete_links')
-          .select('athlete_id, status, linked_at, athlete:users!athlete_id(id, username, email, role, created_at)')
+          .select('athlete_id, status, linked_at, athlete:users!athlete_id(id, username, email, role, created_at, timezone)')
           .eq('coach_id', userId)
           .eq('status', 'active')
           .order('linked_at', { ascending: false })
@@ -65,6 +65,7 @@ export const CoachProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 email: u.email || '',
                 status: 'Active',
                 last_active: row.linked_at || u.created_at,
+                timezone: u.timezone ?? null,
               };
             });
             setAthletes(fetchedAthletes);

@@ -57,11 +57,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isRevalidatingRef = useRef(false);
   const queryClient = useQueryClient();
 
+  const syncUserTimezone = useCallback(async (userId: string) => {
+    try {
+      const deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const storageKey = `cybergym_user_timezone_${userId}`;
+      const cachedZone = typeof window !== 'undefined' && window.localStorage ? localStorage.getItem(storageKey) : null;
+      if (deviceZone && cachedZone !== deviceZone) {
+        (supabase.from('users') as any)
+          .update({ timezone: deviceZone })
+          .eq('id', userId)
+          .then(({ error: tzErr }: any) => {
+            if (tzErr) {
+              console.warn('[AuthContext] Failed to sync timezone:', tzErr);
+            } else if (typeof window !== 'undefined' && window.localStorage) {
+              localStorage.setItem(storageKey, deviceZone);
+            }
+          })
+          .catch((err: any) => {
+            console.warn('[AuthContext] Error syncing timezone:', err);
+          });
+      }
+    } catch (tzCatchErr) {
+      console.warn('[AuthContext] Could not resolve device timezone:', tzCatchErr);
+    }
+  }, []);
+
   const fetchProfile = useCallback(async (userId: string, email?: string) => {
     return dedupeInFlight(`profile:${userId}`, async () => {
       try {
-        const { data, error } = await supabase
-          .from('users')
+        const { data, error } = await (supabase
+          .from('users') as any)
           .select('id, email, username, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, is_coach_mode, coach_code, coach_tier, max_athletes, created_at')
           .eq('id', userId)
           .single();
@@ -69,8 +94,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (signedOutRef.current) return;
 
         if (data && !error) {
-          setProfile(data as UserProfile);
-          localStorage.setItem('cybergym_user', JSON.stringify(data));
+          const storedTz = typeof window !== 'undefined' && window.localStorage ? localStorage.getItem(`cybergym_user_timezone_${userId}`) : null;
+          const userWithTz = {
+            ...data,
+            timezone: data.timezone || storedTz || (typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : null),
+          } as UserProfile;
+          setProfile(userWithTz);
+          localStorage.setItem('cybergym_user', JSON.stringify(userWithTz));
           if (data.auto_rest_timer !== undefined && data.auto_rest_timer !== null) {
             localStorage.setItem('cybergym_auto_rest_timer', String(data.auto_rest_timer));
           }
@@ -82,6 +112,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           }
         } else {
+          let deviceZone: string | undefined;
+          try {
+            deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          } catch {
+            // ignore
+          }
           const fallbackProfile: UserProfile = {
             id: userId,
             email: email || 'user@example.com',
@@ -93,6 +129,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             target_fat: 70,
             target_fiber: 30,
             auto_rest_timer: true,
+            timezone: deviceZone || null,
           };
           setProfile(fallbackProfile);
           localStorage.setItem('cybergym_user', JSON.stringify(fallbackProfile));
@@ -141,6 +178,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             signedOutRef.current = false;
             setUser(result.session.user);
             setLoading(false);
+            syncUserTimezone(result.session.user.id);
             fetchProfile(result.session.user.id, result.session.user.email).catch((err) => {
               console.warn('[AuthContext] Background fetchProfile error:', err);
             });
@@ -190,6 +228,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (session?.user) {
         signedOutRef.current = false;
         setUser(session.user);
+        syncUserTimezone(session.user.id);
         fetchProfile(session.user.id, session.user.email).catch((err) => {
           console.warn('[AuthContext] Background fetchProfile error:', err);
         });
@@ -214,6 +253,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (session?.user) {
               signedOutRef.current = false;
               setUser(session.user);
+              syncUserTimezone(session.user.id);
               fetchProfile(session.user.id, session.user.email).catch((err) => {
                 console.warn('[AuthContext] Background resume fetchProfile error:', err);
               });
@@ -241,7 +281,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       document.removeEventListener('visibilitychange', handleLifecycleResume);
       window.removeEventListener('pageshow', handleLifecycleResume);
     };
-  }, [fetchProfile]);
+  }, [fetchProfile, syncUserTimezone]);
 
   const signIn = useCallback(
     async (email: string, password = 'password123') => {
@@ -257,6 +297,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (data?.user) {
           signedOutRef.current = false;
           setUser(data.user);
+          syncUserTimezone(data.user.id);
           await fetchProfile(data.user.id, data.user.email);
 
           let userRole: UserRole = 'athlete';
@@ -271,7 +312,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: err.message };
       }
     },
-    [fetchProfile]
+    [fetchProfile, syncUserTimezone]
   );
 
   const signUp = useCallback(
@@ -292,6 +333,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         if (data?.session && data?.user) {
           setUser(data.user);
+          syncUserTimezone(data.user.id);
           await fetchProfile(data.user.id, data.user.email);
           return { success: true };
         }
@@ -304,7 +346,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: err.message };
       }
     },
-    [fetchProfile]
+    [fetchProfile, syncUserTimezone]
   );
 
   const signOut = useCallback(async () => {
@@ -343,8 +385,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      const { error } = await supabase
-        .from('users')
+      const { error } = await (supabase
+        .from('users') as any)
         .upsert(updated)
         .eq('id', updated.id);
       if (error) throw error;

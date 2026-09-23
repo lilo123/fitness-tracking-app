@@ -6,6 +6,7 @@ export interface AthleteInfo {
   email: string;
   status?: string;
   last_active?: string;
+  timezone?: string | null;
 }
 
 export interface CoachContextType {

@@ -1351,7 +1351,7 @@ describe('HistoryView', () => {
       expect(getRecordedTables()).toContain('coach_athlete_links');
       expect(getRecordedSelects()).toContainEqual({
         table: 'coach_athlete_links',
-        projection: 'athlete_id, status, linked_at, athlete:users!athlete_id(id, username, email, role, created_at)',
+        projection: 'athlete_id, status, linked_at, athlete:users!athlete_id(id, username, email, role, created_at, timezone)',
       });
 
       // Switch to personal history so edit controls are visible
@@ -1378,6 +1378,121 @@ describe('HistoryView', () => {
       // Toggle inspect mode back to athlete -> meal modal must be dismissed
       fireEvent.click(screen.getByTestId('toggle-inspect-mode-btn'));
       expect(screen.queryByTestId('edit-meal-modal')).toBeNull();
+    });
+
+    it('buckets nutrition logs by athlete timezone rather than viewer timezone in coach inspection mode', async () => {
+      // Mock viewer/coach timezone to Asia/Ho_Chi_Minh (UTC+7)
+      const origResolvedOptions = Intl.DateTimeFormat.prototype.resolvedOptions;
+      const resolvedOptionsSpy = vi
+        .spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions')
+        .mockImplementation(function (this: any) {
+          const res = origResolvedOptions.call(this);
+          return { ...res, timeZone: 'Asia/Ho_Chi_Minh' };
+        });
+
+      const coachSession = {
+        user: { id: 'coach-id', email: 'coach@cybergym.io' },
+      };
+
+      (supabase.auth.getUser as any).mockResolvedValue({ data: { user: coachSession.user } });
+      (supabase.auth.getSession as any).mockResolvedValue({ data: { session: coachSession } });
+
+      // Athlete is in America/New_York (EDT, UTC-4 in September)
+      const athleteLinksData = [
+        {
+          athlete_id: 'ath-1',
+          status: 'active',
+          linked_at: '2026-09-01T00:00:00Z',
+          athlete: {
+            id: 'ath-1',
+            username: 'Alex Johnson',
+            email: 'alex@example.com',
+            role: 'athlete',
+            created_at: '2026-09-01T00:00:00Z',
+            timezone: 'America/New_York',
+          },
+        },
+      ];
+
+      // Two meals logged on September 22 in America/New_York:
+      // 1) 2026-09-22 09:00 EDT = 2026-09-22T13:00:00Z (Asia/Ho_Chi_Minh: 2026-09-22 20:00)
+      // 2) 2026-09-22 21:30 EDT = 2026-09-23T01:30:00Z (Asia/Ho_Chi_Minh: 2026-09-23 08:30)
+      const crossTzNutritionLogs = [
+        {
+          id: 'log-ny-1',
+          user_id: 'ath-1',
+          food_name: 'NY Breakfast Bagel',
+          meal_type: 'breakfast',
+          calories: 450,
+          protein: 20,
+          carbs: 65,
+          fat: 10,
+          fiber: 4,
+          logged_at: '2026-09-22T13:00:00Z',
+        },
+        {
+          id: 'log-ny-2',
+          user_id: 'ath-1',
+          food_name: 'NY Dinner Steak',
+          meal_type: 'dinner',
+          calories: 850,
+          protein: 70,
+          carbs: 10,
+          fat: 55,
+          fiber: 2,
+          logged_at: '2026-09-23T01:30:00Z',
+        },
+      ];
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'coach_athlete_links') {
+          return createSupabaseBuilder('coach_athlete_links', { data: athleteLinksData, error: null });
+        }
+        if (table === 'users') {
+          return createSupabaseBuilder('users', {
+            data: {
+              id: 'coach-id',
+              email: 'coach@cybergym.io',
+              username: 'Coach Duy',
+              role: 'coach',
+              is_coach_mode: true,
+            },
+            error: null,
+          });
+        }
+        if (table === 'nutrition_logs') {
+          return createSupabaseBuilder('nutrition_logs', {
+            data: crossTzNutritionLogs,
+            error: null,
+          });
+        }
+        return createSupabaseBuilder(table, { data: [], error: null });
+      });
+
+      renderComponent();
+
+      // Verify coach inspection banner is active
+      await waitFor(() => {
+        expect(screen.getByTestId('coach-inspection-banner')).toBeDefined();
+      });
+
+      // Switch to Nutrition tab
+      fireEvent.click(screen.getByTestId('history-tab-nutrition'));
+
+      // Both meals should appear
+      expect(await screen.findByText('NY Breakfast Bagel')).toBeDefined();
+      expect(await screen.findByText('NY Dinner Steak')).toBeDefined();
+
+      // Under athlete's timezone (America/New_York), both meals fall on 2026-09-22
+      // so there must be exactly 1 day card: "2026-09-22 • 2 meals logged" (1300 kcal total)
+      expect(screen.getByText('2026-09-22 • 2 meals logged')).toBeDefined();
+      expect(screen.getByText('1300 kcal')).toBeDefined();
+
+      // In viewer's timezone (Asia/Ho_Chi_Minh), Dinner would have rolled over to 2026-09-23.
+      // Assert that NO 2026-09-23 bucket exists!
+      expect(screen.queryByText(/2026-09-23/)).toBeNull();
+
+      resolvedOptionsSpy.mockRestore();
     });
   });
 

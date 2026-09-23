@@ -83,7 +83,7 @@ describe('Header connection status badge', () => {
       expect(getRecordedTables()).toContain('coach_athlete_links');
       expect(getRecordedSelects()).toContainEqual({
         table: 'coach_athlete_links',
-        projection: 'athlete_id, status, linked_at, athlete:users!athlete_id(id, username, email, role, created_at)',
+        projection: 'athlete_id, status, linked_at, athlete:users!athlete_id(id, username, email, role, created_at, timezone)',
       });
     });
   });

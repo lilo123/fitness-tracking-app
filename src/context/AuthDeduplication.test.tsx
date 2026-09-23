@@ -44,6 +44,7 @@ describe('F-15: In-Flight Promise Deduplication', () => {
     target_fat: 70,
     target_fiber: 30,
     auto_rest_timer: true,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   };
 
   const athleteLinksData = [
@@ -67,6 +68,7 @@ describe('F-15: In-Flight Promise Deduplication', () => {
     clearInFlight();
     localStorage.clear();
     localStorage.setItem('cybergym_user', JSON.stringify(mockProfile));
+    localStorage.setItem(`cybergym_user_timezone_${mockProfile.id}`, mockProfile.timezone || 'UTC');
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'users') {
@@ -216,7 +218,7 @@ describe('F-15: In-Flight Promise Deduplication', () => {
     expect(linksQueries.length).toBe(1);
     expect(getRecordedSelects()).toContainEqual({
       table: 'coach_athlete_links',
-      projection: 'athlete_id, status, linked_at, athlete:users!athlete_id(id, username, email, role, created_at)',
+      projection: 'athlete_id, status, linked_at, athlete:users!athlete_id(id, username, email, role, created_at, timezone)',
     });
   });
 

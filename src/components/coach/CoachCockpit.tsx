@@ -3,9 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useCoach } from '../../hooks/useCoach';
-import type { Exercise, RoutineTemplate } from '../../types/database';
+import type { Exercise, RoutineTemplate, UserProfile } from '../../types/database';
 import { DEFAULT_EXERCISES_LIST, normalizeDateStr } from '../../utils/ghostSets';
-import { getDayBounds, getLocalDateStr } from '../../utils/date';
+import { getDayBounds } from '../../utils/date';
 import { WORKOUT_WITH_SETS_PROJECTION, COACH_SETS_PER_WORKOUT_LIMIT, warnIfCoachSetsTruncated } from '../workout/useWorkoutQueries';
 import { Shield, AlertCircle, RotateCcw } from 'lucide-react';
 import { CoachAthleteSwitcher } from './CoachAthleteSwitcher';
@@ -13,7 +13,7 @@ import { CoachAthleteTimeline, type CoachWorkoutSet } from './CoachAthleteTimeli
 import { CoachAthleteMacros } from './CoachAthleteMacros';
 import { CoachTemplateBuilder } from './CoachTemplateBuilder';
 import { StatusBanner } from '../common/StatusBanner';
-import { groupTimelineDays } from '../../utils/timelineGrouping';
+import { groupTimelineDays, resolveAthleteTimeZone, getTimelineDaysAgoStr } from '../../utils/timelineGrouping';
 import { nutritionRowLimitForRange } from '../../utils/coachQueryBounds';
 import { resolveExerciseLabel } from '../../utils/exerciseLabel';
 
@@ -24,6 +24,25 @@ export const CoachCockpit: React.FC = () => {
   const { selectedAthleteId, selectedAthlete, athletes, switchAthlete } = useCoach();
 
   const queryClient = useQueryClient();
+
+  const {
+    data: athleteProfile, isError: isAthleteProfileError,
+    error: athleteProfileError, refetch: refetchAthleteProfile,
+  } = useQuery({
+    queryKey: ['athlete_profile', selectedAthleteId],
+    enabled: Boolean(selectedAthleteId) && selectedAthleteId.length > 0,
+    queryFn: async () => {
+      const { data, error } = await (supabase
+        .from('users') as any)
+        .select('id, username, email, target_calories, target_protein, target_carbs, target_fat, target_fiber, timezone')
+        .eq('id', selectedAthleteId).single();
+      if (error) throw error;
+      return (data as UserProfile | null) || null;
+    },
+  });
+
+  // Athlete timezone: stored profile/link zone falling back to viewer's resolved zone
+  const athleteTimeZone = resolveAthleteTimeZone(athleteProfile, selectedAthlete);
 
   // Mobile segmented tabs
   type CoachMobileTab = 'activity' | 'macros' | 'templates';
@@ -37,11 +56,10 @@ export const CoachCockpit: React.FC = () => {
     setExpandedExercises((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const daysAgoStr = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - daysRange);
-    return getLocalDateStr(d);
-  }, [daysRange]);
+  const daysAgoStr = useMemo(
+    () => getTimelineDaysAgoStr(daysRange, athleteTimeZone),
+    [daysRange, athleteTimeZone]
+  );
 
   // Template Builder State
   const [templateName, setTemplateName] = useState('');
@@ -102,7 +120,7 @@ export const CoachCockpit: React.FC = () => {
     error: workoutsError,
     refetch: refetchWorkouts,
   } = useQuery({
-    queryKey: ['coach_athlete_timeline_workouts', selectedAthleteId, daysRange],
+    queryKey: ['coach_athlete_timeline_workouts', selectedAthleteId, daysRange, athleteTimeZone],
     enabled: Boolean(selectedAthleteId) && selectedAthleteId.length > 0,
     queryFn: async () => {
       if (!selectedAthleteId) return [];
@@ -202,11 +220,11 @@ export const CoachCockpit: React.FC = () => {
     error: athleteNutritionError,
     refetch: refetchAthleteNutrition,
   } = useQuery({
-    queryKey: ['coach_athlete_timeline_nutrition', selectedAthleteId, daysRange],
+    queryKey: ['coach_athlete_timeline_nutrition', selectedAthleteId, daysRange, athleteTimeZone],
     enabled: Boolean(selectedAthleteId) && selectedAthleteId.length > 0,
     queryFn: async () => {
       if (!selectedAthleteId) return [];
-      const { startOfDay } = getDayBounds(daysAgoStr);
+      const { startOfDay } = getDayBounds(daysAgoStr, athleteTimeZone);
       const rowLimit = nutritionRowLimitForRange(daysRange);
       const { data, error } = await supabase
         .from('nutrition_logs')
@@ -227,11 +245,7 @@ export const CoachCockpit: React.FC = () => {
     },
   });
 
-  // Limitation: no timezone stored on user profile/selectedAthlete. Viewer's resolved zone is
-  // correct whenever coach and athlete share a zone, and wrong otherwise.
-  const athleteTimeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
-
-  // Timeline day grouping
+  // Timeline day grouping (uses athlete's timezone or falls back to viewer's resolved zone)
   const timelineDays = useMemo(() => {
     return groupTimelineDays(athleteWorkoutsWithSets, athleteNutrition, athleteTimeZone);
   }, [athleteWorkoutsWithSets, athleteNutrition, athleteTimeZone]);
@@ -251,22 +265,6 @@ export const CoachCockpit: React.FC = () => {
     loadedAthleteIdRef.current = null;
     editedFieldsRef.current.clear();
   }, [selectedAthleteId]);
-
-  const {
-    data: athleteProfile, isError: isAthleteProfileError,
-    error: athleteProfileError, refetch: refetchAthleteProfile,
-  } = useQuery({
-    queryKey: ['athlete_profile', selectedAthleteId],
-    enabled: Boolean(selectedAthleteId) && selectedAthleteId.length > 0,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, username, email, target_calories, target_protein, target_carbs, target_fat, target_fiber')
-        .eq('id', selectedAthleteId).single();
-      if (error) throw error;
-      return data || null;
-    },
-  });
 
   /* oxlint-disable react/set-state-in-effect */
   React.useEffect(() => {

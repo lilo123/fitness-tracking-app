@@ -1,5 +1,32 @@
-import { normalizeDateStr } from './date';
+import { normalizeDateStr, getLocalDateStr } from './date';
 import type { TimelineDay, CoachWorkoutSession, CoachNutritionLog } from '../components/coach/CoachAthleteTimeline';
+
+/**
+ * Resolves the effective athlete timezone from profile or link data, falling back
+ * to undefined (which defaults to the viewer's resolved timezone) if not captured.
+ */
+export function resolveAthleteTimeZone(
+  athleteProfile?: { timezone?: string | null } | null,
+  selectedAthlete?: unknown
+): string | undefined {
+  const athleteObj = selectedAthlete as { timezone?: string | null } | null | undefined;
+  return athleteProfile?.timezone || athleteObj?.timezone || undefined;
+}
+
+/**
+ * Calculates the starting date string (YYYY-MM-DD) for a timeline range (daysRange days ago)
+ * relative to today in the specified timezone (or local viewer timezone if omitted).
+ */
+export function getTimelineDaysAgoStr(daysRange: number, timeZone?: string): string {
+  const tz = timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const todayStr = normalizeDateStr(new Date(), tz);
+  const [y, m, d] = (todayStr || getLocalDateStr()).split('-').map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d - daysRange));
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 /**
  * Checks if a date string or Date object represents a civil date stored at UTC midnight.
@@ -47,8 +74,8 @@ export function groupTimelineDays(
 ): TimelineDay[] {
   const dayMap = new Map<string, TimelineDay>();
 
-  // Limitation: if timeZone is omitted/undefined, falls back to the viewer's resolved zone.
-  // This is correct when coach and athlete share a zone, and wrong otherwise.
+  // Fallback: when timeZone is omitted/undefined (e.g. uncaptured timezone), falls back to viewer's resolved zone.
+  // When an athlete has a stored timezone, it is passed explicitly to group on the athlete's civil day.
   const tz = timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   workouts.forEach((w) => {

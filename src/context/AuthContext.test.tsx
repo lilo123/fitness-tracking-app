@@ -441,5 +441,70 @@ describe('AuthContext - iOS PWA Resilience & Lifecycle', () => {
       expect(localStorage.getItem('cybergym_user')).toBeNull();
     });
   });
+
+  it('9. does not cache in localStorage when timezone sync fails, enabling retry on subsequent revalidation', async () => {
+    localStorage.setItem('cybergym_user', JSON.stringify(mockProfile));
+
+    const deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const storageKey = `cybergym_user_timezone_${mockProfile.id}`;
+
+    let updateAttempts = 0;
+    let shouldFailUpdate = true;
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      const builder = createSupabaseBuilder(table, mockProfile);
+      if (table === 'users') {
+        const origUpdate = builder.update.bind(builder);
+        builder.update = (values: any, options?: any) => {
+          origUpdate(values, options);
+          updateAttempts++;
+          if (shouldFailUpdate) {
+            builder.mockResolvedValue({ data: null, error: new Error('Network timeout') });
+          } else {
+            builder.mockResolvedValue({ data: null, error: null });
+          }
+          return builder;
+        };
+      }
+      return builder;
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <TestConsumer />
+        </AuthProvider>
+      </QueryClientProvider>
+    );
+
+    // Initial mount triggers syncUserTimezone which fails
+    await waitFor(() => {
+      expect(updateAttempts).toBe(1);
+    });
+
+    // Failed update must NOT write to localStorage
+    expect(localStorage.getItem(storageKey)).toBeNull();
+
+    // Now restore network so subsequent attempt succeeds
+    shouldFailUpdate = false;
+
+    // Trigger re-validation via pageshow event
+    act(() => {
+      window.dispatchEvent(new Event('pageshow'));
+    });
+
+    // Second sync attempt should execute and succeed
+    await waitFor(() => {
+      expect(updateAttempts).toBe(2);
+      expect(localStorage.getItem(storageKey)).toBe(deviceZone);
+    });
+
+    // A third revalidation should see cachedZone === deviceZone and NOT trigger a 3rd update
+    act(() => {
+      window.dispatchEvent(new Event('pageshow'));
+    });
+
+    expect(updateAttempts).toBe(2);
+  });
 });
 
