@@ -1,9 +1,14 @@
 -- Migration: 20260923010000_nutrition_logged_date.sql
 -- Description: Add civil logged_date column to public.nutrition_logs and auto-sync triggers without hardcoded timezones
 
--- 1. Clear any hardcoded timezone values from the previous migration revision so only real device syncs populate users.timezone
-UPDATE public.users
-SET timezone = NULL;
+-- 1. (removed) An earlier revision of this file ran `UPDATE public.users SET timezone = NULL;`
+--    unconditionally, to clear hardcoded timezone values seeded by a since-corrected revision of
+--    20260923000000_user_timezone.sql. Those seeds were removed from that file in commit 3eb892e,
+--    so on every future replay (DR restore, `supabase db reset`, a fresh environment) the wipe had
+--    nothing left to undo and would only have destroyed real device-synced timezones -- which in
+--    turn silently skips the logged_date backfill below for those users. Its one-time effect on
+--    production is already recorded in supabase_migrations.schema_migrations; this migration is
+--    never re-run there. users.timezone is populated exclusively by each user's own device.
 
 -- 2. Add logged_date (nullable for legacy rows until the user's real device timezone is synced)
 ALTER TABLE public.nutrition_logs
