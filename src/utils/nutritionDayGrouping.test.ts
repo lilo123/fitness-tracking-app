@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { groupNutritionDays } from './nutritionDayGrouping';
-import { isWithinDayBounds } from './date';
+import { isWithinDayBounds, normalizeDateStr } from './date';
 import type { NutritionLog } from '../types/database';
 
 function createLog(overrides: Partial<NutritionLog> = {}): NutritionLog {
@@ -42,10 +42,31 @@ describe('groupNutritionDays', () => {
       expect(result[0].meals).toHaveLength(1);
       expect(result[0].meals[0].id).toBe('keto-bar-evening');
     });
+
+    it('three-way agreement: groups a travelled meal with logged_date 2026-09-21 and logged_at 2026-09-22T01:00:00Z under 2026-09-21 in Asia/Tokyo', () => {
+      const log = createLog({
+        id: 'travel-meal-1',
+        food_name: 'Travel Meal',
+        calories: 500,
+        protein: 30,
+        carbs: 40,
+        fat: 10,
+        fiber: 5,
+        logged_date: '2026-09-21',
+        logged_at: '2026-09-22T01:00:00Z',
+      });
+
+      const result = groupNutritionDays([log], 'Asia/Tokyo');
+
+      expect(result).toHaveLength(1);
+      expect(result[0].date).toBe('2026-09-21');
+      expect(result[0].meals).toHaveLength(1);
+      expect(result[0].meals[0].id).toBe('travel-meal-1');
+    });
   });
 
   describe('(b) Cross-path consistency oracle (HistoryView vs Nutrition tab)', () => {
-    it('day key matches selectedDate for which isWithinDayBounds is true across 24 hours and multiple timezones', () => {
+    it('LEGACY rows only (logged_date null): day key matches the selectedDate for which isWithinDayBounds is true, across 24 hours and multiple timezones', () => {
       const timezones = [
         'America/Los_Angeles',
         'America/New_York',
@@ -67,7 +88,11 @@ describe('groupNutritionDays', () => {
             logged_at: timestamp,
           });
 
-          // The oracle: find which calendar day the Nutrition tab would attribute this timestamp to
+          // `createLog` leaves `logged_date` undefined, so these fixtures exercise ONLY the legacy
+          // fallback branch of the day key. On that branch the key is derived from `logged_at` in
+          // the viewer's zone, which is exactly what `isWithinDayBounds` computes -- so it remains
+          // a valid independent oracle HERE. It is NOT a general model of the Nutrition tab: the
+          // tab now prefers the immutable `logged_date` whenever the row carries one. See test (c).
           const matchingDates = candidateDates.filter((date) =>
             isWithinDayBounds(timestamp, date, tz)
           );
@@ -80,6 +105,65 @@ describe('groupNutritionDays', () => {
           expect(grouped).toHaveLength(1);
           expect(grouped[0].date).toBe(oracleDate);
           expect(isWithinDayBounds(log.logged_at, grouped[0].date, tz)).toBe(true);
+        }
+      }
+    });
+  });
+
+  describe('(c) Cross-path agreement on the CIVIL date key (travelled rows)', () => {
+    // The real invariant behind the coach/athlete discrepancy bug: History (groupNutritionDays)
+    // and the athlete Nutrition tab must attribute a row to the SAME civil day. Both derive the
+    // key as `logged_date || normalizeDateStr(logged_at, tz)`, but they do so in two separate
+    // implementations that have already drifted apart once. This pins them together.
+    //
+    // `isWithinDayBounds` deliberately is NOT used as the oracle here: for a travelled row it
+    // disagrees with both paths by design, because `logged_date` is immutable and the instant
+    // bounds are not.
+    const nutritionTabDayKey = (log: NutritionLog, tz: string): string =>
+      log.logged_date || normalizeDateStr(log.logged_at, tz);
+
+    it('agrees with the Nutrition tab key for rows that carry logged_date, even when the viewer has since travelled', () => {
+      // Logged at 19:00 on 09-21 in New York (= 09-21 civil), then the athlete flies to Tokyo,
+      // where the same instant reads 08:00 on 09-22. The civil diary date must stay 09-21.
+      const travelled = createLog({
+        id: 'travelled-meal',
+        logged_at: '2026-09-21T23:00:00.000Z',
+        logged_date: '2026-09-21',
+      });
+
+      for (const tz of ['America/New_York', 'Asia/Tokyo', 'UTC', 'Pacific/Kiritimati']) {
+        const grouped = groupNutritionDays([travelled], tz);
+
+        expect(grouped).toHaveLength(1);
+        expect(grouped[0].date).toBe('2026-09-21');
+        expect(grouped[0].date).toBe(nutritionTabDayKey(travelled, tz));
+      }
+    });
+
+    it('agrees with the Nutrition tab key across 24 hours and multiple timezones, for both legacy and stamped rows', () => {
+      const timezones = ['America/Los_Angeles', 'America/New_York', 'UTC', 'Asia/Tokyo'];
+
+      for (const tz of timezones) {
+        for (let hour = 0; hour < 24; hour++) {
+          const hh = String(hour).padStart(2, '0');
+          const logged_at = `2026-09-21T${hh}:30:00.000Z`;
+
+          // Legacy row: no logged_date, key falls back to the instant in the viewer's zone.
+          const legacy = createLog({ id: `legacy-${tz}-${hh}`, logged_at });
+          const legacyGrouped = groupNutritionDays([legacy], tz);
+          expect(legacyGrouped).toHaveLength(1);
+          expect(legacyGrouped[0].date).toBe(nutritionTabDayKey(legacy, tz));
+
+          // Stamped row: logged_date wins outright and is independent of the viewer's zone.
+          const stamped = createLog({
+            id: `stamped-${tz}-${hh}`,
+            logged_at,
+            logged_date: '2026-09-19',
+          });
+          const stampedGrouped = groupNutritionDays([stamped], tz);
+          expect(stampedGrouped).toHaveLength(1);
+          expect(stampedGrouped[0].date).toBe('2026-09-19');
+          expect(stampedGrouped[0].date).toBe(nutritionTabDayKey(stamped, tz));
         }
       }
     });

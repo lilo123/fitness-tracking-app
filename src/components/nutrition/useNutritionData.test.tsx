@@ -30,7 +30,7 @@ describe('useNutritionData (src/components/nutrition/useNutritionData.ts)', () =
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
 
-  it('queries PostgREST using precise startOfDay and endOfDay from getDayBounds', async () => {
+  it('queries PostgREST using widened superset window around getDayBounds (-48h / +48h)', async () => {
     let capturedGte: string | null = null;
     let capturedLte: string | null = null;
     let capturedTable: string | null = null;
@@ -56,6 +56,8 @@ describe('useNutritionData (src/components/nutrition/useNutritionData.ts)', () =
     const targetDate = '2026-07-04';
     const timeZone = 'America/New_York';
     const expectedBounds = getDayBounds(targetDate, timeZone);
+    const expectedStart = new Date(new Date(expectedBounds.startOfDay).getTime() - 48 * 60 * 60 * 1000).toISOString();
+    const expectedEnd = new Date(new Date(expectedBounds.endOfDay).getTime() + 48 * 60 * 60 * 1000).toISOString();
 
     renderHook(
       () =>
@@ -72,13 +74,17 @@ describe('useNutritionData (src/components/nutrition/useNutritionData.ts)', () =
     );
 
     await waitFor(() => {
-      expect(capturedGte).toBe(expectedBounds.startOfDay);
-      expect(capturedLte).toBe(expectedBounds.endOfDay);
+      expect(capturedGte).toBe(expectedStart);
+      expect(capturedLte).toBe(expectedEnd);
     });
 
     expect(capturedTable).toBe('nutrition_logs');
-    expect(capturedGte).toBe('2026-07-04T04:00:00.000Z');
-    expect(capturedLte).toBe('2026-07-05T03:59:59.999Z');
+    // Hardcoded alongside the derived assertions above on purpose: lines 77-78 call the same
+    // getDayBounds the hook calls, so they would still pass if getDayBounds itself regressed.
+    // 2026-07-04 in America/New_York (EDT, UTC-4) starts at 04:00Z; -48h = 2026-07-02T04:00:00Z
+    // and the day ends 2026-07-05T03:59:59.999Z, so +48h = 2026-07-07T03:59:59.999Z.
+    expect(capturedGte).toBe('2026-07-02T04:00:00.000Z');
+    expect(capturedLte).toBe('2026-07-07T03:59:59.999Z');
 
     expect(getRecordedTables()).toContain('nutrition_logs');
     expect(getRecordedSelects()).toContainEqual({
@@ -87,11 +93,11 @@ describe('useNutritionData (src/components/nutrition/useNutritionData.ts)', () =
     });
   });
 
-  it('filters todayLogs in-memory strictly with isWithinDayBounds across positive offset (Tokyo UTC+9)', async () => {
+  it('filters todayLogs in-memory strictly with civil date and timezone fallback across positive offset (Tokyo UTC+9)', async () => {
     const targetDate = '2026-09-08';
     const timeZone = 'Asia/Tokyo';
 
-    // Simulated logs from database spanning boundary
+    // Simulated logs from database spanning boundary (legacy rows without logged_date)
     const mockLogs = [
       {
         id: '1',
@@ -102,6 +108,7 @@ describe('useNutritionData (src/components/nutrition/useNutritionData.ts)', () =
         fat: 10,
         fiber: 5,
         logged_at: '2026-09-07T14:59:59.999Z', // 23:59:59.999 Sept 7 JST
+        logged_date: null,
       },
       {
         id: '2',
@@ -112,6 +119,7 @@ describe('useNutritionData (src/components/nutrition/useNutritionData.ts)', () =
         fat: 10,
         fiber: 4,
         logged_at: '2026-09-07T15:00:00.000Z', // 00:00:00.000 Sept 8 JST
+        logged_date: null,
       },
       {
         id: '3',
@@ -122,6 +130,7 @@ describe('useNutritionData (src/components/nutrition/useNutritionData.ts)', () =
         fat: 20,
         fiber: 8,
         logged_at: '2026-09-08T03:00:00.000Z', // 12:00:00.000 Sept 8 JST
+        logged_date: null,
       },
       {
         id: '4',
@@ -132,6 +141,7 @@ describe('useNutritionData (src/components/nutrition/useNutritionData.ts)', () =
         fat: 5,
         fiber: 2,
         logged_at: '2026-09-08T14:59:59.999Z', // 23:59:59.999 Sept 8 JST
+        logged_date: null,
       },
       {
         id: '5',
@@ -142,6 +152,7 @@ describe('useNutritionData (src/components/nutrition/useNutritionData.ts)', () =
         fat: 15,
         fiber: 5,
         logged_at: '2026-09-08T23:00:00.000Z', // 08:00:00.000 Sept 9 JST
+        logged_date: null,
       },
     ];
 
@@ -170,7 +181,10 @@ describe('useNutritionData (src/components/nutrition/useNutritionData.ts)', () =
       expect(result.current.nutritionLogs.length).toBe(5);
     });
 
-    // todayLogs in-memory filter must keep exactly IDs 2, 3, 4 and drop 1 and 5
+    // Re-expressed removal-counter under the new contract:
+    // The server query returns a 3-day superset window (5 mock logs spanning boundaries).
+    // The authoritative client filter strips rows from adjacent days (IDs 1 and 5)
+    // using normalizeDateStr fallback for legacy null-logged_date rows, leaving exactly IDs 2, 3, 4.
     expect(result.current.nutritionLogs.length - result.current.todayLogs.length).toBe(2);
     expect(result.current.todayLogs.map((l) => l.id)).toEqual(['2', '3', '4']);
     expect(result.current.dailyTotals.calories).toBe(400 + 700 + 300);
@@ -178,6 +192,254 @@ describe('useNutritionData (src/components/nutrition/useNutritionData.ts)', () =
     expect(result.current.dailyTotals.carbs).toBe(50 + 60 + 20);
     expect(result.current.dailyTotals.fat).toBe(10 + 20 + 5);
     expect(result.current.dailyTotals.fiber).toBe(4 + 8 + 2);
+  });
+
+  it('(a) three-way agreement: places travelled meal (logged_date: 2026-09-21, logged_at: 2026-09-22T01:00:00Z) on 2026-09-21 in Asia/Tokyo', async () => {
+    const targetDate = '2026-09-21';
+    const timeZone = 'Asia/Tokyo';
+
+    const mockLogs = [
+      {
+        id: 'travel-meal-1',
+        user_id: 'user-travel',
+        food_name: 'Travel Meal',
+        meal_type: 'dinner',
+        calories: 500,
+        protein: 30,
+        carbs: 40,
+        fat: 10,
+        fiber: 5,
+        serving_size: 1,
+        serving_unit: 'serving',
+        logged_date: '2026-09-21',
+        logged_at: '2026-09-22T01:00:00Z',
+        created_at: '2026-09-22T01:00:00Z',
+        has_components: false,
+      },
+    ];
+
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
+      if (table === 'nutrition_logs') {
+        return createSupabaseBuilder('nutrition_logs', { data: mockLogs, error: null }) as any;
+      }
+      return createSupabaseBuilder(table, { data: [], error: null }) as any;
+    });
+
+    const { result } = renderHook(
+      () =>
+        useNutritionData({
+          targetUserId: 'user-travel',
+          selectedDate: targetDate,
+          timeZone,
+          profile: null,
+          onMutationSuccessReset: vi.fn(),
+          setStatus: vi.fn(),
+          setIsError: vi.fn(),
+        }),
+      { wrapper }
+    );
+
+    await waitFor(() => {
+      expect(result.current.nutritionLogs.length).toBe(1);
+    });
+
+    expect(result.current.todayLogs).toHaveLength(1);
+    expect(result.current.todayLogs[0].id).toBe('travel-meal-1');
+    expect(result.current.todayLogs[0].logged_date).toBe('2026-09-21');
+    expect(result.current.dailyTotals.calories).toBe(500);
+  });
+
+  it('(b) legacy NULL row: log with logged_date null remains visible on the day its logged_at implies in viewer zone', async () => {
+    const targetDate = '2026-09-21';
+    const timeZone = 'America/New_York';
+
+    // 20:00 EDT on 2026-09-21 is 2026-09-22T00:00:00Z in UTC.
+    // In America/New_York (UTC-4 in September), this falls on 2026-09-21.
+    const mockLogs = [
+      {
+        id: 'legacy-null-log',
+        user_id: 'user-legacy',
+        food_name: 'Legacy Dinner',
+        meal_type: 'dinner',
+        calories: 550,
+        protein: 40,
+        carbs: 45,
+        fat: 15,
+        fiber: 6,
+        serving_size: 1,
+        serving_unit: 'serving',
+        logged_date: null,
+        logged_at: '2026-09-22T00:00:00Z',
+        created_at: '2026-09-22T00:00:00Z',
+        has_components: false,
+      },
+    ];
+
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
+      if (table === 'nutrition_logs') {
+        return createSupabaseBuilder('nutrition_logs', { data: mockLogs, error: null }) as any;
+      }
+      return createSupabaseBuilder(table, { data: [], error: null }) as any;
+    });
+
+    const { result } = renderHook(
+      () =>
+        useNutritionData({
+          targetUserId: 'user-legacy',
+          selectedDate: targetDate,
+          timeZone,
+          profile: null,
+          onMutationSuccessReset: vi.fn(),
+          setStatus: vi.fn(),
+          setIsError: vi.fn(),
+        }),
+      { wrapper }
+    );
+
+    await waitFor(() => {
+      expect(result.current.nutritionLogs.length).toBe(1);
+    });
+
+    expect(result.current.todayLogs).toHaveLength(1);
+    expect(result.current.todayLogs[0].id).toBe('legacy-null-log');
+    expect(result.current.dailyTotals.calories).toBe(550);
+  });
+
+  it('(c) no double-counting: logs from selectedDate - 1 and selectedDate + 1 are excluded from todayLogs and do not contribute to dailyTotals', async () => {
+    const timeZone = 'Asia/Tokyo';
+    // 3 logs returned by the widened 3-day superset fetch:
+    // logPrev has logged_date = 2026-09-20. Its logged_at (2026-09-21T01:00:00Z = 10:00 JST Sep 21)
+    // would falsely match selectedDate = 2026-09-21 under the old isWithinDayBounds filter!
+    const logPrev = {
+      id: 'log-prev',
+      user_id: 'user-dc',
+      food_name: 'Previous Day Meal (logged in Hawaii)',
+      meal_type: 'dinner',
+      calories: 300,
+      protein: 20,
+      carbs: 30,
+      fat: 10,
+      fiber: 2,
+      serving_size: 1,
+      serving_unit: 'serving',
+      logged_date: '2026-09-20',
+      logged_at: '2026-09-21T01:00:00Z',
+      created_at: '2026-09-21T01:00:00Z',
+      has_components: false,
+    };
+    const logToday = {
+      id: 'log-today',
+      user_id: 'user-dc',
+      food_name: 'Today Lunch',
+      meal_type: 'lunch',
+      calories: 500,
+      protein: 35,
+      carbs: 50,
+      fat: 15,
+      fiber: 5,
+      serving_size: 1,
+      serving_unit: 'serving',
+      logged_date: '2026-09-21',
+      logged_at: '2026-09-21T05:00:00Z',
+      created_at: '2026-09-21T05:00:00Z',
+      has_components: false,
+    };
+    // logNext has logged_date = 2026-09-22. Its logged_at (2026-09-21T14:00:00Z = 23:00 JST Sep 21)
+    // would also falsely match selectedDate = 2026-09-21 under the old isWithinDayBounds filter!
+    const logNext = {
+      id: 'log-next',
+      user_id: 'user-dc',
+      food_name: 'Next Day Early Meal',
+      meal_type: 'breakfast',
+      calories: 400,
+      protein: 25,
+      carbs: 45,
+      fat: 12,
+      fiber: 4,
+      serving_size: 1,
+      serving_unit: 'serving',
+      logged_date: '2026-09-22',
+      logged_at: '2026-09-21T14:00:00Z',
+      created_at: '2026-09-21T14:00:00Z',
+      has_components: false,
+    };
+
+    const mockLogs = [logPrev, logToday, logNext];
+
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
+      if (table === 'nutrition_logs') {
+        return createSupabaseBuilder('nutrition_logs', { data: mockLogs, error: null }) as any;
+      }
+      return createSupabaseBuilder(table, { data: [], error: null }) as any;
+    });
+
+    // 1. Query for selectedDate = 2026-09-21:
+    // Must contain ONLY logToday. logPrev and logNext must be EXCLUDED.
+    const { result: resToday } = renderHook(
+      () =>
+        useNutritionData({
+          targetUserId: 'user-dc',
+          selectedDate: '2026-09-21',
+          timeZone,
+          profile: null,
+          onMutationSuccessReset: vi.fn(),
+          setStatus: vi.fn(),
+          setIsError: vi.fn(),
+        }),
+      { wrapper }
+    );
+
+    await waitFor(() => {
+      expect(resToday.current.nutritionLogs.length).toBe(3);
+    });
+
+    expect(resToday.current.todayLogs).toHaveLength(1);
+    expect(resToday.current.todayLogs[0].id).toBe('log-today');
+    expect(resToday.current.dailyTotals.calories).toBe(500);
+
+    // 2. Query for selectedDate = 2026-09-20:
+    // Must contain ONLY logPrev.
+    const { result: resPrev } = renderHook(
+      () =>
+        useNutritionData({
+          targetUserId: 'user-dc',
+          selectedDate: '2026-09-20',
+          timeZone,
+          profile: null,
+          onMutationSuccessReset: vi.fn(),
+          setStatus: vi.fn(),
+          setIsError: vi.fn(),
+        }),
+      { wrapper }
+    );
+
+    await waitFor(() => {
+      expect(resPrev.current.todayLogs).toHaveLength(1);
+    });
+    expect(resPrev.current.todayLogs[0].id).toBe('log-prev');
+    expect(resPrev.current.dailyTotals.calories).toBe(300);
+
+    // 3. Query for selectedDate = 2026-09-22:
+    // Must contain ONLY logNext.
+    const { result: resNext } = renderHook(
+      () =>
+        useNutritionData({
+          targetUserId: 'user-dc',
+          selectedDate: '2026-09-22',
+          timeZone,
+          profile: null,
+          onMutationSuccessReset: vi.fn(),
+          setStatus: vi.fn(),
+          setIsError: vi.fn(),
+        }),
+      { wrapper }
+    );
+
+    await waitFor(() => {
+      expect(resNext.current.todayLogs).toHaveLength(1);
+    });
+    expect(resNext.current.todayLogs[0].id).toBe('log-next');
+    expect(resNext.current.dailyTotals.calories).toBe(400);
   });
 
   it('scaleLogMutation: refetches items before scaling when items are omitted and updates database', async () => {
@@ -372,7 +634,13 @@ describe('useNutritionData (src/components/nutrition/useNutritionData.ts)', () =
         const endDayMs = localCivilToUtcMs(2026, 9, 17, 23, 59, 59, 999, tz);
         timestamps.push(new Date(endDayMs).toISOString());
 
-        // 1. Direct validation: isWithinDayBounds preserves 100% of the 25 records
+        // 1. isWithinDayBounds preserves 100% of the 25 records.
+        //    NOTE: the hook no longer calls isWithinDayBounds -- it keys on
+        //    `logged_date || normalizeDateStr(logged_at, tz)`. These fixtures carry no
+        //    `logged_date`, so they take the legacy fallback, where the two agree by
+        //    construction. This step therefore pins that equivalence, NOT the hook's
+        //    current mechanism. Rows WITH `logged_date` are covered in
+        //    src/utils/nutritionDayGrouping.test.ts describe block (c).
         for (const ts of timestamps) {
           expect(isWithinDayBounds(ts, targetDate, tz)).toBe(true);
         }

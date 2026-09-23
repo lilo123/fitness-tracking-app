@@ -385,5 +385,27 @@ describe('Athlete-coach cross-timezone day bucketing (DIR-B4 / Bug scenario)', (
     expect(daysAgoNy).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(daysAgoHcm).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
+
+  it('three-way agreement: groups a travelled meal with logged_date 2026-09-21 and logged_at 2026-09-22T01:00:00Z under 2026-09-21 in Asia/Tokyo', () => {
+    const nutrition: CoachNutritionLog[] = [
+      {
+        id: 'travel-nut-1',
+        food_name: 'Travel Meal',
+        calories: 500,
+        protein: 30,
+        carbs: 40,
+        fat: 10,
+        logged_date: '2026-09-21',
+        logged_at: '2026-09-22T01:00:00Z',
+      },
+    ];
+
+    const result = groupTimelineDays([], nutrition, 'Asia/Tokyo');
+
+    expect(result).toHaveLength(1);
+    expect(result[0].date).toBe('2026-09-21');
+    expect(result[0].nutrition).toHaveLength(1);
+    expect(result[0].nutrition[0].id).toBe('travel-nut-1');
+  });
 });
 

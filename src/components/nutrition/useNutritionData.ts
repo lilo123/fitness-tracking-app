@@ -18,7 +18,7 @@ export async function fetchDishDetail(dishId: string): Promise<CustomDishDetail 
 
 import {
   getDayBounds,
-  isWithinDayBounds,
+  normalizeDateStr,
 } from '../../utils/date';
 import { roundTo1Decimal, calculateRemainingFuel } from '../../utils/nutrition';
 import { restTimerStore } from '../../utils/restTimerStore';
@@ -116,16 +116,25 @@ export function useNutritionData({
     queryFn: async () => {
       if (!targetUserId) return [];
       const { startOfDay, endOfDay } = getDayBounds(selectedDate, timeZone);
+      // Superset window. A row stamped `logged_date = selectedDate` by a device in another zone
+      // can sit up to 26h outside this viewer's day bounds: the civil day spans 24h, and IANA
+      // offsets range from -12 to +14, so the worst case (logger at +14, viewer at -12) needs
+      // 26h of slack on each side. 48h is that bound with margin.
+      const windowStart = new Date(new Date(startOfDay).getTime() - 48 * 60 * 60 * 1000).toISOString();
+      const windowEnd = new Date(new Date(endOfDay).getTime() + 48 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase
         .from('nutrition_logs')
         .select(
           'id, user_id, food_name, meal_type, calories, protein, carbs, fat, fiber, serving_size, serving_unit, logged_at, logged_date, created_at, has_components'
         )
         .eq('user_id', targetUserId)
-        .gte('logged_at', startOfDay)
-        .lte('logged_at', endOfDay)
+        .gte('logged_at', windowStart)
+        .lte('logged_at', windowEnd)
         .order('logged_at', { ascending: false })
-        .limit(100);
+        // 500 = the 5-day superset window x the previous 100/day bound. Must stay an
+        // unconditional literal: scripts/check-query-bounds.js requires one and does not
+        // inspect the argument.
+        .limit(500);
 
       if (error) throw error;
       if (!data) return [];
@@ -134,24 +143,20 @@ export function useNutritionData({
     enabled: Boolean(targetUserId && selectedDate),
   });
 
-  // RFIX-18 (resolved 2026-09-17, conductor ruling). The server query above already bounds the
-  // result with .gte(startOfDay)/.lte(endOfDay) derived from the SAME getDayBounds(selectedDate,
-  // timeZone) call this filter uses, so in production this filter is expected to strip nothing.
-  // Measured: 0 rows stripped across 24 hourly timestamps x 4 timezones (UTC, America/New_York,
-  // Asia/Tokyo, Pacific/Auckland) — see tier3_evidence/P2-4_verify.txt. Because that count is 0,
-  // RFIX-01's server-side bound is confirmed correct and is NOT reopened.
+  // RFIX-18 (updated): The server query above fetches an intentional five-day superset window
+  // (startOfDay - 48h to endOfDay + 48h) to guarantee that meals logged under a different timezone
+  // are never excluded by server-side bounds. 48h, not 24h: a row stamped `logged_date = D` by a
+  // device at UTC+14 and read by a viewer at UTC-12 sits up to 26h outside the viewer's own day
+  // bounds, so a 24h widening would still drop it.
   //
-  // The filter is retained rather than deleted for one verified reason: it is load-bearing for the
-  // test suite. The createSupabaseBuilder test double returns static fixtures without evaluating
-  // PostgREST range predicates, so useNutritionData.test.tsx asserts day-filtering behaviour
-  // through this code path (see the removal-counter assertion at useNutritionData.test.tsx:174).
-  // Deleting the filter would require deleting those assertions.
-  //
-  // It is therefore a client-side restatement of a server-side invariant, costing one O(n) pass
-  // over at most 100 rows. Do not add semantics here that the server bound does not also enforce —
-  // if the two ever disagree, the server bound is the bug.
+  // The client filter is authoritative: it keys on the civil diary date (`logged_date`), falling
+  // back to `normalizeDateStr(logged_at, timeZone)` for legacy rows where `logged_date` is null.
+  // This matches the grouping contract used by History and Coach views.
   const todayLogs = useMemo(() => {
-    return nutritionLogs.filter((l) => isWithinDayBounds(l.logged_at, selectedDate, timeZone));
+    const targetDate = normalizeDateStr(selectedDate, timeZone);
+    return nutritionLogs.filter(
+      (l) => (l.logged_date || normalizeDateStr(l.logged_at, timeZone)) === targetDate
+    );
   }, [nutritionLogs, selectedDate, timeZone]);
 
   const dailyTotals = useMemo(() => {
