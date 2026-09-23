@@ -54,7 +54,7 @@ test.describe('Coach-Athlete Multi-Tenant Flow E2E', () => {
       await saveBtn.click();
 
       // Assert confirmation message or saved template
-      await expect(page.locator('text=Template saved')).toBeVisible();
+      await expect(page.locator('span').filter({ hasText: 'Template saved' })).toBeVisible();
     }
   });
 });

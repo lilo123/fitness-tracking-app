@@ -4,23 +4,24 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CoachSettingsCard } from './CoachSettingsCard';
 import { expectNoA11yViolations } from '../../test/a11y';
 import type { UserProfile } from '../../types/database';
+import { createSupabaseBuilder, clearMockHistory, getRecordedTables, getRecordedSelects } from '../../test/supabaseBuilderMock';
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
-    from: vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({ count: 0, error: null }),
-        }),
-      }),
-    }),
+    from: vi.fn((table: string) => createSupabaseBuilder(table, { data: [], error: null })),
     rpc: vi.fn().mockResolvedValue({ data: { success: true }, error: null }),
   },
 }));
 
 describe('CoachSettingsCard accessibility', () => {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
+  let queryClient: QueryClient;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearMockHistory();
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
   });
 
   const mockProfile: UserProfile = {
@@ -119,5 +120,14 @@ describe('CoachSettingsCard accessibility', () => {
     expect(container.querySelector('[role="status"]')).toBe(polite);
     expect(container.querySelector('[role="alert"]')).toBe(assertive);
     expect(assertive!.textContent).toContain('Code must be 4-20 characters long');
+  });
+
+  it('queries coach athlete links with exact projection when coach capability is active', async () => {
+    renderCard();
+    expect(getRecordedTables()).toContain('coach_athlete_links');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'coach_athlete_links',
+      projection: 'id',
+    });
   });
 });

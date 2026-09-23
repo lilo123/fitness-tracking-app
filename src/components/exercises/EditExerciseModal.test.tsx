@@ -5,10 +5,11 @@ import { EditExerciseModal } from './EditExerciseModal';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { expectNoA11yViolationsForRules } from '../../test/a11y';
 import { supabase } from '../../lib/supabase';
+import { createSupabaseBuilder, clearMockHistory, getRecordedTables } from '../../test/supabaseBuilderMock';
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
-    from: vi.fn(),
+    from: vi.fn((table: string) => createSupabaseBuilder(table, { data: [], error: null })),
   },
 }));
 
@@ -51,12 +52,15 @@ describe('EditExerciseModal', () => {
     await expectNoA11yViolationsForRules(container, ['label']);
   });
 
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearMockHistory();
+  });
+
   it('mounts edit-exercise-error live region empty while idle and retains same node on error (NEW-15)', async () => {
-    (supabase.from as any).mockReturnValue({
-      update: vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue({ error: new Error('Failed to update exercise in DB') }),
-      }),
-    });
+    (supabase.from as any).mockImplementation((table: string) =>
+      createSupabaseBuilder(table, { error: new Error('Failed to update exercise in DB') })
+    );
 
     const { container } = render(
       <QueryClientProvider client={queryClient}>
@@ -79,6 +83,9 @@ describe('EditExerciseModal', () => {
 
     // Alert DOM node is identical
     expect(container.querySelector('[role="alert"]')).toBe(alert);
+
+    // NO_PROJECTION_APPLIES: Exercise updates are mutation-only with no select projection
+    expect(getRecordedTables()).toContain('exercises');
   });
 
   describe('accessibility and focus management', () => {

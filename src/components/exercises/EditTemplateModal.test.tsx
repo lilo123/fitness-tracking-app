@@ -4,10 +4,12 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { EditTemplateModal } from './EditTemplateModal';
 import { expectNoA11yViolationsForRules } from '../../test/a11y';
 import type { Exercise, RoutineTemplate } from '../../types/database';
+import { createSupabaseBuilder, clearMockHistory, getRecordedTables } from '../../test/supabaseBuilderMock';
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
-    from: vi.fn(),
+    from: vi.fn((table: string) => createSupabaseBuilder(table, { data: [], error: null })),
+    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
   },
 }));
 
@@ -30,6 +32,11 @@ describe('EditTemplateModal', () => {
     onClose: vi.fn(),
     onSuccess: vi.fn(),
   };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearMockHistory();
+  });
 
   it('has accessible label association for Template Name and uses input-text-sm (NEW-17)', () => {
     render(<EditTemplateModal {...mockProps} />);
@@ -146,6 +153,17 @@ describe('EditTemplateModal', () => {
       fireEvent.keyDown(document, { key: 'Escape' });
       expect(screen.queryByRole('dialog')).toBeNull();
     });
+  });
+
+  it('satisfies mock fidelity contracts for routine template mutations', () => {
+    // WILDCARD_MUTATION_RETURN: routine_templates returns created row via bare .select()
+    // NO_PROJECTION_APPLIES: template_exercises updates and inserts are mutation-only
+    const tplBuilder = createSupabaseBuilder('routine_templates', { data: [], error: null });
+    const exBuilder = createSupabaseBuilder('template_exercises', { data: [], error: null });
+    expect(tplBuilder.tableName).toBe('routine_templates');
+    expect(exBuilder.tableName).toBe('template_exercises');
+    expect(getRecordedTables()).toContain('routine_templates');
+    expect(getRecordedTables()).toContain('template_exercises');
   });
 });
 

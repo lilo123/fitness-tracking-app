@@ -4,18 +4,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MyCoachCard } from './MyCoachCard';
 import { expectNoA11yViolations } from '../../test/a11y';
 import type { UserProfile } from '../../types/database';
+import { createSupabaseBuilder, clearMockHistory, getRecordedTables, getRecordedSelects } from '../../test/supabaseBuilderMock';
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
-    from: vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-          }),
-        }),
-      }),
-    }),
+    from: vi.fn((table: string) => createSupabaseBuilder(table, { data: null, error: null })),
     rpc: vi.fn().mockImplementation((fn: string, args: any) => {
       if (fn === 'link_to_coach') {
         if (args?.input_code === 'INVALID') {
@@ -31,6 +24,11 @@ vi.mock('../../lib/supabase', () => ({
 describe('MyCoachCard accessibility and live regions', () => {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearMockHistory();
   });
 
   const mockProfile: UserProfile = {
@@ -102,5 +100,14 @@ describe('MyCoachCard accessibility and live regions', () => {
     expect(container.querySelector('[role="alert"]')).toBe(assertive);
     expect(polite!.textContent).toContain('Successfully linked to coach!');
     expect(assertive!.textContent).toBe('');
+  });
+
+  it('queries active coach link with exact projection', async () => {
+    renderCard();
+    expect(getRecordedTables()).toContain('coach_athlete_links');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'coach_athlete_links',
+      projection: 'id, coach_id, linked_at, coach:users!coach_id(username, email, coach_code)',
+    });
   });
 });

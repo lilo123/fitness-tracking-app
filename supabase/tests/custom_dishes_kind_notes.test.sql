@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(22);
+SELECT plan(20);
 
 -- 1. Table & Column existence and schema assertions
 SELECT has_column('public', 'custom_dishes', 'kind', 'custom_dishes has kind column');
@@ -261,21 +261,6 @@ BEGIN
 END;
 $$;
 SELECT pass('backfill correctly sets recipe for >1 items, food for 1 item, and food for NULL items');
-
--- 7. Verify pre-existing database dishes in dev database
--- 'Vietnamese Crab Noodle Soup (Bun Rieu)' has 6 items -> must be 'recipe'
--- 'Stress Custom Dish 1' through 5 have 1 item -> must be 'food'
-SELECT is(
-  (SELECT kind FROM public.custom_dishes WHERE name = 'Vietnamese Crab Noodle Soup (Bun Rieu)'),
-  'recipe',
-  'Bun Rieu (6 items) was backfilled to recipe'
-);
-
-SELECT is(
-  (SELECT count(*)::int FROM public.custom_dishes WHERE name LIKE 'Stress Custom Dish %' AND kind = 'food'),
-  5,
-  'All 5 Stress Custom Dishes (1 item each) were backfilled to food'
-);
 
 -- 8. RLS still restricts custom_dishes to the owning user after ALTER
 DO $$

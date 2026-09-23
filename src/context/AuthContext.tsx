@@ -63,19 +63,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const storageKey = `cybergym_user_timezone_${userId}`;
       const cachedZone = typeof window !== 'undefined' && window.localStorage ? localStorage.getItem(storageKey) : null;
       if (deviceZone && cachedZone !== deviceZone) {
-        (supabase.from('users') as any)
+        supabase
+          .from('users')
           .update({ timezone: deviceZone })
           .eq('id', userId)
-          .then(({ error: tzErr }: any) => {
-            if (tzErr) {
-              console.warn('[AuthContext] Failed to sync timezone:', tzErr);
-            } else if (typeof window !== 'undefined' && window.localStorage) {
-              localStorage.setItem(storageKey, deviceZone);
+          .then(
+            ({ error: tzErr }) => {
+              if (tzErr) {
+                console.warn('[AuthContext] Failed to sync timezone:', tzErr);
+              } else if (typeof window !== 'undefined' && window.localStorage) {
+                localStorage.setItem(storageKey, deviceZone);
+              }
+            },
+            (err: unknown) => {
+              console.warn('[AuthContext] Error syncing timezone:', err);
             }
-          })
-          .catch((err: any) => {
-            console.warn('[AuthContext] Error syncing timezone:', err);
-          });
+          );
       }
     } catch (tzCatchErr) {
       console.warn('[AuthContext] Could not resolve device timezone:', tzCatchErr);

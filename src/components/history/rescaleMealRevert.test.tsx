@@ -10,7 +10,7 @@ import {
 } from '../nutrition/useNutritionData';
 import { useHistoryData } from './useHistoryData';
 import { supabase } from '../../lib/supabase';
-import { createSupabaseBuilder, clearMockHistory } from '../../test/supabaseBuilderMock';
+import { createSupabaseBuilder, clearMockHistory, getRecordedTables, getRecordedSelects } from '../../test/supabaseBuilderMock';
 import type { NutritionLog } from '../../types/database';
 import type { NutritionItem } from '../../utils/itemModel';
 
@@ -242,6 +242,12 @@ describe('NEW-16: Rescale meal from /history consistency and silent revert preve
     expect(rehydratedLog!.items![1].quantity).toBe(300);
     expect(rehydratedLog!.items![0].calories).toBe(660);
     expect(rehydratedLog!.items![1].calories).toBe(330);
+
+    expect(getRecordedTables()).toContain('nutrition_logs');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'nutrition_logs',
+      projection: 'id, user_id, food_name, meal_type, calories, protein, carbs, fat, fiber, serving_size, serving_unit, logged_at, created_at, has_components',
+    });
   });
 
   it('prevents silent revert: subsequent write-back from /nutrition after /history rescale does not roll back to pre-rescale items', async () => {
@@ -427,6 +433,12 @@ describe('NEW-16: Rescale meal from /history consistency and silent revert preve
     expect(cached).toBeDefined();
     expect(cached).toHaveLength(2);
     expect(cached[0].name).toBe('Salmon');
+
+    expect(getRecordedTables()).toContain('nutrition_logs');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'nutrition_logs',
+      projection: 'id, items, calories, protein, carbs, fat, fiber',
+    });
   });
 
   it('deleteMealMutation in /history evicts the deleted log from logItemsMemoryCache', async () => {

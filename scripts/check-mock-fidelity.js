@@ -377,6 +377,91 @@ const SERVICED_QUERIES_REGISTRY = {
       description: 'Export user profile fetch query',
     },
   ],
+  'src/components/workout/RoutinePickerModal.test.tsx': [
+    {
+      table: 'routine_templates',
+      type: 'EXACT',
+      projection: 'id, user_id, name, is_master, assigned_to, days_of_week, created_at, exercises:template_exercises(id, template_id, exercise_id, order_index, target_sets, target_reps, exercise:exercises(name))',
+      description: 'Routine templates picker query',
+    },
+  ],
+  'src/components/exercises/EditExerciseModal.test.tsx': [
+    {
+      table: 'exercises',
+      type: 'NO_PROJECTION_APPLIES',
+      description: 'Mutation-only exercise update',
+    },
+  ],
+  'src/components/exercises/EditTemplateModal.test.tsx': [
+    {
+      table: 'routine_templates',
+      type: 'WILDCARD_MUTATION_RETURN',
+      description: 'Bare .select() post-insert row return',
+    },
+    {
+      table: 'template_exercises',
+      type: 'NO_PROJECTION_APPLIES',
+      description: 'Mutation-only template exercise updates',
+    },
+  ],
+  'src/components/settings/CoachSettingsCard.test.tsx': [
+    {
+      table: 'coach_athlete_links',
+      type: 'EXACT',
+      projection: 'id',
+      description: 'Coach active athlete count query',
+    },
+  ],
+  'src/components/settings/MyCoachCard.test.tsx': [
+    {
+      table: 'coach_athlete_links',
+      type: 'EXACT',
+      projection: 'id, coach_id, linked_at, coach:users!coach_id(username, email, coach_code)',
+      description: 'Athlete active coach link query',
+    },
+  ],
+  'src/components/nutrition/dishNotesSnapshot.test.tsx': [
+    {
+      table: 'custom_dishes',
+      type: 'EXACT',
+      projection: 'id, user_id, name, calories, protein, carbs, fat, fiber, created_at, kind, use_count, notes',
+      description: 'Custom dishes list query with notes',
+    },
+    {
+      table: 'nutrition_logs',
+      type: 'EXACT',
+      projection: 'id, user_id, food_name, meal_type, calories, protein, carbs, fat, fiber, serving_size, serving_unit, logged_at, created_at, has_components',
+      description: 'Daily nutrition logs query',
+    },
+  ],
+  'src/components/history/rescaleMealRevert.test.tsx': [
+    {
+      table: 'nutrition_logs',
+      type: 'EXACT',
+      projection: 'id, user_id, food_name, meal_type, calories, protein, carbs, fat, fiber, serving_size, serving_unit, logged_at, created_at, has_components',
+      description: 'Daily nutrition logs list query',
+    },
+    {
+      table: 'nutrition_logs',
+      type: 'EXACT',
+      projection: 'id, items, calories, protein, carbs, fat, fiber',
+      description: 'On-demand meal log items and macros query for rescale',
+    },
+  ],
+  'src/components/nutrition/rescaleMealRevert.test.tsx': [
+    {
+      table: 'nutrition_logs',
+      type: 'EXACT',
+      projection: 'id, user_id, food_name, meal_type, calories, protein, carbs, fat, fiber, serving_size, serving_unit, logged_at, created_at, has_components',
+      description: 'Daily nutrition logs list query',
+    },
+    {
+      table: 'nutrition_logs',
+      type: 'EXACT',
+      projection: 'id, items, calories, protein, carbs, fat, fiber',
+      description: 'On-demand meal log items and macros query for rescale',
+    },
+  ],
 };
 
 function findTestFiles(dir) {

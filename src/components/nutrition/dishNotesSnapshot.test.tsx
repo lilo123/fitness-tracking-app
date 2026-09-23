@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../../context/AuthContext';
 import { CoachProvider } from '../../context/CoachContext';
 import { supabase } from '../../lib/supabase';
-import { createSupabaseBuilder, clearMockHistory } from '../../test/supabaseBuilderMock';
+import { createSupabaseBuilder, clearMockHistory, getRecordedTables, getRecordedSelects } from '../../test/supabaseBuilderMock';
 
 const { mockSession } = vi.hoisted(() => ({
   mockSession: {
@@ -127,6 +127,17 @@ describe('Snapshot Isolation: Custom Dish Notes', () => {
     // 1. Verify dish card is rendered with original note
     await waitFor(() => {
       expect(screen.getByTestId('custom-dish-card-dish-note-1')).toBeDefined();
+    });
+
+    expect(getRecordedTables()).toContain('custom_dishes');
+    expect(getRecordedTables()).toContain('nutrition_logs');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'custom_dishes',
+      projection: 'id, user_id, name, calories, protein, carbs, fat, fiber, created_at, kind, use_count, notes',
+    });
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'nutrition_logs',
+      projection: 'id, user_id, food_name, meal_type, calories, protein, carbs, fat, fiber, serving_size, serving_unit, logged_at, created_at, has_components',
     });
 
     // 2. Stage the custom dish

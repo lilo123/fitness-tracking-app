@@ -5,17 +5,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { RoutineTemplate, Exercise } from '../../types/database';
 import type { DEFAULT_WORKOUT_TEMPLATES } from '../../utils/ghostSets';
 
+import { createSupabaseBuilder, clearMockHistory, getRecordedTables, getRecordedSelects } from '../../test/supabaseBuilderMock';
+
 vi.mock('../../lib/supabase', () => ({
   supabase: {
-    from: vi.fn(() => ({
-      select: vi.fn(() => ({
-        or: vi.fn(() => ({
-          order: vi.fn(() => ({
-            limit: vi.fn().mockResolvedValue({ data: [], error: null }),
-          })),
-        })),
-      })),
-    })),
+    from: vi.fn((table: string) => createSupabaseBuilder(table, { data: [], error: null })),
   },
 }));
 
@@ -68,6 +62,7 @@ describe('RoutinePickerModal', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    clearMockHistory();
     queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
@@ -185,5 +180,17 @@ describe('RoutinePickerModal', () => {
     const backdrop = screen.getByTestId('routine-picker-modal');
     fireEvent.click(backdrop);
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('queries routine templates with exact projection when targetUserId is provided', async () => {
+    const targetUserId = '11111111-1111-4111-a111-111111111111';
+    renderModal({ targetUserId });
+
+    expect(getRecordedTables()).toContain('routine_templates');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'routine_templates',
+      projection:
+        'id, user_id, name, is_master, assigned_to, days_of_week, created_at, exercises:template_exercises(id, template_id, exercise_id, order_index, target_sets, target_reps, exercise:exercises(name))',
+    });
   });
 });

@@ -112,7 +112,7 @@ test.describe('Coach-Athlete Code Linking & Lifecycle E2E', () => {
     await expect(finalDisconnectBtn).toBeVisible();
     await finalDisconnectBtn.click();
 
-    await expect(page.locator('text=Successfully disconnected from coach.')).toBeVisible();
+    await expect(page.locator('[data-testid="link-coach-status"]')).toContainText('Successfully disconnected from coach.');
     await expect(page.locator('[data-testid="link-coach-code-input"]')).toBeVisible();
 
     // 13. Re-link at the end to leave DB in seeded state for other test suites

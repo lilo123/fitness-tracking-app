@@ -398,6 +398,7 @@ export type Database = {
           target_fat: number | null
           target_fiber: number | null
           target_protein: number | null
+          timezone: string | null
           username: string | null
         }
         Insert: {
@@ -415,6 +416,7 @@ export type Database = {
           target_fat?: number | null
           target_fiber?: number | null
           target_protein?: number | null
+          timezone?: string | null
           username?: string | null
         }
         Update: {
@@ -432,6 +434,7 @@ export type Database = {
           target_fat?: number | null
           target_fiber?: number | null
           target_protein?: number | null
+          timezone?: string | null
           username?: string | null
         }
         Relationships: []
