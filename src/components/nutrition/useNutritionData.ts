@@ -20,6 +20,7 @@ import {
   getDayBounds,
   normalizeDateStr,
 } from '../../utils/date';
+import { nutritionDayKey } from '../../utils/nutritionDayKey';
 import { roundTo1Decimal, calculateRemainingFuel } from '../../utils/nutrition';
 import { restTimerStore } from '../../utils/restTimerStore';
 import {
@@ -155,7 +156,7 @@ export function useNutritionData({
   const todayLogs = useMemo(() => {
     const targetDate = normalizeDateStr(selectedDate, timeZone);
     return nutritionLogs.filter(
-      (l) => (l.logged_date || normalizeDateStr(l.logged_at, timeZone)) === targetDate
+      (l) => nutritionDayKey(l, timeZone) === targetDate
     );
   }, [nutritionLogs, selectedDate, timeZone]);
 

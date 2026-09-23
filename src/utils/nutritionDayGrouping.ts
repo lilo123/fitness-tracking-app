@@ -1,4 +1,4 @@
-import { normalizeDateStr } from './date';
+import { nutritionDayKey } from './nutritionDayKey';
 import type { NutritionLog } from '../types/database';
 import type { NutritionDaySummary } from '../components/history/NutritionHistoryTimeline';
 
@@ -16,7 +16,7 @@ export function groupNutritionDays(
   const tz = timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   logs.forEach((log) => {
-    const date = log.logged_date || normalizeDateStr(log.logged_at, tz);
+    const date = nutritionDayKey(log, tz);
     if (!date) return;
     if (!map.has(date)) {
       map.set(date, {

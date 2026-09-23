@@ -1,4 +1,5 @@
 import { normalizeDateStr, getLocalDateStr } from './date';
+import { nutritionDayKey } from './nutritionDayKey';
 import type { TimelineDay, CoachWorkoutSession, CoachNutritionLog } from '../components/coach/CoachAthleteTimeline';
 
 /**
@@ -94,7 +95,7 @@ export function groupTimelineDays(
   nutrition.forEach((n) => {
     // n.logged_date is the authoritative civil date recorded at log time.
     // Falls back to converting n.logged_at to the target timezone's calendar day.
-    const d = n.logged_date || normalizeDateStr(n.logged_at, tz) || (n.logged_at ? String(n.logged_at).slice(0, 10) : '');
+    const d = nutritionDayKey(n, tz);
     if (!d) return;
     if (!dayMap.has(d)) {
       dayMap.set(d, { date: d, workouts: [], nutrition: [] });
