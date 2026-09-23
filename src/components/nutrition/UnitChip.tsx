@@ -71,7 +71,7 @@ export const UnitChip: React.FC<UnitChipProps> = ({
         className={`shrink-0 max-w-[64px] truncate min-h-[44px] px-2 text-[12px] font-bold text-cyan-300 transition touch-manipulation disabled:opacity-50 ${
           embedded
             ? 'border-0 bg-transparent hover:bg-zinc-800/60 hover:text-cyan-200 rounded-lg'
-            : 'rounded-lg border border-zinc-500 bg-zinc-950 hover:border-cyan-500'
+            : 'rounded-lg border border-border-interactive bg-zinc-950 hover:border-cyan-500'
         }`}
       >
         {shortUnitLabel(value)}

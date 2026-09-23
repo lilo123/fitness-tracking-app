@@ -348,14 +348,14 @@ export const WorkoutEngine: React.FC = () => {
               <div className="flex items-center gap-2">
                 <button
                   onClick={collapseCompleted}
-                  className="text-xs font-bold text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700/80 px-2.5 py-1 rounded-lg transition flex items-center gap-1.5"
+                  className="text-xs font-bold text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 border border-border-interactive px-2.5 py-1 rounded-lg transition flex items-center gap-1.5"
                   title="Collapse completed exercises"
                 >
                   <span>Collapse Completed</span>
                 </button>
                 <button
                   onClick={() => toggleAllAccordions(!allExpanded)}
-                  className="text-xs font-bold text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700/80 px-2.5 py-1 rounded-lg transition"
+                  className="text-xs font-bold text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 border border-border-interactive px-2.5 py-1 rounded-lg transition"
                 >
                   {allExpanded ? 'Collapse All' : 'Expand All'}
                 </button>
@@ -415,7 +415,7 @@ export const WorkoutEngine: React.FC = () => {
               <select
                 value={selectedExerciseToAdd}
                 onChange={(e) => setSelectedExerciseToAdd(e.target.value)}
-                className="flex-1 min-w-0 bg-zinc-950 border border-zinc-500 text-white rounded-xl px-3 py-2 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none truncate"
+                className="flex-1 min-w-0 bg-zinc-950 border border-border-interactive text-white rounded-xl px-3 py-2 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none truncate"
                 data-testid="add-exercise-select"
               >
                 <option value="">-- Choose Exercise --</option>

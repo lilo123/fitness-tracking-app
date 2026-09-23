@@ -73,7 +73,7 @@ export const CoachTemplateBuilder: React.FC<CoachTemplateBuilderProps> = ({
               value={templateName}
               onChange={(e) => setTemplateName(e.target.value)}
               placeholder="e.g. Hypertrophy Upper Body A"
-              className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none"
+              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none"
             />
           </div>
 
@@ -83,7 +83,7 @@ export const CoachTemplateBuilder: React.FC<CoachTemplateBuilderProps> = ({
               id="isMasterCheckbox"
               checked={isMaster}
               onChange={(e) => setIsMaster(e.target.checked)}
-              className="rounded bg-zinc-950 border-zinc-500 text-cyan-500 focus:ring-0 w-5 h-5 shrink-0"
+              className="rounded bg-zinc-950 border-border-interactive text-cyan-500 focus:ring-0 w-5 h-5 shrink-0"
             />
             <span className="text-xs text-zinc-300 font-bold select-none">
               Master Template (Available to all athletes)
@@ -96,7 +96,7 @@ export const CoachTemplateBuilder: React.FC<CoachTemplateBuilderProps> = ({
               value={exerciseToAdd}
               onChange={(e) => setExerciseToAdd(e.target.value)}
               aria-label="Choose exercise to add"
-              className="flex-1 min-w-0 max-w-full truncate cursor-pointer bg-zinc-950 border border-zinc-500 text-white rounded-xl px-3 py-2 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none min-h-[44px]"
+              className="flex-1 min-w-0 max-w-full truncate cursor-pointer bg-zinc-950 border border-border-interactive text-white rounded-xl px-3 py-2 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none min-h-[44px]"
               data-testid="template-exercise-select"
             >
               <option value="">-- Choose Exercise to Add --</option>
@@ -110,7 +110,7 @@ export const CoachTemplateBuilder: React.FC<CoachTemplateBuilderProps> = ({
               type="button"
               onClick={onAddExercise}
               disabled={!exerciseToAdd}
-              className="bg-zinc-800 hover:bg-zinc-700 text-cyan-300 font-bold px-4 py-2 min-h-[44px] rounded-xl text-xs flex items-center gap-1 border border-zinc-700 disabled:opacity-50 touch-manipulation shrink-0"
+              className="bg-zinc-800 hover:bg-zinc-700 text-cyan-300 font-bold px-4 py-2 min-h-[44px] rounded-xl text-xs flex items-center gap-1 border border-border-interactive disabled:opacity-50 touch-manipulation shrink-0"
               data-testid="add-template-exercise-btn"
             >
               <Plus className="w-4 h-4 shrink-0" />
@@ -148,7 +148,7 @@ export const CoachTemplateBuilder: React.FC<CoachTemplateBuilderProps> = ({
                             const val = Number(e.target.value) || 1;
                             onUpdateTargetSets(idx, val);
                           }}
-                          className="w-12 min-h-[44px] bg-zinc-900 border border-zinc-500 text-white rounded-lg px-1 py-0.5 text-center text-base sm:text-xs font-bold shrink-0"
+                          className="w-12 min-h-[44px] bg-zinc-900 border border-border-interactive text-white rounded-lg px-1 py-0.5 text-center text-base sm:text-xs font-bold shrink-0"
                           title="Target Sets"
                           data-testid={`template-target-sets-${idx}`}
                         />
@@ -166,7 +166,7 @@ export const CoachTemplateBuilder: React.FC<CoachTemplateBuilderProps> = ({
                             const val = Number(e.target.value) || 1;
                             onUpdateTargetReps(idx, val);
                           }}
-                          className="w-14 min-h-[44px] bg-zinc-900 border border-zinc-500 text-white rounded-lg px-1 py-0.5 text-center text-base sm:text-xs font-bold shrink-0"
+                          className="w-14 min-h-[44px] bg-zinc-900 border border-border-interactive text-white rounded-lg px-1 py-0.5 text-center text-base sm:text-xs font-bold shrink-0"
                           title="Target Reps"
                           data-testid={`template-target-reps-${idx}`}
                         />

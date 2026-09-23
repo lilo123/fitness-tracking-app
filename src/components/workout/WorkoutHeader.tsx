@@ -52,7 +52,7 @@ export const WorkoutHeader: React.FC<WorkoutHeaderProps> = ({
             </span>
             <button
               onClick={onOpenRoutineModal}
-              className="bg-zinc-800/90 hover:bg-zinc-700/80 border border-zinc-700/80 hover:border-cyan-500/50 text-white text-xs font-bold px-3 py-1.5 min-h-[44px] rounded-xl flex items-center gap-2 transition-all shadow-sm"
+              className="bg-zinc-800/90 hover:bg-zinc-700/80 border border-border-interactive hover:border-cyan-500/50 text-white text-xs font-bold px-3 py-1.5 min-h-[44px] rounded-xl flex items-center gap-2 transition-all shadow-sm"
               data-testid="routine-select-btn"
             >
               <Layers className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
@@ -63,7 +63,7 @@ export const WorkoutHeader: React.FC<WorkoutHeaderProps> = ({
             <button
               type="button"
               onClick={() => restTimerStore.toggleHeaderTimer()}
-              className="bg-zinc-800/90 hover:bg-zinc-700/80 border border-zinc-700/80 hover:border-cyan-500/50 text-cyan-300 text-xs font-bold px-3 py-1.5 min-h-[44px] rounded-xl flex items-center gap-1.5 transition-all shadow-sm touch-manipulation shrink-0"
+              className="bg-zinc-800/90 hover:bg-zinc-700/80 border border-border-interactive hover:border-cyan-500/50 text-cyan-300 text-xs font-bold px-3 py-1.5 min-h-[44px] rounded-xl flex items-center gap-1.5 transition-all shadow-sm touch-manipulation shrink-0"
               title="Rest Timer"
               data-testid="rest-timer-btn"
             >
@@ -83,7 +83,7 @@ export const WorkoutHeader: React.FC<WorkoutHeaderProps> = ({
                 workoutSessionStore.flushPendingWrites();
                 onDateChange(e.target.value);
               }}
-              className="bg-zinc-950 border border-zinc-500 text-cyan-400 rounded-xl px-2.5 py-1.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none shadow-inner cursor-pointer"
+              className="bg-zinc-950 border border-border-interactive text-cyan-400 rounded-xl px-2.5 py-1.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none shadow-inner cursor-pointer"
               data-testid="workout-date-input"
             />
             <button

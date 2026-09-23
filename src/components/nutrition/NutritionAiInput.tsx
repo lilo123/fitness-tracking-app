@@ -71,16 +71,16 @@ export const NutritionAiInput: React.FC<NutritionAiInputProps> = memo(({
         <button
           type="button"
           onClick={onToggleManualForm}
-          className="text-[11px] font-bold text-zinc-400 hover:text-white flex items-center justify-center gap-1 bg-zinc-800 hover:bg-zinc-700 px-3 py-2 min-h-[44px] min-w-[44px] rounded-xl transition border border-zinc-700 touch-manipulation"
+          className="text-[11px] font-bold text-zinc-400 hover:text-white flex items-center justify-center gap-1 bg-zinc-800 hover:bg-zinc-700 px-3 py-2 min-h-[44px] min-w-[44px] rounded-xl transition border border-border-interactive touch-manipulation"
         >
           <span>{showManualForm ? 'Hide Manual' : 'Manual Entry'}</span>
           {showManualForm ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         </button>
       </div>
 
-      <div className="bg-zinc-950 border border-zinc-500 rounded-2xl p-3 focus-within:border-cyan-500 transition space-y-2.5">
+      <div className="bg-zinc-950 border border-border-interactive rounded-2xl p-3 focus-within:border-cyan-500 focus-within:ring-2 focus-within:ring-cyan-500/50 transition space-y-2.5">
         {selectedPhoto && (
-          <div data-testid="photo-preview-container" className="relative flex items-center justify-between p-2.5 bg-zinc-900 border border-zinc-750 rounded-xl">
+          <div data-testid="photo-preview-container" className="relative flex items-center justify-between p-2.5 bg-zinc-900 border border-zinc-800 rounded-xl">
             <div className="flex items-center gap-3">
               <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-cyan-500/40 shrink-0 bg-zinc-950 shadow-md">
                 <img
@@ -95,7 +95,7 @@ export const NutritionAiInput: React.FC<NutritionAiInputProps> = memo(({
                     data-testid="remove-photo-button"
                     onClick={onRemovePhoto}
                     aria-label="Remove photo"
-                    className="absolute top-0 right-0 min-w-[44px] min-h-[44px] p-2 rounded-full bg-zinc-950/80 hover:bg-rose-600 text-white flex items-center justify-center transition border border-zinc-700 touch-manipulation"
+                    className="absolute top-0 right-0 min-w-[44px] min-h-[44px] p-2 rounded-full bg-zinc-950/80 hover:bg-rose-600 text-white flex items-center justify-center transition border border-border-interactive touch-manipulation"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -159,7 +159,7 @@ export const NutritionAiInput: React.FC<NutritionAiInputProps> = memo(({
               data-testid="camera-trigger"
               onClick={() => onPickPhoto(CameraSource.Camera)}
               disabled={isAnalyzing}
-              className="p-2.5 min-h-[44px] min-w-[44px] rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-cyan-400 border border-zinc-800 transition flex items-center justify-center gap-1.5 text-xs font-bold disabled:opacity-50 touch-manipulation"
+              className="p-2.5 min-h-[44px] min-w-[44px] rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-cyan-400 border border-border-interactive transition flex items-center justify-center gap-1.5 text-xs font-bold disabled:opacity-50 touch-manipulation"
               title="Take Photo"
             >
               <CameraIcon className="w-4 h-4 text-cyan-400" />
@@ -171,7 +171,7 @@ export const NutritionAiInput: React.FC<NutritionAiInputProps> = memo(({
               data-testid="gallery-trigger"
               onClick={() => onPickPhoto(CameraSource.Photos)}
               disabled={isAnalyzing}
-              className="p-2.5 min-h-[44px] min-w-[44px] rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-cyan-400 border border-zinc-800 transition flex items-center justify-center gap-1.5 text-xs font-bold disabled:opacity-50 touch-manipulation"
+              className="p-2.5 min-h-[44px] min-w-[44px] rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-cyan-400 border border-border-interactive transition flex items-center justify-center gap-1.5 text-xs font-bold disabled:opacity-50 touch-manipulation"
               title="Photo Gallery"
             >
               <ImageIcon className="w-4 h-4 text-cyan-400" />

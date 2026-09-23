@@ -273,7 +273,7 @@ export const ExercisesView: React.FC = () => {
                   type="text"
                   value={exerciseName}
                   onChange={(e) => setExerciseName(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-3 text-base sm:text-sm font-semibold focus:border-cyan-500 outline-none"
+                  className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-3 text-base sm:text-sm font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none"
                   placeholder="e.g. Incline Bench Press"
                 />
               </div>
@@ -290,7 +290,7 @@ export const ExercisesView: React.FC = () => {
                     <button
                       key={part}
                       onClick={() => toggleBodyPart(part)}
-                      className={`px-3.5 py-2 min-h-[44px] flex items-center justify-center rounded-full text-xs font-bold transition touch-manipulation ${selectedBodyParts.includes(part) ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' : 'bg-zinc-900 text-zinc-400 border border-zinc-800'}`}
+                      className={`px-3.5 py-2 min-h-[44px] flex items-center justify-center rounded-full text-xs font-bold transition touch-manipulation ${selectedBodyParts.includes(part) ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' : 'bg-zinc-900 text-zinc-400 border border-border-interactive'}`}
                     >
                       {part}
                     </button>
@@ -404,7 +404,7 @@ export const ExercisesView: React.FC = () => {
                 className={`px-3.5 py-2 min-h-[44px] flex items-center justify-center rounded-xl text-xs font-bold transition shrink-0 touch-manipulation ${
                   selectedDayFilter === d
                     ? 'bg-violet-500 text-white shadow-neon-violet'
-                    : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white'
+                    : 'bg-zinc-900 border border-border-interactive text-zinc-400 hover:text-white'
                 }`}
               >
                 {d}

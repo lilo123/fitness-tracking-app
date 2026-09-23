@@ -256,7 +256,7 @@ const EditSetForm: React.FC<EditSetFormProps> = ({
               value={selectedExerciseId}
               onChange={(e) => setSelectedExerciseId(e.target.value)}
               disabled={isPending}
-              className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl px-3 py-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none truncate"
+              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl px-3 py-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none truncate"
             >
               {!exercises.some((ex) => ex.id === selectedExerciseId) && selectedExerciseId && (
                 <option value={selectedExerciseId}>
@@ -285,7 +285,7 @@ const EditSetForm: React.FC<EditSetFormProps> = ({
               value={setType}
               onChange={(e) => setSetType(e.target.value as SetType)}
               disabled={isPending}
-              className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl px-3 py-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none"
+              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl px-3 py-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none"
             >
               {SET_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>
@@ -314,7 +314,7 @@ const EditSetForm: React.FC<EditSetFormProps> = ({
                 onChange={(e) => handleWeightChange(e.target.value)}
                 placeholder="0 for BW"
                 disabled={isPending}
-                className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl px-3 py-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+                className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl px-3 py-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
               />
               <span className="text-[10px] text-zinc-500 mt-1 block">0 = Bodyweight</span>
             </div>
@@ -337,7 +337,7 @@ const EditSetForm: React.FC<EditSetFormProps> = ({
                 onChange={(e) => handleRepsChange(e.target.value)}
                 placeholder="Reps"
                 disabled={isPending}
-                className="w-full bg-zinc-950 border border-zinc-500 text-cyan-300 rounded-xl px-3 py-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+                className="w-full bg-zinc-950 border border-border-interactive text-cyan-300 rounded-xl px-3 py-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
               />
               <span className="text-[10px] text-zinc-500 mt-1 block">Min: 1</span>
             </div>
@@ -360,7 +360,7 @@ const EditSetForm: React.FC<EditSetFormProps> = ({
               onChange={(e) => handleRpeChange(e.target.value)}
               placeholder="e.g. 8.5"
               disabled={isPending}
-              className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl px-3 py-2 text-base sm:text-xs font-mono focus:border-cyan-500 outline-none"
+              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl px-3 py-2 text-base sm:text-xs font-mono focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none"
             />
           </div>
 

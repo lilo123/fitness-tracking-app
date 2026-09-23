@@ -410,7 +410,7 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g., Push Day - Hypertrophy"
-                  className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-3 input-text-sm focus:border-violet-500 outline-none"
+                  className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-3 input-text-sm focus:border-violet-500 focus:ring-2 focus:ring-violet-500/50 outline-none"
                 />
               </div>
 
@@ -432,7 +432,7 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
                         className={`px-3.5 py-2 min-h-[44px] flex items-center justify-center rounded-xl text-xs font-bold transition touch-manipulation ${
                           active
                             ? 'bg-violet-500 text-white shadow-neon-violet'
-                            : 'bg-zinc-950 border border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                            : 'bg-zinc-950 border border-border-interactive text-zinc-400 hover:border-zinc-700'
                         }`}
                       >
                         {d}
@@ -478,7 +478,7 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
                   type="button"
                   data-testid="open-exercise-picker"
                   onClick={() => setIsPickerOpen(true)}
-                  className="w-full py-3.5 min-h-[48px] rounded-2xl border border-dashed border-zinc-700 hover:border-violet-500/60 bg-zinc-950/60 hover:bg-violet-500/5 text-xs font-bold text-zinc-300 hover:text-violet-300 flex items-center justify-center gap-2 transition active:scale-98 touch-manipulation"
+                  className="w-full py-3.5 min-h-[48px] rounded-2xl border border-dashed border-border-interactive hover:border-violet-500/60 bg-zinc-950/60 hover:bg-violet-500/5 text-xs font-bold text-zinc-300 hover:text-violet-300 flex items-center justify-center gap-2 transition active:scale-98 touch-manipulation"
                 >
                   <Plus className="w-4 h-4 text-violet-400" />
                   <span>Add Exercise to Routine</span>

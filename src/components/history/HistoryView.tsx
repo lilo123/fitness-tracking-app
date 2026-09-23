@@ -371,7 +371,7 @@ export const HistoryView: React.FC = () => {
               onClick={() => setViewMode('session')}
               className={`flex-1 py-2 px-3 min-h-[44px] rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition ${
                 viewMode === 'session'
-                  ? 'bg-zinc-800 text-cyan-300 border border-zinc-700'
+                  ? 'bg-zinc-800 text-cyan-300 border border-border-interactive'
                   : 'text-zinc-400 hover:text-white bg-transparent'
               }`}
             >
@@ -382,7 +382,7 @@ export const HistoryView: React.FC = () => {
               onClick={() => setViewMode('exercise')}
               className={`flex-1 py-2 px-3 min-h-[44px] rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition ${
                 viewMode === 'exercise'
-                  ? 'bg-zinc-800 text-cyan-300 border border-zinc-700'
+                  ? 'bg-zinc-800 text-cyan-300 border border-border-interactive'
                   : 'text-zinc-400 hover:text-white bg-transparent'
               }`}
             >
@@ -400,7 +400,7 @@ export const HistoryView: React.FC = () => {
             data-testid="history-range-all"
             className={`flex-1 py-1.5 px-3 min-h-[44px] rounded-xl font-bold transition whitespace-nowrap ${
               timeRange === 'all'
-                ? 'bg-zinc-800 text-cyan-300 border border-zinc-700 shadow-sm'
+                ? 'bg-zinc-800 text-cyan-300 border border-border-interactive shadow-sm'
                 : 'text-zinc-400 hover:text-white bg-transparent'
             }`}
           >
@@ -412,7 +412,7 @@ export const HistoryView: React.FC = () => {
             data-testid="history-range-90d"
             className={`flex-1 py-1.5 px-3 min-h-[44px] rounded-xl font-bold transition whitespace-nowrap ${
               timeRange === '90d'
-                ? 'bg-zinc-800 text-cyan-300 border border-zinc-700 shadow-sm'
+                ? 'bg-zinc-800 text-cyan-300 border border-border-interactive shadow-sm'
                 : 'text-zinc-400 hover:text-white bg-transparent'
             }`}
           >
@@ -424,7 +424,7 @@ export const HistoryView: React.FC = () => {
             data-testid="history-range-30d"
             className={`flex-1 py-1.5 px-3 min-h-[44px] rounded-xl font-bold transition whitespace-nowrap ${
               timeRange === '30d'
-                ? 'bg-zinc-800 text-cyan-300 border border-zinc-700 shadow-sm'
+                ? 'bg-zinc-800 text-cyan-300 border border-border-interactive shadow-sm'
                 : 'text-zinc-400 hover:text-white bg-transparent'
             }`}
           >
@@ -436,7 +436,7 @@ export const HistoryView: React.FC = () => {
             data-testid="history-range-1y"
             className={`flex-1 py-1.5 px-3 min-h-[44px] rounded-xl font-bold transition whitespace-nowrap ${
               timeRange === '1y'
-                ? 'bg-zinc-800 text-cyan-300 border border-zinc-700 shadow-sm'
+                ? 'bg-zinc-800 text-cyan-300 border border-border-interactive shadow-sm'
                 : 'text-zinc-400 hover:text-white bg-transparent'
             }`}
           >

@@ -87,7 +87,7 @@ export const ResetPasswordView: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-3 pr-12 text-base sm:text-sm font-semibold focus:border-cyan-500 outline-none transition"
+                  className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-3 pr-12 text-base sm:text-sm font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none transition"
                   required
                 />
                 <button
@@ -115,7 +115,7 @@ export const ResetPasswordView: React.FC = () => {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-3 pr-12 text-base sm:text-sm font-semibold focus:border-cyan-500 outline-none transition"
+                  className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-3 pr-12 text-base sm:text-sm font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none transition"
                   required
                 />
                 <button

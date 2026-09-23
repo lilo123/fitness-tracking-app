@@ -77,7 +77,7 @@ export const QuickLogAllSheet: React.FC<QuickLogAllSheetProps> = ({
           placeholder="Search favorites (e.g. oats, shake, bowl)..."
           aria-label="Search favorite dishes"
           data-testid="search-favorites-input"
-          className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl pl-10 pr-12 py-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none transition min-h-[44px]"
+          className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl pl-10 pr-12 py-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none transition min-h-[44px]"
         />
         {searchQuery.length > 0 && (
           <button
@@ -185,7 +185,7 @@ export const QuickLogAllSheet: React.FC<QuickLogAllSheetProps> = ({
         <button
           type="button"
           onClick={onClose}
-          className="min-h-[44px] px-4 rounded-xl border border-zinc-800 text-xs font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition touch-manipulation"
+          className="min-h-[44px] px-4 rounded-xl border border-border-interactive text-xs font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition touch-manipulation"
         >
           Close
         </button>

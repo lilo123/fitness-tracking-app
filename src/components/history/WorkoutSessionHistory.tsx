@@ -344,7 +344,7 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
             onClick={onLoadMore}
             disabled={isLoadingMore}
             data-testid="load-more-sessions-btn"
-            className="px-5 py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-zinc-800/80 hover:bg-zinc-700 text-cyan-300 border border-zinc-700/80 transition touch-manipulation disabled:opacity-50"
+            className="px-5 py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-zinc-800/80 hover:bg-zinc-700 text-cyan-300 border border-border-interactive transition touch-manipulation disabled:opacity-50"
           >
             {isLoadingMore
               ? 'Loading...'

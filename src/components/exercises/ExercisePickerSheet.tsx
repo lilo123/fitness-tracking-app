@@ -58,7 +58,7 @@ export const ExercisePickerSheet: React.FC<ExercisePickerSheetProps> = ({
           placeholder="Search exercise library..."
           value={searchQuery}
           onChange={(e) => onSearchQueryChange(e.target.value)}
-          className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl pl-9 pr-3 py-2.5 input-text-xs focus:border-violet-500 outline-none"
+          className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl pl-9 pr-3 py-2.5 input-text-xs focus:border-violet-500 focus:ring-2 focus:ring-violet-500/50 outline-none"
         />
       </div>
 
@@ -72,7 +72,7 @@ export const ExercisePickerSheet: React.FC<ExercisePickerSheetProps> = ({
             className={`px-3.5 py-2 min-h-[44px] flex items-center justify-center rounded-xl text-xs font-bold shrink-0 transition touch-manipulation ${
               selectedCategory === cat
                 ? 'bg-violet-500 text-white shadow-neon-violet'
-                : 'bg-zinc-950 text-zinc-400 border border-zinc-800 hover:border-zinc-700'
+                : 'bg-zinc-950 text-zinc-400 border border-border-interactive hover:border-zinc-700'
             }`}
           >
             {cat}

@@ -172,7 +172,7 @@ export const WorkoutExerciseHistory: React.FC<WorkoutExerciseHistoryProps> = ({
             placeholder="Search exercise library..."
             value={searchQuery}
             onChange={(e) => onSearchQueryChange(e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-500 text-white rounded-2xl pl-10 pr-4 py-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none"
+            className="w-full bg-zinc-900 border border-border-interactive text-white rounded-2xl pl-10 pr-4 py-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none"
           />
         </div>
 
@@ -184,7 +184,7 @@ export const WorkoutExerciseHistory: React.FC<WorkoutExerciseHistoryProps> = ({
               className={`px-3.5 py-2 min-h-[44px] flex items-center justify-center rounded-xl text-xs font-bold shrink-0 transition touch-manipulation ${
                 selectedCategory === cat
                   ? 'bg-cyan-500 text-black shadow-neon-cyan'
-                  : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'
+                  : 'bg-zinc-900 text-zinc-400 hover:text-white border border-border-interactive'
               }`}
             >
               {cat}

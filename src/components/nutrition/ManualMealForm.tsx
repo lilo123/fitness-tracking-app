@@ -130,7 +130,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             value={manualName}
             onChange={(e) => onManualNameChange(e.target.value)}
             placeholder="e.g. Scrambled Eggs & Toast"
-            className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none"
+            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none"
             required
           />
         </div>
@@ -145,7 +145,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             id={mealTypeId}
             value={manualMealType}
             onChange={(e) => onManualMealTypeChange(e.target.value)}
-            className="w-full bg-zinc-950 border border-zinc-500 text-zinc-300 rounded-xl p-2 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none"
+            className="w-full bg-zinc-950 border border-border-interactive text-zinc-300 rounded-xl p-2 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none"
           >
             <option value="Breakfast">Breakfast</option>
             <option value="Lunch">Lunch</option>
@@ -174,7 +174,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             value={manualCalories}
             onChange={(e) => onManualCaloriesChange(e.target.value === '' ? '' : Number(e.target.value))}
             placeholder="0"
-            className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
             required
           />
         </div>
@@ -194,7 +194,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             value={manualProtein}
             onChange={(e) => onManualProteinChange(e.target.value === '' ? '' : Number(e.target.value))}
             placeholder="0"
-            className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
             required
           />
         </div>
@@ -214,7 +214,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             value={manualCarbs}
             onChange={(e) => onManualCarbsChange(e.target.value === '' ? '' : Number(e.target.value))}
             placeholder="0"
-            className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
             required
           />
         </div>
@@ -234,7 +234,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             value={manualFat}
             onChange={(e) => onManualFatChange(e.target.value === '' ? '' : Number(e.target.value))}
             placeholder="0"
-            className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
             required
           />
         </div>
@@ -254,7 +254,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             value={manualFiber}
             onChange={(e) => onManualFiberChange(e.target.value === '' ? '' : Number(e.target.value))}
             placeholder="0"
-            className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
           />
         </div>
       </div>
@@ -274,7 +274,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             inputMode="decimal"
             value={manualServingSize}
             onChange={(e) => onManualServingSizeChange(e.target.value === '' ? '' : Number(e.target.value))}
-            className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2 text-base sm:text-xs font-mono focus:border-cyan-500 outline-none text-center"
+            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
           />
         </div>
         <div>
@@ -289,7 +289,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             type="text"
             value={manualServingUnit}
             onChange={(e) => onManualServingUnitChange(e.target.value)}
-            className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none text-center"
+            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
           />
         </div>
       </div>

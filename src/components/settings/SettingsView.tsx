@@ -125,7 +125,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none"
+              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none"
             />
           </div>
 
@@ -141,7 +141,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
                   className={`p-3 min-h-[44px] rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition touch-manipulation ${
                     role === 'athlete'
                       ? 'bg-cyan-500/15 border-cyan-500 text-cyan-300 shadow-neon-cyan'
-                      : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                      : 'bg-zinc-950 border-border-interactive text-zinc-400 hover:border-zinc-700'
                   }`}
                 >
                   <Dumbbell className="w-4 h-4" /> Athlete View
@@ -152,7 +152,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
                   className={`p-3 min-h-[44px] rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition touch-manipulation ${
                     role === 'coach'
                       ? 'bg-cyan-500/15 border-cyan-500 text-cyan-300 shadow-neon-cyan'
-                      : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                      : 'bg-zinc-950 border-border-interactive text-zinc-400 hover:border-zinc-700'
                   }`}
                 >
                   <Shield className="w-4 h-4" /> Coach View

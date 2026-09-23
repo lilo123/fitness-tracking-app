@@ -92,7 +92,7 @@ export const QuickLogFavorites: React.FC<QuickLogFavoritesProps> = ({
           type="button"
           onClick={() => setIsSheetOpen(true)}
           data-testid="open-favorites-sheet-btn"
-          className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-zinc-950 hover:bg-zinc-850 border border-zinc-800/90 text-xs font-semibold text-zinc-300 hover:text-white transition touch-manipulation min-h-[44px] group shadow-sm"
+          className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-zinc-950 hover:bg-zinc-850 border border-border-interactive text-xs font-semibold text-zinc-300 hover:text-white transition touch-manipulation min-h-[44px] group shadow-sm"
         >
           <div className="flex items-center gap-2">
             <Search className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />

@@ -113,7 +113,7 @@ export const RoutinePickerModal: React.FC<RoutinePickerModalProps> = ({
           <button
             type="button"
             onClick={onReloadScheduledRoutine}
-            className="w-full py-2.5 px-3 mb-2 rounded-xl border border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 text-cyan-400 font-bold text-xs flex items-center justify-center gap-1.5 transition"
+            className="w-full py-2.5 px-3 mb-2 rounded-xl border border-border-interactive bg-zinc-800/80 hover:bg-zinc-700 text-cyan-400 font-bold text-xs flex items-center justify-center gap-1.5 transition"
             data-testid="reload-scheduled-routine-btn"
             title="Discard draft and reload scheduled routine"
           >
@@ -126,7 +126,7 @@ export const RoutinePickerModal: React.FC<RoutinePickerModalProps> = ({
             className={`w-full text-left p-3.5 rounded-xl border flex items-center justify-between font-black transition ${
               activeRoutineName === 'Free Workout'
                 ? 'bg-cyan-500/15 border-cyan-500 text-cyan-300'
-                : 'bg-zinc-950 border-zinc-800/80 text-white hover:bg-zinc-800'
+                : 'bg-zinc-950 border-border-interactive text-white hover:bg-zinc-800'
             }`}
           >
             <span>Free Workout</span>
@@ -138,7 +138,7 @@ export const RoutinePickerModal: React.FC<RoutinePickerModalProps> = ({
             className={`w-full text-left p-3.5 rounded-xl border flex items-center justify-between font-black transition ${
               activeRoutineName === 'Rest Day'
                 ? 'bg-indigo-500/20 border-indigo-500 text-indigo-300'
-                : 'bg-zinc-950 border-zinc-800/80 text-white hover:bg-zinc-800'
+                : 'bg-zinc-950 border-border-interactive text-white hover:bg-zinc-800'
             }`}
           >
             <div className="flex items-center gap-2">
@@ -157,7 +157,7 @@ export const RoutinePickerModal: React.FC<RoutinePickerModalProps> = ({
                 className={`w-full text-left p-3.5 rounded-xl border transition ${
                   activeRoutineName === tpl.name
                     ? 'bg-cyan-500/15 border-cyan-500 text-cyan-300'
-                    : 'bg-zinc-950 border-zinc-800/80 text-white hover:bg-zinc-800'
+                    : 'bg-zinc-950 border-border-interactive text-white hover:bg-zinc-800'
                 }`}
               >
                 <div className="flex items-center justify-between font-black">
@@ -208,7 +208,7 @@ export const RoutinePickerModal: React.FC<RoutinePickerModalProps> = ({
               className={`w-full text-left p-3.5 rounded-xl border transition ${
                 activeRoutineName === tpl.name
                   ? 'bg-cyan-500/15 border-cyan-500 text-cyan-300'
-                  : 'bg-zinc-950 border-zinc-800/80 text-white hover:bg-zinc-800'
+                  : 'bg-zinc-950 border-border-interactive text-white hover:bg-zinc-800'
               }`}
             >
               <div className="flex items-center justify-between font-black">

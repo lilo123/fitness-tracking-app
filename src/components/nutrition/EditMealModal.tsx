@@ -196,7 +196,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
               onChange={(e) => setFoodName(e.target.value)}
               placeholder="e.g. Grilled Chicken & Rice"
               data-testid="edit-meal-name-input"
-              className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none"
+              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none"
               required
             />
           </div>
@@ -213,7 +213,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
               value={mealType}
               onChange={(e) => setMealType(e.target.value)}
               data-testid="edit-meal-type-select"
-              className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none min-h-[44px]"
+              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none min-h-[44px]"
             >
               {MEAL_TYPES.map((t) => (
                 <option key={t} value={t}>
@@ -244,7 +244,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
                 onChange={(e) => setServingSize(e.target.value)}
                 placeholder="1"
                 data-testid="edit-meal-serving-size-input"
-                className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2 text-base sm:text-xs font-mono focus:border-cyan-500 outline-none text-center min-h-[44px]"
+                className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px]"
               />
             </div>
             <div>
@@ -261,7 +261,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
                 onChange={(e) => setServingUnit(e.target.value)}
                 placeholder="e.g. serving, g, oz"
                 data-testid="edit-meal-serving-unit-input"
-                className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none text-center min-h-[44px]"
+                className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px]"
               />
             </div>
           </div>
@@ -296,7 +296,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
                 aria-readonly={hasBreakdown}
                 placeholder="0"
                 data-testid="edit-meal-calories-input"
-                className={`w-full border border-zinc-500 rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center min-h-[44px] ${hasBreakdown ? 'bg-zinc-900 text-zinc-400 cursor-not-allowed' : 'bg-zinc-950 text-white'}`}
+                className={`w-full border border-border-interactive rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px] ${hasBreakdown ? 'bg-zinc-900 text-zinc-400 cursor-not-allowed' : 'bg-zinc-950 text-white'}`}
                 required
               />
             </div>
@@ -319,7 +319,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
                 aria-readonly={hasBreakdown}
                 placeholder="0"
                 data-testid="edit-meal-protein-input"
-                className={`w-full border border-zinc-500 rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center min-h-[44px] ${hasBreakdown ? 'bg-zinc-900 text-zinc-400 cursor-not-allowed' : 'bg-zinc-950 text-white'}`}
+                className={`w-full border border-border-interactive rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px] ${hasBreakdown ? 'bg-zinc-900 text-zinc-400 cursor-not-allowed' : 'bg-zinc-950 text-white'}`}
               />
             </div>
             <div className="col-span-2 sm:col-span-1">
@@ -341,7 +341,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
                 aria-readonly={hasBreakdown}
                 placeholder="0"
                 data-testid="edit-meal-carbs-input"
-                className={`w-full border border-zinc-500 rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center min-h-[44px] ${hasBreakdown ? 'bg-zinc-900 text-zinc-400 cursor-not-allowed' : 'bg-zinc-950 text-white'}`}
+                className={`w-full border border-border-interactive rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px] ${hasBreakdown ? 'bg-zinc-900 text-zinc-400 cursor-not-allowed' : 'bg-zinc-950 text-white'}`}
               />
             </div>
             <div className="col-span-3 sm:col-span-1">
@@ -363,7 +363,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
                 aria-readonly={hasBreakdown}
                 placeholder="0"
                 data-testid="edit-meal-fat-input"
-                className={`w-full border border-zinc-500 rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center min-h-[44px] ${hasBreakdown ? 'bg-zinc-900 text-zinc-400 cursor-not-allowed' : 'bg-zinc-950 text-white'}`}
+                className={`w-full border border-border-interactive rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px] ${hasBreakdown ? 'bg-zinc-900 text-zinc-400 cursor-not-allowed' : 'bg-zinc-950 text-white'}`}
               />
             </div>
             <div className="col-span-3 sm:col-span-1">
@@ -385,7 +385,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
                 aria-readonly={hasBreakdown}
                 placeholder="0"
                 data-testid="edit-meal-fiber-input"
-                className={`w-full border border-zinc-500 rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center min-h-[44px] ${hasBreakdown ? 'bg-zinc-900 text-zinc-400 cursor-not-allowed' : 'bg-zinc-950 text-white'}`}
+                className={`w-full border border-border-interactive rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px] ${hasBreakdown ? 'bg-zinc-900 text-zinc-400 cursor-not-allowed' : 'bg-zinc-950 text-white'}`}
               />
             </div>
           </div>

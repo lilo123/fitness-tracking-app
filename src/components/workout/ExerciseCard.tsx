@@ -212,7 +212,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
             <button
               type="button"
               onClick={() => onMoveExercise(exIndex, -1)}
-              className="relative w-7 h-7 rounded-lg bg-zinc-800/60 hover:bg-zinc-700 border border-zinc-700/50 flex items-center justify-center text-zinc-400 hover:text-cyan-400 transition touch-manipulation before:absolute before:-inset-1.5 before:content-['']"
+              className="relative w-7 h-7 rounded-lg bg-zinc-800/60 hover:bg-zinc-700 border border-border-interactive flex items-center justify-center text-zinc-400 hover:text-cyan-400 transition touch-manipulation before:absolute before:-inset-1.5 before:content-['']"
               title="Move up"
               aria-label={`Move ${exName} up`}
             >
@@ -224,7 +224,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
             <button
               type="button"
               onClick={() => onMoveExercise(exIndex, 1)}
-              className="relative w-7 h-7 rounded-lg bg-zinc-800/60 hover:bg-zinc-700 border border-zinc-700/50 flex items-center justify-center text-zinc-400 hover:text-cyan-400 transition touch-manipulation before:absolute before:-inset-1.5 before:content-['']"
+              className="relative w-7 h-7 rounded-lg bg-zinc-800/60 hover:bg-zinc-700 border border-border-interactive flex items-center justify-center text-zinc-400 hover:text-cyan-400 transition touch-manipulation before:absolute before:-inset-1.5 before:content-['']"
               title="Move down"
               aria-label={`Move ${exName} down`}
             >
@@ -235,7 +235,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
           <button
             type="button"
             onClick={() => onRemoveExercise(exIndex)}
-            className="relative w-7 h-7 rounded-lg bg-zinc-800/60 hover:bg-rose-500/20 border border-zinc-700/50 flex items-center justify-center text-zinc-500 hover:text-rose-400 transition touch-manipulation before:absolute before:-inset-1.5 before:content-['']"
+            className="relative w-7 h-7 rounded-lg bg-zinc-800/60 hover:bg-rose-500/20 border border-border-interactive flex items-center justify-center text-zinc-500 hover:text-rose-400 transition touch-manipulation before:absolute before:-inset-1.5 before:content-['']"
             title="Remove from workout"
             aria-label={`Remove ${exName} from workout`}
           >

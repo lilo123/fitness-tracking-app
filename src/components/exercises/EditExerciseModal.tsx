@@ -175,7 +175,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Incline Bench Press"
-              className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-3 input-text-sm font-semibold focus:border-cyan-500 outline-none transition"
+              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-3 input-text-sm font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none transition"
             />
           </div>
 
@@ -204,7 +204,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
                     className={`px-3.5 py-2 min-h-[44px] flex items-center justify-center rounded-full text-xs font-bold transition touch-manipulation ${
                       isSelected
                         ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
-                        : 'bg-zinc-900 text-zinc-400 border border-zinc-800 hover:border-zinc-700'
+                        : 'bg-zinc-900 text-zinc-400 border border-border-interactive hover:border-zinc-700'
                     }`}
                   >
                     {part}

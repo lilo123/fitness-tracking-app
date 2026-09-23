@@ -127,7 +127,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
               value={dishModalName}
               onChange={(e) => setDishModalName(e.target.value)}
               placeholder="e.g. Protein Oatmeal"
-              className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 outline-none"
+              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none"
               required
             />
           </div>
@@ -212,7 +212,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
                     setDishModalCalories(e.target.value === '' ? '' : roundTo1Decimal(Number(e.target.value)))
                   }
                   placeholder="0"
-                  className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+                  className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
                   required
                 />
               </div>
@@ -233,7 +233,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
                     setDishModalProtein(e.target.value === '' ? '' : roundTo1Decimal(Number(e.target.value)))
                   }
                   placeholder="0"
-                  className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+                  className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
                   required
                 />
               </div>
@@ -254,7 +254,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
                     setDishModalCarbs(e.target.value === '' ? '' : roundTo1Decimal(Number(e.target.value)))
                   }
                   placeholder="0"
-                  className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+                  className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
                   required
                 />
               </div>
@@ -275,7 +275,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
                     setDishModalFat(e.target.value === '' ? '' : roundTo1Decimal(Number(e.target.value)))
                   }
                   placeholder="0"
-                  className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+                  className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
                   required
                 />
               </div>
@@ -296,7 +296,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
                     setDishModalFiber(e.target.value === '' ? '' : roundTo1Decimal(Number(e.target.value)))
                   }
                   placeholder="0"
-                  className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+                  className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
                 />
               </div>
             </div>

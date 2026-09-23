@@ -67,7 +67,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
               data-testid="dish-name-input"
               value={stagedMeal.name}
               onChange={(e) => onUpdateStagedMeal({ ...stagedMeal, name: e.target.value })}
-              className="bg-zinc-950 border border-zinc-500 text-white font-black text-base rounded-xl px-3 py-1.5 w-full focus:border-cyan-500 outline-none"
+              className="bg-zinc-950 border border-border-interactive text-white font-black text-base rounded-xl px-3 py-1.5 w-full focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none"
               placeholder="Meal name..."
             />
           </div>
@@ -78,7 +78,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
             aria-label="Meal type"
             value={stagedMeal.mealType}
             onChange={(e) => onUpdateStagedMeal({ ...stagedMeal, mealType: e.target.value })}
-            className="bg-zinc-950 border border-zinc-500 text-zinc-300 input-text-xs font-semibold rounded-xl px-2.5 py-2 focus:border-cyan-500 outline-none"
+            className="bg-zinc-950 border border-border-interactive text-zinc-300 input-text-xs font-semibold rounded-xl px-2.5 py-2 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none"
           >
             <option value="Breakfast">Breakfast</option>
             <option value="Lunch">Lunch</option>
@@ -154,7 +154,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
                 calories: e.target.value === '' ? 0 : roundTo1Decimal(Number(e.target.value)),
               })
             }
-            className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
           />
         </div>
         <div className="col-span-2 sm:col-span-1">
@@ -177,7 +177,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
                 protein: e.target.value === '' ? 0 : roundTo1Decimal(Number(e.target.value)),
               })
             }
-            className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
           />
         </div>
         <div className="col-span-2 sm:col-span-1">
@@ -200,7 +200,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
                 carbs: e.target.value === '' ? 0 : roundTo1Decimal(Number(e.target.value)),
               })
             }
-            className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
           />
         </div>
         <div className="col-span-3 sm:col-span-1">
@@ -223,7 +223,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
                 fat: e.target.value === '' ? 0 : roundTo1Decimal(Number(e.target.value)),
               })
             }
-            className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
           />
         </div>
         <div className="col-span-3 sm:col-span-1">
@@ -246,7 +246,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
                 fiber: e.target.value === '' ? 0 : roundTo1Decimal(Number(e.target.value)),
               })
             }
-            className="w-full bg-zinc-950 border border-zinc-500 text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none text-center"
+            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
           />
         </div>
       </div>
@@ -270,7 +270,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
         <button
           type="button"
           onClick={onSaveStagedAsCustomDish}
-          className="bg-zinc-800 hover:bg-zinc-700 text-amber-300 font-bold py-3 px-3.5 min-h-[44px] rounded-xl text-xs border border-zinc-700 transition flex items-center gap-1.5"
+          className="bg-zinc-800 hover:bg-zinc-700 text-amber-300 font-bold py-3 px-3.5 min-h-[44px] rounded-xl text-xs border border-border-interactive transition flex items-center gap-1.5"
           title="Save this meal as a quick-log custom dish"
         >
           <Star className="w-3.5 h-3.5 fill-amber-400" />
@@ -280,7 +280,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
         <button
           type="button"
           onClick={onDiscardStagedMeal}
-          className="bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white p-3 min-h-[44px] min-w-[44px] rounded-xl transition border border-zinc-700 flex items-center justify-center"
+          className="bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white p-3 min-h-[44px] min-w-[44px] rounded-xl transition border border-border-interactive flex items-center justify-center"
           title="Discard"
         >
           <X className="w-4 h-4" />

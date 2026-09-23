@@ -96,7 +96,7 @@ export const NotesField: React.FC<NotesFieldProps> = ({
           disabled={disabled}
           data-testid="add-note-btn"
           aria-label="Add note"
-          className="inline-flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-xl text-xs font-semibold text-zinc-400 hover:text-cyan-300 hover:bg-zinc-800/60 border border-dashed border-zinc-700/80 hover:border-cyan-500/40 transition touch-manipulation disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-xl text-xs font-semibold text-zinc-400 hover:text-cyan-300 hover:bg-zinc-800/60 border border-dashed border-border-interactive hover:border-cyan-500/40 transition touch-manipulation disabled:opacity-50"
         >
           <Plus className="w-3.5 h-3.5 text-cyan-400" aria-hidden="true" />
           <span>Add note</span>
@@ -147,7 +147,7 @@ export const NotesField: React.FC<NotesFieldProps> = ({
           aria-labelledby={labelId}
           aria-describedby={`${hintId} ${statusId}`}
           data-testid="dish-notes-textarea"
-          className="w-full bg-zinc-950 border border-zinc-500 focus:border-cyan-500 rounded-xl p-2.5 text-base sm:text-xs text-white placeholder-zinc-600 outline-none transition resize-none min-h-[60px] max-h-[140px] leading-relaxed"
+          className="w-full bg-zinc-950 border border-border-interactive focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 rounded-xl p-2.5 text-base sm:text-xs text-white placeholder-zinc-600 outline-none transition resize-none min-h-[60px] max-h-[140px] leading-relaxed"
         />
       </div>
 

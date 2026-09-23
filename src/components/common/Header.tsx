@@ -77,7 +77,7 @@ export const Header: React.FC = () => {
                 className={`text-xs font-bold px-3.5 py-2 min-h-[44px] min-w-[44px] rounded-full border flex items-center justify-center gap-1.5 transition touch-manipulation focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-zinc-900 ${
                   role === 'coach'
                     ? 'text-cyan-300 bg-cyan-500/15 border-cyan-500/40 shadow-[0_0_10px_rgba(6,182,212,0.2)]'
-                    : 'text-zinc-400 bg-zinc-800 border-zinc-700'
+                    : 'text-zinc-400 bg-zinc-800 border-border-interactive'
                 }`}
               >
                 {role === 'coach' ? (

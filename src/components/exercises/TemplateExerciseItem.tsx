@@ -78,7 +78,7 @@ export const TemplateExerciseItem: React.FC<TemplateExerciseItemProps> = memo(({
         {/* Sets Stepper */}
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Sets</span>
-          <div className="flex items-center bg-zinc-900 border border-zinc-500 rounded-xl p-0.5">
+          <div className="flex items-center bg-zinc-900 border border-border-interactive rounded-xl p-0.5">
             <button
               type="button"
               data-testid={`dec-sets-${idx}`}
@@ -112,7 +112,7 @@ export const TemplateExerciseItem: React.FC<TemplateExerciseItemProps> = memo(({
         {/* Reps Stepper */}
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Reps</span>
-          <div className="flex items-center bg-zinc-900 border border-zinc-500 rounded-xl p-0.5">
+          <div className="flex items-center bg-zinc-900 border border-border-interactive rounded-xl p-0.5">
             <button
               type="button"
               data-testid={`dec-reps-${idx}`}

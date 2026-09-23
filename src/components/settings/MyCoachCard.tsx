@@ -167,7 +167,7 @@ export const MyCoachCard: React.FC<MyCoachCardProps> = ({
               onChange={(e) => setLinkCodeInput(e.target.value.toUpperCase())}
               placeholder="e.g. CYBER-DEMO01"
               maxLength={20}
-              className="flex-1 bg-zinc-950 border border-zinc-500 text-white rounded-xl px-3 py-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 outline-none uppercase min-h-[44px]"
+              className="flex-1 bg-zinc-950 border border-border-interactive text-white rounded-xl px-3 py-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none uppercase min-h-[44px]"
               data-testid="link-coach-code-input"
               required
             />

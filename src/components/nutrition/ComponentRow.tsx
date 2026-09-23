@@ -204,7 +204,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
       {editable && (
         <div className="space-y-1.5">
           <div className="flex items-center">
-            <div className="inline-flex items-center gap-0.5 rounded-xl border border-zinc-500 bg-zinc-950 p-0.5 shadow-sm">
+            <div className="inline-flex items-center gap-0.5 rounded-xl border border-border-interactive bg-zinc-950 p-0.5 shadow-sm">
               <button
                 type="button"
                 aria-label={`Decrease quantity of ${item.name}`}
