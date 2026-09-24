@@ -2,6 +2,21 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { GoogleGenAI, Type } from "npm:@google/genai";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+// Overall AI execution budgets (in milliseconds). Deliberately set below the client
+// ceilings of 45s (vision) and 30s (text) in src/components/nutrition/useNutritionAi.ts
+// so that edge function timeouts/fallbacks resolve before the client drops the connection.
+export const OVERALL_BUDGET_VISION_MS = 42000;
+export const OVERALL_BUDGET_TEXT_MS = 27000;
+export const MIN_ATTEMPT_BUDGET_MS = 1500;
+
+// Bounded HTTP retry configuration for @google/genai SDK calls
+const HTTP_RETRY_OPTIONS = {
+  attempts: 2,
+  initialDelay: 1.0,
+  maxDelay: 4.0,
+  jitter: 1,
+};
+
 export function isAllowedOrigin(origin: string | null | undefined): boolean {
   if (!origin) return false;
   const trimmed = origin.trim().replace(/\/+$/, '');
@@ -457,23 +472,23 @@ CORE RESPONSIBILITIES & GUIDELINES:
           { inlineData: { data: cleanBase64, mimeType: imageMimeType } },
           { text: userNotes },
         ];
-        const defaultVisionModel = Deno.env.get("GEMINI_VISION_MODEL_ID") || "gemini-3.8-flash";
+        const defaultVisionModel = Deno.env.get("GEMINI_VISION_MODEL_ID") || "gemini-3.5-flash-lite";
         candidateModels = Array.from(new Set([
           defaultVisionModel,
-          "gemini-3.8-flash",
           "gemini-3.5-flash-lite",
           "gemini-3.1-flash-lite",
+          "gemini-3.8-flash",
         ]));
       } else {
         contents = [
           { text: input },
         ];
-        const defaultTextModel = Deno.env.get("GEMINI_MODEL_ID") || "gemini-3.7-flash";
+        const defaultTextModel = Deno.env.get("GEMINI_MODEL_ID") || "gemini-3.5-flash-lite";
         candidateModels = Array.from(new Set([
           defaultTextModel,
-          "gemini-3.7-flash",
           "gemini-3.5-flash-lite",
           "gemini-3.1-flash-lite",
+          "gemini-3.7-flash",
         ]));
       }
 
@@ -522,16 +537,36 @@ CORE RESPONSIBILITIES & GUIDELINES:
         required: ["is_food", "name", "calories", "protein", "carbs", "fat", "fiber", "items", "explanation"],
       };
 
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          retryOptions: HTTP_RETRY_OPTIONS,
+        },
+      });
       let responseText = "";
       let lastAiError: any = null;
       let rateLimitEncountered: any = null;
       let capacityErrorEncountered: any = null;
       let timeoutEncountered: any = null;
 
+      const overallBudgetMs = cleanBase64 ? OVERALL_BUDGET_VISION_MS : OVERALL_BUDGET_TEXT_MS;
+      const loopStartTime = Date.now();
+
       for (const model of candidateModels) {
+        // Rationale: instant 503s cost ~0.3s so falling through remains cheap,
+        // while a slow-but-healthy model gets all remaining time.
+        const elapsed = Date.now() - loopStartTime;
+        const remaining = overallBudgetMs - elapsed;
+        if (remaining < MIN_ATTEMPT_BUDGET_MS) {
+          const timeoutErr = new Error(`Overall AI budget exceeded: remaining ${remaining}ms < ${MIN_ATTEMPT_BUDGET_MS}ms`);
+          timeoutEncountered = timeoutErr;
+          lastAiError = timeoutErr;
+          break;
+        }
+
+        const attemptStartTime = Date.now();
         try {
-          const timeoutSignal = AbortSignal.timeout(5000);
+          const timeoutSignal = AbortSignal.timeout(remaining);
           const response = await ai.models.generateContent({
             model,
             contents,
@@ -541,6 +576,9 @@ CORE RESPONSIBILITIES & GUIDELINES:
               responseMimeType: "application/json",
               responseSchema,
               abortSignal: timeoutSignal,
+              httpOptions: {
+                retryOptions: HTTP_RETRY_OPTIONS,
+              },
             },
           });
           if (response?.text) {
@@ -573,6 +611,7 @@ CORE RESPONSIBILITIES & GUIDELINES:
               throw new Error("Candidate model returned JSON missing both calories and items");
             }
             responseText = candidateText;
+            console.info(`[parse-nutrition] ${model} OK in ${Date.now() - attemptStartTime}ms`);
             break;
           }
         } catch (modelErr: any) {
@@ -584,7 +623,9 @@ CORE RESPONSIBILITIES & GUIDELINES:
           } else if (isTimeoutError(modelErr)) {
             timeoutEncountered = modelErr;
           }
-          console.warn(`[parse-nutrition] Model ${model} encountered error:`, modelErr?.message || modelErr);
+          const attemptDurationMs = Date.now() - attemptStartTime;
+          const statusInfo = modelErr?.status ? ` (status ${modelErr.status})` : '';
+          console.warn(`[parse-nutrition] Model ${model} encountered error in ${attemptDurationMs}ms${statusInfo}:`, modelErr?.message || modelErr);
         }
       }
 

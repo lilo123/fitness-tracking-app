@@ -397,7 +397,7 @@ Deno.test("parse-nutrition should return 429 with RATE_LIMITED code when Gemini 
     }
 });
 
-Deno.test("parse-nutrition should structure multimodal payload with inlineData and route to gemini-3.8-flash", async () => {
+Deno.test("parse-nutrition should structure multimodal payload with inlineData and route to gemini-3.5-flash-lite", async () => {
     const originalKey = Deno.env.get("GEMINI_API_KEY");
     Deno.env.set("GEMINI_API_KEY", "test-key");
 
@@ -474,8 +474,8 @@ Deno.test("parse-nutrition should structure multimodal payload with inlineData a
         assertEquals(data.calories, 520);
         assertEquals(data.protein, 42);
 
-        // Verify that gemini-3.8-flash was called as the primary vision model
-        assertEquals(interceptedUrl.includes("gemini-3.8-flash"), true);
+        // Verify that gemini-3.5-flash-lite was called as the primary vision model
+        assertEquals(interceptedUrl.includes("gemini-3.5-flash-lite"), true);
 
         // Verify that inlineData was properly constructed in the Gemini contents parts
         assertExists(interceptedBody);
@@ -738,7 +738,7 @@ Deno.test("parse-nutrition seamlessly falls back to secondary model when primary
         }
         if (urlString.includes("generativelanguage.googleapis.com")) {
             callCount += 1;
-            if (urlString.includes("gemini-3.7-flash")) {
+            if (urlString.includes("gemini-3.5-flash-lite")) {
                 // First candidate model fails with 503
                 return new Response(JSON.stringify({ error: { code: 503, message: "Model is currently experiencing high demand" } }), {
                     status: 503,
@@ -1237,7 +1237,7 @@ Deno.test("parse-nutrition seamlessly falls back to secondary model when primary
         }
         if (urlString.includes("generativelanguage.googleapis.com")) {
             callCount += 1;
-            if (urlString.includes("gemini-3.7-flash")) {
+            if (urlString.includes("gemini-3.5-flash-lite")) {
                 // Primary model returns truncated/malformed JSON
                 return new Response(JSON.stringify({
                     candidates: [
@@ -1327,7 +1327,7 @@ Deno.test("parse-nutrition falls back to secondary model when primary candidate 
         }
         if (urlString.includes("generativelanguage.googleapis.com")) {
             callCount += 1;
-            if (urlString.includes("gemini-3.7-flash")) {
+            if (urlString.includes("gemini-3.5-flash-lite")) {
                 // Primary model returns valid JSON but empty object missing calories/items
                 return new Response(JSON.stringify({
                     candidates: [
@@ -1558,7 +1558,7 @@ Deno.test("parse-nutrition pre-structured fast-path returns HTTP 200 without cal
     }
 });
 
-Deno.test("parse-nutrition queries primary model first and falls back to gemini-3.5-flash-lite on failure", async () => {
+Deno.test("parse-nutrition queries primary model first and falls back to gemini-3.1-flash-lite on failure", async () => {
     const originalKey = Deno.env.get("GEMINI_API_KEY");
     Deno.env.set("GEMINI_API_KEY", "test-key");
 
@@ -1573,15 +1573,15 @@ Deno.test("parse-nutrition queries primary model first and falls back to gemini-
             });
         }
         if (urlString.includes("generativelanguage.googleapis.com")) {
-            if (urlString.includes("gemini-3.7-flash")) {
-                calledModels.push("gemini-3.7-flash");
+            if (urlString.includes("gemini-3.5-flash-lite")) {
+                calledModels.push("gemini-3.5-flash-lite");
                 return new Response(JSON.stringify({ error: { code: 503, message: "Server busy" } }), {
                     status: 503,
                     headers: { "Content-Type": "application/json" }
                 });
             }
-            if (urlString.includes("gemini-3.5-flash-lite")) {
-                calledModels.push("gemini-3.5-flash-lite");
+            if (urlString.includes("gemini-3.1-flash-lite")) {
+                calledModels.push("gemini-3.1-flash-lite");
                 const mockResponse = {
                     candidates: [{
                         content: {
@@ -1621,8 +1621,9 @@ Deno.test("parse-nutrition queries primary model first and falls back to gemini-
 
         const res = await app.fetch(req);
         assertEquals(res.status, 200);
-        assertEquals(calledModels[0], "gemini-3.7-flash");
-        assertEquals(calledModels[1], "gemini-3.5-flash-lite");
+        const uniqueModels = Array.from(new Set(calledModels));
+        assertEquals(uniqueModels[0], "gemini-3.5-flash-lite");
+        assertEquals(uniqueModels[1], "gemini-3.1-flash-lite");
         const data = await res.json();
         assertEquals(data.name, "Protein Shake");
         assertEquals(data.calories, 250);
@@ -1633,7 +1634,7 @@ Deno.test("parse-nutrition queries primary model first and falls back to gemini-
     }
 });
 
-Deno.test("parse-nutrition aborts primary candidate after timeout signal and invokes gemini-3.5-flash-lite", async () => {
+Deno.test("parse-nutrition aborts primary candidate after timeout signal and invokes gemini-3.1-flash-lite", async () => {
     const originalKey = Deno.env.get("GEMINI_API_KEY");
     Deno.env.set("GEMINI_API_KEY", "test-key");
 
@@ -1648,12 +1649,12 @@ Deno.test("parse-nutrition aborts primary candidate after timeout signal and inv
             });
         }
         if (urlString.includes("generativelanguage.googleapis.com")) {
-            if (urlString.includes("gemini-3.7-flash")) {
-                calledModels.push("gemini-3.7-flash");
-                throw new DOMException("The operation was aborted", "AbortError");
-            }
             if (urlString.includes("gemini-3.5-flash-lite")) {
                 calledModels.push("gemini-3.5-flash-lite");
+                throw new DOMException("The operation was aborted", "AbortError");
+            }
+            if (urlString.includes("gemini-3.1-flash-lite")) {
+                calledModels.push("gemini-3.1-flash-lite");
                 const mockResponse = {
                     candidates: [{
                         content: {
@@ -1693,8 +1694,8 @@ Deno.test("parse-nutrition aborts primary candidate after timeout signal and inv
 
         const res = await app.fetch(req);
         assertEquals(res.status, 200);
-        assertEquals(calledModels.includes("gemini-3.7-flash"), true);
         assertEquals(calledModels.includes("gemini-3.5-flash-lite"), true);
+        assertEquals(calledModels.includes("gemini-3.1-flash-lite"), true);
         const data = await res.json();
         assertEquals(data.name, "Overnight Oats");
         assertEquals(data.calories, 380);
@@ -2025,7 +2026,7 @@ Deno.test("parse-nutrition bottom fallback salvages structured text when all AI 
     }
 });
 
-Deno.test("parse-nutrition vision model failover routes directly from gemini-3.8-flash to gemini-3.5-flash-lite", async () => {
+Deno.test("parse-nutrition vision model failover routes directly from gemini-3.5-flash-lite to gemini-3.1-flash-lite", async () => {
     const originalKey = Deno.env.get("GEMINI_API_KEY");
     Deno.env.set("GEMINI_API_KEY", "test-key");
 
@@ -2040,15 +2041,15 @@ Deno.test("parse-nutrition vision model failover routes directly from gemini-3.8
             });
         }
         if (urlString.includes("generativelanguage.googleapis.com")) {
-            if (urlString.includes("gemini-3.8-flash")) {
-                calledVisionModels.push("gemini-3.8-flash");
+            if (urlString.includes("gemini-3.5-flash-lite")) {
+                calledVisionModels.push("gemini-3.5-flash-lite");
                 return new Response(JSON.stringify({ error: { code: 503, message: "Service Unavailable" } }), {
                     status: 503,
                     headers: { "Content-Type": "application/json" }
                 });
             }
-            if (urlString.includes("gemini-3.5-flash-lite")) {
-                calledVisionModels.push("gemini-3.5-flash-lite");
+            if (urlString.includes("gemini-3.1-flash-lite")) {
+                calledVisionModels.push("gemini-3.1-flash-lite");
                 const mockResponse = {
                     candidates: [{
                         content: {
@@ -2091,9 +2092,10 @@ Deno.test("parse-nutrition vision model failover routes directly from gemini-3.8
 
         const res = await app.fetch(req);
         assertEquals(res.status, 200);
-        // Assert primary was gemini-3.8-flash and fallback 1 was gemini-3.5-flash-lite (no gemini-3.7-flash delay)
-        assertEquals(calledVisionModels[0], "gemini-3.8-flash");
-        assertEquals(calledVisionModels[1], "gemini-3.5-flash-lite");
+        const uniqueVisionModels = Array.from(new Set(calledVisionModels));
+        // Assert primary was gemini-3.5-flash-lite and fallback 1 was gemini-3.1-flash-lite (no gemini-3.7-flash delay)
+        assertEquals(uniqueVisionModels[0], "gemini-3.5-flash-lite");
+        assertEquals(uniqueVisionModels[1], "gemini-3.1-flash-lite");
         assertEquals(calledVisionModels.includes("gemini-3.7-flash"), false);
         const data = await res.json();
         assertEquals(data.name, "Protein Shake");
