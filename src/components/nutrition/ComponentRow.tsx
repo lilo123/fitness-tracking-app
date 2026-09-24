@@ -221,7 +221,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
                 aria-disabled={Boolean(pendingUnit)}
                 className="min-h-[40px] min-w-[40px] w-10 h-10 shrink-0 rounded-lg flex items-center justify-center bg-transparent text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 active:bg-zinc-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-400 disabled:opacity-30 disabled:cursor-not-allowed touch-manipulation"
               >
-                -
+                −
               </button>
               <input
                 type="number"

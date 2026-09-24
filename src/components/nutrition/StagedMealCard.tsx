@@ -217,12 +217,12 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
       {isMultiItem ? (
         <div
           data-testid="staged-meal-totals"
-          className="rounded-xl bg-zinc-950/80 border border-zinc-800/80 px-2.5 py-1.5 flex items-center justify-between text-xs tabular-nums text-zinc-400 leading-tight"
+          className="rounded-xl bg-zinc-950/80 border border-zinc-800/80 px-2.5 py-1.5 flex flex-wrap items-baseline gap-x-3 text-xs tabular-nums text-zinc-400 leading-tight"
           aria-label="Totals are the sum of items"
           title="Totals are the sum of items · edit an item via ⋯"
         >
           <span className="sr-only">Totals are the sum of items</span>
-          <span data-testid="staged-total-calories" className="text-amber-400 font-bold shrink-0">
+          <span data-testid="staged-total-calories" className="text-amber-400 font-semibold shrink-0">
             {formatCalories(stagedMeal.calories)} kcal
           </span>
           {roundTo1Decimal(stagedMeal.protein) > 0 && (
