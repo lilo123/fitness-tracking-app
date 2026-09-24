@@ -20,28 +20,28 @@ function component(over: Partial<NutritionItem> = {}): NutritionItem {
 }
 
 describe('ComponentRow', () => {
-  it('renders 3-zone layout: name, portion chip, all 5 macros, and controls', () => {
+  it('renders compact row: name, non-zero macros, and controls without portion chip', () => {
     const item = component();
     render(<ComponentRow item={item} reference={item} onChange={() => {}} />);
 
-    // Zone 1: Identity
+    // Name & absence of portion chip (D1)
     expect(screen.getByTestId('component-name').textContent).toBe(item.name);
+    expect(screen.queryByTestId('component-portion-chip')).toBeNull();
 
-    // Zone 2: Portion chip + 5 macros
-    expect(screen.getByTestId('component-portion-chip').textContent).toBe('150 g');
+    // Non-zero macros
     expect(screen.getByText(/182 kcal/)).toBeDefined();
     expect(screen.getByText(/P 12.5/)).toBeDefined();
     expect(screen.getByText(/C 3.2/)).toBeDefined();
     expect(screen.getByText(/F 13.1/)).toBeDefined();
     expect(screen.getByText(/Fib 1.2/)).toBeDefined();
 
-    // Zone 3: Steppers, input, unit chip
+    // Stepper, input, unit chip
     expect(screen.getByTestId('component-quantity-input')).toBeDefined();
     expect((screen.getByTestId('component-quantity-input') as HTMLInputElement).value).toBe('150');
     expect(screen.getByTestId('component-unit-chip')).toBeDefined();
   });
 
-  it('renders only the canonical amount in the portion chip and drops the raw portion string', () => {
+  it('does not render portion chip and drops raw portion string (D1)', () => {
     const item = component({
       quantity: 540,
       unit: 'g',
@@ -49,10 +49,64 @@ describe('ComponentRow', () => {
     });
     render(<ComponentRow item={item} reference={item} onChange={() => {}} />);
 
-    const chip = screen.getByTestId('component-portion-chip');
-    expect(chip.textContent).toBe('540 g');
-    expect(chip.textContent).not.toContain('1 serving');
+    expect(screen.queryByTestId('component-portion-chip')).toBeNull();
     expect(screen.queryByText('1 serving')).toBeNull();
+  });
+
+  it('hides zero-value macros while displaying non-zero macros (D2)', () => {
+    const item = component({
+      calories: 104,
+      protein: 10,
+      carbs: 0,
+      fat: 6.5,
+      fiber: 0,
+    });
+    render(<ComponentRow item={item} reference={item} onChange={() => {}} />);
+
+    expect(screen.getByText(/104 kcal/)).toBeDefined();
+    expect(screen.getByText(/P 10/)).toBeDefined();
+    expect(screen.getByText(/F 6.5/)).toBeDefined();
+    expect(screen.queryByText(/C 0/)).toBeNull();
+    expect(screen.queryByText(/Fib 0/)).toBeNull();
+  });
+
+  it('displays 0 kcal when calories is 0 (kcal always shown even if 0)', () => {
+    const item = component({
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      fiber: 0,
+    });
+    render(<ComponentRow item={item} reference={item} onChange={() => {}} />);
+
+    expect(screen.getByText(/0 kcal/)).toBeDefined();
+    expect(screen.queryByText(/P /)).toBeNull();
+    expect(screen.queryByText(/C /)).toBeNull();
+    expect(screen.queryByText(/F /)).toBeNull();
+    expect(screen.queryByText(/Fib /)).toBeNull();
+  });
+
+  it('stepper, input, unit chip, and overflow menu are present and typing quantity invokes onChange', () => {
+    const item = component({ quantity: 50, calories: 100 });
+    const onChange = vi.fn();
+    const onRemove = vi.fn();
+    render(<ComponentRow item={item} reference={item} onChange={onChange} onRemove={onRemove} />);
+
+    expect(screen.getByLabelText(/Decrease quantity of/)).toBeDefined();
+    expect(screen.getByLabelText(/Increase quantity of/)).toBeDefined();
+    expect(screen.getByTestId('component-quantity-input')).toBeDefined();
+    expect(screen.getByTestId('component-unit-chip')).toBeDefined();
+    expect(screen.getByTestId('component-actions')).toBeDefined();
+
+    const input = screen.getByTestId('component-quantity-input');
+    fireEvent.change(input, { target: { value: '75' } });
+    fireEvent.blur(input);
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const scaled = onChange.mock.calls[0][0] as NutritionItem;
+    expect(scaled.quantity).toBe(75);
+    expect(scaled.calories).toBe(150);
   });
 
   it('steps quantity up and down and scales macros linearly', () => {

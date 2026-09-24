@@ -18,22 +18,15 @@ export interface ComponentRowProps {
 }
 
 /**
- * A level-2 component, laid out as three stacked full-width zones.
+ * Compact item row for staged meals and meal logs (Fixes D1, D2, D6, R3).
  *
- * Today's shipping row puts everything on one line and overflows its card by
- * 38 px at a 320 px viewport — the delete icon renders outside the card. The
- * team's usual `min-w-0` / `shrink-0` fix does not help here: the control
- * group's intrinsic width genuinely exceeds the space, so `shrink-0`
- * *guarantees* the overflow. This row is restructured, not annotated.
+ * Layout:
+ *   Left  (flex-1 min-w-0): name (line 1, truncate) stacked above non-zero macros
+ *         (line 2, kcal first in amber, then non-zero P/C/F/Fib in macro colors).
+ *   Right (shrink-0): compact stepper [ - ][ editable qty input ][ + ] with inline UnitChip,
+ *         followed by the OverflowMenu (⋯).
  *
- *   Zone 1  identity   name (truncate, whole line) + one overflow button
- *   Zone 2  macro line portion chip first, then all five macros
- *   Zone 3  controls   quantity pill (-, free-text input, +) + unit chip
- *
- * The portion chip leads zone 2 rather than trailing the name: `truncate` on a
- * flex *container* does not ellipsise a flex item, so a trailing chip is
- * clipped clean off the end and the name breaks mid-glyph. Demoting the chip is
- * what buys the name its whole first line.
+ * Maintains touch target sizes >= 40x40 px and typography >= 12 px (text-xs).
  */
 export const ComponentRow: React.FC<ComponentRowProps> = ({
   item,
@@ -157,61 +150,61 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
     menuItems.push({ label: 'Remove', onSelect: onRemove, tone: 'danger', testId: 'component-remove' });
   }
 
-  // Hierarchy is signalled by a 2px left accent on the row itself, not by outer
-  // indentation: a pl-3 border-l-2 indent costs 14 px and pushes the quantity
-  // field down to 29 px at 320 px, where the accent costs 1 px.
+  const p = roundTo1Decimal(item.protein);
+  const c = roundTo1Decimal(item.carbs);
+  const f = roundTo1Decimal(item.fat);
+  const fib = roundTo1Decimal(item.fiber);
+  const hasMacros = p > 0 || c > 0 || f > 0 || fib > 0;
+
   return (
     <div
       data-testid="component-row"
-      className="rounded-xl border border-zinc-800 border-l-2 border-l-cyan-500/40 bg-zinc-900/90 p-2 sm:p-2.5 space-y-1.5"
+      className="py-1 border-b border-zinc-800/80 last:border-b-0 min-h-[44px] flex flex-col justify-center"
     >
-      {/* Zone 1 — identity */}
-      <div className="flex items-center gap-1.5">
-        <span
-          data-testid="component-name"
-          title={item.name}
-          className="min-w-0 flex-1 truncate text-xs font-bold text-white"
-        >
-          {item.name}
-        </span>
-        {!readOnly && menuItems.length > 0 && (
-          <OverflowMenu
-            ariaLabel={`Actions for ${item.name}`}
-            items={menuItems}
-            testId="component-actions"
-          />
-        )}
-      </div>
+      <div className="flex items-center justify-between gap-1.5 sm:gap-2">
+        {/* LEFT (flex-1, min-w-0): name (line 1, text-xs/semibold, may truncate) above macros line (line 2, text-xs, font-mono, kcal first in amber, then non-zero P/C/F/Fib in their macro colors; kcal never truncated) */}
+        <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
+          {/* Line 1: Name */}
+          <div
+            data-testid="component-name"
+            title={item.name}
+            className="truncate text-xs font-semibold text-white leading-tight"
+          >
+            {item.name}
+          </div>
 
-      {/* Zone 2 — portion chip, then all five macros */}
-      <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono text-zinc-400">
-        <span
-          data-testid="component-portion-chip"
-          className="whitespace-nowrap rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400"
-        >
-          {roundTo1Decimal(item.quantity)} {shortUnitLabel(item.unit)}
-        </span>
-        <span className="whitespace-nowrap font-bold text-amber-400">
-          {formatCalories(item.calories)} kcal
-        </span>
-        <span className="whitespace-nowrap text-cyan-400">P {formatMacro(item.protein)}</span>
-        <span className="whitespace-nowrap text-emerald-400">C {formatMacro(item.carbs)}</span>
-        <span className="whitespace-nowrap text-violet-400">F {formatMacro(item.fat)}</span>
-        <span className="whitespace-nowrap text-teal-400">Fib {formatMacro(item.fiber)}</span>
-      </div>
+          {/* Line 2: Macros line */}
+          <div className="flex items-center gap-1.5 text-xs font-mono text-zinc-400 leading-tight whitespace-nowrap overflow-hidden">
+            <span className="font-bold text-amber-400 shrink-0">
+              {formatCalories(item.calories)} kcal
+            </span>
+            {hasMacros && <span className="text-zinc-600 shrink-0">·</span>}
+            {p > 0 && (
+              <span className="text-cyan-400 shrink-0">P {formatMacro(item.protein)}</span>
+            )}
+            {c > 0 && (
+              <span className="text-emerald-400 shrink-0">C {formatMacro(item.carbs)}</span>
+            )}
+            {f > 0 && (
+              <span className="text-violet-400 shrink-0">F {formatMacro(item.fat)}</span>
+            )}
+            {fib > 0 && (
+              <span className="text-teal-400 shrink-0">Fib {formatMacro(item.fiber)}</span>
+            )}
+          </div>
+        </div>
 
-      {/* Zone 3 — compound quantity stepper + unit chip */}
-      {editable && (
-        <div className="space-y-1.5">
-          <div className="flex items-center">
-            <div className="inline-flex items-center gap-0.5 rounded-xl border border-border-interactive bg-zinc-950 p-0.5 shadow-sm">
+        {/* RIGHT (shrink-0): compact stepper [−][editable qty input][+] + inline UnitChip, then the ⋯ OverflowMenu */}
+        <div className="shrink-0 flex items-center gap-1 sm:gap-1.5">
+          {editable ? (
+            <div className="inline-flex items-center rounded-lg border border-border-interactive bg-zinc-950 p-0.5 shadow-sm">
               <button
                 type="button"
                 aria-label={`Decrease quantity of ${item.name}`}
                 onClick={() => step(-1)}
                 disabled={Boolean(pendingUnit)}
                 aria-disabled={Boolean(pendingUnit)}
-                className="min-h-[44px] min-w-[44px] shrink-0 rounded-lg bg-zinc-800 text-sm font-bold text-zinc-300 transition hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation flex items-center justify-center"
+                className="min-h-[40px] min-w-[40px] w-10 h-10 shrink-0 rounded flex items-center justify-center bg-zinc-800 text-sm font-bold text-zinc-300 transition hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
               >
                 -
               </button>
@@ -233,7 +226,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
                     commit((e.target as HTMLInputElement).value);
                   }
                 }}
-                className="min-h-[44px] w-12 sm:w-16 min-w-0 bg-transparent text-center text-base sm:text-xs font-mono font-bold text-white outline-none px-0.5"
+                className="min-h-[40px] w-10 sm:w-16 min-w-0 bg-transparent text-center text-base sm:text-xs font-mono font-bold text-white outline-none px-0.5 input-text-xs"
               />
               <button
                 type="button"
@@ -241,13 +234,13 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
                 onClick={() => step(1)}
                 disabled={Boolean(pendingUnit)}
                 aria-disabled={Boolean(pendingUnit)}
-                className="min-h-[44px] min-w-[44px] shrink-0 rounded-lg bg-zinc-800 text-sm font-bold text-zinc-300 transition hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation flex items-center justify-center"
+                className="min-h-[40px] min-w-[40px] w-10 h-10 shrink-0 rounded flex items-center justify-center bg-zinc-800 text-sm font-bold text-zinc-300 transition hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
               >
                 +
               </button>
 
               {/* Internal vertical divider separating stepper from unit selector */}
-              <div className="h-6 w-px bg-zinc-800 mx-0.5 shrink-0" aria-hidden="true" />
+              <div className="h-5 w-px bg-zinc-800 mx-0.5 shrink-0" aria-hidden="true" />
 
               {/* Seamless embedded UnitChip */}
               <UnitChip
@@ -257,12 +250,25 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
                 embedded
               />
             </div>
-          </div>
-          {pendingUnit && (
-            <div data-testid="component-reanchor-hint" className="text-[10px] text-zinc-400">
-              amount in {pendingUnit} for this {formatCalories(item.calories)} kcal
-            </div>
+          ) : (
+            <span className="text-xs font-mono font-medium text-zinc-400 px-1">
+              {roundTo1Decimal(item.quantity)}{shortUnitLabel(item.unit)}
+            </span>
           )}
+
+          {!readOnly && menuItems.length > 0 && (
+            <OverflowMenu
+              ariaLabel={`Actions for ${item.name}`}
+              items={menuItems}
+              testId="component-actions"
+            />
+          )}
+        </div>
+      </div>
+
+      {pendingUnit && (
+        <div data-testid="component-reanchor-hint" className="mt-1 text-xs text-zinc-400">
+          amount in {pendingUnit} for this {formatCalories(item.calories)} kcal
         </div>
       )}
 
@@ -270,7 +276,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
       {pendingAbsurdEdit && (
         <div
           data-testid="absurd-edit-confirm"
-          className="rounded-lg border border-amber-500/40 bg-amber-950/40 p-2 text-xs space-y-1.5"
+          className="mt-1.5 rounded-lg border border-amber-500/40 bg-amber-950/40 p-2 text-xs space-y-1.5"
         >
           <div className="text-amber-200">
             This edit increases calories by more than 20x ({formatCalories(item.calories)} → {formatCalories(pendingAbsurdEdit.calories)} kcal).
@@ -284,7 +290,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
                 setPendingAbsurdEdit(null);
                 setDraft(null);
               }}
-              className="rounded bg-amber-500 px-2 py-1 font-bold text-zinc-950 hover:bg-amber-400"
+              className="rounded bg-amber-500 px-2 py-1 font-bold text-zinc-950 hover:bg-amber-400 min-h-[40px] touch-manipulation"
             >
               Apply anyway
             </button>
@@ -295,7 +301,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
                 setPendingAbsurdEdit(null);
                 setDraft(null);
               }}
-              className="rounded bg-zinc-800 px-2 py-1 text-zinc-300 hover:bg-zinc-700"
+              className="rounded bg-zinc-800 px-2 py-1 text-zinc-300 hover:bg-zinc-700 min-h-[40px] touch-manipulation"
             >
               Cancel
             </button>
