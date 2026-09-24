@@ -301,12 +301,19 @@ describe('StagedMealCard', () => {
     expect(within(totalsContainer).queryAllByRole('spinbutton')).toHaveLength(0);
     expect(within(totalsContainer).queryAllByRole('textbox')).toHaveLength(0);
 
-    // Verify all 5 visible read-only figures via individual testids
+    // Verify typography matches ComponentRow: proportional tabular-nums, font-mono absent
+    expect(totalsContainer.className).not.toContain('font-mono');
+    expect(totalsContainer.className).toContain('tabular-nums');
+
+    // Verify visible read-only non-zero figures via individual testids with exact-number assertions
     expect(screen.getByTestId('staged-total-calories')).toHaveTextContent(/^484\s*kcal$/);
-    expect(screen.getByTestId('staged-total-protein')).toHaveTextContent(/^39\.5\s*P$/);
-    expect(screen.getByTestId('staged-total-carbs')).toHaveTextContent(/^0\s*C$/);
-    expect(screen.getByTestId('staged-total-fat')).toHaveTextContent(/^34\.5\s*F$/);
-    expect(screen.getByTestId('staged-total-fiber')).toHaveTextContent(/^0\s*Fib$/);
+    expect(screen.getByTestId('staged-total-protein')).toHaveTextContent(/^P\s*39\.5$/);
+    expect(screen.getByTestId('staged-total-fat')).toHaveTextContent(/^F\s*34\.5$/);
+
+    // Verify zero macros are not rendered (assert absence via queryByTestId === null)
+    expect(screen.queryByTestId('staged-total-carbs')).toBeNull();
+    expect(screen.queryByTestId('staged-total-fiber')).toBeNull();
+
     expect(screen.getByText(/totals are the sum of items/i)).toBeDefined();
 
     // Verify absolutely no hidden or visible macro inputs exist on multi-item card
@@ -315,6 +322,31 @@ describe('StagedMealCard', () => {
     expect(screen.queryByTestId('carbs-input')).toBeNull();
     expect(screen.queryByTestId('fat-input')).toBeNull();
     expect(screen.queryByTestId('fiber-input')).toBeNull();
+  });
+
+  it('renders all macro figures when all macros are non-zero', () => {
+    const meal = makeMultiItemMeal();
+    meal.carbs = 20;
+    meal.fiber = 5;
+    render(
+      <StagedMealCard
+        stagedMeal={meal}
+        onUpdateStagedMeal={vi.fn()}
+        onApplyStagedItemChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onSaveItemAsCustomDish={vi.fn()}
+        onLogStagedMeal={vi.fn()}
+        onSaveStagedAsCustomDish={vi.fn()}
+        onDiscardStagedMeal={vi.fn()}
+        isPending={false}
+      />
+    );
+
+    expect(screen.getByTestId('staged-total-calories')).toHaveTextContent(/^484\s*kcal$/);
+    expect(screen.getByTestId('staged-total-protein')).toHaveTextContent(/^P\s*39\.5$/);
+    expect(screen.getByTestId('staged-total-carbs')).toHaveTextContent(/^C\s*20$/);
+    expect(screen.getByTestId('staged-total-fat')).toHaveTextContent(/^F\s*34\.5$/);
+    expect(screen.getByTestId('staged-total-fiber')).toHaveTextContent(/^Fib\s*5$/);
   });
 
   it('single-item meal: keeps editable total inputs and writes back to items[0] and base fields', () => {

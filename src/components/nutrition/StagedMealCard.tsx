@@ -217,16 +217,34 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
       {isMultiItem ? (
         <div
           data-testid="staged-meal-totals"
-          className="rounded-xl bg-zinc-950/80 border border-zinc-800/80 px-2.5 py-1.5 flex items-center justify-between text-xs font-mono tabular-nums"
+          className="rounded-xl bg-zinc-950/80 border border-zinc-800/80 px-2.5 py-1.5 flex items-center justify-between text-xs tabular-nums text-zinc-400 leading-tight"
           aria-label="Totals are the sum of items"
           title="Totals are the sum of items · edit an item via ⋯"
         >
           <span className="sr-only">Totals are the sum of items</span>
-          <span data-testid="staged-total-calories" className="text-amber-400 font-bold">{formatCalories(stagedMeal.calories)} kcal</span>
-          <span data-testid="staged-total-protein" className="text-cyan-400 font-semibold">{formatMacro(stagedMeal.protein)} P</span>
-          <span data-testid="staged-total-carbs" className="text-emerald-400 font-semibold">{formatMacro(stagedMeal.carbs)} C</span>
-          <span data-testid="staged-total-fat" className="text-violet-400 font-semibold">{formatMacro(stagedMeal.fat)} F</span>
-          <span data-testid="staged-total-fiber" className="text-teal-400 font-semibold">{formatMacro(stagedMeal.fiber)} Fib</span>
+          <span data-testid="staged-total-calories" className="text-amber-400 font-bold shrink-0">
+            {formatCalories(stagedMeal.calories)} kcal
+          </span>
+          {roundTo1Decimal(stagedMeal.protein) > 0 && (
+            <span data-testid="staged-total-protein" className="text-cyan-400 font-semibold shrink-0">
+              P {formatMacro(stagedMeal.protein)}
+            </span>
+          )}
+          {roundTo1Decimal(stagedMeal.carbs) > 0 && (
+            <span data-testid="staged-total-carbs" className="text-emerald-400 font-semibold shrink-0">
+              C {formatMacro(stagedMeal.carbs)}
+            </span>
+          )}
+          {roundTo1Decimal(stagedMeal.fat) > 0 && (
+            <span data-testid="staged-total-fat" className="text-violet-400 font-semibold shrink-0">
+              F {formatMacro(stagedMeal.fat)}
+            </span>
+          )}
+          {roundTo1Decimal(stagedMeal.fiber) > 0 && (
+            <span data-testid="staged-total-fiber" className="text-teal-400 font-semibold shrink-0">
+              Fib {formatMacro(stagedMeal.fiber)}
+            </span>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-5 gap-1.5 pt-0.5">
