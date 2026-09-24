@@ -68,7 +68,7 @@ export const UnitChip: React.FC<UnitChipProps> = ({
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen(true)}
-        className={`shrink-0 min-w-[40px] max-w-[64px] truncate min-h-[40px] px-2 text-xs font-bold text-cyan-300 transition touch-manipulation disabled:opacity-50 ${
+        className={`shrink-0 min-w-[40px] max-w-[64px] truncate min-h-[40px] px-1 flex items-center justify-center text-xs font-bold text-cyan-300 transition touch-manipulation disabled:opacity-50 ${
           embedded
             ? 'border-0 bg-transparent hover:bg-zinc-800/60 hover:text-cyan-200 rounded-lg'
             : 'rounded-lg border border-border-interactive bg-zinc-950 hover:border-cyan-500'

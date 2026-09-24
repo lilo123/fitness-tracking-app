@@ -174,7 +174,10 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
           </div>
 
           {/* Line 2: Macros line */}
-          <div className="flex items-center gap-1.5 text-xs font-mono text-zinc-400 leading-tight whitespace-nowrap overflow-hidden">
+          <div
+            data-testid="component-macros"
+            className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs tabular-nums text-zinc-400 leading-tight"
+          >
             <span className="font-bold text-amber-400 shrink-0">
               {formatCalories(item.calories)} kcal
             </span>
@@ -194,8 +197,8 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
           </div>
         </div>
 
-        {/* RIGHT (shrink-0): compact stepper [−][editable qty input][+] + inline UnitChip, then the ⋯ OverflowMenu */}
-        <div className="shrink-0 flex items-center gap-1 sm:gap-1.5">
+        {/* RIGHT (shrink-0): compact stepper [−][editable qty input][inline UnitChip][+] + ⋯ OverflowMenu */}
+        <div className="shrink-0 flex items-center gap-1">
           {editable ? (
             <div className="inline-flex items-center rounded-lg border border-border-interactive bg-zinc-950 p-0.5 shadow-sm">
               <button
@@ -226,7 +229,13 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
                     commit((e.target as HTMLInputElement).value);
                   }
                 }}
-                className="min-h-[40px] w-10 sm:w-16 min-w-0 bg-transparent text-center text-base sm:text-xs font-mono font-bold text-white outline-none px-0.5 input-text-xs"
+                className="min-h-[40px] w-11 sm:w-16 min-w-0 bg-transparent text-center text-base sm:text-xs font-semibold tabular-nums text-white outline-none px-0.5 input-text-xs"
+              />
+              <UnitChip
+                value={pendingUnit ?? item.unit}
+                onChange={handleUnitChange}
+                testId="component-unit-chip"
+                embedded
               />
               <button
                 type="button"
@@ -238,17 +247,6 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
               >
                 +
               </button>
-
-              {/* Internal vertical divider separating stepper from unit selector */}
-              <div className="h-5 w-px bg-zinc-800 mx-0.5 shrink-0" aria-hidden="true" />
-
-              {/* Seamless embedded UnitChip */}
-              <UnitChip
-                value={pendingUnit ?? item.unit}
-                onChange={handleUnitChange}
-                testId="component-unit-chip"
-                embedded
-              />
             </div>
           ) : (
             <span className="text-xs font-mono font-medium text-zinc-400 px-1">
