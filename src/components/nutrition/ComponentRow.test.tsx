@@ -450,4 +450,117 @@ describe('ComponentRow', () => {
     expect(compoundContainer).not.toBeNull();
     expect(compoundContainer?.contains(unitChip)).toBe(true);
   });
+
+  it('does not render "Edit nutrition" option in overflow menu when onEditNutrition is omitted', () => {
+    const item = component();
+    render(<ComponentRow item={item} reference={item} onChange={() => {}} onRemove={() => {}} />);
+
+    fireEvent.click(screen.getByTestId('component-actions'));
+    expect(screen.queryByTestId('component-edit-nutrition')).toBeNull();
+    expect(screen.getByTestId('component-remove')).toBeDefined();
+  });
+
+  it('renders "Edit nutrition" FIRST in overflow menu when onEditNutrition is provided', () => {
+    const item = component();
+    render(
+      <ComponentRow
+        item={item}
+        reference={item}
+        onChange={() => {}}
+        onSaveToQuickLog={() => {}}
+        onRemove={() => {}}
+        onEditNutrition={() => {}}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('component-actions'));
+    const editBtn = screen.getByTestId('component-edit-nutrition');
+    const saveQuickBtn = screen.getByTestId('component-save-quick-log');
+    const removeBtn = screen.getByTestId('component-remove');
+
+    expect(editBtn).toBeDefined();
+    expect(saveQuickBtn).toBeDefined();
+    expect(removeBtn).toBeDefined();
+
+    // Verify ordering: Edit nutrition precedes Save to quick log and Remove
+    const menuContainer = editBtn.closest('[role="menu"]');
+    expect(menuContainer).not.toBeNull();
+    const menuItems = menuContainer?.querySelectorAll('[role="menuitem"]') ?? [];
+    expect(menuItems[0]).toBe(editBtn);
+    expect(menuItems[1]).toBe(saveQuickBtn);
+    expect(menuItems[2]).toBe(removeBtn);
+  });
+
+  it('supports full flow: open modal via menu -> change calories to 150 -> Save calls onEditNutrition', () => {
+    const item = component({
+      calories: 104,
+      protein: 10,
+      carbs: 0,
+      fat: 6.5,
+      fiber: 0,
+    });
+    const onEditNutrition = vi.fn();
+
+    render(
+      <ComponentRow
+        item={item}
+        reference={item}
+        onChange={() => {}}
+        onEditNutrition={onEditNutrition}
+      />
+    );
+
+    // Open overflow menu
+    fireEvent.click(screen.getByTestId('component-actions'));
+
+    // Click Edit nutrition
+    fireEvent.click(screen.getByTestId('component-edit-nutrition'));
+
+    // Modal is opened with prefilled values
+    const calInput = screen.getByTestId('edit-item-calories-input') as HTMLInputElement;
+    expect(calInput.value).toBe('104');
+
+    // Change calories to 150
+    fireEvent.change(calInput, { target: { value: '150' } });
+    expect(calInput.value).toBe('150');
+
+    // Save
+    fireEvent.click(screen.getByTestId('save-edit-item-nutrition-btn'));
+
+    // Verify onEditNutrition called with parsed numbers
+    expect(onEditNutrition).toHaveBeenCalledTimes(1);
+    expect(onEditNutrition).toHaveBeenCalledWith({
+      calories: 150,
+      protein: 10,
+      carbs: 0,
+      fat: 6.5,
+      fiber: 0,
+    });
+
+    // Modal closed
+    expect(screen.queryByTestId('edit-item-nutrition-modal')).toBeNull();
+  });
+
+  it('restores focus to the overflow menu trigger when modal closes via Cancel', () => {
+    const item = component();
+    render(
+      <ComponentRow
+        item={item}
+        reference={item}
+        onChange={() => {}}
+        onEditNutrition={() => {}}
+      />
+    );
+
+    const trigger = screen.getByTestId('component-actions');
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    fireEvent.click(screen.getByTestId('component-edit-nutrition'));
+    expect(screen.getByTestId('edit-item-nutrition-modal')).toBeDefined();
+
+    fireEvent.click(screen.getByTestId('cancel-edit-item-nutrition-btn'));
+    expect(screen.queryByTestId('edit-item-nutrition-modal')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
 });

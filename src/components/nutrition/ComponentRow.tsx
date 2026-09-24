@@ -4,6 +4,8 @@ import { parseQuantityInput, shortUnitLabel, type CanonicalUnit } from '../../ut
 import { scaleItemToQuantity, reanchorItemTo, type NutritionItem } from '../../utils/itemModel';
 import { OverflowMenu, type OverflowMenuItem } from '../common/OverflowMenu';
 import { UnitChip } from './UnitChip';
+import { ItemNutritionModal } from './ItemNutritionModal';
+import type { EditedItemNutrition } from './nutritionEngineHelpers';
 
 export interface ComponentRowProps {
   item: NutritionItem;
@@ -13,6 +15,7 @@ export interface ComponentRowProps {
   onReanchor?: (next: NutritionItem) => void;
   onRemove?: () => void;
   onSaveToQuickLog?: () => void;
+  onEditNutrition?: (edited: EditedItemNutrition) => void;
   /** Coach read-only inspection: expanding is allowed, every mutating affordance is not. */
   readOnly?: boolean;
 }
@@ -35,6 +38,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
   onReanchor,
   onRemove,
   onSaveToQuickLog,
+  onEditNutrition,
   readOnly = false,
 }) => {
   // The input is free text so an in-progress value like "" or "12." is not
@@ -43,6 +47,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
   const [pendingUnit, setPendingUnit] = useState<CanonicalUnit | null>(null);
   const [pendingAbsurdEdit, setPendingAbsurdEdit] = useState<NutritionItem | null>(null);
   const [localAnchor, setLocalAnchor] = useState<NutritionItem | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const shown = draft ?? (pendingUnit !== null ? '' : String(roundTo1Decimal(item.quantity)));
 
@@ -143,6 +148,13 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
   };
 
   const menuItems: OverflowMenuItem[] = [];
+  if (onEditNutrition) {
+    menuItems.push({
+      label: 'Edit nutrition',
+      onSelect: () => setIsEditModalOpen(true),
+      testId: 'component-edit-nutrition',
+    });
+  }
   if (onSaveToQuickLog) {
     menuItems.push({ label: 'Save to quick log', onSelect: onSaveToQuickLog, testId: 'component-save-quick-log' });
   }
@@ -305,6 +317,15 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
             </button>
           </div>
         </div>
+      )}
+
+      {onEditNutrition && (
+        <ItemNutritionModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          item={item}
+          onSave={onEditNutrition}
+        />
       )}
     </div>
   );
