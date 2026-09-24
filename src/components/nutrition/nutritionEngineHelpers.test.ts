@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { buildStagedItem, stagedReference } from './nutritionEngineHelpers';
+import {
+  buildStagedItem,
+  stagedReference,
+  recomputeStagedTotals,
+  updateStagedItemNutrition,
+  type StagedItem,
+} from './nutritionEngineHelpers';
 import { scaleItemToQuantity } from '../../utils/itemModel';
 
 describe('buildStagedItem', () => {
@@ -108,3 +114,184 @@ describe('buildStagedItem', () => {
     expect(itemNull.baseQuantity).toBe(4);
   });
 });
+
+describe('updateStagedItemNutrition', () => {
+  it('(a) sets current macros, base macros, baseQuantity to item.quantity, portionMultiplier to 1, and userOverridden flag', () => {
+    const item = buildStagedItem({
+      name: 'Chicken Breast',
+      portion: '50g',
+      quantity: 50,
+      unit: 'g',
+      calories: 104,
+      protein: 15,
+      carbs: 0,
+      fat: 2,
+      fiber: 0,
+    });
+
+    const updated = updateStagedItemNutrition(item, {
+      calories: 150,
+      protein: 20,
+      carbs: 5,
+      fat: 3,
+      fiber: 1,
+    });
+
+    expect(updated.calories).toBe(150);
+    expect(updated.baseCalories).toBe(150);
+    expect(updated.protein).toBe(20);
+    expect(updated.baseProtein).toBe(20);
+    expect(updated.carbs).toBe(5);
+    expect(updated.baseCarbs).toBe(5);
+    expect(updated.fat).toBe(3);
+    expect(updated.baseFat).toBe(3);
+    expect(updated.fiber).toBe(1);
+    expect(updated.baseFiber).toBe(1);
+    expect(updated.baseQuantity).toBe(50);
+    expect(updated.portionMultiplier).toBe(1);
+    expect(updated.userOverridden).toBe(true);
+  });
+
+  it('(b) scales linearly to 75g via the app stepper code path yielding 225 kcal, and back to 50g yields 150 exactly', () => {
+    const item = buildStagedItem({
+      name: 'Chicken Breast',
+      portion: '50g',
+      quantity: 50,
+      unit: 'g',
+      calories: 104,
+    });
+
+    const edited = updateStagedItemNutrition(item, {
+      calories: 150,
+      protein: 20,
+      carbs: 0,
+      fat: 3,
+      fiber: 0,
+    });
+
+    // Code path used by ComponentRow.tsx / NutritionEngine.tsx:
+    // reference = stagedReference(edited)
+    // scaled = scaleItemToQuantity(reference, nextQuantity)
+    const ref = stagedReference(edited);
+    const scaled75 = scaleItemToQuantity(ref, 75);
+    expect(scaled75.calories).toBe(225);
+
+    const scaled50 = scaleItemToQuantity(ref, 50);
+    expect(scaled50.calories).toBe(150);
+  });
+
+  it('(c) clamps negative and non-finite (NaN, Infinity) inputs to 0', () => {
+    const item = buildStagedItem({
+      name: 'Test Item',
+      portion: '1 serving',
+      quantity: 100,
+      unit: 'g',
+      calories: 200,
+    });
+
+    const updated = updateStagedItemNutrition(item, {
+      calories: -100,
+      protein: NaN,
+      carbs: -0.02,
+      fat: Infinity,
+      fiber: -Infinity,
+    });
+
+    expect(updated.calories).toBe(0);
+    expect(updated.baseCalories).toBe(0);
+    expect(updated.protein).toBe(0);
+    expect(updated.baseProtein).toBe(0);
+    expect(updated.carbs).toBe(0);
+    expect(updated.baseCarbs).toBe(0);
+    expect(updated.fat).toBe(0);
+    expect(updated.baseFat).toBe(0);
+    expect(updated.fiber).toBe(0);
+    expect(updated.baseFiber).toBe(0);
+  });
+
+  it('(d) recomputeStagedTotals over [edited, other] equals their sum', () => {
+    const item1 = buildStagedItem({
+      name: 'Item 1',
+      portion: '50g',
+      quantity: 50,
+      unit: 'g',
+      calories: 104,
+    });
+    const edited1 = updateStagedItemNutrition(item1, {
+      calories: 150,
+      protein: 20,
+      carbs: 10,
+      fat: 4,
+      fiber: 2,
+    });
+
+    const item2 = buildStagedItem({
+      name: 'Item 2',
+      portion: '100g',
+      quantity: 100,
+      unit: 'g',
+      calories: 200,
+      protein: 10,
+      carbs: 25,
+      fat: 5,
+      fiber: 3,
+    });
+
+    const totals = recomputeStagedTotals([edited1, item2]);
+    expect(totals.calories).toBe(350);
+    expect(totals.protein).toBe(30);
+    expect(totals.carbs).toBe(35);
+    expect(totals.fat).toBe(9);
+    expect(totals.fiber).toBe(5);
+  });
+
+  it('(e) does not mutate the input item object', () => {
+    const original = buildStagedItem({
+      name: 'Immutable Item',
+      portion: '50g',
+      quantity: 50,
+      unit: 'g',
+      calories: 104,
+      protein: 15,
+      carbs: 2,
+      fat: 1,
+      fiber: 0,
+    });
+    const snapshot = JSON.parse(JSON.stringify(original));
+
+    const updated = updateStagedItemNutrition(original, {
+      calories: 200,
+      protein: 30,
+      carbs: 5,
+      fat: 4,
+      fiber: 1,
+    });
+
+    expect(original).toEqual(snapshot);
+    expect(updated).not.toBe(original);
+  });
+
+  it('preserves baseQuantity if item.quantity <= 0 while updating base macros', () => {
+    const item = buildStagedItem({
+      name: 'Zero Quantity Item',
+      portion: '0g',
+      quantity: 0,
+      unit: 'g',
+      calories: 100,
+    });
+    const itemWithBase: StagedItem = { ...item, baseQuantity: 50, quantity: 0 };
+
+    const updated = updateStagedItemNutrition(itemWithBase, {
+      calories: 180,
+      protein: 15,
+      carbs: 10,
+      fat: 5,
+      fiber: 2,
+    });
+
+    expect(updated.baseQuantity).toBe(50);
+    expect(updated.calories).toBe(180);
+    expect(updated.baseCalories).toBe(180);
+  });
+});
+

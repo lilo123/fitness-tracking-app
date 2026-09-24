@@ -27,6 +27,8 @@ export interface StagedItem {
   carbs: number;
   fat: number;
   fiber: number;
+  /** Optional flag indicating user explicitly edited the item's nutrition. */
+  userOverridden?: boolean;
 }
 
 /** The staged component as the shared level-2 model sees it. */
@@ -90,6 +92,58 @@ export function reanchorStagedItem(item: StagedItem, next: NutritionItem): Stage
     baseFat: f,
     baseFiber: fib,
     portionMultiplier: 1,
+  };
+}
+
+function sanitizeEditedMacro(val: unknown): number {
+  const n = Number(val);
+  if (!Number.isFinite(n) || n <= 0) {
+    return 0;
+  }
+  return roundTo1Decimal(n);
+}
+
+export interface EditedItemNutrition {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber: number;
+}
+
+/**
+ * Update a staged component's nutrition with user-edited macros.
+ * All base* fields are rewritten and baseQuantity is synchronized to current
+ * quantity (unless quantity <= 0, in which case baseQuantity is preserved),
+ * ensuring subsequent stepper adjustments scale linearly from the edited baseline
+ * without precision drift.
+ */
+export function updateStagedItemNutrition(
+  item: StagedItem,
+  edited: EditedItemNutrition
+): StagedItem {
+  const c = sanitizeEditedMacro(edited.calories);
+  const p = sanitizeEditedMacro(edited.protein);
+  const cb = sanitizeEditedMacro(edited.carbs);
+  const f = sanitizeEditedMacro(edited.fat);
+  const fib = sanitizeEditedMacro(edited.fiber);
+  const baseQuantity = item.quantity > 0 ? item.quantity : item.baseQuantity;
+
+  return {
+    ...item,
+    calories: c,
+    protein: p,
+    carbs: cb,
+    fat: f,
+    fiber: fib,
+    baseCalories: c,
+    baseProtein: p,
+    baseCarbs: cb,
+    baseFat: f,
+    baseFiber: fib,
+    baseQuantity,
+    portionMultiplier: 1,
+    userOverridden: true,
   };
 }
 
