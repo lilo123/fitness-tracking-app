@@ -435,20 +435,33 @@ describe('ComponentRow', () => {
     expect(selectSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('renders stepper and unit chip in a unified compound container with embedded styling (Cards B2/E2)', () => {
+  it('renders lighter stepper and unit chip in a borderless compound container with ghost buttons and muted unit text (Tweak 1)', () => {
     const item = component();
     render(<ComponentRow item={item} reference={item} onChange={() => {}} />);
 
     const unitChip = screen.getByTestId('component-unit-chip');
-    // Embedded UnitChip strips border and background
+    // Embedded UnitChip strips border and background, uses muted text
     expect(unitChip.className).toContain('border-0');
     expect(unitChip.className).toContain('bg-transparent');
+    expect(unitChip.className).toContain('text-zinc-400');
 
-    // Stepper and unit chip share the same compound container
+    // Stepper and unit chip share compound container without heavy outer borders
     const input = screen.getByTestId('component-quantity-input');
     const compoundContainer = input.closest('div.inline-flex');
     expect(compoundContainer).not.toBeNull();
+    expect(compoundContainer?.className).not.toContain('border');
+    expect(compoundContainer?.className).not.toContain('bg-zinc-950');
     expect(compoundContainer?.contains(unitChip)).toBe(true);
+
+    // Stepper buttons are ghost buttons with transparent bg and min-40 dimensions
+    const decBtn = screen.getByLabelText(/Decrease quantity of/);
+    const incBtn = screen.getByLabelText(/Increase quantity of/);
+    expect(decBtn.className).toContain('bg-transparent');
+    expect(decBtn.className).toContain('min-h-[40px]');
+    expect(decBtn.className).toContain('min-w-[40px]');
+    expect(incBtn.className).toContain('bg-transparent');
+    expect(incBtn.className).toContain('min-h-[40px]');
+    expect(incBtn.className).toContain('min-w-[40px]');
   });
 
   it('does not render "Edit nutrition" option in overflow menu when onEditNutrition is omitted', () => {

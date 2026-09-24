@@ -210,16 +210,16 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
         </div>
 
         {/* RIGHT (shrink-0): compact stepper [−][editable qty input][inline UnitChip][+] + ⋯ OverflowMenu */}
-        <div className="shrink-0 flex items-center gap-1">
+        <div data-testid="component-right-cluster" className="shrink-0 flex items-center gap-1">
           {editable ? (
-            <div className="inline-flex items-center rounded-lg border border-border-interactive bg-zinc-950 p-0.5 shadow-sm">
+            <div className="inline-flex items-center">
               <button
                 type="button"
                 aria-label={`Decrease quantity of ${item.name}`}
                 onClick={() => step(-1)}
                 disabled={Boolean(pendingUnit)}
                 aria-disabled={Boolean(pendingUnit)}
-                className="min-h-[40px] min-w-[40px] w-10 h-10 shrink-0 rounded flex items-center justify-center bg-zinc-800 text-sm font-bold text-zinc-300 transition hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
+                className="min-h-[40px] min-w-[40px] w-10 h-10 shrink-0 rounded-lg flex items-center justify-center bg-transparent text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 active:bg-zinc-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-400 disabled:opacity-30 disabled:cursor-not-allowed touch-manipulation"
               >
                 -
               </button>
@@ -241,7 +241,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
                     commit((e.target as HTMLInputElement).value);
                   }
                 }}
-                className="min-h-[40px] w-11 sm:w-16 min-w-0 bg-transparent text-center text-base sm:text-xs font-semibold tabular-nums text-white outline-none px-0.5 input-text-xs"
+                className="min-h-[40px] w-9 sm:w-16 min-w-0 bg-transparent text-right pr-0.5 text-base sm:text-xs font-semibold tabular-nums text-white outline-none border-b border-zinc-700/60 focus:border-cyan-400 input-text-xs"
               />
               <UnitChip
                 value={pendingUnit ?? item.unit}
@@ -255,7 +255,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
                 onClick={() => step(1)}
                 disabled={Boolean(pendingUnit)}
                 aria-disabled={Boolean(pendingUnit)}
-                className="min-h-[40px] min-w-[40px] w-10 h-10 shrink-0 rounded flex items-center justify-center bg-zinc-800 text-sm font-bold text-zinc-300 transition hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
+                className="min-h-[40px] min-w-[40px] w-10 h-10 shrink-0 rounded-lg flex items-center justify-center bg-transparent text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 active:bg-zinc-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-400 disabled:opacity-30 disabled:cursor-not-allowed touch-manipulation"
               >
                 +
               </button>
