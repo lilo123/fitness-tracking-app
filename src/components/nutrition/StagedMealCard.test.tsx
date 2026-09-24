@@ -301,11 +301,20 @@ describe('StagedMealCard', () => {
     expect(within(totalsContainer).queryAllByRole('spinbutton')).toHaveLength(0);
     expect(within(totalsContainer).queryAllByRole('textbox')).toHaveLength(0);
 
-    // Verify macro figures are shown
-    expect(within(totalsContainer).getByText(/484\s*kcal/i)).toBeDefined();
-    expect(within(totalsContainer).getByText(/39\.5\s*P/i)).toBeDefined();
-    expect(within(totalsContainer).getByText(/34\.5\s*F/i)).toBeDefined();
+    // Verify all 5 visible read-only figures via individual testids
+    expect(screen.getByTestId('staged-total-calories')).toHaveTextContent(/^484\s*kcal$/);
+    expect(screen.getByTestId('staged-total-protein')).toHaveTextContent(/^39\.5\s*P$/);
+    expect(screen.getByTestId('staged-total-carbs')).toHaveTextContent(/^0\s*C$/);
+    expect(screen.getByTestId('staged-total-fat')).toHaveTextContent(/^34\.5\s*F$/);
+    expect(screen.getByTestId('staged-total-fiber')).toHaveTextContent(/^0\s*Fib$/);
     expect(screen.getByText(/totals are the sum of items/i)).toBeDefined();
+
+    // Verify absolutely no hidden or visible macro inputs exist on multi-item card
+    expect(screen.queryByTestId('calories-input')).toBeNull();
+    expect(screen.queryByTestId('protein-input')).toBeNull();
+    expect(screen.queryByTestId('carbs-input')).toBeNull();
+    expect(screen.queryByTestId('fat-input')).toBeNull();
+    expect(screen.queryByTestId('fiber-input')).toBeNull();
   });
 
   it('single-item meal: keeps editable total inputs and writes back to items[0] and base fields', () => {

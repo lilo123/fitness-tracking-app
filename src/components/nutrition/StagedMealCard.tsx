@@ -215,27 +215,19 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
 
       {/* Macro Totals: Read-only for multi-item (Fix D5), editable for single-item */}
       {isMultiItem ? (
-        <>
-          <div
-            data-testid="staged-meal-totals"
-            className="rounded-xl bg-zinc-950/80 border border-zinc-800/80 px-2.5 py-1.5 flex items-center justify-between text-xs font-mono tabular-nums"
-            aria-label="Totals are the sum of items"
-            title="Totals are the sum of items · edit an item via ⋯"
-          >
-            <span className="sr-only">Totals are the sum of items</span>
-            <span className="text-amber-400 font-bold">{formatCalories(stagedMeal.calories)} kcal</span>
-            <span className="text-cyan-400 font-semibold">{formatMacro(stagedMeal.protein)} P</span>
-            <span className="text-emerald-400 font-semibold">{formatMacro(stagedMeal.carbs)} C</span>
-            <span className="text-violet-400 font-semibold">{formatMacro(stagedMeal.fat)} F</span>
-            <span className="text-teal-400 font-semibold">{formatMacro(stagedMeal.fiber)} Fib</span>
-          </div>
-          {/* Hidden inputs to preserve backward compatibility for testids on multi-item staged meals */}
-          <input type="number" data-testid="calories-input" value={roundTo1Decimal(stagedMeal.calories)} readOnly className="hidden" />
-          <input type="number" data-testid="protein-input" value={roundTo1Decimal(stagedMeal.protein)} readOnly className="hidden" />
-          <input type="number" data-testid="carbs-input" value={roundTo1Decimal(stagedMeal.carbs)} readOnly className="hidden" />
-          <input type="number" data-testid="fat-input" value={roundTo1Decimal(stagedMeal.fat)} readOnly className="hidden" />
-          <input type="number" data-testid="fiber-input" value={roundTo1Decimal(stagedMeal.fiber)} readOnly className="hidden" />
-        </>
+        <div
+          data-testid="staged-meal-totals"
+          className="rounded-xl bg-zinc-950/80 border border-zinc-800/80 px-2.5 py-1.5 flex items-center justify-between text-xs font-mono tabular-nums"
+          aria-label="Totals are the sum of items"
+          title="Totals are the sum of items · edit an item via ⋯"
+        >
+          <span className="sr-only">Totals are the sum of items</span>
+          <span data-testid="staged-total-calories" className="text-amber-400 font-bold">{formatCalories(stagedMeal.calories)} kcal</span>
+          <span data-testid="staged-total-protein" className="text-cyan-400 font-semibold">{formatMacro(stagedMeal.protein)} P</span>
+          <span data-testid="staged-total-carbs" className="text-emerald-400 font-semibold">{formatMacro(stagedMeal.carbs)} C</span>
+          <span data-testid="staged-total-fat" className="text-violet-400 font-semibold">{formatMacro(stagedMeal.fat)} F</span>
+          <span data-testid="staged-total-fiber" className="text-teal-400 font-semibold">{formatMacro(stagedMeal.fiber)} Fib</span>
+        </div>
       ) : (
         <div className="grid grid-cols-5 gap-1.5 pt-0.5">
           <div>

@@ -916,11 +916,11 @@ Total Fiber: 8 g`;
     expect(screen.getByText('Chocolate Coconut Chia Pudding')).toBeDefined();
     expect(screen.getByText('2% Plain Greek Yogurt')).toBeDefined();
 
-    // Check exact totals in editable macro inputs
-    expect(screen.getByTestId('protein-input')).toHaveValue(46);
-    expect(screen.getByTestId('carbs-input')).toHaveValue(24);
-    expect(screen.getByTestId('fat-input')).toHaveValue(30);
-    expect(screen.getByTestId('fiber-input')).toHaveValue(8);
+    // Check exact totals in visible read-only macro figures
+    expect(screen.getByTestId('staged-total-protein')).toHaveTextContent(/^46\s*P$/);
+    expect(screen.getByTestId('staged-total-carbs')).toHaveTextContent(/^24\s*C$/);
+    expect(screen.getByTestId('staged-total-fat')).toHaveTextContent(/^30\s*F$/);
+    expect(screen.getByTestId('staged-total-fiber')).toHaveTextContent(/^8\s*Fib$/);
     expect(screen.getByText(/Total: 550 kcal \| 46g P \| 24g C \| 30g F \| 8g Fiber/)).toBeDefined();
   });
 
@@ -1041,10 +1041,10 @@ Total Fiber: 1 g`;
 
     expect(screen.getByText('Grilled Chicken Breast')).toBeDefined();
     expect(screen.getByText('Jasmine Rice')).toBeDefined();
-    expect(screen.getByTestId('protein-input')).toHaveValue(49);
-    expect(screen.getByTestId('carbs-input')).toHaveValue(45);
-    expect(screen.getByTestId('fat-input')).toHaveValue(6);
-    expect(screen.getByTestId('fiber-input')).toHaveValue(1);
+    expect(screen.getByTestId('staged-total-protein')).toHaveTextContent(/^49\s*P$/);
+    expect(screen.getByTestId('staged-total-carbs')).toHaveTextContent(/^45\s*C$/);
+    expect(screen.getByTestId('staged-total-fat')).toHaveTextContent(/^6\s*F$/);
+    expect(screen.getByTestId('staged-total-fiber')).toHaveTextContent(/^1\s*Fib$/);
   });
 
   it('opens Edit Meal modal from today\'s meal timeline and updates meal in supabase', async () => {
