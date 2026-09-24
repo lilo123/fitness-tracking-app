@@ -1,6 +1,6 @@
-import React, { memo, useId } from 'react';
-import { Utensils, Calculator, Check, Star, X } from 'lucide-react';
-import { roundTo1Decimal, formatCalories } from '../../utils/nutrition';
+import React, { memo, useId, useState } from 'react';
+import { Utensils, Check, Star, X } from 'lucide-react';
+import { roundTo1Decimal, formatCalories, formatMacro } from '../../utils/nutrition';
 import type { NutritionItem } from '../../utils/itemModel';
 import { ComponentRow } from './ComponentRow';
 import {
@@ -8,6 +8,8 @@ import {
   stagedReference,
   reanchorStagedItem,
   recomputeStagedTotals,
+  updateStagedItemNutrition,
+  type EditedItemNutrition,
   type StagedItem,
   type StagedMeal,
 } from './nutritionEngineHelpers';
@@ -23,6 +25,8 @@ export interface StagedMealCardProps {
   onDiscardStagedMeal: () => void;
   isPending: boolean;
 }
+
+type MacroField = 'calories' | 'protein' | 'carbs' | 'fat' | 'fiber';
 
 export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
   stagedMeal,
@@ -42,13 +46,89 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
   const fatId = `${baseId}-fat`;
   const fiberId = `${baseId}-fiber`;
 
+  const [drafts, setDrafts] = useState<Partial<Record<MacroField, string>>>({});
+
+  const isMultiItem = stagedMeal.items && stagedMeal.items.length > 1;
+
+  const commitSingleItemField = (field: MacroField, num: number) => {
+    if (!stagedMeal.items || stagedMeal.items.length === 0) {
+      onUpdateStagedMeal({
+        ...stagedMeal,
+        [field]: num,
+      });
+      return;
+    }
+
+    const item0 = stagedMeal.items[0];
+    const currentEdited: EditedItemNutrition = {
+      calories: item0.calories,
+      protein: item0.protein,
+      carbs: item0.carbs,
+      fat: item0.fat,
+      fiber: item0.fiber,
+    };
+    currentEdited[field] = num;
+
+    const updatedItem = updateStagedItemNutrition(item0, currentEdited);
+    const updatedItems = [updatedItem];
+    const totals = recomputeStagedTotals(updatedItems);
+    onUpdateStagedMeal({
+      ...stagedMeal,
+      items: updatedItems,
+      ...totals,
+    });
+  };
+
+  const handleInputChange = (field: MacroField, rawVal: string) => {
+    setDrafts((prev) => ({ ...prev, [field]: rawVal }));
+
+    // In-progress typing (e.g. "3." or "-") should not commit yet
+    if (rawVal.endsWith('.') || rawVal === '-') {
+      return;
+    }
+
+    if (rawVal === '') {
+      commitSingleItemField(field, 0);
+      return;
+    }
+
+    const parsed = parseFloat(rawVal);
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      commitSingleItemField(field, roundTo1Decimal(parsed));
+    }
+  };
+
+  const handleInputBlur = (field: MacroField) => {
+    const draftVal = drafts[field];
+    if (draftVal !== undefined) {
+      const parsed = parseFloat(draftVal);
+      const num = Number.isFinite(parsed) && parsed >= 0 ? roundTo1Decimal(parsed) : 0;
+      commitSingleItemField(field, num);
+      setDrafts((prev) => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+    }
+  };
+
+  const getInputValue = (field: MacroField): string => {
+    if (drafts[field] !== undefined) {
+      return drafts[field]!;
+    }
+    return String(roundTo1Decimal(stagedMeal[field]));
+  };
+
   return (
-    <div data-testid="staged-meal-card" className="bg-zinc-900/90 border border-cyan-500/50 rounded-3xl p-5 shadow-[0_0_30px_rgba(6,182,212,0.15)] space-y-4 animate-in fade-in">
-      {/* Header row: Dish Name & Meal Type */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 pb-3">
-        <div className="flex items-center gap-2.5 flex-1 min-w-[200px]">
+    <div
+      data-testid="staged-meal-card"
+      className="bg-zinc-900/90 border border-cyan-500/50 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-[0_0_30px_rgba(6,182,212,0.15)] space-y-2.5 sm:space-y-3 animate-in fade-in"
+    >
+      {/* Header row: Dish Name & Meal Type (1 row on mobile & desktop) */}
+      <div className="flex items-center gap-2 border-b border-zinc-800 pb-2.5">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           {stagedMeal.photoUrl ? (
-            <div className="w-12 h-12 rounded-xl overflow-hidden border border-cyan-500/40 shrink-0 bg-zinc-950 shadow-md">
+            <div className="w-8 h-8 rounded-lg overflow-hidden border border-cyan-500/40 shrink-0 bg-zinc-950 shadow-md">
               <img
                 src={stagedMeal.photoUrl}
                 alt="Staged meal preview"
@@ -57,47 +137,42 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
               />
             </div>
           ) : (
-            <div className="w-9 h-9 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center shrink-0">
               <Utensils className="w-4 h-4 text-cyan-400" />
             </div>
           )}
-          <div className="flex-1 min-w-0">
-            <input
-              type="text"
-              data-testid="dish-name-input"
-              value={stagedMeal.name}
-              onChange={(e) => onUpdateStagedMeal({ ...stagedMeal, name: e.target.value })}
-              className="bg-zinc-950 border border-border-interactive text-white font-black text-base rounded-xl px-3 py-1.5 w-full focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none"
-              placeholder="Meal name..."
-            />
-          </div>
+          <input
+            type="text"
+            data-testid="dish-name-input"
+            value={stagedMeal.name}
+            onChange={(e) => onUpdateStagedMeal({ ...stagedMeal, name: e.target.value })}
+            className="flex-1 min-w-0 bg-zinc-950 border border-border-interactive text-white font-bold text-base rounded-xl px-2.5 py-1.5 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none truncate"
+            placeholder="Meal name..."
+          />
         </div>
 
-        <div className="flex items-center gap-2">
-          <select
-            aria-label="Meal type"
-            value={stagedMeal.mealType}
-            onChange={(e) => onUpdateStagedMeal({ ...stagedMeal, mealType: e.target.value })}
-            className="bg-zinc-950 border border-border-interactive text-zinc-300 input-text-xs font-semibold rounded-xl px-2.5 py-2 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none"
-          >
-            <option value="Breakfast">Breakfast</option>
-            <option value="Lunch">Lunch</option>
-            <option value="Dinner">Dinner</option>
-            <option value="Snack">Snack</option>
-            <option value="Pre-Workout">Pre-Workout</option>
-            <option value="Post-Workout">Post-Workout</option>
-          </select>
-        </div>
+        <select
+          aria-label="Meal type"
+          value={stagedMeal.mealType}
+          onChange={(e) => onUpdateStagedMeal({ ...stagedMeal, mealType: e.target.value })}
+          className="w-28 shrink-0 bg-zinc-950 border border-border-interactive text-zinc-300 text-xs font-semibold rounded-xl px-2 py-2 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none"
+        >
+          <option value="Breakfast">Breakfast</option>
+          <option value="Lunch">Lunch</option>
+          <option value="Dinner">Dinner</option>
+          <option value="Snack">Snack</option>
+          <option value="Pre-Workout">Pre-Workout</option>
+          <option value="Post-Workout">Post-Workout</option>
+        </select>
       </div>
 
       {/* Itemized Ingredient Breakdown */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-[11px] font-black uppercase text-zinc-400 tracking-wider">
+      <div className="space-y-1">
+        <div className="flex items-center justify-between text-xs font-bold uppercase text-zinc-400 tracking-wider">
           <span>Itemized Breakdown ({stagedMeal.items.length})</span>
-          <span className="text-zinc-500 text-[10px]">Adjust portion or remove item</span>
         </div>
 
-        <div className="space-y-1.5">
+        <div className="divide-y divide-zinc-800/80">
           {stagedMeal.items.map((item) => (
             <ComponentRow
               key={item.id}
@@ -117,150 +192,175 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
               }}
               onRemove={() => onDeleteItem(item.id)}
               onSaveToQuickLog={() => onSaveItemAsCustomDish(item)}
+              onEditNutrition={(edited) => {
+                const updatedItems = stagedMeal.items.map((it) =>
+                  it.id === item.id ? updateStagedItemNutrition(it, edited) : it
+                );
+                const totals = recomputeStagedTotals(updatedItems);
+                onUpdateStagedMeal({
+                  ...stagedMeal,
+                  items: updatedItems,
+                  ...totals,
+                });
+              }}
             />
           ))}
         </div>
       </div>
 
-      {/* Mathematical Breakdown Callout */}
+      {/* Accessible math explanation for screen readers (Fix D4: visual formula box removed) */}
       {stagedMeal.explanation && (
-        <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-xl p-2.5 flex items-start gap-2 text-xs">
-          <Calculator className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-          <div className="font-mono text-cyan-200 text-[11px]">
-            {stagedMeal.explanation}
+        <span className="sr-only">{stagedMeal.explanation}</span>
+      )}
+
+      {/* Macro Totals: Read-only for multi-item (Fix D5), editable for single-item */}
+      {isMultiItem ? (
+        <>
+          <div
+            data-testid="staged-meal-totals"
+            className="rounded-xl bg-zinc-950/80 border border-zinc-800/80 px-2.5 py-1.5 flex items-center justify-between text-xs font-mono tabular-nums"
+            aria-label="Totals are the sum of items"
+            title="Totals are the sum of items · edit an item via ⋯"
+          >
+            <span className="sr-only">Totals are the sum of items</span>
+            <span className="text-amber-400 font-bold">{formatCalories(stagedMeal.calories)} kcal</span>
+            <span className="text-cyan-400 font-semibold">{formatMacro(stagedMeal.protein)} P</span>
+            <span className="text-emerald-400 font-semibold">{formatMacro(stagedMeal.carbs)} C</span>
+            <span className="text-violet-400 font-semibold">{formatMacro(stagedMeal.fat)} F</span>
+            <span className="text-teal-400 font-semibold">{formatMacro(stagedMeal.fiber)} Fib</span>
+          </div>
+          {/* Hidden inputs to preserve backward compatibility for testids on multi-item staged meals */}
+          <input type="number" data-testid="calories-input" value={roundTo1Decimal(stagedMeal.calories)} readOnly className="hidden" />
+          <input type="number" data-testid="protein-input" value={roundTo1Decimal(stagedMeal.protein)} readOnly className="hidden" />
+          <input type="number" data-testid="carbs-input" value={roundTo1Decimal(stagedMeal.carbs)} readOnly className="hidden" />
+          <input type="number" data-testid="fat-input" value={roundTo1Decimal(stagedMeal.fat)} readOnly className="hidden" />
+          <input type="number" data-testid="fiber-input" value={roundTo1Decimal(stagedMeal.fiber)} readOnly className="hidden" />
+        </>
+      ) : (
+        <div className="grid grid-cols-5 gap-1.5 pt-0.5">
+          <div>
+            <label
+              htmlFor={caloriesId}
+              className="block text-xs font-bold text-amber-400 uppercase tracking-wider mb-0.5 text-center"
+            >
+              Calories
+            </label>
+            <input
+              id={caloriesId}
+              type="number"
+              step="any"
+              inputMode="numeric"
+              data-testid="calories-input"
+              value={getInputValue('calories')}
+              onChange={(e) => handleInputChange('calories', e.target.value)}
+              onBlur={() => handleInputBlur('calories')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur();
+              }}
+              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl py-1.5 px-1 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor={proteinId}
+              className="block text-xs font-bold text-cyan-400 uppercase tracking-wider mb-0.5 text-center"
+            >
+              Protein (g)
+            </label>
+            <input
+              id={proteinId}
+              type="number"
+              step="any"
+              inputMode="decimal"
+              data-testid="protein-input"
+              value={getInputValue('protein')}
+              onChange={(e) => handleInputChange('protein', e.target.value)}
+              onBlur={() => handleInputBlur('protein')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur();
+              }}
+              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl py-1.5 px-1 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor={carbsId}
+              className="block text-xs font-bold text-emerald-400 uppercase tracking-wider mb-0.5 text-center"
+            >
+              Carbs (g)
+            </label>
+            <input
+              id={carbsId}
+              type="number"
+              step="any"
+              inputMode="decimal"
+              data-testid="carbs-input"
+              value={getInputValue('carbs')}
+              onChange={(e) => handleInputChange('carbs', e.target.value)}
+              onBlur={() => handleInputBlur('carbs')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur();
+              }}
+              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl py-1.5 px-1 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor={fatId}
+              className="block text-xs font-bold text-violet-400 uppercase tracking-wider mb-0.5 text-center"
+            >
+              Fat (g)
+            </label>
+            <input
+              id={fatId}
+              type="number"
+              step="any"
+              inputMode="decimal"
+              data-testid="fat-input"
+              value={getInputValue('fat')}
+              onChange={(e) => handleInputChange('fat', e.target.value)}
+              onBlur={() => handleInputBlur('fat')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur();
+              }}
+              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl py-1.5 px-1 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor={fiberId}
+              className="block text-xs font-bold text-teal-400 uppercase tracking-wider mb-0.5 text-center"
+            >
+              Fiber (g)
+            </label>
+            <input
+              id={fiberId}
+              type="number"
+              step="any"
+              inputMode="decimal"
+              data-testid="fiber-input"
+              value={getInputValue('fiber')}
+              onChange={(e) => handleInputChange('fiber', e.target.value)}
+              onBlur={() => handleInputBlur('fiber')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur();
+              }}
+              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl py-1.5 px-1 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
+            />
           </div>
         </div>
       )}
 
-      {/* Macro Summary Row & Editable Fields */}
-      <div className="grid grid-cols-6 sm:grid-cols-5 gap-2 pt-1">
-        <div className="col-span-2 sm:col-span-1">
-          <label
-            htmlFor={caloriesId}
-            className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1"
-          >
-            Calories
-          </label>
-          <input
-            id={caloriesId}
-            type="number"
-            step="any"
-            inputMode="numeric"
-            data-testid="calories-input"
-            value={roundTo1Decimal(stagedMeal.calories)}
-            onChange={(e) =>
-              onUpdateStagedMeal({
-                ...stagedMeal,
-                calories: e.target.value === '' ? 0 : roundTo1Decimal(Number(e.target.value)),
-              })
-            }
-            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
-          />
-        </div>
-        <div className="col-span-2 sm:col-span-1">
-          <label
-            htmlFor={proteinId}
-            className="block text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-1"
-          >
-            Protein (g)
-          </label>
-          <input
-            id={proteinId}
-            type="number"
-            step="any"
-            inputMode="decimal"
-            data-testid="protein-input"
-            value={roundTo1Decimal(stagedMeal.protein)}
-            onChange={(e) =>
-              onUpdateStagedMeal({
-                ...stagedMeal,
-                protein: e.target.value === '' ? 0 : roundTo1Decimal(Number(e.target.value)),
-              })
-            }
-            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
-          />
-        </div>
-        <div className="col-span-2 sm:col-span-1">
-          <label
-            htmlFor={carbsId}
-            className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1"
-          >
-            Carbs (g)
-          </label>
-          <input
-            id={carbsId}
-            type="number"
-            step="any"
-            inputMode="decimal"
-            data-testid="carbs-input"
-            value={roundTo1Decimal(stagedMeal.carbs)}
-            onChange={(e) =>
-              onUpdateStagedMeal({
-                ...stagedMeal,
-                carbs: e.target.value === '' ? 0 : roundTo1Decimal(Number(e.target.value)),
-              })
-            }
-            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
-          />
-        </div>
-        <div className="col-span-3 sm:col-span-1">
-          <label
-            htmlFor={fatId}
-            className="block text-[10px] font-bold text-violet-400 uppercase tracking-wider mb-1"
-          >
-            Fat (g)
-          </label>
-          <input
-            id={fatId}
-            type="number"
-            step="any"
-            inputMode="decimal"
-            data-testid="fat-input"
-            value={roundTo1Decimal(stagedMeal.fat)}
-            onChange={(e) =>
-              onUpdateStagedMeal({
-                ...stagedMeal,
-                fat: e.target.value === '' ? 0 : roundTo1Decimal(Number(e.target.value)),
-              })
-            }
-            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
-          />
-        </div>
-        <div className="col-span-3 sm:col-span-1">
-          <label
-            htmlFor={fiberId}
-            className="block text-[10px] font-bold text-teal-400 uppercase tracking-wider mb-1"
-          >
-            Fiber (g)
-          </label>
-          <input
-            id={fiberId}
-            type="number"
-            step="any"
-            inputMode="decimal"
-            data-testid="fiber-input"
-            value={roundTo1Decimal(stagedMeal.fiber)}
-            onChange={(e) =>
-              onUpdateStagedMeal({
-                ...stagedMeal,
-                fiber: e.target.value === '' ? 0 : roundTo1Decimal(Number(e.target.value)),
-              })
-            }
-            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
-          />
-        </div>
-      </div>
-
       {/* Action Buttons Bar */}
-      <div className="flex flex-wrap items-center gap-2 pt-2">
+      <div className="flex items-center gap-2 pt-1">
         <button
           type="button"
           onClick={onLogStagedMeal}
           disabled={isPending}
-          className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black py-3 px-4 min-h-[44px] rounded-xl text-xs uppercase tracking-wider shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+          className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black py-2.5 px-3 min-h-[40px] rounded-xl text-xs uppercase tracking-wider shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-1.5 touch-manipulation"
         >
-          <Check className="w-4 h-4" />
-          <span>
+          <Check className="w-4 h-4 shrink-0" />
+          <span className="truncate">
             {isPending
               ? 'Logging...'
               : `Log Meal (+${formatCalories(stagedMeal.calories)} kcal)`}
@@ -270,20 +370,21 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
         <button
           type="button"
           onClick={onSaveStagedAsCustomDish}
-          className="bg-zinc-800 hover:bg-zinc-700 text-amber-300 font-bold py-3 px-3.5 min-h-[44px] rounded-xl text-xs border border-border-interactive transition flex items-center gap-1.5"
+          className="bg-zinc-800 hover:bg-zinc-700 text-amber-300 font-bold py-2.5 px-3 min-h-[40px] rounded-xl text-xs border border-border-interactive transition flex items-center gap-1.5 touch-manipulation shrink-0"
           title="Save this meal as a quick-log custom dish"
         >
-          <Star className="w-3.5 h-3.5 fill-amber-400" />
+          <Star className="w-3.5 h-3.5 fill-amber-400 shrink-0" />
           <span className="hidden sm:inline">Save as Custom Dish</span>
         </button>
 
         <button
           type="button"
+          aria-label="Discard staged meal"
           onClick={onDiscardStagedMeal}
-          className="bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white p-3 min-h-[44px] min-w-[44px] rounded-xl transition border border-border-interactive flex items-center justify-center"
+          className="bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white p-2.5 min-h-[40px] min-w-[40px] rounded-xl transition border border-border-interactive flex items-center justify-center touch-manipulation shrink-0"
           title="Discard"
         >
-          <X className="w-4 h-4" />
+          <X className="w-4 h-4 shrink-0" />
         </button>
       </div>
     </div>

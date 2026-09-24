@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { StagedMealCard } from './StagedMealCard';
 import type { StagedMeal } from './nutritionEngineHelpers';
 import { expectNoA11yViolations, expectNoA11yViolationsForRules } from '../../test/a11y';
@@ -35,6 +35,99 @@ function makeStagedMeal(): StagedMeal {
         baseFat: 20,
         baseFiber: 5,
         unit: 'unit',
+      },
+    ],
+  };
+}
+
+function makeMultiItemMeal(): StagedMeal {
+  return {
+    name: '4-Item Feast',
+    mealType: 'Dinner',
+    explanation: '104 kcal (Salmon) + 74 kcal (Trout) + 125 kcal (Beef) + 181 kcal (Pork) = 484 kcal',
+    servingSize: 1,
+    servingUnit: 'serving',
+    calories: 484,
+    protein: 39.5,
+    carbs: 0,
+    fat: 34.5,
+    fiber: 0,
+    items: [
+      {
+        id: 'item-1',
+        name: 'Salmon',
+        portion: '50g',
+        portionMultiplier: 1,
+        quantity: 50,
+        unit: 'g',
+        calories: 104,
+        protein: 10,
+        carbs: 0,
+        fat: 6.5,
+        fiber: 0,
+        baseQuantity: 50,
+        baseCalories: 104,
+        baseProtein: 10,
+        baseCarbs: 0,
+        baseFat: 6.5,
+        baseFiber: 0,
+      },
+      {
+        id: 'item-2',
+        name: 'Trout',
+        portion: '50g',
+        portionMultiplier: 1,
+        quantity: 50,
+        unit: 'g',
+        calories: 74,
+        protein: 10.5,
+        carbs: 0,
+        fat: 3.5,
+        fiber: 0,
+        baseQuantity: 50,
+        baseCalories: 74,
+        baseProtein: 10.5,
+        baseCarbs: 0,
+        baseFat: 3.5,
+        baseFiber: 0,
+      },
+      {
+        id: 'item-3',
+        name: 'Beef',
+        portion: '50g',
+        portionMultiplier: 1,
+        quantity: 50,
+        unit: 'g',
+        calories: 125,
+        protein: 13,
+        carbs: 0,
+        fat: 8,
+        fiber: 0,
+        baseQuantity: 50,
+        baseCalories: 125,
+        baseProtein: 13,
+        baseCarbs: 0,
+        baseFat: 8,
+        baseFiber: 0,
+      },
+      {
+        id: 'item-4',
+        name: 'Pork',
+        portion: '50g',
+        portionMultiplier: 1,
+        quantity: 50,
+        unit: 'g',
+        calories: 181,
+        protein: 6,
+        carbs: 0,
+        fat: 16.5,
+        fiber: 0,
+        baseQuantity: 50,
+        baseCalories: 181,
+        baseProtein: 6,
+        baseCarbs: 0,
+        baseFat: 16.5,
+        baseFiber: 0,
       },
     ],
   };
@@ -165,5 +258,126 @@ describe('StagedMealCard', () => {
       </div>
     );
     await expectNoA11yViolationsForRules(container, ['duplicate-id', 'label']);
+  });
+
+  it('D3 & D4: omits "Adjust portion or remove item" helper label and formula callout box', () => {
+    const meal = makeMultiItemMeal();
+    const { container } = render(
+      <StagedMealCard
+        stagedMeal={meal}
+        onUpdateStagedMeal={vi.fn()}
+        onApplyStagedItemChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onSaveItemAsCustomDish={vi.fn()}
+        onLogStagedMeal={vi.fn()}
+        onSaveStagedAsCustomDish={vi.fn()}
+        onDiscardStagedMeal={vi.fn()}
+        isPending={false}
+      />
+    );
+
+    expect(screen.queryByText(/adjust portion or remove item/i)).toBeNull();
+    expect(container.querySelector('.lucide-calculator')).toBeNull();
+    expect(screen.getByText(/itemized breakdown \(4\)/i)).toBeDefined();
+  });
+
+  it('D5: renders read-only totals with no inputs for multi-item meal and shows 484/39.5/34.5 values', () => {
+    const meal = makeMultiItemMeal();
+    render(
+      <StagedMealCard
+        stagedMeal={meal}
+        onUpdateStagedMeal={vi.fn()}
+        onApplyStagedItemChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onSaveItemAsCustomDish={vi.fn()}
+        onLogStagedMeal={vi.fn()}
+        onSaveStagedAsCustomDish={vi.fn()}
+        onDiscardStagedMeal={vi.fn()}
+        isPending={false}
+      />
+    );
+
+    const totalsContainer = screen.getByTestId('staged-meal-totals');
+    expect(within(totalsContainer).queryAllByRole('spinbutton')).toHaveLength(0);
+    expect(within(totalsContainer).queryAllByRole('textbox')).toHaveLength(0);
+
+    // Verify macro figures are shown
+    expect(within(totalsContainer).getByText(/484\s*kcal/i)).toBeDefined();
+    expect(within(totalsContainer).getByText(/39\.5\s*P/i)).toBeDefined();
+    expect(within(totalsContainer).getByText(/34\.5\s*F/i)).toBeDefined();
+    expect(screen.getByText(/totals are the sum of items/i)).toBeDefined();
+  });
+
+  it('single-item meal: keeps editable total inputs and writes back to items[0] and base fields', () => {
+    const meal = makeStagedMeal();
+    const onUpdateStagedMeal = vi.fn();
+    render(
+      <StagedMealCard
+        stagedMeal={meal}
+        onUpdateStagedMeal={onUpdateStagedMeal}
+        onApplyStagedItemChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onSaveItemAsCustomDish={vi.fn()}
+        onLogStagedMeal={vi.fn()}
+        onSaveStagedAsCustomDish={vi.fn()}
+        onDiscardStagedMeal={vi.fn()}
+        isPending={false}
+      />
+    );
+
+    const calInput = screen.getByTestId('calories-input');
+    fireEvent.change(calInput, { target: { value: '650' } });
+
+    expect(onUpdateStagedMeal).toHaveBeenCalled();
+    const lastCallArg = onUpdateStagedMeal.mock.calls[onUpdateStagedMeal.mock.calls.length - 1][0] as StagedMeal;
+    expect(lastCallArg.calories).toBe(650);
+    expect(lastCallArg.items[0].calories).toBe(650);
+    expect(lastCallArg.items[0].baseCalories).toBe(650);
+    expect(lastCallArg.items[0].userOverridden).toBe(true);
+  });
+
+  it('Option A: wires onEditNutrition to update item nutrition and recompute staged totals', () => {
+    const meal = makeMultiItemMeal();
+    const onUpdateStagedMeal = vi.fn();
+    render(
+      <StagedMealCard
+        stagedMeal={meal}
+        onUpdateStagedMeal={onUpdateStagedMeal}
+        onApplyStagedItemChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onSaveItemAsCustomDish={vi.fn()}
+        onLogStagedMeal={vi.fn()}
+        onSaveStagedAsCustomDish={vi.fn()}
+        onDiscardStagedMeal={vi.fn()}
+        isPending={false}
+      />
+    );
+
+    // Open overflow menu on the first item (Salmon: 104 kcal)
+    const actionButtons = screen.getAllByTestId('component-actions');
+    fireEvent.click(actionButtons[0]);
+
+    // Click "Edit nutrition"
+    const editBtn = screen.getByTestId('component-edit-nutrition');
+    fireEvent.click(editBtn);
+
+    // Edit nutrition modal is open
+    const calInput = screen.getByTestId('edit-item-calories-input');
+    fireEvent.change(calInput, { target: { value: '150' } });
+
+    // Save
+    const saveBtn = screen.getByTestId('save-edit-item-nutrition-btn');
+    fireEvent.click(saveBtn);
+
+    expect(onUpdateStagedMeal).toHaveBeenCalledTimes(1);
+    const updated = onUpdateStagedMeal.mock.calls[0][0] as StagedMeal;
+
+    // First item updated: 150 kcal
+    expect(updated.items[0].calories).toBe(150);
+    expect(updated.items[0].baseCalories).toBe(150);
+    expect(updated.items[0].userOverridden).toBe(true);
+
+    // Totals recomputed: 484 - 104 + 150 = 530 kcal
+    expect(updated.calories).toBe(530);
   });
 });
