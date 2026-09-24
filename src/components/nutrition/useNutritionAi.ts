@@ -95,7 +95,11 @@ export function useNutritionAi({
   const handleAnalyze = async () => {
     if (!nlInput.trim() && !selectedPhoto) return;
     setIsAnalyzing(true);
-    setStatus('Analyzing...');
+    setStatus(
+      selectedPhoto
+        ? 'Analyzing (this could take up to 45s)...'
+        : 'Analyzing (this could take up to 30s)...'
+    );
     setIsError(false);
     setIsRateLimited(false);
 
