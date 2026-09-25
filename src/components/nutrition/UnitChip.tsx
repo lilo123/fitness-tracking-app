@@ -73,7 +73,7 @@ export const UnitChip: React.FC<UnitChipProps> = ({
         onClick={() => setOpen(true)}
         className={`shrink-0 min-h-[40px] h-10 flex items-center text-xs transition touch-manipulation disabled:opacity-50 ${
           embedded
-            ? 'w-[52px] min-w-[52px] max-w-[52px] border-0 border-l border-zinc-700/80 bg-zinc-700/60 hover:bg-zinc-700/80 hover:text-zinc-200 text-zinc-300 font-medium justify-between pl-1.5 pr-1'
+            ? 'w-[52px] min-w-[52px] max-w-[52px] border-0 border-l border-zinc-700/80 bg-zinc-700/60 hover:bg-zinc-700/80 hover:text-zinc-200 text-zinc-300 font-normal justify-between pl-1.5 pr-1'
             : 'min-w-[40px] max-w-[64px] rounded-lg border border-border-interactive bg-zinc-950 hover:border-cyan-500 font-bold text-cyan-300 justify-center px-1'
         }`}
       >
@@ -101,7 +101,7 @@ export const UnitChip: React.FC<UnitChipProps> = ({
             ref={sheetRef}
             className="w-full max-w-md space-y-1 rounded-t-3xl border border-zinc-800 bg-zinc-900 p-4 pb-[max(1.25rem,env(safe-area-inset-bottom,1.25rem))] shadow-2xl sm:rounded-3xl"
           >
-            <span className="block pb-2 text-xs font-black uppercase tracking-wider text-zinc-500">
+            <span className="block pb-2 text-xs font-bold uppercase tracking-wider text-zinc-500">
               Unit
             </span>
             {CANONICAL_UNITS.map((unit) => (

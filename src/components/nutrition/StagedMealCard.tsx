@@ -169,10 +169,10 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
                     data-testid={`staged-total-${colKey}`}
                     className={`text-right text-xs tabular-nums ${isZero ? 'text-zinc-600 font-normal' : config.colorClass}`}
                   >
-                    <span data-testid={`macro-val-${colKey}`} className={`tabular-nums ${isZero ? 'font-normal' : 'font-semibold'}`}>
+                    <span data-testid={`macro-val-${colKey}`} className={`text-sm tabular-nums ${isZero ? 'font-normal' : 'font-semibold'}`}>
                       {formatted}
                     </span>{' '}
-                    <span className="opacity-70 font-normal">
+                    <span className="text-xs opacity-70 font-normal">
                       {config.label}
                     </span>
                   </div>
@@ -210,7 +210,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
           type="button"
           onClick={onLogStagedMeal}
           disabled={isPending}
-          className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black py-2.5 px-3 min-h-[40px] rounded-xl text-xs uppercase tracking-wider shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-1.5 touch-manipulation"
+          className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold py-2.5 px-3 min-h-[40px] rounded-xl text-xs uppercase tracking-wider shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-1.5 touch-manipulation"
         >
           <Check className="w-4 h-4 shrink-0" />
           <span className="truncate">

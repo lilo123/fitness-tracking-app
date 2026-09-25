@@ -71,16 +71,16 @@ export const MacroRing: React.FC<MacroRingProps> = ({
           />
         </svg>
         <div className="absolute flex flex-col items-center justify-center text-center">
-          <span className={`text-xs font-black font-mono ${colorClass}`}>
+          <span className={`text-sm font-bold tabular-nums ${colorClass}`}>
             {formattedCurrent}
           </span>
-          <span className="text-xs text-zinc-500 font-mono -mt-0.5">
+          <span className="text-xs font-normal text-zinc-500 tabular-nums -mt-0.5">
             /{formattedTarget}
           </span>
         </div>
       </div>
       <div className="mt-1.5 sm:mt-2 text-center w-full">
-        <div className="text-xs font-extrabold uppercase tracking-wider text-zinc-300 truncate">
+        <div className="text-xs font-bold uppercase tracking-wider text-zinc-300 truncate">
           {label}
         </div>
         {subtitle && (
@@ -95,7 +95,7 @@ export const MacroRing: React.FC<MacroRingProps> = ({
           </div>
         )}
         {!subtitle && (
-          <div className="text-xs text-zinc-500 font-mono">
+          <div className="text-xs font-normal text-zinc-500 tabular-nums">
             {displayPercentage}%
           </div>
         )}

@@ -144,7 +144,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
       className="p-4 bg-zinc-950 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in"
     >
       <div className="flex items-center justify-between border-b border-zinc-850 pb-2">
-        <span className="text-xs font-black uppercase tracking-wider text-cyan-400">
+        <span className="text-xs font-bold uppercase tracking-wider text-cyan-400">
           Manual Macro Logging
         </span>
         <button
@@ -202,7 +202,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             placeholder="e.g. Scrambled Eggs & Toast"
             aria-invalid={Boolean(errors.name)}
             aria-errormessage={errors.name ? `${nameId}-error` : undefined}
-            className={`w-full bg-zinc-950 border text-white rounded-xl p-2.5 text-base sm:text-xs font-semibold outline-none scroll-mb-24 transition ${
+            className={`w-full bg-zinc-950 border text-white rounded-xl p-2.5 text-base font-semibold outline-none scroll-mb-24 transition ${
               errors.name
                 ? 'border-rose-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/50'
                 : 'border-border-interactive focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50'
@@ -231,7 +231,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             id={mealTypeId}
             value={manualMealType}
             onChange={(e) => onManualMealTypeChange(e.target.value)}
-            className="w-full bg-zinc-950 border border-border-interactive text-zinc-300 rounded-xl p-2 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none scroll-mb-24 min-h-[40px]"
+            className="w-full bg-zinc-950 border border-border-interactive text-zinc-300 rounded-xl p-2 text-base font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none scroll-mb-24 min-h-[40px]"
           >
             <option value="Breakfast">Breakfast</option>
             <option value="Lunch">Lunch</option>
@@ -263,7 +263,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             placeholder="0"
             aria-invalid={Boolean(errors.calories)}
             aria-errormessage={errors.calories ? `${caloriesId}-error` : undefined}
-            className={`w-full bg-zinc-950 border text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold outline-none text-center scroll-mb-24 transition ${
+            className={`w-full bg-zinc-950 border text-white rounded-xl p-2 text-base tabular-nums font-bold outline-none text-center scroll-mb-24 transition ${
               errors.calories
                 ? 'border-rose-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/50'
                 : 'border-border-interactive focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50'
@@ -300,7 +300,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             placeholder="0"
             aria-invalid={Boolean(errors.protein)}
             aria-errormessage={errors.protein ? `${proteinId}-error` : undefined}
-            className={`w-full bg-zinc-950 border text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold outline-none text-center scroll-mb-24 transition ${
+            className={`w-full bg-zinc-950 border text-white rounded-xl p-2 text-base tabular-nums font-bold outline-none text-center scroll-mb-24 transition ${
               errors.protein
                 ? 'border-rose-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/50'
                 : 'border-border-interactive focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50'
@@ -336,7 +336,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             placeholder="0"
             aria-invalid={Boolean(errors.carbs)}
             aria-errormessage={errors.carbs ? `${carbsId}-error` : undefined}
-            className={`w-full bg-zinc-950 border text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold outline-none text-center scroll-mb-24 transition ${
+            className={`w-full bg-zinc-950 border text-white rounded-xl p-2 text-base tabular-nums font-bold outline-none text-center scroll-mb-24 transition ${
               errors.carbs
                 ? 'border-rose-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/50'
                 : 'border-border-interactive focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50'
@@ -372,7 +372,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             placeholder="0"
             aria-invalid={Boolean(errors.fat)}
             aria-errormessage={errors.fat ? `${fatId}-error` : undefined}
-            className={`w-full bg-zinc-950 border text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold outline-none text-center scroll-mb-24 transition ${
+            className={`w-full bg-zinc-950 border text-white rounded-xl p-2 text-base tabular-nums font-bold outline-none text-center scroll-mb-24 transition ${
               errors.fat
                 ? 'border-rose-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/50'
                 : 'border-border-interactive focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50'
@@ -408,7 +408,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             placeholder="0"
             aria-invalid={Boolean(errors.fiber)}
             aria-errormessage={errors.fiber ? `${fiberId}-error` : undefined}
-            className={`w-full bg-zinc-950 border text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold outline-none text-center scroll-mb-24 transition ${
+            className={`w-full bg-zinc-950 border text-white rounded-xl p-2 text-base tabular-nums font-bold outline-none text-center scroll-mb-24 transition ${
               errors.fiber
                 ? 'border-rose-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/50'
                 : 'border-border-interactive focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50'
@@ -445,7 +445,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             onChange={(e) => onManualServingSizeChange(e.target.value === '' ? '' : Number(e.target.value))}
             aria-invalid={Boolean(errors.servingSize)}
             aria-errormessage={errors.servingSize ? `${servingSizeId}-error` : undefined}
-            className={`w-full bg-zinc-950 border text-white rounded-xl p-2 text-base sm:text-xs font-mono outline-none text-center scroll-mb-24 transition ${
+            className={`w-full bg-zinc-950 border text-white rounded-xl p-2 text-base tabular-nums font-normal outline-none text-center scroll-mb-24 transition ${
               errors.servingSize
                 ? 'border-rose-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/50'
                 : 'border-border-interactive focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50'
@@ -474,7 +474,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             type="text"
             value={manualServingUnit}
             onChange={(e) => onManualServingUnitChange(e.target.value)}
-            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center scroll-mb-24"
+            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center scroll-mb-24"
           />
         </div>
       </div>
@@ -493,7 +493,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
         <button
           type="submit"
           disabled={isPending}
-          className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black py-3 min-h-[44px] rounded-xl uppercase tracking-wider text-xs shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 transition disabled:opacity-50"
+          className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold py-3 min-h-[44px] rounded-xl uppercase tracking-wider text-xs shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 transition disabled:opacity-50"
         >
           {isPending ? 'Logging...' : 'Log Meal'}
         </button>

@@ -61,7 +61,7 @@ export const NutritionDashboardRings: React.FC<NutritionDashboardRingsProps> = m
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Flame className="w-5 h-5 text-amber-400" />
-          <h2 className="text-sm font-black uppercase tracking-wider text-white">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-white">
             Today's Nutrition
           </h2>
         </div>
@@ -70,7 +70,7 @@ export const NutritionDashboardRings: React.FC<NutritionDashboardRingsProps> = m
           data-testid="nutrition-date-input"
           value={selectedDate}
           onChange={(e) => onDateChange(e.target.value)}
-          className="bg-zinc-950 border border-border-interactive text-cyan-400 rounded-xl px-2.5 py-1.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none cursor-pointer"
+          className="bg-zinc-950 border border-border-interactive text-cyan-400 rounded-xl px-2.5 py-1.5 text-base tabular-nums font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none cursor-pointer"
         />
       </div>
 

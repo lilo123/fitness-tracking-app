@@ -168,7 +168,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
         <div
           data-testid="component-name"
           title={item.name}
-          className="flex-1 min-w-0 text-xs font-semibold text-white leading-tight break-words line-clamp-2"
+          className="flex-1 min-w-0 text-sm font-semibold text-white leading-tight break-words line-clamp-2"
         >
           {item.name}
         </div>
@@ -209,7 +209,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
               />
             </div>
           ) : (
-            <span className="text-xs font-mono font-medium text-zinc-400 px-1">
+            <span className="text-xs tabular-nums font-normal text-zinc-400 px-1">
               {roundTo1Decimal(item.quantity)}{shortUnitLabel(item.unit)}
             </span>
           )}
