@@ -4,6 +4,7 @@ import {
   stagedReference,
   recomputeStagedTotals,
   updateStagedItemNutrition,
+  buildStagedMealFromManualData,
   type StagedItem,
 } from './nutritionEngineHelpers';
 import { scaleItemToQuantity } from '../../utils/itemModel';
@@ -295,3 +296,59 @@ describe('updateStagedItemNutrition', () => {
   });
 });
 
+describe('buildStagedMealFromManualData', () => {
+  it('constructs a single-item StagedMeal from manual data with calculated explanation and photos', () => {
+    const staged = buildStagedMealFromManualData(
+      {
+        food_name: 'Grilled Salmon',
+        calories: 350,
+        protein: 34,
+        carbs: 0,
+        fat: 22,
+        fiber: 0,
+        meal_type: 'Dinner',
+        serving_size: 200,
+        serving_unit: 'g',
+      },
+      'data:image/jpeg;base64,sample'
+    );
+
+    expect(staged.name).toBe('Grilled Salmon');
+    expect(staged.mealType).toBe('Dinner');
+    expect(staged.photoUrl).toBe('data:image/jpeg;base64,sample');
+    expect(staged.calories).toBe(350);
+    expect(staged.protein).toBe(34);
+    expect(staged.carbs).toBe(0);
+    expect(staged.fat).toBe(22);
+    expect(staged.fiber).toBe(0);
+    expect(staged.servingSize).toBe(200);
+    expect(staged.servingUnit).toBe('g');
+    expect(staged.explanation).toBe('350 kcal (Grilled Salmon)');
+
+    expect(staged.items).toHaveLength(1);
+    const item = staged.items[0];
+    expect(item.name).toBe('Grilled Salmon');
+    expect(item.portion).toBe('200 g');
+    expect(item.quantity).toBe(200);
+    expect(item.unit).toBe('g');
+    expect(item.calories).toBe(350);
+  });
+
+  it('falls back mealType to Breakfast and unit to unit when unspecified or unknown', () => {
+    const staged = buildStagedMealFromManualData({
+      food_name: 'Custom Snack',
+      calories: 120,
+      protein: 2,
+      carbs: 15,
+      fat: 5,
+      fiber: 1,
+      meal_type: '',
+      serving_size: 1,
+      serving_unit: 'piece',
+    });
+
+    expect(staged.mealType).toBe('Breakfast');
+    expect(staged.items[0].unit).toBe('unit');
+    expect(staged.photoUrl).toBeUndefined();
+  });
+});

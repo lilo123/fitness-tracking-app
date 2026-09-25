@@ -44,6 +44,7 @@ export const useNavHeight = (): number => {
 import { convertPortion, type CanonicalUnit } from '../../utils/unitConverter';
 import { roundTo1Decimal, formatCalories } from '../../utils/nutrition';
 import { sumItems, type NutritionItem } from '../../utils/itemModel';
+import type { ManualMealStagedData } from './useManualMealForm';
 
 export interface StagedItem {
   id: string;
@@ -302,5 +303,42 @@ export function recomputeStagedTotals(items: StagedItem[]) {
     fat: roundTo1Decimal(totals.fat),
     fiber: roundTo1Decimal(totals.fiber),
     explanation,
+  };
+}
+
+/**
+ * Build a single-item StagedMeal from manual meal form data.
+ */
+export function buildStagedMealFromManualData(
+  data: ManualMealStagedData,
+  photoUrl?: string
+): StagedMeal {
+  const item = buildStagedItem({
+    name: data.food_name,
+    portion: `${data.serving_size} ${data.serving_unit}`,
+    quantity: data.serving_size,
+    unit: (data.serving_unit === 'g' || data.serving_unit === 'ml' || data.serving_unit === 'unit')
+      ? data.serving_unit
+      : 'unit',
+    calories: data.calories,
+    protein: data.protein,
+    carbs: data.carbs,
+    fat: data.fat,
+    fiber: data.fiber,
+  });
+
+  return {
+    name: data.food_name,
+    mealType: data.meal_type || 'Breakfast',
+    explanation: `${formatCalories(data.calories)} kcal (${data.food_name})`,
+    items: [item],
+    calories: data.calories,
+    protein: data.protein,
+    carbs: data.carbs,
+    fat: data.fat,
+    fiber: data.fiber,
+    servingSize: data.serving_size,
+    servingUnit: data.serving_unit,
+    photoUrl,
   };
 }

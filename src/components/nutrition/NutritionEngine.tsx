@@ -10,7 +10,7 @@ import {
 import { MealLogRow } from './MealLogRow';
 import { NutrientBreakdownModal, type BreakdownNutrient } from './NutrientBreakdownModal';
 import {
-  stagedToItem, buildStagedItem, recomputeStagedTotals, type StagedItem, type StagedMeal,
+  stagedToItem, buildStagedItem, recomputeStagedTotals, buildStagedMealFromManualData, type StagedItem, type StagedMeal,
 } from './nutritionEngineHelpers';
 import { useNutritionData } from './useNutritionData';
 import { useNutritionAi } from './useNutritionAi';
@@ -46,36 +46,7 @@ export const NutritionEngine: React.FC = () => {
   const [isError, setIsError] = useState(false);
 
   const handleStageManualMeal = (data: ManualMealStagedData) => {
-    const item = buildStagedItem({
-      name: data.food_name,
-      portion: `${data.serving_size} ${data.serving_unit}`,
-      quantity: data.serving_size,
-      unit: (data.serving_unit === 'g' || data.serving_unit === 'ml' || data.serving_unit === 'unit')
-        ? data.serving_unit
-        : 'unit',
-      calories: data.calories,
-      protein: data.protein,
-      carbs: data.carbs,
-      fat: data.fat,
-      fiber: data.fiber,
-    });
-
-    const staged: StagedMeal = {
-      name: data.food_name,
-      mealType: data.meal_type || 'Breakfast',
-      explanation: `${formatCalories(data.calories)} kcal (${data.food_name})`,
-      items: [item],
-      calories: data.calories,
-      protein: data.protein,
-      carbs: data.carbs,
-      fat: data.fat,
-      fiber: data.fiber,
-      servingSize: data.serving_size,
-      servingUnit: data.serving_unit,
-      photoUrl: ai.selectedPhoto?.dataUrl,
-    };
-
-    setStagedMeal(staged);
+    setStagedMeal(buildStagedMealFromManualData(data, ai.selectedPhoto?.dataUrl));
     setShowManualForm(false);
   };
 
