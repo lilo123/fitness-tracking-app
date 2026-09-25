@@ -1,5 +1,5 @@
 import React, { memo, useRef, useEffect, useState } from 'react';
-import { Utensils, Check, Star, X } from 'lucide-react';
+import { Utensils, Check, Star, X, ChevronDown } from 'lucide-react';
 import { roundTo1Decimal, formatCalories, formatMacro } from '../../utils/nutrition';
 import type { NutritionItem } from '../../utils/itemModel';
 import { ComponentRow } from './ComponentRow';
@@ -140,19 +140,25 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
           />
         </div>
 
-        <select
-          aria-label="Meal type"
-          value={stagedMeal.mealType}
-          onChange={(e) => onUpdateStagedMeal({ ...stagedMeal, mealType: e.target.value })}
-          className="w-28 shrink-0 bg-zinc-950 border border-border-interactive text-zinc-300 text-base sm:text-xs font-semibold rounded-xl px-2 py-2 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none min-h-[40px] h-10"
-        >
-          <option value="Breakfast">Breakfast</option>
-          <option value="Lunch">Lunch</option>
-          <option value="Dinner">Dinner</option>
-          <option value="Snack">Snack</option>
-          <option value="Pre-Workout">Pre-Workout</option>
-          <option value="Post-Workout">Post-Workout</option>
-        </select>
+        <div className="relative w-[134px] shrink-0">
+          <select
+            aria-label="Meal type"
+            value={stagedMeal.mealType}
+            onChange={(e) => onUpdateStagedMeal({ ...stagedMeal, mealType: e.target.value })}
+            className="w-full appearance-none bg-zinc-950 border border-border-interactive text-zinc-300 text-base sm:text-xs font-semibold rounded-xl pl-2 pr-7 py-2 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none min-h-[40px] h-10 cursor-pointer"
+          >
+            <option value="Breakfast">Breakfast</option>
+            <option value="Lunch">Lunch</option>
+            <option value="Dinner">Dinner</option>
+            <option value="Snack">Snack</option>
+            <option value="Pre-Workout">Pre-Workout</option>
+            <option value="Post-Workout">Post-Workout</option>
+          </select>
+          <ChevronDown
+            className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400"
+            aria-hidden="true"
+          />
+        </div>
       </div>
 
       {/* Itemized Ingredient Breakdown */}

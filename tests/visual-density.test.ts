@@ -124,6 +124,98 @@ async function setupPageAndLogin(page: Page) {
   await page.waitForSelector("text=Today's Nutrition");
 }
 
+// Check helper: Staged card meal-type select chevron geometry (D27)
+async function checkSelectChevronGeometry(card: Locator) {
+  return await card.evaluate((cardEl) => {
+    const select = cardEl.querySelector<HTMLSelectElement>('select[aria-label="Meal type"]');
+    if (!select) throw new Error('Meal type select not found');
+
+    const container = select.parentElement;
+    const headerBorderB = cardEl.querySelector('.border-b');
+    if (!container || container === headerBorderB) {
+      throw new Error('Meal type select is not wrapped in a dedicated container (found direct child of header)');
+    }
+
+    const chevronSvg = container.querySelector<SVGElement>(':scope > svg, :scope svg');
+    if (!chevronSvg) {
+      throw new Error('Meal type select chevron SVG not found inside container');
+    }
+
+    const dishNameInput = cardEl.querySelector<HTMLInputElement>('[data-testid="dish-name-input"]');
+    const inputRect = dishNameInput ? dishNameInput.getBoundingClientRect() : null;
+
+    const selectRect = select.getBoundingClientRect();
+    const selectStyle = window.getComputedStyle(select);
+    const paddingLeft = parseFloat(selectStyle.paddingLeft) || 0;
+    const paddingRight = parseFloat(selectStyle.paddingRight) || 0;
+
+    // Measure chevron computed styles to ensure not hidden or blocking clicks
+    const cStyle = window.getComputedStyle(chevronSvg);
+    const isChevronVisible = cStyle.display !== 'none' && cStyle.visibility !== 'hidden' && parseFloat(cStyle.opacity) > 0;
+    const chevronOpacity = parseFloat(cStyle.opacity) || 0;
+    const chevronPointerEvents = cStyle.pointerEvents;
+
+    // Measure text width of ALL options using canvas
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.font = `${selectStyle.fontStyle} ${selectStyle.fontVariant} ${selectStyle.fontWeight} ${selectStyle.fontSize} ${selectStyle.fontFamily}`;
+    }
+
+    let maxTextWidth = 0;
+    let longestOption = '';
+    const optionWidths: Record<string, number> = {};
+    for (let i = 0; i < select.options.length; i++) {
+      const optText = select.options[i].text;
+      const w = ctx ? ctx.measureText(optText).width : 0;
+      optionWidths[optText] = w;
+      if (w > maxTextWidth) {
+        maxTextWidth = w;
+        longestOption = optText;
+      }
+    }
+
+    const selectedText = select.options[select.selectedIndex]?.text || '';
+    const textWidth = ctx ? ctx.measureText(selectedText).width : 0;
+
+    const cRect = chevronSvg.getBoundingClientRect();
+    const chevronBox = { x: cRect.x, y: cRect.y, width: cRect.width, height: cRect.height, right: cRect.right, bottom: cRect.bottom };
+    const rightInset = selectRect.right - cRect.right;
+    const chevronOffsetLeft = cRect.left - selectRect.left;
+    const selectCenterY = selectRect.top + selectRect.height / 2;
+    const chevronCenterY = cRect.top + cRect.height / 2;
+    const verticalDelta = Math.abs(selectCenterY - chevronCenterY);
+    const isInside = cRect.left >= selectRect.left && cRect.right <= selectRect.right && cRect.top >= selectRect.top && cRect.bottom <= selectRect.bottom;
+    const clearanceLongest = (chevronOffsetLeft - 2) - (paddingLeft + maxTextWidth);
+    const noOverlapLongest = clearanceLongest >= 0;
+
+    return {
+      hasCustomChevron: true,
+      isChevronVisible,
+      chevronOpacity,
+      chevronPointerEvents,
+      chevronBox,
+      selectBox: { x: selectRect.x, y: selectRect.y, width: selectRect.width, height: selectRect.height },
+      inputBox: inputRect ? { x: inputRect.x, y: inputRect.y, width: inputRect.width, height: inputRect.height } : null,
+      rightInset,
+      verticalDelta,
+      isInside,
+      scrollWidth: select.scrollWidth,
+      clientWidth: select.clientWidth,
+      isClipped: select.scrollWidth > select.clientWidth,
+      textWidth,
+      maxTextWidth,
+      longestOption,
+      optionWidths,
+      paddingLeft,
+      paddingRight,
+      chevronOffsetLeft,
+      clearanceLongest,
+      noOverlapLongest,
+    };
+  });
+}
+
 // Check 1 helper: Font sizes
 async function checkFontSizes(surface: Locator) {
   const result = await surface.evaluate((root) => {
@@ -600,7 +692,46 @@ test.describe('Surface A: Staged card with 4 items', () => {
       expect(result.logBtnMetrics.spanScrollWidth).toBeLessThanOrEqual(result.logBtnMetrics.spanClientWidth + 1);
     }
   });
+
+  test('A: meal-type select chevron geometry at 390px and 700px', async () => {
+    expect(page.viewportSize()?.width).toBe(390);
+    await waitForScrollSettled(page);
+
+    const result390 = await checkSelectChevronGeometry(cardLocator);
+    console.log(JSON.stringify({ test: 'A: meal-type select chevron geometry at 390px', surface: 'A', ...result390 }));
+    expect(result390.hasCustomChevron, 'Meal type select must have a custom chevron icon at 390px').toBe(true);
+    expect(result390.isChevronVisible, 'Chevron must be visible at 390px').toBe(true);
+    expect(result390.chevronOpacity, 'Chevron computed opacity must be > 0 at 390px').toBeGreaterThan(0);
+    expect(result390.chevronPointerEvents, 'Chevron pointer-events must be none at 390px').toBe('none');
+    expect(result390.isInside, 'Chevron must be inside select border at 390px').toBe(true);
+    expect(result390.rightInset, 'Chevron right inset must be >= 8px at 390px').toBeGreaterThanOrEqual(8);
+    expect(result390.verticalDelta, 'Chevron must be vertically centered within +-2px at 390px').toBeLessThanOrEqual(2);
+    expect(result390.isClipped, 'Select label must not be clipped at 390px').toBe(false);
+    expect(result390.paddingLeft + result390.maxTextWidth, `No overlap between longest label (${result390.longestOption}) and chevron at 390px`).toBeLessThanOrEqual(result390.chevronOffsetLeft - 2);
+
+    // Test at 700px viewport wrapped in try/finally to prevent viewport leak into subsequent tests
+    try {
+      await page.setViewportSize({ width: 700, height: 900 });
+      await waitForScrollSettled(page);
+      const result700 = await checkSelectChevronGeometry(cardLocator);
+      console.log(JSON.stringify({ test: 'A: meal-type select chevron geometry at 700px', surface: 'A', ...result700 }));
+      expect(result700.hasCustomChevron, 'Custom chevron icon must be present at 700px').toBe(true);
+      expect(result700.isChevronVisible, 'Chevron must be visible at 700px').toBe(true);
+      expect(result700.chevronOpacity, 'Chevron computed opacity must be > 0 at 700px').toBeGreaterThan(0);
+      expect(result700.chevronPointerEvents, 'Chevron pointer-events must be none at 700px').toBe('none');
+      expect(result700.isInside, 'Chevron must be inside select border at 700px').toBe(true);
+      expect(result700.rightInset, 'Chevron right inset must be >= 8px at 700px').toBeGreaterThanOrEqual(8);
+      expect(result700.verticalDelta, 'Chevron must be vertically centered within +-2px at 700px').toBeLessThanOrEqual(2);
+      expect(result700.isClipped, 'Select label must not be clipped at 700px').toBe(false);
+      expect(result700.paddingLeft + result700.maxTextWidth, `No overlap between longest label (${result700.longestOption}) and chevron at 700px`).toBeLessThanOrEqual(result700.chevronOffsetLeft - 2);
+    } finally {
+      // Restore viewport to 390x844
+      await page.setViewportSize({ width: 390, height: 844 });
+      await waitForScrollSettled(page);
+    }
+  });
 });
+
 
 // ---------------------------------------------------------------------------
 // Surface B: Staged card with 1 item
@@ -1347,7 +1478,25 @@ test.describe('Surface E: Staged card at 320px width (D24)', () => {
       ).toBeLessThanOrEqual(result.logBtnMetrics.spanClientWidth + 1);
     }
   });
+
+  test('E: meal-type select chevron geometry at 320px', async () => {
+    expect(page.viewportSize()?.width).toBe(320);
+    await waitForScrollSettled(page);
+
+    const result320 = await checkSelectChevronGeometry(cardLocator);
+    console.log(JSON.stringify({ test: 'E: meal-type select chevron geometry at 320px', surface: 'E', ...result320 }));
+    expect(result320.hasCustomChevron, 'Meal type select must have a custom chevron icon at 320px').toBe(true);
+    expect(result320.isChevronVisible, 'Chevron must be visible at 320px').toBe(true);
+    expect(result320.chevronOpacity, 'Chevron computed opacity must be > 0 at 320px').toBeGreaterThan(0);
+    expect(result320.chevronPointerEvents, 'Chevron pointer-events must be none at 320px').toBe('none');
+    expect(result320.isInside, 'Chevron must be inside select border at 320px').toBe(true);
+    expect(result320.rightInset, 'Chevron right inset must be >= 8px at 320px').toBeGreaterThanOrEqual(8);
+    expect(result320.verticalDelta, 'Chevron must be vertically centered within +-2px at 320px').toBeLessThanOrEqual(2);
+    expect(result320.isClipped, 'Select label must not be clipped at 320px').toBe(false);
+    expect(result320.paddingLeft + result320.maxTextWidth, `No overlap between longest label (${result320.longestOption}) and chevron at 320px`).toBeLessThanOrEqual(result320.chevronOffsetLeft - 2);
+  });
 });
+
 
 // ---------------------------------------------------------------------------
 // Surface F: Manual-staged card and Add-item at 390×844 (D22)
