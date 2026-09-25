@@ -126,7 +126,7 @@ async function setupPageAndLogin(page: Page) {
 
 // Check 1 helper: Font sizes
 async function checkFontSizes(surface: Locator) {
-  return surface.evaluate((root) => {
+  const result = await surface.evaluate((root) => {
     function isVis(el: Element): boolean {
       if (!(el instanceof HTMLElement || el instanceof SVGElement)) return false;
       const s = window.getComputedStyle(el);
@@ -147,6 +147,7 @@ async function checkFontSizes(surface: Locator) {
     const offenders: Array<{ selector: string; text: string; fontSize: number }> = [];
     let minFontSize = Infinity;
     let minFontElement: { selector: string; text: string; fontSize: number } | null = null;
+    let candidateCount = 0;
 
     const allEls = [root, ...Array.from(root.querySelectorAll('*'))];
     for (const el of allEls) {
@@ -162,6 +163,7 @@ async function checkFontSizes(surface: Locator) {
       }
 
       if (directText) {
+        candidateCount++;
         const fs = parseFloat(s.fontSize);
         if (!isNaN(fs)) {
           if (fs < minFontSize) {
@@ -175,13 +177,16 @@ async function checkFontSizes(surface: Locator) {
       }
     }
 
-    return { minFontSize, minFontElement, offenders };
+    return { minFontSize, minFontElement, offenders, candidateCount };
   });
+
+  expect(result.candidateCount, 'checkFontSizes matched 0 text candidates').toBeGreaterThan(0);
+  return result;
 }
 
 // Check 2 helper: Tap targets
 async function checkTapTargets(surface: Locator) {
-  return surface.evaluate((root) => {
+  const result = await surface.evaluate((root) => {
     function isVis(el: Element): boolean {
       if (!(el instanceof HTMLElement || el instanceof SVGElement)) return false;
       const s = window.getComputedStyle(el);
@@ -205,9 +210,11 @@ async function checkTapTargets(surface: Locator) {
 
     const tapsUnder48: Array<{ selector: string; text: string; width: number; height: number }> = [];
     const offendersUnder40: Array<{ selector: string; text: string; width: number; height: number }> = [];
+    let candidateCount = 0;
 
     for (const el of tapCandidates) {
       if (!isVis(el)) continue;
+      candidateCount++;
       const r = el.getBoundingClientRect();
       const width = Math.round(r.width * 10) / 10;
       const height = Math.round(r.height * 10) / 10;
@@ -222,13 +229,16 @@ async function checkTapTargets(surface: Locator) {
       }
     }
 
-    return { tapsUnder48, offendersUnder40 };
+    return { tapsUnder48, offendersUnder40, candidateCount };
   });
+
+  expect(result.candidateCount, 'checkTapTargets matched 0 tap candidates').toBeGreaterThan(0);
+  return result;
 }
 
 // Check 3 helper: Clipping
 async function checkClipping(surface: Locator) {
-  return surface.evaluate((root) => {
+  const result = await surface.evaluate((root) => {
     function isVis(el: Element): boolean {
       if (!(el instanceof HTMLElement || el instanceof SVGElement)) return false;
       const s = window.getComputedStyle(el);
@@ -257,8 +267,11 @@ async function checkClipping(surface: Locator) {
     }> = [];
 
     const allEls = [root, ...Array.from(root.querySelectorAll('*'))];
+    let candidateCount = 0;
+
     for (const el of allEls) {
       if (!isVis(el)) continue;
+      candidateCount++;
       const s = window.getComputedStyle(el);
 
       // Inputs scroll horizontally by design, so exempt them from horizontal scrollWidth clipping check
@@ -283,8 +296,11 @@ async function checkClipping(surface: Locator) {
       }
     }
 
-    return { clippedElements };
+    return { clippedElements, candidateCount };
   });
+
+  expect(result.candidateCount, 'checkClipping matched 0 candidate elements').toBeGreaterThan(0);
+  return result;
 }
 
 // Check 4 helper: Wait for smooth scroll animation to settle across animation frames

@@ -224,10 +224,9 @@ test.describe('Nutrition Flow E2E', () => {
     const actionsBtn = row.locator('button[aria-haspopup="menu"]');
     await expect(actionsBtn).toBeVisible();
     const box = await actionsBtn.boundingBox();
-    if (box) {
-      expect(box.width).toBeGreaterThanOrEqual(40);
-      expect(box.height).toBeGreaterThanOrEqual(40);
-    }
+    expect(box).not.toBeNull();
+    expect(box!.width).toBeGreaterThanOrEqual(40);
+    expect(box!.height).toBeGreaterThanOrEqual(40);
 
     // The destructive action must still be reachable, not merely relabelled.
     const id = ((await actionsBtn.getAttribute('data-testid')) ?? '').replace('meal-actions-', '');
@@ -270,10 +269,9 @@ test.describe('Nutrition Flow E2E', () => {
     const quantityInput = page.locator('[data-testid="component-quantity-input"]').first();
     await expect(quantityInput).toBeVisible();
     const inputBox = await quantityInput.boundingBox();
-    if (inputBox) {
-      expect(inputBox.width).toBeGreaterThanOrEqual(40);
-      expect(inputBox.height).toBeGreaterThanOrEqual(40);
-    }
+    expect(inputBox).not.toBeNull();
+    expect(inputBox!.width).toBeGreaterThanOrEqual(40);
+    expect(inputBox!.height).toBeGreaterThanOrEqual(40);
     await quantityInput.fill('4');
     await quantityInput.press('Enter');
     await expect(quantityInput).toHaveValue('4');
@@ -477,10 +475,9 @@ Total Fiber: 8 g`;
 
     // Verify touch target for the overflow trigger >= 40px
     const editBox = await actionsBtn.boundingBox();
-    if (editBox) {
-      expect(editBox.width).toBeGreaterThanOrEqual(40);
-      expect(editBox.height).toBeGreaterThanOrEqual(40);
-    }
+    expect(editBox).not.toBeNull();
+    expect(editBox!.width).toBeGreaterThanOrEqual(40);
+    expect(editBox!.height).toBeGreaterThanOrEqual(40);
 
     await actionsBtn.click();
     const editBtn = originalRow.locator('[role="menuitem"]', { hasText: 'Edit meal' });
