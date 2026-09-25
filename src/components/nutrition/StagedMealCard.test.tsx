@@ -1262,5 +1262,28 @@ describe('StagedMealCard', () => {
       fireEvent.click(logBtn);
       expect(onLogStagedMeal).toHaveBeenCalled();
     });
+
+    it('provides accessible name for meal name input and save as custom dish button (F2)', () => {
+      const meal = makeStagedMeal();
+      render(
+        <StagedMealCard
+          stagedMeal={meal}
+          onUpdateStagedMeal={vi.fn()}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={vi.fn()}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={false}
+        />
+      );
+
+      const mealNameInput = screen.getByRole('textbox', { name: 'Meal name' });
+      expect(mealNameInput).toBe(screen.getByTestId('dish-name-input'));
+
+      const saveDishBtn = screen.getByRole('button', { name: 'Save as Custom Dish' });
+      expect(saveDishBtn).toHaveAttribute('aria-label', 'Save as Custom Dish');
+    });
   });
 });

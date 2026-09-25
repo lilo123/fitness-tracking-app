@@ -132,6 +132,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
           <input
             type="text"
             data-testid="dish-name-input"
+            aria-label="Meal name"
             value={stagedMeal.name}
             onChange={(e) => onUpdateStagedMeal({ ...stagedMeal, name: e.target.value })}
             className="flex-1 min-w-0 bg-zinc-950 border border-border-interactive text-white font-bold text-base rounded-xl px-2.5 py-1.5 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none truncate min-h-[40px] h-10"
@@ -311,6 +312,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
 
         <button
           type="button"
+          aria-label="Save as Custom Dish"
           onClick={onSaveStagedAsCustomDish}
           className="bg-zinc-800 hover:bg-zinc-700 text-amber-300 font-bold py-2.5 px-3 min-h-[40px] rounded-xl text-xs border border-border-interactive transition flex items-center gap-1.5 touch-manipulation shrink-0"
           title="Save this meal as a quick-log custom dish"

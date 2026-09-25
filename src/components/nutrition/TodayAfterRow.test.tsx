@@ -109,6 +109,10 @@ describe('DayTotalRow', () => {
     expect(calCell).not.toHaveClass('text-amber-400');
     const calOver = screen.getByTestId('day-total-over-calories');
     expect(calOver).toHaveTextContent('over target by 100 kcal');
+    // F3: Ensure aria-label is NOT set on the day-total container so it does not override child text
+    expect(calCell).not.toHaveAttribute('aria-label');
+    expect(calCell).toHaveTextContent(/2100\s*kcal/);
+    expect(calCell).toHaveTextContent('over target by 100 kcal');
 
     // Protein is not over target (uses cyan-400)
     const pCell = screen.getByTestId('day-total-protein');
