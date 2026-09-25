@@ -1,4 +1,4 @@
-import React, { memo, useRef, useEffect } from 'react';
+import React, { memo, useRef, useEffect, useState } from 'react';
 import { Utensils, Check, Star, X } from 'lucide-react';
 import { roundTo1Decimal, formatCalories, formatMacro } from '../../utils/nutrition';
 import type { NutritionItem } from '../../utils/itemModel';
@@ -9,11 +9,13 @@ import {
   reanchorStagedItem,
   recomputeStagedTotals,
   updateStagedItemNutrition,
+  buildStagedItem,
   getScrollBehavior,
   useNavHeight,
   type StagedItem,
   type StagedMeal,
 } from './nutritionEngineHelpers';
+import { AddItemForm, type AddItemFormData } from './AddItemForm';
 import { computeVisibleMacroColumns, MACRO_COLUMNS_CONFIG, getMacroGridTemplateColumns } from './macroColumns';
 import { DayTotalRow, type MacroTotalsShape } from './TodayAfterRow';
 
@@ -60,6 +62,46 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
       dishNameInput?.focus({ preventScroll: true });
     }
   }, []);
+
+  const [isAddingItem, setIsAddingItem] = useState(false);
+  const [newlyAddedItemId, setNewlyAddedItemId] = useState<string | null>(null);
+  const wasAddingItemRef = useRef(false);
+  const addItemBtnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (newlyAddedItemId && cardRef.current) {
+      const row = cardRef.current.querySelector(`[data-item-id="${newlyAddedItemId}"]`);
+      const qtyInput = row?.querySelector<HTMLInputElement>('[data-testid="component-quantity-input"]');
+      qtyInput?.focus();
+      setNewlyAddedItemId(null);
+    } else if (wasAddingItemRef.current && !isAddingItem) {
+      addItemBtnRef.current?.focus();
+    }
+    wasAddingItemRef.current = isAddingItem;
+  }, [newlyAddedItemId, isAddingItem]);
+
+  const handleAddItem = (data: AddItemFormData) => {
+    const newItem = buildStagedItem({
+      name: data.name,
+      portion: `${data.quantity} ${data.unit}`,
+      quantity: data.quantity,
+      unit: data.unit,
+      calories: data.calories,
+      protein: data.protein,
+      carbs: data.carbs,
+      fat: data.fat,
+      fiber: data.fiber,
+    });
+    const updatedItems = [...stagedMeal.items, newItem];
+    const totals = recomputeStagedTotals(updatedItems);
+    onUpdateStagedMeal({
+      ...stagedMeal,
+      items: updatedItems,
+      ...totals,
+    });
+    setIsAddingItem(false);
+    setNewlyAddedItemId(newItem.id);
+  };
 
   const isMultiItem = stagedMeal.items && stagedMeal.items.length > 1;
   const macroColumns = computeVisibleMacroColumns(stagedMeal.items);
@@ -114,47 +156,70 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
 
       {/* Itemized Ingredient Breakdown */}
       <div className="space-y-0.5">
-        {isMultiItem && (
-          <div className="flex items-center justify-between text-xs font-bold uppercase text-zinc-400 tracking-wider">
+        <div className="flex items-center justify-between text-xs font-bold uppercase text-zinc-400 tracking-wider">
+          {isMultiItem ? (
             <span>Itemized Breakdown ({stagedMeal.items.length})</span>
-          </div>
-        )}
+          ) : (
+            <span className="sr-only">Items</span>
+          )}
+          {!isAddingItem && (
+            <button
+              ref={addItemBtnRef}
+              type="button"
+              data-testid="add-item-button"
+              onClick={() => setIsAddingItem(true)}
+              className="text-cyan-400 hover:text-cyan-300 font-bold text-xs uppercase tracking-wider min-h-[40px] px-2.5 py-1 flex items-center justify-center -my-1 rounded-lg transition touch-manipulation"
+            >
+              + Add item
+            </button>
+          )}
+        </div>
 
         <div className="divide-y divide-zinc-800/80">
           {stagedMeal.items.map((item) => (
-            <ComponentRow
-              key={item.id}
-              item={stagedToItem(item)}
-              reference={stagedReference(item)}
-              macroColumns={macroColumns}
-              onChange={(next) => onApplyStagedItemChange(item.id, next)}
-              onReanchor={(next) => {
-                const updatedItems = stagedMeal.items.map((it) =>
-                  it.id === item.id ? reanchorStagedItem(it, next) : it
-                );
-                const totals = recomputeStagedTotals(updatedItems);
-                onUpdateStagedMeal({
-                  ...stagedMeal,
-                  items: updatedItems,
-                  ...totals,
-                });
-              }}
-              onRemove={() => onDeleteItem(item.id)}
-              onSaveToQuickLog={() => onSaveItemAsCustomDish(item)}
-              onEditNutrition={(edited) => {
-                const updatedItems = stagedMeal.items.map((it) =>
-                  it.id === item.id ? updateStagedItemNutrition(it, edited) : it
-                );
-                const totals = recomputeStagedTotals(updatedItems);
-                onUpdateStagedMeal({
-                  ...stagedMeal,
-                  items: updatedItems,
-                  ...totals,
-                });
-              }}
-            />
+            <div key={item.id} data-item-id={item.id}>
+              <ComponentRow
+                item={stagedToItem(item)}
+                reference={stagedReference(item)}
+                macroColumns={macroColumns}
+                onChange={(next) => onApplyStagedItemChange(item.id, next)}
+                onReanchor={(next) => {
+                  const updatedItems = stagedMeal.items.map((it) =>
+                    it.id === item.id ? reanchorStagedItem(it, next) : it
+                  );
+                  const totals = recomputeStagedTotals(updatedItems);
+                  onUpdateStagedMeal({
+                    ...stagedMeal,
+                    items: updatedItems,
+                    ...totals,
+                  });
+                }}
+                onRemove={() => onDeleteItem(item.id)}
+                onSaveToQuickLog={() => onSaveItemAsCustomDish(item)}
+                onEditNutrition={(edited) => {
+                  const updatedItems = stagedMeal.items.map((it) =>
+                    it.id === item.id ? updateStagedItemNutrition(it, edited) : it
+                  );
+                  const totals = recomputeStagedTotals(updatedItems);
+                  onUpdateStagedMeal({
+                    ...stagedMeal,
+                    items: updatedItems,
+                    ...totals,
+                  });
+                }}
+              />
+            </div>
           ))}
         </div>
+
+        {isAddingItem && (
+          <div className="pt-1">
+            <AddItemForm
+              onAddItem={handleAddItem}
+              onCancel={() => setIsAddingItem(false)}
+            />
+          </div>
+        )}
 
         {/* Macro Totals: Read-only for multi-item (Fix D5) directly under the rows */}
         {isMultiItem && (
@@ -221,7 +286,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
 
       {/* Accessible math explanation for screen readers (Fix D4: visual formula box removed) */}
       {stagedMeal.explanation && (
-        <span className="sr-only">{stagedMeal.explanation}</span>
+        <span className="sr-only" aria-live="polite">{stagedMeal.explanation}</span>
       )}
 
       {/* Action Buttons Bar */}

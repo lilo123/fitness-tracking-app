@@ -576,6 +576,14 @@ describe('NutritionEngine', () => {
 
     fireEvent.click(screen.getByText('Log Meal'));
 
+    // D22: Submitting manual meal form stages into StagedMealCard without DB insert
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(screen.getByTestId('staged-meal-card')).toBeDefined();
+    expect(screen.getByDisplayValue('Greek Yogurt & Honey')).toBeDefined();
+
+    // Logging the staged manual meal writes exactly the totals shown
+    fireEvent.click(screen.getByRole('button', { name: /log meal \(\+180 kcal\)/i }));
+
     await waitFor(() => {
       expect(mockInsert).toHaveBeenCalled();
     });
@@ -584,6 +592,214 @@ describe('NutritionEngine', () => {
     expect(payload.food_name).toBe('Greek Yogurt & Honey');
     expect(payload.calories).toBe(180);
     expect(payload.protein).toBe(15);
+  });
+
+  it('D22/D5: single-item manual meal with edited totals, then Add item logs displayed totals without silent discard', async () => {
+    const mockInsert = vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) });
+    (supabase.from as any).mockImplementation((table: string) => {
+      const b = createSupabaseBuilder(table, { data: [], error: null });
+      if (table === 'nutrition_logs') {
+        b.insert = mockInsert;
+      }
+      return b;
+    });
+
+    renderComponent();
+
+    // 1. Open manual entry and submit
+    fireEvent.click(screen.getByText('Manual Entry'));
+    await userEvent.type(screen.getByTestId('dish-name-input'), 'Greek Yogurt');
+    await userEvent.type(screen.getByTestId('calories-input'), '150');
+    await userEvent.type(screen.getByTestId('protein-input'), '15');
+    await userEvent.type(screen.getByTestId('carbs-input'), '10');
+    await userEvent.type(screen.getByTestId('fat-input'), '0');
+
+    fireEvent.click(screen.getByText('Log Meal'));
+
+    // Staged card appears with single item (150 kcal)
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(screen.getByTestId('staged-meal-card')).toBeDefined();
+
+    // 2. Edit nutrition of single item (150 -> 200 kcal, 15 -> 20 P)
+    fireEvent.click(screen.getByTestId('component-actions'));
+    fireEvent.click(screen.getByTestId('component-edit-nutrition'));
+    fireEvent.change(screen.getByTestId('edit-item-calories-input'), { target: { value: '200' } });
+    fireEvent.change(screen.getByTestId('edit-item-protein-input'), { target: { value: '20' } });
+    fireEvent.click(screen.getByTestId('save-edit-item-nutrition-btn'));
+
+    // 3. Add item: Honey (60 kcal, 17 C)
+    fireEvent.click(screen.getByTestId('add-item-button'));
+    fireEvent.change(screen.getByTestId('add-item-name-input'), { target: { value: 'Honey' } });
+    fireEvent.change(screen.getByTestId('add-item-quantity-input'), { target: { value: '20' } });
+    fireEvent.change(screen.getByTestId('add-item-unit-input'), { target: { value: 'g' } });
+    fireEvent.change(screen.getByTestId('add-item-calories-input'), { target: { value: '60' } });
+    fireEvent.change(screen.getByTestId('add-item-carbs-input'), { target: { value: '17' } });
+    fireEvent.click(screen.getByTestId('submit-add-item-button'));
+
+    // Card totals: 200 (edited item) + 60 (honey) = 260 kcal; 20 P, 27 C
+    const logButton = screen.getByRole('button', { name: /log meal \(\+260 kcal\)/i });
+    expect(logButton).toBeDefined();
+
+    // 4. Log meal
+    fireEvent.click(logButton);
+
+    await waitFor(() => {
+      expect(mockInsert).toHaveBeenCalled();
+    });
+
+    const payload = mockInsert.mock.calls[0][0][0];
+    expect(payload.food_name).toBe('Greek Yogurt');
+    expect(payload.calories).toBe(260);
+    expect(payload.protein).toBe(20);
+    expect(payload.carbs).toBe(27);
+    expect(payload.items).toHaveLength(2);
+    expect(payload.items[0].calories).toBe(200);
+    expect(payload.items[1].calories).toBe(60);
+  });
+
+  it('D22: AI-staged meal + Add item logs displayed totals to DB', async () => {
+    const mockInsert = vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) });
+    (supabase.from as any).mockImplementation((table: string) => {
+      const b = createSupabaseBuilder(table, { data: [], error: null });
+      if (table === 'nutrition_logs') {
+        b.insert = mockInsert;
+      }
+      return b;
+    });
+
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: {
+        name: 'Eggs & Toast',
+        calories: 370,
+        protein: 24,
+        carbs: 32,
+        fat: 17,
+        fiber: 2,
+        explanation: '210 kcal (Eggs) + 160 kcal (Toast) = 370 kcal',
+        items: [
+          { name: 'Eggs', portion: '3 large', quantity: 3, unit: 'unit', calories: 210, protein: 18, carbs: 2, fat: 15, fiber: 0 },
+          { name: 'Toast', portion: '2 slices', quantity: 2, unit: 'unit', calories: 160, protein: 6, carbs: 30, fat: 2, fiber: 2 },
+        ],
+      },
+      error: null,
+    });
+
+    renderComponent();
+
+    const input = screen.getByPlaceholderText('Describe what you ate (e.g., 3 eggs, 2 slices sourdough, 1 tbsp butter)');
+    await userEvent.type(input, '3 eggs and 2 slices toast');
+    fireEvent.click(screen.getByText('Analyze Meal'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('staged-meal-card')).toBeDefined();
+    });
+
+    // Add item: Avocado (80 kcal, 1 P, 4 C, 7 F, 3 Fib)
+    fireEvent.click(screen.getByTestId('add-item-button'));
+    fireEvent.change(screen.getByTestId('add-item-name-input'), { target: { value: 'Avocado' } });
+    fireEvent.change(screen.getByTestId('add-item-quantity-input'), { target: { value: '50' } });
+    fireEvent.change(screen.getByTestId('add-item-unit-input'), { target: { value: 'g' } });
+    fireEvent.change(screen.getByTestId('add-item-calories-input'), { target: { value: '80' } });
+    fireEvent.change(screen.getByTestId('add-item-protein-input'), { target: { value: '1' } });
+    fireEvent.change(screen.getByTestId('add-item-carbs-input'), { target: { value: '4' } });
+    fireEvent.change(screen.getByTestId('add-item-fat-input'), { target: { value: '7' } });
+    fireEvent.change(screen.getByTestId('add-item-fiber-input'), { target: { value: '3' } });
+    fireEvent.click(screen.getByTestId('submit-add-item-button'));
+
+    // Totals = 370 + 80 = 450 kcal
+    const logButton = screen.getByRole('button', { name: /log meal \(\+450 kcal\)/i });
+    expect(logButton).toBeDefined();
+
+    fireEvent.click(logButton);
+
+    await waitFor(() => {
+      expect(mockInsert).toHaveBeenCalled();
+    });
+
+    const payload = mockInsert.mock.calls[0][0][0];
+    expect(payload.food_name).toBe('Eggs & Toast');
+    expect(payload.calories).toBe(450);
+    expect(payload.protein).toBe(25);
+    expect(payload.carbs).toBe(36);
+    expect(payload.fat).toBe(24);
+    expect(payload.fiber).toBe(5);
+    expect(payload.items).toHaveLength(3);
+  });
+
+  it('D22: dish-staged meal + Add item logs displayed totals to DB', async () => {
+    const mockInsert = vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) });
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'custom_dishes') {
+        const dishData = {
+          id: 'dish-oats',
+          name: 'Protein Oatmeal',
+          calories: 350,
+          protein: 25,
+          carbs: 45,
+          fat: 6,
+          fiber: 5,
+          items: [
+            { name: 'Rolled Oats', quantity: 50, unit: 'g', calories: 190, protein: 7, carbs: 34, fat: 3, fiber: 5 },
+            { name: 'Whey Protein', quantity: 25, unit: 'g', calories: 160, protein: 18, carbs: 11, fat: 3, fiber: 0 },
+          ],
+        };
+        const b = createSupabaseBuilder('custom_dishes', {
+          data: [dishData],
+          error: null,
+        });
+        b.single = vi.fn().mockResolvedValue({ data: dishData, error: null });
+        return b;
+      }
+      const b = createSupabaseBuilder(table, { data: [], error: null });
+      if (table === 'nutrition_logs') {
+        b.insert = mockInsert;
+      }
+      return b;
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('custom-dish-card-dish-oats')).toBeDefined();
+    });
+
+    // Stage the dish
+    fireEvent.click(screen.getByTestId('custom-dish-card-dish-oats'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('staged-meal-card')).toBeDefined();
+    });
+
+    // Add item: Chia Seeds (50 kcal, 2 P, 4 C, 3 F, 3 Fib)
+    fireEvent.click(screen.getByTestId('add-item-button'));
+    fireEvent.change(screen.getByTestId('add-item-name-input'), { target: { value: 'Chia Seeds' } });
+    fireEvent.change(screen.getByTestId('add-item-quantity-input'), { target: { value: '10' } });
+    fireEvent.change(screen.getByTestId('add-item-unit-input'), { target: { value: 'g' } });
+    fireEvent.change(screen.getByTestId('add-item-calories-input'), { target: { value: '50' } });
+    fireEvent.change(screen.getByTestId('add-item-protein-input'), { target: { value: '2' } });
+    fireEvent.change(screen.getByTestId('add-item-carbs-input'), { target: { value: '4' } });
+    fireEvent.change(screen.getByTestId('add-item-fat-input'), { target: { value: '3' } });
+    fireEvent.change(screen.getByTestId('add-item-fiber-input'), { target: { value: '3' } });
+    fireEvent.click(screen.getByTestId('submit-add-item-button'));
+
+    // Totals = 350 + 50 = 400 kcal; 27 P, 49 C, 9 F, 8 Fib
+    const logButton = screen.getByRole('button', { name: /log meal \(\+400 kcal\)/i });
+    expect(logButton).toBeDefined();
+
+    fireEvent.click(logButton);
+
+    await waitFor(() => {
+      expect(mockInsert).toHaveBeenCalled();
+    });
+
+    const payload = mockInsert.mock.calls[0][0][0];
+    expect(payload.food_name).toBe('Protein Oatmeal');
+    expect(payload.calories).toBe(400);
+    expect(payload.protein).toBe(27);
+    expect(payload.carbs).toBe(49);
+    expect(payload.fat).toBe(9);
+    expect(payload.fiber).toBe(8);
+    expect(payload.items).toHaveLength(3);
   });
 
   it('saves a staged meal as a custom dish with JSON serialized ingredients and fiber', async () => {

@@ -3,12 +3,25 @@ import type { NutritionLog } from '../../types/database';
 import { formatLocalTimestamp } from '../../utils/date';
 import { roundTo1Decimal } from '../../utils/nutrition';
 
-export interface UseManualMealFormOptions {
-  selectedDate: string;
-  onSubmitLog: (payload: Partial<NutritionLog>) => void;
+export interface ManualMealStagedData {
+  food_name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber: number;
+  meal_type: string;
+  serving_size: number;
+  serving_unit: string;
 }
 
-export function useManualMealForm({ selectedDate, onSubmitLog }: UseManualMealFormOptions) {
+export interface UseManualMealFormOptions {
+  selectedDate: string;
+  onSubmitLog?: (payload: Partial<NutritionLog>) => void;
+  onStageMeal?: (meal: ManualMealStagedData) => void;
+}
+
+export function useManualMealForm({ selectedDate, onSubmitLog, onStageMeal }: UseManualMealFormOptions) {
   // Manual Form Fallback State
   const [manualDishName, setManualDishName] = useState('');
   const [manualCalories, setManualCalories] = useState<number | ''>('');
@@ -39,7 +52,7 @@ export function useManualMealForm({ selectedDate, onSubmitLog }: UseManualMealFo
     if (manualFiber !== '' && Number(manualFiber) < 0) return;
     if (manualServingSize !== '' && Number(manualServingSize) < 0) return;
 
-    const payload: Partial<NutritionLog> = {
+    const data: ManualMealStagedData = {
       food_name: manualDishName.trim(),
       calories: roundTo1Decimal(manualCalories),
       protein: manualProtein === '' ? 0 : roundTo1Decimal(manualProtein),
@@ -49,11 +62,18 @@ export function useManualMealForm({ selectedDate, onSubmitLog }: UseManualMealFo
       meal_type: manualMealType,
       serving_size: Number(manualServingSize) || 1,
       serving_unit: manualServingUnit,
-      logged_at: formatLocalTimestamp(selectedDate),
-      logged_date: selectedDate,
     };
 
-    onSubmitLog(payload);
+    if (onStageMeal) {
+      onStageMeal(data);
+    } else if (onSubmitLog) {
+      const payload: Partial<NutritionLog> = {
+        ...data,
+        logged_at: formatLocalTimestamp(selectedDate),
+        logged_date: selectedDate,
+      };
+      onSubmitLog(payload);
+    }
   };
 
   return {

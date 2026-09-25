@@ -1043,4 +1043,224 @@ describe('StagedMealCard', () => {
     const calTotal = screen.getByTestId('staged-total-calories');
     expect(calTotal).toHaveClass('whitespace-nowrap');
   });
+
+  describe('Add item flow (D22)', () => {
+    it('renders + Add item control on single-item card and multi-item card', () => {
+      const singleMeal = makeStagedMeal();
+      const { unmount } = render(
+        <StagedMealCard
+          stagedMeal={singleMeal}
+          onUpdateStagedMeal={vi.fn()}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={vi.fn()}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={false}
+        />
+      );
+      expect(screen.getByTestId('add-item-button')).toBeDefined();
+      expect(screen.getByText('+ Add item')).toBeDefined();
+      unmount();
+
+      const multiMeal = makeMultiItemMeal();
+      render(
+        <StagedMealCard
+          stagedMeal={multiMeal}
+          onUpdateStagedMeal={vi.fn()}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={vi.fn()}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={false}
+        />
+      );
+      expect(screen.getByTestId('add-item-button')).toBeDefined();
+    });
+
+    it('clicking + Add item opens the inline form, and Cancel closes it without changes', () => {
+      const meal = makeStagedMeal();
+      const onUpdateStagedMeal = vi.fn();
+      render(
+        <StagedMealCard
+          stagedMeal={meal}
+          onUpdateStagedMeal={onUpdateStagedMeal}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={vi.fn()}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={false}
+        />
+      );
+
+      // Initially inline form is not open
+      expect(screen.queryByTestId('add-item-form')).toBeNull();
+
+      // Click + Add item
+      fireEvent.click(screen.getByTestId('add-item-button'));
+      expect(screen.getByTestId('add-item-form')).toBeDefined();
+      expect(screen.queryByTestId('add-item-button')).toBeNull(); // button hidden while form open
+
+      // Click Cancel
+      fireEvent.click(screen.getByTestId('cancel-add-item-button'));
+      expect(screen.queryByTestId('add-item-form')).toBeNull();
+      expect(screen.getByTestId('add-item-button')).toBeDefined();
+      expect(onUpdateStagedMeal).not.toHaveBeenCalled();
+    });
+
+    it('submitting Add item appends item and updates totals to Σ(items)', () => {
+      const meal = makeStagedMeal(); // 600 kcal, 30 P, 40 C, 20 F, 5 Fib (1 item: Egg Meatloaf)
+      let currentMeal = meal;
+      const onUpdateStagedMeal = vi.fn((updated) => {
+        currentMeal = updated;
+      });
+
+      const { rerender } = render(
+        <StagedMealCard
+          stagedMeal={currentMeal}
+          onUpdateStagedMeal={onUpdateStagedMeal}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={vi.fn()}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={false}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId('add-item-button'));
+
+      // Fill in new item (White Rice, 200g, 260 kcal, 5 P, 56 C, 1 F, 2 Fib)
+      fireEvent.change(screen.getByTestId('add-item-name-input'), { target: { value: 'White Rice' } });
+      fireEvent.change(screen.getByTestId('add-item-quantity-input'), { target: { value: '200' } });
+      fireEvent.change(screen.getByTestId('add-item-unit-input'), { target: { value: 'g' } });
+      fireEvent.change(screen.getByTestId('add-item-calories-input'), { target: { value: '260' } });
+      fireEvent.change(screen.getByTestId('add-item-protein-input'), { target: { value: '5' } });
+      fireEvent.change(screen.getByTestId('add-item-carbs-input'), { target: { value: '56' } });
+      fireEvent.change(screen.getByTestId('add-item-fat-input'), { target: { value: '1' } });
+      fireEvent.change(screen.getByTestId('add-item-fiber-input'), { target: { value: '2' } });
+
+      fireEvent.click(screen.getByTestId('submit-add-item-button'));
+
+      expect(onUpdateStagedMeal).toHaveBeenCalled();
+      expect(currentMeal.items.length).toBe(2);
+      expect(currentMeal.items[1].name).toBe('White Rice');
+      expect(currentMeal.items[1].calories).toBe(260);
+
+      // Σ(items): 600 + 260 = 860 kcal, 30 + 5 = 35 P, 40 + 56 = 96 C, 20 + 1 = 21 F, 5 + 2 = 7 Fib
+      expect(currentMeal.calories).toBe(860);
+      expect(currentMeal.protein).toBe(35);
+      expect(currentMeal.carbs).toBe(96);
+      expect(currentMeal.fat).toBe(21);
+      expect(currentMeal.fiber).toBe(7);
+
+      // Rerender with updated meal: multi-item totals row appears, read-only
+      rerender(
+        <StagedMealCard
+          stagedMeal={currentMeal}
+          onUpdateStagedMeal={onUpdateStagedMeal}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={vi.fn()}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={false}
+        />
+      );
+
+      expect(screen.getByTestId('this-meal-label')).toBeDefined();
+      const totalsBox = screen.getByTestId('staged-meal-totals');
+      expect(within(totalsBox).getByTestId('macro-val-calories')).toHaveTextContent('860');
+      expect(within(totalsBox).getByTestId('macro-val-protein')).toHaveTextContent('35');
+      expect(within(totalsBox).getByTestId('macro-val-carbs')).toHaveTextContent('96');
+      expect(within(totalsBox).getByTestId('macro-val-fat')).toHaveTextContent('21');
+      expect(within(totalsBox).getByTestId('macro-val-fiber')).toHaveTextContent('7');
+    });
+
+    it('preserves single-item nutrition edits when Add item appends second item', () => {
+      const meal = makeStagedMeal(); // 600 kcal
+      let currentMeal = meal;
+      const onUpdateStagedMeal = vi.fn((updated) => {
+        currentMeal = updated;
+      });
+
+      const { rerender } = render(
+        <StagedMealCard
+          stagedMeal={currentMeal}
+          onUpdateStagedMeal={onUpdateStagedMeal}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={vi.fn()}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={false}
+        />
+      );
+
+      // Step 1: Edit nutrition on single item (600 -> 750 kcal)
+      fireEvent.click(screen.getByTestId('component-actions'));
+      fireEvent.click(screen.getByTestId('component-edit-nutrition'));
+      fireEvent.change(screen.getByTestId('edit-item-calories-input'), { target: { value: '750' } });
+      fireEvent.click(screen.getByTestId('save-edit-item-nutrition-btn'));
+
+      expect(onUpdateStagedMeal).toHaveBeenCalled();
+      expect(currentMeal.items[0].calories).toBe(750);
+      expect(currentMeal.calories).toBe(750);
+
+      // Step 2: Add item to the meal
+      rerender(
+        <StagedMealCard
+          stagedMeal={currentMeal}
+          onUpdateStagedMeal={onUpdateStagedMeal}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={vi.fn()}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={false}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId('add-item-button'));
+      fireEvent.change(screen.getByTestId('add-item-name-input'), { target: { value: 'Side Salad' } });
+      fireEvent.change(screen.getByTestId('add-item-calories-input'), { target: { value: '50' } });
+      fireEvent.click(screen.getByTestId('submit-add-item-button'));
+
+      // Totals = 750 (edited item 0) + 50 (new item) = 800 (no silent discard)
+      expect(currentMeal.items[0].calories).toBe(750);
+      expect(currentMeal.items[1].calories).toBe(50);
+      expect(currentMeal.calories).toBe(800);
+    });
+
+    it('clicking Log Meal calls onLogStagedMeal', () => {
+      const meal = makeStagedMeal();
+      const onLogStagedMeal = vi.fn();
+      render(
+        <StagedMealCard
+          stagedMeal={meal}
+          onUpdateStagedMeal={vi.fn()}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={onLogStagedMeal}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={false}
+        />
+      );
+
+      const logBtn = screen.getByRole('button', { name: /log meal/i });
+      fireEvent.click(logBtn);
+      expect(onLogStagedMeal).toHaveBeenCalled();
+    });
+  });
 });

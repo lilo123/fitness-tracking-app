@@ -20,7 +20,7 @@ import { QuickLogFavorites } from './QuickLogFavorites';
 import { NutritionAiInput } from './NutritionAiInput';
 import { StagedMealCard } from './StagedMealCard';
 import { ManualMealForm } from './ManualMealForm';
-import { useManualMealForm } from './useManualMealForm';
+import { useManualMealForm, type ManualMealStagedData } from './useManualMealForm';
 import { useCustomDishSaving } from './useCustomDishSaving';
 import { CustomDishesModal } from './CustomDishesModal';
 import { Utensils, CheckCircle2, AlertCircle, RotateCcw } from 'lucide-react';
@@ -45,10 +45,44 @@ export const NutritionEngine: React.FC = () => {
   const [status, setStatus] = useState<string>('');
   const [isError, setIsError] = useState(false);
 
-  // Manual Form Fallback State
+  const handleStageManualMeal = (data: ManualMealStagedData) => {
+    const item = buildStagedItem({
+      name: data.food_name,
+      portion: `${data.serving_size} ${data.serving_unit}`,
+      quantity: data.serving_size,
+      unit: (data.serving_unit === 'g' || data.serving_unit === 'ml' || data.serving_unit === 'unit')
+        ? data.serving_unit
+        : 'unit',
+      calories: data.calories,
+      protein: data.protein,
+      carbs: data.carbs,
+      fat: data.fat,
+      fiber: data.fiber,
+    });
+
+    const staged: StagedMeal = {
+      name: data.food_name,
+      mealType: data.meal_type || 'Breakfast',
+      explanation: `${formatCalories(data.calories)} kcal (${data.food_name})`,
+      items: [item],
+      calories: data.calories,
+      protein: data.protein,
+      carbs: data.carbs,
+      fat: data.fat,
+      fiber: data.fiber,
+      servingSize: data.serving_size,
+      servingUnit: data.serving_unit,
+      photoUrl: ai.selectedPhoto?.dataUrl,
+    };
+
+    setStagedMeal(staged);
+    setShowManualForm(false);
+  };
+
+  // Manual Form Fallback State (D22: stages into StagedMealCard instead of logging directly)
   const manualMealForm = useManualMealForm({
     selectedDate,
-    onSubmitLog: (payload) => mutation.mutate(payload),
+    onStageMeal: handleStageManualMeal,
   });
 
   const [editingMealLog, setEditingMealLog] = useState<NutritionLog | null>(null);

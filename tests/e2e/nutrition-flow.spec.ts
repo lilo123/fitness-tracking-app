@@ -196,9 +196,15 @@ test.describe('Nutrition Flow E2E', () => {
       await fiberInput.fill('5');
     }
 
-    // Submit
+    // Submit manual form (stages meal into StagedMealCard per D22)
     const logBtn = page.locator('button:has-text("Log Meal")').last();
     await logBtn.click();
+
+    // Commit staged meal to log
+    const stagedCard = page.locator('[data-testid="staged-meal-card"]');
+    await expect(stagedCard).toBeVisible();
+    await stagedCard.locator('button:has-text("Log Meal")').click();
+    await expect(stagedCard).not.toBeVisible();
 
     // Verify meal is displayed in today's meals timeline
     await expect(page.locator('text=Playwright Test Chicken & Rice').first()).toBeVisible();
@@ -454,6 +460,12 @@ Total Fiber: 8 g`;
     const logBtn = page.locator('button:has-text("Log Meal")').last();
     await logBtn.click();
 
+    // Commit staged meal to log (D22)
+    const stagedCard = page.locator('[data-testid="staged-meal-card"]');
+    await expect(stagedCard).toBeVisible();
+    await stagedCard.locator('button:has-text("Log Meal")').click();
+    await expect(stagedCard).not.toBeVisible();
+
     // Verify meal is displayed
     const originalRow = page.locator('[data-testid="meal-log-item"]').filter({ hasText: originalMealName });
     await expect(originalRow).toBeVisible();
@@ -554,5 +566,71 @@ Total Fiber: 8 g`;
     // exercises delete from the history view, which nothing else covers.
     await deleteMealRow(page, historyMealName);
   });
-});
+test('manual form stages meal, adds item with updated totals, and logs to timeline (D22)', async ({ page }) => {
+    const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const manualMealName = `Manual Multi-Item ${uniqueSuffix}`;
 
+    // 1. Toggle manual form
+    const manualToggleBtn = page.locator('button:has-text("Manual Entry")');
+    if (await manualToggleBtn.isVisible()) {
+      await manualToggleBtn.click();
+    }
+
+    // 2. Fill manual entry fields
+    await page.locator('[data-testid="dish-name-input"]').fill(manualMealName);
+    await page.locator('[data-testid="calories-input"]').fill('300');
+    await page.locator('[data-testid="protein-input"]').fill('25');
+    await page.locator('[data-testid="carbs-input"]').fill('35');
+    await page.locator('[data-testid="fat-input"]').fill('5');
+    const fiberInput = page.locator('[data-testid="fiber-input"]');
+    if (await fiberInput.isVisible()) {
+      await fiberInput.fill('4');
+    }
+
+    // 3. Stage the meal
+    const stageBtn = page.locator('button:has-text("Log Meal")').last();
+    await stageBtn.click();
+
+    // 4. Assert staged card is visible, but meal is NOT yet logged in timeline
+    const stagedCard = page.locator('[data-testid="staged-meal-card"]');
+    await expect(stagedCard).toBeVisible();
+    await expect(page.locator('[data-testid="meal-log-item"]').filter({ hasText: manualMealName })).toHaveCount(0);
+
+    // 5. Click "+ Add item"
+    const addItemBtn = stagedCard.locator('[data-testid="add-item-button"]');
+    await expect(addItemBtn).toBeVisible();
+    await addItemBtn.click();
+
+    // 6. Fill AddItemForm
+    const addItemForm = stagedCard.locator('[data-testid="add-item-form"]');
+    await expect(addItemForm).toBeVisible();
+    await addItemForm.locator('[data-testid="add-item-name-input"]').fill('Extra Avocado');
+    await addItemForm.locator('[data-testid="add-item-quantity-input"]').fill('50');
+    await addItemForm.locator('[data-testid="add-item-unit-input"]').fill('g');
+    await addItemForm.locator('[data-testid="add-item-calories-input"]').fill('80');
+    await addItemForm.locator('[data-testid="add-item-protein-input"]').fill('1');
+    await addItemForm.locator('[data-testid="add-item-carbs-input"]').fill('4');
+    await addItemForm.locator('[data-testid="add-item-fat-input"]').fill('7');
+    await addItemForm.locator('[data-testid="add-item-fiber-input"]').fill('3');
+
+    // Submit AddItemForm
+    await addItemForm.locator('[data-testid="submit-add-item-button"]').click();
+    await expect(addItemForm).not.toBeVisible();
+
+    // 7. Verify 2 items in staged card, and totals equal Σ (300 + 80 = 380 kcal)
+    const commitBtn = stagedCard.locator('button:has-text("Log Meal (+380 kcal)")');
+    await expect(commitBtn).toBeVisible();
+
+    // 8. Commit Log Meal
+    await commitBtn.click();
+    await expect(stagedCard).not.toBeVisible();
+
+    // 9. Verify logged meal row in timeline with combined totals (380 kcal)
+    const loggedRow = page.locator('[data-testid="meal-log-item"]').filter({ hasText: manualMealName }).first();
+    await expect(loggedRow).toBeVisible();
+    await expect(loggedRow.locator('text=380 kcal')).toBeVisible();
+
+    // 10. Delete row to remain net-neutral
+    await deleteMealRow(page, manualMealName);
+  });
+});

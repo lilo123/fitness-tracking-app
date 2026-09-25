@@ -265,5 +265,66 @@ describe('ManualMealForm', () => {
 
       expect(onSubmitLog).not.toHaveBeenCalled();
     });
+
+    it('stages meal via onStageMeal without calling onSubmitLog (D22)', () => {
+      const onSubmitLog = vi.fn();
+      const onStageMeal = vi.fn();
+      const { result } = renderHook(() =>
+        useManualMealForm({
+          selectedDate: '2026-09-25',
+          onSubmitLog,
+          onStageMeal,
+        })
+      );
+
+      act(() => {
+        result.current.setManualDishName('Grilled Chicken Bowl');
+        result.current.setManualCalories(450);
+        result.current.setManualProtein(40);
+        result.current.setManualCarbs(35);
+        result.current.setManualFat(12);
+        result.current.setManualFiber(4);
+        result.current.setManualServingSize(1);
+        result.current.setManualServingUnit('bowl');
+      });
+
+      act(() => {
+        result.current.handleManualSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+      });
+
+      expect(onStageMeal).toHaveBeenCalledWith({
+        food_name: 'Grilled Chicken Bowl',
+        calories: 450,
+        protein: 40,
+        carbs: 35,
+        fat: 12,
+        fiber: 4,
+        meal_type: 'Breakfast',
+        serving_size: 1,
+        serving_unit: 'bowl',
+      });
+      expect(onSubmitLog).not.toHaveBeenCalled();
+    });
+
+    it('blocks staging when inputs are invalid', () => {
+      const onStageMeal = vi.fn();
+      const { result } = renderHook(() =>
+        useManualMealForm({
+          selectedDate: '2026-09-25',
+          onStageMeal,
+        })
+      );
+
+      // Negative protein
+      act(() => {
+        result.current.setManualDishName('Valid Name');
+        result.current.setManualCalories(200);
+        result.current.setManualProtein(-5);
+      });
+      act(() => {
+        result.current.handleManualSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+      });
+      expect(onStageMeal).not.toHaveBeenCalled();
+    });
   });
 });

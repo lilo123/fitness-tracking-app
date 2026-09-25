@@ -1278,3 +1278,220 @@ test.describe('Surface E: Staged card at 320px width (D24)', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Surface F: Manual-staged card and Add-item at 390×844 (D22)
+// ---------------------------------------------------------------------------
+
+test.describe('Surface F: Manual-staged card and Add-item at 390×844', () => {
+  let page: Page;
+  let cardLocator: Locator;
+  let navLocator: Locator;
+  let actionRowLocator: Locator;
+
+  test.beforeAll(async ({ browser }) => {
+    page = await browser.newPage({
+      viewport: { width: 390, height: 844 },
+      deviceScaleFactor: 1,
+    });
+    await setupPageAndLogin(page);
+
+    // Open manual form
+    const manualToggleBtn = page.locator('button:has-text("Manual Entry")');
+    if (await manualToggleBtn.isVisible()) {
+      await manualToggleBtn.click();
+    }
+
+    // Fill manual entry fields (single item)
+    await page.fill('[data-testid="dish-name-input"]', 'Grilled Chicken Breast');
+    await page.fill('[data-testid="calories-input"]', '280');
+    await page.fill('[data-testid="protein-input"]', '35');
+    await page.fill('[data-testid="carbs-input"]', '0');
+    await page.fill('[data-testid="fat-input"]', '6');
+    const fiberInput = page.locator('[data-testid="fiber-input"]');
+    if (await fiberInput.isVisible()) {
+      await fiberInput.fill('0');
+    }
+
+    // Stage the meal
+    const logBtn = page.locator('button:has-text("Log Meal")').last();
+    await logBtn.click();
+
+    cardLocator = page.locator('[data-testid="staged-meal-card"]');
+    await expect(cardLocator).toBeVisible({ timeout: 15000 });
+    navLocator = page.locator('nav').filter({ has: page.locator('[data-testid="nav-nutrition"]') });
+    const discardBtn = cardLocator.locator('button[aria-label="Discard staged meal"]');
+    actionRowLocator = discardBtn.locator('..');
+    await waitForScrollSettled(page);
+  });
+
+  test.afterAll(async () => {
+    await page.close();
+  });
+
+  test('F: 1-item card height <= 320px', async () => {
+    await waitForScrollSettled(page);
+    const cardBox = (await cardLocator.boundingBox())!;
+    console.log(JSON.stringify({
+      test: 'F: 1-item card height <= 320px',
+      surface: 'F',
+      cardHeight: Math.round(cardBox.height * 10) / 10,
+    }));
+    expect(cardBox.height).toBeLessThanOrEqual(320);
+  });
+
+  test('F: font >= 12px', async () => {
+    const result = await checkFontSizes(cardLocator);
+    console.log(JSON.stringify({
+      test: 'F: font >= 12px',
+      surface: 'F',
+      minFontSize: result.minFontSize,
+      minFontElement: result.minFontElement,
+      offenderCount: result.offenders.length,
+    }));
+    expect(result.offenders, `Found fonts smaller than 12px: ${JSON.stringify(result.offenders)}`).toEqual([]);
+  });
+
+  test('F: taps >= 40px', async () => {
+    const result = await checkTapTargets(cardLocator);
+    console.log(JSON.stringify({
+      test: 'F: taps >= 40px',
+      surface: 'F',
+      tapsUnder48Count: result.tapsUnder48.length,
+      offendersUnder40Count: result.offendersUnder40.length,
+      offendersUnder40: result.offendersUnder40,
+    }));
+    expect(result.offendersUnder40, `Found tap targets smaller than 40px: ${JSON.stringify(result.offendersUnder40)}`).toEqual([]);
+  });
+
+  test('F: no clipping', async () => {
+    const result = await checkClipping(cardLocator);
+    console.log(JSON.stringify({
+      test: 'F: no clipping',
+      surface: 'F',
+      clippedCount: result.clippedElements.length,
+      clippedElements: result.clippedElements,
+    }));
+    expect(result.clippedElements, `Found clipped elements: ${JSON.stringify(result.clippedElements)}`).toEqual([]);
+  });
+
+  test('F: D10 placement (cardTop in [0, 200], actionRowBottom <= navTop)', async () => {
+    await waitForScrollSettled(page);
+    const cardBox = (await cardLocator.boundingBox())!;
+    const cardTop = Math.round(cardBox.y * 10) / 10;
+    const navBox = (await navLocator.boundingBox())!;
+    const navTop = Math.round(navBox.y * 10) / 10;
+    const actionRowBox = (await actionRowLocator.boundingBox())!;
+    const actionRowBottom = Math.round((actionRowBox.y + actionRowBox.height) * 10) / 10;
+
+    console.log(JSON.stringify({
+      test: 'F: D10 placement',
+      surface: 'F',
+      cardTop,
+      actionRowBottom,
+      navTop,
+    }));
+
+    expect(cardTop, `Card top (${cardTop}px) must be >= 0`).toBeGreaterThanOrEqual(0);
+    expect(cardTop, `Card top (${cardTop}px) must be <= 200`).toBeLessThanOrEqual(200);
+    expect(actionRowBottom, `Action row bottom (${actionRowBottom}px) must be <= nav top (${navTop}px)`).toBeLessThanOrEqual(navTop);
+  });
+
+  test('F: Add-item form open (font >= 12, taps >= 40, inputs 16px)', async () => {
+    const addItemBtn = cardLocator.locator('[data-testid="add-item-button"]');
+    await expect(addItemBtn).toBeVisible();
+    await addItemBtn.click();
+
+    const addItemForm = cardLocator.locator('[data-testid="add-item-form"]');
+    await expect(addItemForm).toBeVisible();
+
+    const fontResult = await checkFontSizes(addItemForm);
+    expect(fontResult.offenders, `Found fonts smaller than 12px in AddItemForm: ${JSON.stringify(fontResult.offenders)}`).toEqual([]);
+
+    const tapResult = await checkTapTargets(addItemForm);
+    expect(tapResult.offendersUnder40, `Found tap targets smaller than 40px in AddItemForm: ${JSON.stringify(tapResult.offendersUnder40)}`).toEqual([]);
+
+    // Verify all input elements in AddItemForm have fontSize >= 16px (to prevent iOS auto-zoom)
+    const inputsUnder16 = await addItemForm.evaluate((form) => {
+      const inputs = Array.from(form.querySelectorAll('input, select, textarea'));
+      const under16: Array<{ name: string; fontSize: number }> = [];
+      for (const input of inputs) {
+        const fs = parseFloat(window.getComputedStyle(input).fontSize);
+        if (fs < 16) {
+          under16.push({
+            name: input.getAttribute('name') || input.getAttribute('data-testid') || input.tagName,
+            fontSize: fs,
+          });
+        }
+      }
+      return under16;
+    });
+
+    console.log(JSON.stringify({
+      test: 'F: Add-item form inputs font size',
+      surface: 'F',
+      inputsUnder16,
+    }));
+
+    expect(inputsUnder16, `Found inputs with font-size < 16px in AddItemForm: ${JSON.stringify(inputsUnder16)}`).toEqual([]);
+  });
+
+  test('F: 4 items after Add item (height <= 500px)', async () => {
+    const addItemForm = cardLocator.locator('[data-testid="add-item-form"]');
+    await expect(addItemForm).toBeVisible();
+
+    // Add item 2
+    await addItemForm.locator('[data-testid="add-item-name-input"]').fill('Steamed Jasmine Rice');
+    await addItemForm.locator('[data-testid="add-item-quantity-input"]').fill('150');
+    await addItemForm.locator('[data-testid="add-item-unit-input"]').fill('g');
+    await addItemForm.locator('[data-testid="add-item-calories-input"]').fill('195');
+    await addItemForm.locator('[data-testid="add-item-protein-input"]').fill('3.5');
+    await addItemForm.locator('[data-testid="add-item-carbs-input"]').fill('42');
+    await addItemForm.locator('[data-testid="add-item-fat-input"]').fill('0.5');
+    await addItemForm.locator('[data-testid="add-item-fiber-input"]').fill('0.6');
+    await addItemForm.locator('[data-testid="submit-add-item-button"]').click();
+    await expect(addItemForm).not.toBeVisible();
+
+    // Add item 3
+    const addItemBtn = cardLocator.locator('[data-testid="add-item-button"]');
+    await addItemBtn.click();
+    await expect(addItemForm).toBeVisible();
+    await addItemForm.locator('[data-testid="add-item-name-input"]').fill('Steamed Broccoli');
+    await addItemForm.locator('[data-testid="add-item-quantity-input"]').fill('100');
+    await addItemForm.locator('[data-testid="add-item-unit-input"]').fill('g');
+    await addItemForm.locator('[data-testid="add-item-calories-input"]').fill('35');
+    await addItemForm.locator('[data-testid="add-item-protein-input"]').fill('2.4');
+    await addItemForm.locator('[data-testid="add-item-carbs-input"]').fill('7');
+    await addItemForm.locator('[data-testid="add-item-fat-input"]').fill('0.4');
+    await addItemForm.locator('[data-testid="add-item-fiber-input"]').fill('2.6');
+    await addItemForm.locator('[data-testid="submit-add-item-button"]').click();
+    await expect(addItemForm).not.toBeVisible();
+
+    // Add item 4
+    await addItemBtn.click();
+    await expect(addItemForm).toBeVisible();
+    await addItemForm.locator('[data-testid="add-item-name-input"]').fill('Olive Oil Drizzle');
+    await addItemForm.locator('[data-testid="add-item-quantity-input"]').fill('10');
+    await addItemForm.locator('[data-testid="add-item-unit-input"]').fill('ml');
+    await addItemForm.locator('[data-testid="add-item-calories-input"]').fill('88');
+    await addItemForm.locator('[data-testid="add-item-protein-input"]').fill('0');
+    await addItemForm.locator('[data-testid="add-item-carbs-input"]').fill('0');
+    await addItemForm.locator('[data-testid="add-item-fat-input"]').fill('10');
+    await addItemForm.locator('[data-testid="add-item-fiber-input"]').fill('0');
+    await addItemForm.locator('[data-testid="submit-add-item-button"]').click();
+    await expect(addItemForm).not.toBeVisible();
+
+    // Verify 4 component rows present
+    const rows = cardLocator.locator('[data-testid="component-row"]');
+    await expect(rows).toHaveCount(4);
+
+    await waitForScrollSettled(page);
+    const cardBox = (await cardLocator.boundingBox())!;
+    console.log(JSON.stringify({
+      test: 'F: 4 items after Add item (height <= 500px)',
+      surface: 'F',
+      cardHeight: Math.round(cardBox.height * 10) / 10,
+    }));
+    expect(cardBox.height).toBeLessThanOrEqual(500);
+  });
+});
