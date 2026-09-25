@@ -1,6 +1,4 @@
 import { useState, type FormEvent } from 'react';
-import type { NutritionLog } from '../../types/database';
-import { formatLocalTimestamp } from '../../utils/date';
 import { roundTo1Decimal } from '../../utils/nutrition';
 
 export interface ManualMealStagedData {
@@ -16,12 +14,10 @@ export interface ManualMealStagedData {
 }
 
 export interface UseManualMealFormOptions {
-  selectedDate: string;
-  onSubmitLog?: (payload: Partial<NutritionLog>) => void;
-  onStageMeal?: (meal: ManualMealStagedData) => void;
+  onStageMeal: (meal: ManualMealStagedData) => void;
 }
 
-export function useManualMealForm({ selectedDate, onSubmitLog, onStageMeal }: UseManualMealFormOptions) {
+export function useManualMealForm({ onStageMeal }: UseManualMealFormOptions) {
   // Manual Form Fallback State
   const [manualDishName, setManualDishName] = useState('');
   const [manualCalories, setManualCalories] = useState<number | ''>('');
@@ -64,16 +60,7 @@ export function useManualMealForm({ selectedDate, onSubmitLog, onStageMeal }: Us
       serving_unit: manualServingUnit,
     };
 
-    if (onStageMeal) {
-      onStageMeal(data);
-    } else if (onSubmitLog) {
-      const payload: Partial<NutritionLog> = {
-        ...data,
-        logged_at: formatLocalTimestamp(selectedDate),
-        logged_date: selectedDate,
-      };
-      onSubmitLog(payload);
-    }
+    onStageMeal(data);
   };
 
   return {

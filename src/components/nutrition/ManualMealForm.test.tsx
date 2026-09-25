@@ -191,12 +191,11 @@ describe('ManualMealForm', () => {
   });
 
   describe('useManualMealForm', () => {
-    it('saves blank P/C/F/Fib as 0 in payload', () => {
-      const onSubmitLog = vi.fn();
+    it('stages blank P/C/F/Fib as 0 in staged data (D22)', () => {
+      const onStageMeal = vi.fn();
       const { result } = renderHook(() =>
         useManualMealForm({
-          selectedDate: '2026-09-25',
-          onSubmitLog,
+          onStageMeal,
         })
       );
 
@@ -210,7 +209,7 @@ describe('ManualMealForm', () => {
         result.current.handleManualSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
       });
 
-      expect(onSubmitLog).toHaveBeenCalledWith(
+      expect(onStageMeal).toHaveBeenCalledWith(
         expect.objectContaining({
           food_name: 'Black Coffee',
           calories: 5,
@@ -224,12 +223,11 @@ describe('ManualMealForm', () => {
       );
     });
 
-    it('blocks submission when calories is negative', () => {
-      const onSubmitLog = vi.fn();
+    it('blocks staging when calories is negative', () => {
+      const onStageMeal = vi.fn();
       const { result } = renderHook(() =>
         useManualMealForm({
-          selectedDate: '2026-09-25',
-          onSubmitLog,
+          onStageMeal,
         })
       );
 
@@ -242,15 +240,14 @@ describe('ManualMealForm', () => {
         result.current.handleManualSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
       });
 
-      expect(onSubmitLog).not.toHaveBeenCalled();
+      expect(onStageMeal).not.toHaveBeenCalled();
     });
 
-    it('blocks submission when dish name is empty', () => {
-      const onSubmitLog = vi.fn();
+    it('blocks staging when dish name is empty', () => {
+      const onStageMeal = vi.fn();
       const { result } = renderHook(() =>
         useManualMealForm({
-          selectedDate: '2026-09-25',
-          onSubmitLog,
+          onStageMeal,
         })
       );
 
@@ -263,16 +260,13 @@ describe('ManualMealForm', () => {
         result.current.handleManualSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
       });
 
-      expect(onSubmitLog).not.toHaveBeenCalled();
+      expect(onStageMeal).not.toHaveBeenCalled();
     });
 
-    it('stages meal via onStageMeal without calling onSubmitLog (D22)', () => {
-      const onSubmitLog = vi.fn();
+    it('stages meal via onStageMeal with complete macro data (D22)', () => {
       const onStageMeal = vi.fn();
       const { result } = renderHook(() =>
         useManualMealForm({
-          selectedDate: '2026-09-25',
-          onSubmitLog,
           onStageMeal,
         })
       );
@@ -303,14 +297,12 @@ describe('ManualMealForm', () => {
         serving_size: 1,
         serving_unit: 'bowl',
       });
-      expect(onSubmitLog).not.toHaveBeenCalled();
     });
 
     it('blocks staging when inputs are invalid', () => {
       const onStageMeal = vi.fn();
       const { result } = renderHook(() =>
         useManualMealForm({
-          selectedDate: '2026-09-25',
           onStageMeal,
         })
       );

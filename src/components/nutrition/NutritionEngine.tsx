@@ -29,7 +29,6 @@ import { supabase } from '../../lib/supabase';
 import { useQueryClient } from '@tanstack/react-query';
 import { StatusBanner } from '../common/StatusBanner';
 
-export { type StagedItem, stagedToItem, stagedReference, type StagedMeal } from './nutritionEngineHelpers';
 
 export const NutritionEngine: React.FC = () => {
   const { user, profile } = useAuth();
@@ -53,7 +52,6 @@ export const NutritionEngine: React.FC = () => {
 
   // Manual Form Fallback State (D22: stages into StagedMealCard instead of logging directly)
   const manualMealForm = useManualMealForm({
-    selectedDate,
     onStageMeal: handleStageManualMeal,
   });
 
