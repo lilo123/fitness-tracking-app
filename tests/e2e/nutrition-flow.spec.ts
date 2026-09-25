@@ -353,20 +353,72 @@ Total Fiber: 8 g`;
     await expect(stagedCard.getByText('Chocolate Coconut Chia Pudding', { exact: true })).toBeVisible();
     await expect(stagedCard.getByText('2% Plain Greek Yogurt', { exact: true })).toBeVisible();
 
-    // Assert macro inputs have exact values
-    await expect(stagedCard.locator('[data-testid="calories-input"]')).toHaveValue('550');
-    await expect(stagedCard.locator('[data-testid="protein-input"]')).toHaveValue('46');
-    await expect(stagedCard.locator('[data-testid="carbs-input"]')).toHaveValue('24');
-    await expect(stagedCard.locator('[data-testid="fat-input"]')).toHaveValue('30');
-    await expect(stagedCard.locator('[data-testid="fiber-input"]')).toHaveValue('8');
+    // Assert all 5 component items exist and read each item's macros
+    const rows = stagedCard.locator('[data-testid="component-row"]');
+    await expect(rows).toHaveCount(5);
+
+    let sumCalories = 0;
+    let sumProtein = 0;
+    let sumCarbs = 0;
+    let sumFat = 0;
+    let sumFiber = 0;
+
+    for (let i = 0; i < 5; i++) {
+      const row = rows.nth(i);
+      const cal = parseFloat(await row.locator('[data-testid="component-macro-calories"] [data-testid="macro-val-calories"]').innerText());
+      const pro = parseFloat(await row.locator('[data-testid="component-macro-protein"] [data-testid="macro-val-protein"]').innerText());
+      const carbs = parseFloat(await row.locator('[data-testid="component-macro-carbs"] [data-testid="macro-val-carbs"]').innerText());
+      const fat = parseFloat(await row.locator('[data-testid="component-macro-fat"] [data-testid="macro-val-fat"]').innerText());
+      const fiber = parseFloat(await row.locator('[data-testid="component-macro-fiber"] [data-testid="macro-val-fiber"]').innerText());
+
+      sumCalories += cal;
+      sumProtein += pro;
+      sumCarbs += carbs;
+      sumFat += fat;
+      sumFiber += fiber;
+    }
+
+    sumCalories = Math.round(sumCalories);
+    sumProtein = Math.round(sumProtein * 10) / 10;
+    sumCarbs = Math.round(sumCarbs * 10) / 10;
+    sumFat = Math.round(sumFat * 10) / 10;
+    sumFiber = Math.round(sumFiber * 10) / 10;
+
+    // Verify individual items sum to the expected pre-analyzed totals
+    expect(sumCalories).toBe(550);
+    expect(sumProtein).toBe(46);
+    expect(sumCarbs).toBe(24);
+    expect(sumFat).toBe(30);
+    expect(sumFiber).toBe(8);
+
+    // Assert read-only staged totals (Fix D5) equal the sum of items
+    await expect(stagedCard.locator('[data-testid="staged-total-calories"] [data-testid="macro-val-calories"]')).toHaveText(String(sumCalories));
+    await expect(stagedCard.locator('[data-testid="staged-total-protein"] [data-testid="macro-val-protein"]')).toHaveText(String(sumProtein));
+    await expect(stagedCard.locator('[data-testid="staged-total-carbs"] [data-testid="macro-val-carbs"]')).toHaveText(String(sumCarbs));
+    await expect(stagedCard.locator('[data-testid="staged-total-fat"] [data-testid="macro-val-fat"]')).toHaveText(String(sumFat));
+    await expect(stagedCard.locator('[data-testid="staged-total-fiber"] [data-testid="macro-val-fiber"]')).toHaveText(String(sumFiber));
+
+    await expect(stagedCard.locator('[data-testid="staged-total-calories"]')).toContainText(`${sumCalories} kcal`);
+    await expect(stagedCard.locator('[data-testid="staged-total-protein"]')).toContainText(`${sumProtein} P`);
+    await expect(stagedCard.locator('[data-testid="staged-total-carbs"]')).toContainText(`${sumCarbs} C`);
+    await expect(stagedCard.locator('[data-testid="staged-total-fat"]')).toContainText(`${sumFat} F`);
+    await expect(stagedCard.locator('[data-testid="staged-total-fiber"]')).toContainText(`${sumFiber} Fib`);
 
     // Commit meal
-    const commitBtn = stagedCard.locator('button:has-text("Log Meal (+550 kcal)")');
+    const commitBtn = stagedCard.locator(`button:has-text("Log Meal (+${sumCalories} kcal)")`);
     await expect(commitBtn).toBeVisible();
     await commitBtn.click();
 
     await expect(stagedCard).not.toBeVisible();
-    await expect(page.locator('[data-testid="meal-log-item"]').filter({ hasText: 'High-Protein Breakfast Plate' }).first()).toBeVisible();
+    const loggedRow = page.locator('[data-testid="meal-log-item"]').filter({ hasText: 'High-Protein Breakfast Plate' }).first();
+    await expect(loggedRow).toBeVisible();
+
+    // Assert logged meal row displays exact totals matching the staged totals
+    await expect(loggedRow.locator(`text=${sumCalories} kcal`)).toBeVisible();
+    await expect(loggedRow.locator(`text=P ${sumProtein}`)).toBeVisible();
+    await expect(loggedRow.locator(`text=C ${sumCarbs}`)).toBeVisible();
+    await expect(loggedRow.locator(`text=F ${sumFat}`)).toBeVisible();
+    await expect(loggedRow.locator(`text=Fib ${sumFiber}`)).toBeVisible();
 
     // Net-neutral: remove the row this test just committed.
     await deleteMealRow(page, 'High-Protein Breakfast Plate & Chia Pudding Bowl (Friday Menu Grounded)');
