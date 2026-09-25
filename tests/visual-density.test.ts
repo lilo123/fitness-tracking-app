@@ -634,3 +634,279 @@ test.describe('Surface C: Manual entry form', () => {
     ).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Surface D: staged card placement (D10)
+// ---------------------------------------------------------------------------
+
+test.describe('Surface D: staged card placement (D10)', () => {
+  let page: Page;
+  let cardLocator: Locator;
+  let navLocator: Locator;
+  let actionRowLocator: Locator;
+
+  test.beforeAll(async ({ browser }) => {
+    page = await browser.newPage({
+      viewport: { width: 390, height: 844 },
+      deviceScaleFactor: 1,
+    });
+    await setupPageAndLogin(page);
+
+    await page.fill('textarea[placeholder*="Describe what you ate"]', '4-item salmon dinner');
+    await page.click('button:has-text("Analyze Meal")');
+    cardLocator = page.locator('[data-testid="staged-meal-card"]');
+    await expect(cardLocator).toBeVisible({ timeout: 15000 });
+
+    const discardBtn = cardLocator.locator('button[aria-label="Discard staged meal"]');
+    actionRowLocator = discardBtn.locator('..');
+    navLocator = page.locator('nav').filter({ has: page.locator('[data-testid="nav-nutrition"]') });
+  });
+
+  test.afterAll(async () => {
+    await page.close();
+  });
+
+  test('D1: after staging card top in [0, 200]', async () => {
+    // Wait for smooth scroll to settle
+    await page.waitForTimeout(600);
+
+    const cardBox = (await cardLocator.boundingBox())!;
+    const cardTop = Math.round(cardBox.y * 10) / 10;
+
+    const measurements = {
+      test: 'D1: after staging card top in [0, 200]',
+      surface: 'D',
+      cardTop,
+      inRange: cardTop >= 0 && cardTop <= 200,
+    };
+    console.log(JSON.stringify(measurements));
+
+    expect(cardTop, `Card top (${cardTop}px) must be >= 0`).toBeGreaterThanOrEqual(0);
+    expect(cardTop, `Card top (${cardTop}px) must be <= 200`).toBeLessThanOrEqual(200);
+  });
+
+  test('D2: action row visible above nav at staging and mid scroll', async () => {
+    // 1. Right after staging
+    const navBoxAtStaging = (await navLocator.boundingBox())!;
+    const actionBoxAtStaging = (await actionRowLocator.boundingBox())!;
+
+    const atStaging = {
+      navTop: Math.round(navBoxAtStaging.y * 10) / 10,
+      actionRowTop: Math.round(actionBoxAtStaging.y * 10) / 10,
+      actionRowBottom: Math.round((actionBoxAtStaging.y + actionBoxAtStaging.height) * 10) / 10,
+      actionRowBottomLteNavTop:
+        Math.round((actionBoxAtStaging.y + actionBoxAtStaging.height) * 10) / 10 <=
+        Math.round(navBoxAtStaging.y * 10) / 10,
+      actionRowTopGteZero: actionBoxAtStaging.y >= 0,
+    };
+
+    // 2. After scrolling to the middle
+    const maxScroll = await page.evaluate(
+      () => document.documentElement.scrollHeight - window.innerHeight
+    );
+    await page.evaluate((y) => window.scrollTo(0, y), maxScroll / 2);
+    await page.waitForTimeout(400);
+
+    const navBoxMid = (await navLocator.boundingBox())!;
+    const actionBoxMid = (await actionRowLocator.boundingBox())!;
+
+    const midScroll = {
+      navTop: Math.round(navBoxMid.y * 10) / 10,
+      actionRowTop: Math.round(actionBoxMid.y * 10) / 10,
+      actionRowBottom: Math.round((actionBoxMid.y + actionBoxMid.height) * 10) / 10,
+      actionRowBottomLteNavTop:
+        Math.round((actionBoxMid.y + actionBoxMid.height) * 10) / 10 <=
+        Math.round(navBoxMid.y * 10) / 10,
+      actionRowTopGteZero: actionBoxMid.y >= 0,
+    };
+
+    const measurements = {
+      test: 'D2: action row visible above nav at staging and mid scroll',
+      surface: 'D',
+      atStaging,
+      midScroll,
+    };
+    console.log(JSON.stringify(measurements));
+
+    // Reset scroll back for subsequent measurements
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(200);
+
+    expect(
+      atStaging.actionRowBottom,
+      `At staging: Action row bottom (${atStaging.actionRowBottom}px) exceeds nav top (${atStaging.navTop}px)`
+    ).toBeLessThanOrEqual(atStaging.navTop);
+    expect(
+      atStaging.actionRowTop,
+      `At staging: Action row top (${atStaging.actionRowTop}px) < 0`
+    ).toBeGreaterThanOrEqual(0);
+
+    expect(
+      midScroll.actionRowBottom,
+      `Mid scroll: Action row bottom (${midScroll.actionRowBottom}px) exceeds nav top (${midScroll.navTop}px)`
+    ).toBeLessThanOrEqual(midScroll.navTop);
+    expect(
+      midScroll.actionRowTop,
+      `Mid scroll: Action row top (${midScroll.actionRowTop}px) < 0`
+    ).toBeGreaterThanOrEqual(0);
+  });
+
+  test('D3: last row not covered at end of scroll', async () => {
+    // Scroll page to end
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await page.waitForTimeout(400);
+
+    const lastRowLocator = cardLocator.locator('[data-testid="staged-meal-day-total"]');
+    const lastRowBox = (await lastRowLocator.boundingBox())!;
+    const actionBoxEnd = (await actionRowLocator.boundingBox())!;
+    const navBoxEnd = (await navLocator.boundingBox())!;
+
+    const lastRowBottom = Math.round((lastRowBox.y + lastRowBox.height) * 10) / 10;
+    const actionRowTop = Math.round(actionBoxEnd.y * 10) / 10;
+    const navTop = Math.round(navBoxEnd.y * 10) / 10;
+
+    const measurements = {
+      test: 'D3: last row not covered at end of scroll',
+      surface: 'D',
+      lastRowBottom,
+      actionRowTop,
+      navTop,
+      lastRowLteActionRowTop: lastRowBottom <= actionRowTop,
+      lastRowLteNavTop: lastRowBottom <= navTop,
+    };
+    console.log(JSON.stringify(measurements));
+
+    // Reset scroll back
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(200);
+
+    expect(
+      lastRowBottom,
+      `Last row bottom (${lastRowBottom}px) exceeds action row top (${actionRowTop}px)`
+    ).toBeLessThanOrEqual(actionRowTop);
+    expect(
+      lastRowBottom,
+      `Last row bottom (${lastRowBottom}px) exceeds nav top (${navTop}px)`
+    ).toBeLessThanOrEqual(navTop);
+  });
+
+  test('D4: D1 with reducedMotion reduce emulated', async () => {
+    // Discard current staged meal
+    await cardLocator.locator('button[aria-label="Discard staged meal"]').click();
+    await expect(cardLocator).not.toBeVisible();
+
+    // Emulate reduced motion
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+
+    // Staged card replaces AI input again
+    await page.click('button:has-text("Analyze Meal")');
+    await expect(cardLocator).toBeVisible({ timeout: 15000 });
+    await page.waitForTimeout(400);
+
+    const cardBox = (await cardLocator.boundingBox())!;
+    const cardTop = Math.round(cardBox.y * 10) / 10;
+
+    const measurements = {
+      test: 'D4: D1 with reducedMotion reduce emulated',
+      surface: 'D',
+      cardTop,
+      inRange: cardTop >= 0 && cardTop <= 200,
+    };
+    console.log(JSON.stringify(measurements));
+
+    expect(cardTop, `Reduced motion card top (${cardTop}px) must be >= 0`).toBeGreaterThanOrEqual(0);
+    expect(cardTop, `Reduced motion card top (${cardTop}px) must be <= 200`).toBeLessThanOrEqual(200);
+  });
+
+  test('D5: page end content not covered by nav', async () => {
+    const navBox = (await navLocator.boundingBox())!;
+    const navTop = Math.round(navBox.y * 10) / 10;
+
+    const findBottomMostContentBottom = async () => {
+      return page.evaluate(() => {
+        const main = document.querySelector('main');
+        if (!main) return null;
+        const nav = document.querySelector('nav');
+        const all = Array.from(main.querySelectorAll('*'));
+        let maxBottom = -Infinity;
+
+        for (const el of all) {
+          if (nav && nav.contains(el)) continue;
+          const style = window.getComputedStyle(el);
+          if (style.position === 'fixed' || style.position === 'sticky') continue;
+          if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') continue;
+          const rect = el.getBoundingClientRect();
+          if (rect.width <= 0 || rect.height <= 0) continue;
+          if (rect.bottom > maxBottom) {
+            maxBottom = rect.bottom;
+          }
+        }
+        return Math.round(maxBottom * 10) / 10;
+      });
+    };
+
+    // Measurement 1: with a staged 4-item card
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await page.waitForTimeout(400);
+
+    const stagedLastContentBottom = (await findBottomMostContentBottom())!;
+    const actionBoxEnd = (await actionRowLocator.boundingBox())!;
+    const actionRowTop = Math.round(actionBoxEnd.y * 10) / 10;
+    const actionRowBottom = Math.round((actionBoxEnd.y + actionBoxEnd.height) * 10) / 10;
+
+    const actionRowFullyVisibleOrAbove =
+      (actionRowBottom <= navTop && actionRowTop >= 0) || actionRowBottom <= 0;
+
+    const stagedMeasurement = {
+      stagedLastContentBottom,
+      navTop,
+      actionRowTop,
+      actionRowBottom,
+      actionRowFullyVisibleOrAbove,
+      contentNotCovered: stagedLastContentBottom <= navTop,
+    };
+
+    // Measurement 2: with nothing staged
+    await cardLocator.locator('button[aria-label="Discard staged meal"]').click();
+    await expect(cardLocator).not.toBeVisible();
+
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await page.waitForTimeout(400);
+
+    const unstagedLastContentBottom = (await findBottomMostContentBottom())!;
+
+    const unstagedMeasurement = {
+      unstagedLastContentBottom,
+      navTop,
+      contentNotCovered: unstagedLastContentBottom <= navTop,
+    };
+
+    const measurements = {
+      test: 'D5: page end content not covered by nav',
+      surface: 'D',
+      staged: stagedMeasurement,
+      unstaged: unstagedMeasurement,
+    };
+    console.log(JSON.stringify(measurements));
+
+    expect(
+      stagedLastContentBottom,
+      `Staged case: last content bottom (${stagedLastContentBottom}px) exceeds nav top (${navTop}px)`
+    ).toBeLessThanOrEqual(navTop);
+
+    expect(
+      actionRowBottom,
+      `Staged case: action row bottom (${actionRowBottom}px) exceeds nav top (${navTop}px)`
+    ).toBeLessThanOrEqual(navTop);
+
+    expect(
+      actionRowFullyVisibleOrAbove,
+      `Staged case: action row (top: ${actionRowTop}px, bottom: ${actionRowBottom}px) must be fully visible above nav (navTop: ${navTop}px) or fully scrolled above viewport`
+    ).toBe(true);
+
+    expect(
+      unstagedLastContentBottom,
+      `Unstaged case: last content bottom (${unstagedLastContentBottom}px) exceeds nav top (${navTop}px)`
+    ).toBeLessThanOrEqual(navTop);
+  });
+});

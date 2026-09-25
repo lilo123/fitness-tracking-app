@@ -1,3 +1,46 @@
+import { useState, useEffect } from 'react';
+
+export const getScrollBehavior = (): ScrollBehavior => {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return 'smooth';
+  }
+  try {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+  } catch {
+    return 'smooth';
+  }
+};
+
+export const useNavHeight = (): number => {
+  const [navHeight, setNavHeight] = useState<number>(() => {
+    if (typeof document !== 'undefined') {
+      const nav = document.querySelector('nav');
+      if (nav) {
+        const rect = nav.getBoundingClientRect();
+        if (rect.height > 0) return Math.round(rect.height);
+      }
+    }
+    return 66;
+  });
+
+  useEffect(() => {
+    const update = () => {
+      const nav = document.querySelector('nav');
+      if (nav) {
+        const rect = nav.getBoundingClientRect();
+        if (rect.height > 0) {
+          setNavHeight(Math.round(rect.height));
+        }
+      }
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  return navHeight;
+};
+
 import { convertPortion, type CanonicalUnit } from '../../utils/unitConverter';
 import { roundTo1Decimal, formatCalories } from '../../utils/nutrition';
 import { sumItems, type NutritionItem } from '../../utils/itemModel';

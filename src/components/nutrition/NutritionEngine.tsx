@@ -290,7 +290,7 @@ export const NutritionEngine: React.FC = () => {
     : null;
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${stagedMeal ? 'pb-32' : ''}`}>
       <NutritionDashboardRings
         selectedDate={selectedDate}
         onDateChange={setSelectedDate}
@@ -336,32 +336,7 @@ export const NutritionEngine: React.FC = () => {
         }
       />
 
-      <NutritionAiInput
-        nlInput={ai.nlInput}
-        onNlInputChange={ai.setNlInput}
-        selectedPhoto={ai.selectedPhoto}
-        onRemovePhoto={ai.handleRemovePhoto}
-        onFileChange={ai.handleFileChange}
-        onPickPhoto={ai.handlePickPhoto}
-        isAnalyzing={ai.isAnalyzing}
-        onAnalyze={ai.handleAnalyze}
-        showManualForm={showManualForm}
-        onToggleManualForm={() => setShowManualForm((prev) => !prev)}
-        isRateLimited={ai.isRateLimited}
-        onSwitchToManual={() => {
-          setShowManualForm(true);
-          ai.setIsRateLimited(false);
-          if (!manualMealForm.manualDishName.trim()) {
-            manualMealForm.setManualDishName(ai.nlInput.trim() || (ai.selectedPhoto ? 'Meal Photo' : ''));
-          }
-        }}
-        status={status}
-        isError={isError}
-        fileInputRef={ai.fileInputRef}
-        hasCustomDishes={customDishes.length > 0}
-      />
-
-      {stagedMeal && (
+      {stagedMeal ? (
         <StagedMealCard
           stagedMeal={stagedMeal}
           dailyTotals={dailyTotals}
@@ -374,6 +349,31 @@ export const NutritionEngine: React.FC = () => {
           onSaveStagedAsCustomDish={handleSaveStagedAsCustomDish}
           onDiscardStagedMeal={() => setStagedMeal(null)}
           isPending={mutation.isPending}
+        />
+      ) : (
+        <NutritionAiInput
+          nlInput={ai.nlInput}
+          onNlInputChange={ai.setNlInput}
+          selectedPhoto={ai.selectedPhoto}
+          onRemovePhoto={ai.handleRemovePhoto}
+          onFileChange={ai.handleFileChange}
+          onPickPhoto={ai.handlePickPhoto}
+          isAnalyzing={ai.isAnalyzing}
+          onAnalyze={ai.handleAnalyze}
+          showManualForm={showManualForm}
+          onToggleManualForm={() => setShowManualForm((prev) => !prev)}
+          isRateLimited={ai.isRateLimited}
+          onSwitchToManual={() => {
+            setShowManualForm(true);
+            ai.setIsRateLimited(false);
+            if (!manualMealForm.manualDishName.trim()) {
+              manualMealForm.setManualDishName(ai.nlInput.trim() || (ai.selectedPhoto ? 'Meal Photo' : ''));
+            }
+          }}
+          status={status}
+          isError={isError}
+          fileInputRef={ai.fileInputRef}
+          hasCustomDishes={customDishes.length > 0}
         />
       )}
 

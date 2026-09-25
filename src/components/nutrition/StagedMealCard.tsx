@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useRef, useEffect } from 'react';
 import { Utensils, Check, Star, X } from 'lucide-react';
 import { roundTo1Decimal, formatCalories, formatMacro } from '../../utils/nutrition';
 import type { NutritionItem } from '../../utils/itemModel';
@@ -9,6 +9,8 @@ import {
   reanchorStagedItem,
   recomputeStagedTotals,
   updateStagedItemNutrition,
+  getScrollBehavior,
+  useNavHeight,
   type StagedItem,
   type StagedMeal,
 } from './nutritionEngineHelpers';
@@ -16,6 +18,7 @@ import { computeVisibleMacroColumns, MACRO_COLUMNS_CONFIG, getMacroGridTemplateC
 import { DayTotalRow, type MacroTotalsShape } from './TodayAfterRow';
 
 export interface StagedMealCardProps {
+  navHeight?: number;
   stagedMeal: StagedMeal;
   dailyTotals?: Partial<MacroTotalsShape>;
   targets?: Partial<MacroTotalsShape>;
@@ -41,14 +44,31 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
   onSaveStagedAsCustomDish,
   onDiscardStagedMeal,
   isPending,
+  navHeight: navHeightProp,
 }) => {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const measuredNavHeight = useNavHeight();
+  const effectiveNavHeight = navHeightProp ?? measuredNavHeight;
+
+  useEffect(() => {
+    const behavior = getScrollBehavior();
+    if (cardRef.current) {
+      if (typeof cardRef.current.scrollIntoView === 'function') {
+        cardRef.current.scrollIntoView({ behavior, block: 'start' });
+      }
+      const dishNameInput = cardRef.current.querySelector<HTMLInputElement>('[data-testid="dish-name-input"]');
+      dishNameInput?.focus({ preventScroll: true });
+    }
+  }, []);
+
   const isMultiItem = stagedMeal.items && stagedMeal.items.length > 1;
   const macroColumns = computeVisibleMacroColumns(stagedMeal.items);
 
   return (
     <div
+      ref={cardRef}
       data-testid="staged-meal-card"
-      className="bg-zinc-900/90 border border-cyan-500/50 rounded-2xl sm:rounded-3xl px-3 py-2 sm:p-4 shadow-[0_0_30px_rgba(6,182,212,0.15)] space-y-1.5 sm:space-y-2 animate-in fade-in"
+      className="bg-zinc-900/90 border border-cyan-500/50 rounded-2xl sm:rounded-3xl px-3 pt-2 pb-0 sm:pt-4 sm:px-4 sm:pb-0 shadow-[0_0_30px_rgba(6,182,212,0.15)] space-y-1.5 sm:space-y-2 animate-in fade-in scroll-mt-16 sm:scroll-mt-20"
     >
       {/* Header row: Dish Name & Meal Type (1 row on mobile & desktop) */}
       <div className="flex items-center gap-2 border-b border-zinc-800 pb-1.5">
@@ -205,7 +225,11 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
       )}
 
       {/* Action Buttons Bar */}
-      <div className="flex items-center gap-2 pt-2">
+      <div
+        data-testid="staged-card-actions"
+        style={{ bottom: `${effectiveNavHeight}px` }}
+        className="sticky z-20 bg-zinc-900 border-t border-zinc-800/80 -mx-3 px-3 sm:-mx-4 sm:px-4 py-2 flex items-center gap-2 rounded-b-2xl sm:rounded-b-3xl"
+      >
         <button
           type="button"
           onClick={onLogStagedMeal}

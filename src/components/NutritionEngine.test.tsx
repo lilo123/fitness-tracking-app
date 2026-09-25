@@ -3442,6 +3442,103 @@ Total Fiber: 1 g`;
       expect(screen.getByTestId('day-total-val-protein')).toHaveTextContent('90');
     });
   });
+
+  describe('Batch 3 / D10: Staged meal card in-place replacement and AI input restore', () => {
+    it('hides AI input while meal is staged and restores previous text on discard (D10)', async () => {
+      (supabase.functions.invoke as any).mockResolvedValue({
+        data: {
+          name: 'Eggs & Toast',
+          calories: 350,
+          protein: 20,
+          carbs: 30,
+          fat: 15,
+          fiber: 2,
+          items: [
+            { name: 'Eggs', portion: '2 eggs', calories: 150, protein: 14, carbs: 2, fat: 10, fiber: 0, quantity: 2, unit: 'unit' },
+            { name: 'Toast', portion: '1 slice', calories: 200, protein: 6, carbs: 28, fat: 5, fiber: 2, quantity: 1, unit: 'slice' },
+          ],
+        },
+        error: null,
+      });
+
+      renderComponent();
+
+      // AI input is initially visible
+      const input = screen.getByPlaceholderText(/Describe what you ate/i);
+      await userEvent.type(input, '2 eggs and toast');
+
+      const analyzeBtn = screen.getByText('Analyze Meal');
+      fireEvent.click(analyzeBtn);
+
+      // Staged card replaces AI input in place
+      await waitFor(() => {
+        expect(screen.getByTestId('staged-meal-card')).toBeDefined();
+      });
+
+      // AI input textarea must NOT be present while meal is staged
+      expect(screen.queryByPlaceholderText(/Describe what you ate/i)).toBeNull();
+
+      // Discard the staged meal
+      const discardBtn = screen.getByRole('button', { name: /Discard staged meal/i });
+      fireEvent.click(discardBtn);
+
+      // Staged card is removed
+      await waitFor(() => {
+        expect(screen.queryByTestId('staged-meal-card')).toBeNull();
+      });
+
+      // AI input is restored WITH the previous text intact
+      const restoredInput = screen.getByPlaceholderText(/Describe what you ate/i);
+      expect(restoredInput).toBeDefined();
+      expect(restoredInput).toHaveValue('2 eggs and toast');
+    });
+
+    it('hides AI input while meal is staged and restores empty AI input after log (D10)', async () => {
+      (supabase.functions.invoke as any).mockResolvedValue({
+        data: {
+          name: 'Protein Shake',
+          calories: 200,
+          protein: 30,
+          carbs: 5,
+          fat: 2,
+          fiber: 1,
+          items: [
+            { name: 'Whey', portion: '1 scoop', calories: 200, protein: 30, carbs: 5, fat: 2, fiber: 1, quantity: 1, unit: 'scoop' },
+          ],
+        },
+        error: null,
+      });
+
+      renderComponent();
+
+      const input = screen.getByPlaceholderText(/Describe what you ate/i);
+      await userEvent.type(input, 'whey protein shake');
+
+      fireEvent.click(screen.getByText('Analyze Meal'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('staged-meal-card')).toBeDefined();
+      });
+
+      // AI input is hidden
+      expect(screen.queryByPlaceholderText(/Describe what you ate/i)).toBeNull();
+
+      // Log the staged meal
+      const logBtn = screen.getByRole('button', { name: /Log Meal/i });
+      fireEvent.click(logBtn);
+
+      // Staged card is removed after mutation success
+      await waitFor(() => {
+        expect(screen.queryByTestId('staged-meal-card')).toBeNull();
+      });
+
+      // AI input is restored with empty input
+      const restoredInput = screen.getByPlaceholderText(/Describe what you ate/i);
+      expect(restoredInput).toBeDefined();
+      expect(restoredInput).toHaveValue('');
+    });
+  });
+
 });
 
 

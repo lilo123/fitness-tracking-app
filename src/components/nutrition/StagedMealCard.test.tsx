@@ -802,5 +802,169 @@ describe('StagedMealCard', () => {
     expect(pCell).not.toHaveClass('text-rose-400');
     expect(screen.queryByTestId('day-total-over-protein')).toBeNull();
   });
+  describe('Batch 3 / D10: sticky action row and scrollIntoView', () => {
+    it('action row has the sticky class and bottom style set to nav height', () => {
+      const meal = makeMultiItemMeal();
+      render(
+        <StagedMealCard
+          stagedMeal={meal}
+          navHeight={66}
+          onUpdateStagedMeal={vi.fn()}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={vi.fn()}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={false}
+        />
+      );
+
+      const actionRow = screen.getByTestId('staged-card-actions');
+      expect(actionRow).toHaveClass('sticky');
+      expect(actionRow.className).toContain('sticky');
+      expect(actionRow).toHaveStyle({ bottom: '66px' });
+    });
+
+    it('scroll called with smooth normally on mount', () => {
+      const scrollSpy = vi.fn();
+      Element.prototype.scrollIntoView = scrollSpy;
+
+      window.matchMedia = vi.fn().mockImplementation((query) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }));
+
+      const meal = makeMultiItemMeal();
+      render(
+        <StagedMealCard
+          stagedMeal={meal}
+          onUpdateStagedMeal={vi.fn()}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={vi.fn()}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={false}
+        />
+      );
+
+      expect(scrollSpy).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+    });
+
+    it('scroll called with auto when prefers-reduced-motion matches', () => {
+      const scrollSpy = vi.fn();
+      Element.prototype.scrollIntoView = scrollSpy;
+
+      window.matchMedia = vi.fn().mockImplementation((query) => ({
+        matches: query === '(prefers-reduced-motion: reduce)',
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }));
+
+      const meal = makeMultiItemMeal();
+      render(
+        <StagedMealCard
+          stagedMeal={meal}
+          onUpdateStagedMeal={vi.fn()}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={vi.fn()}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={false}
+        />
+      );
+
+      expect(scrollSpy).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' });
+    });
+
+    it('guards against window.matchMedia being absent in jsdom', () => {
+      const scrollSpy = vi.fn();
+      Element.prototype.scrollIntoView = scrollSpy;
+
+      const originalMatchMedia = window.matchMedia;
+      // @ts-expect-error test absence
+      delete window.matchMedia;
+
+      const meal = makeMultiItemMeal();
+      render(
+        <StagedMealCard
+          stagedMeal={meal}
+          onUpdateStagedMeal={vi.fn()}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={vi.fn()}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={false}
+        />
+      );
+
+      expect(scrollSpy).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+      window.matchMedia = originalMatchMedia;
+    });
+
+    it('does not re-scroll on re-render or quantity change', () => {
+      const scrollSpy = vi.fn();
+      Element.prototype.scrollIntoView = scrollSpy;
+
+      const meal = makeMultiItemMeal();
+      const { rerender } = render(
+        <StagedMealCard
+          stagedMeal={meal}
+          onUpdateStagedMeal={vi.fn()}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={vi.fn()}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={false}
+        />
+      );
+
+      expect(scrollSpy).toHaveBeenCalledTimes(1);
+
+      const updatedMeal = {
+        ...meal,
+        items: [
+          { ...meal.items[0], quantity: 200, calories: 400 },
+          ...meal.items.slice(1),
+        ],
+      };
+
+      rerender(
+        <StagedMealCard
+          stagedMeal={updatedMeal}
+          onUpdateStagedMeal={vi.fn()}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={vi.fn()}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={false}
+        />
+      );
+
+      expect(scrollSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
 });
 
