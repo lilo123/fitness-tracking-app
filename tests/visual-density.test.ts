@@ -326,6 +326,47 @@ async function waitForScrollSettled(page: Page, targetSelector: string = '[data-
   );
 }
 
+// Check 4 helper: Wait for instant scroll position to reach target and settle across animation frames
+async function waitForScrollPosition(page: Page, target: number | 'bottom') {
+  await page.evaluate(() => {
+    delete (window as unknown as { __scrollPosState?: unknown }).__scrollPosState;
+  });
+
+  await page.waitForFunction(
+    (tgt) => {
+      const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      const expectedY = tgt === 'bottom' ? maxScroll : Math.min(tgt, maxScroll);
+      const currentY = window.scrollY;
+
+      const w = window as unknown as {
+        __scrollPosState?: { y: number; count: number };
+      };
+
+      if (!w.__scrollPosState) {
+        w.__scrollPosState = { y: currentY, count: 0 };
+        return false;
+      }
+
+      const diffFromExpected = Math.abs(currentY - expectedY);
+      const diffFromLast = Math.abs(currentY - w.__scrollPosState.y);
+
+      if (diffFromExpected <= 1 && diffFromLast < 0.5) {
+        w.__scrollPosState.count++;
+      } else {
+        if (diffFromExpected > 1) {
+          window.scrollTo(0, expectedY);
+        }
+        w.__scrollPosState.y = window.scrollY;
+        w.__scrollPosState.count = 0;
+      }
+
+      return w.__scrollPosState.count >= 2;
+    },
+    target,
+    { timeout: 5000, polling: 'raf' }
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Surface A: Staged card with 4 items
 // ---------------------------------------------------------------------------
@@ -709,7 +750,9 @@ test.describe('Surface C: Manual entry form', () => {
 
     // 2. Measure after scrolling page to bottom
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-    await page.waitForTimeout(300);
+    await waitForScrollPosition(page, 'bottom');
+    await expect(logBtnLocator).toBeVisible();
+    await expect(navLocator).toBeVisible();
 
     const navBoxScrolled = (await navLocator.boundingBox())!;
     const logBoxScrolled = (await logBtnLocator.boundingBox())!;
@@ -731,7 +774,8 @@ test.describe('Surface C: Manual entry form', () => {
 
     // Reset scroll back to top for subsequent tests
     await page.evaluate(() => window.scrollTo(0, 0));
-    await page.waitForTimeout(100);
+    await waitForScrollPosition(page, 0);
+    await expect(formLocator).toBeVisible();
 
     // Assert reachable at rest
     expect(
@@ -868,7 +912,9 @@ test.describe('Surface D: staged card placement (D10)', () => {
       () => document.documentElement.scrollHeight - window.innerHeight
     );
     await page.evaluate((y) => window.scrollTo(0, y), maxScroll / 2);
-    await page.waitForTimeout(400);
+    await waitForScrollPosition(page, maxScroll / 2);
+    await expect(actionRowLocator).toBeVisible();
+    await expect(navLocator).toBeVisible();
 
     const navBoxMid = (await navLocator.boundingBox())!;
     const actionBoxMid = (await actionRowLocator.boundingBox())!;
@@ -893,7 +939,8 @@ test.describe('Surface D: staged card placement (D10)', () => {
 
     // Reset scroll back for subsequent measurements
     await page.evaluate(() => window.scrollTo(0, 0));
-    await page.waitForTimeout(200);
+    await waitForScrollPosition(page, 0);
+    await expect(cardLocator).toBeVisible();
 
     expect(
       atStaging.actionRowBottom,
@@ -917,9 +964,12 @@ test.describe('Surface D: staged card placement (D10)', () => {
   test('D3: last row not covered at end of scroll', async () => {
     // Scroll page to end
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-    await page.waitForTimeout(400);
-
+    await waitForScrollPosition(page, 'bottom');
     const lastRowLocator = cardLocator.locator('[data-testid="staged-meal-day-total"]');
+    await expect(lastRowLocator).toBeVisible();
+    await expect(actionRowLocator).toBeVisible();
+    await expect(navLocator).toBeVisible();
+
     const lastRowBox = (await lastRowLocator.boundingBox())!;
     const actionBoxEnd = (await actionRowLocator.boundingBox())!;
     const navBoxEnd = (await navLocator.boundingBox())!;
@@ -941,7 +991,8 @@ test.describe('Surface D: staged card placement (D10)', () => {
 
     // Reset scroll back
     await page.evaluate(() => window.scrollTo(0, 0));
-    await page.waitForTimeout(200);
+    await waitForScrollPosition(page, 0);
+    await expect(cardLocator).toBeVisible();
 
     expect(
       lastRowBottom,
@@ -1010,7 +1061,9 @@ test.describe('Surface D: staged card placement (D10)', () => {
 
     // Measurement 1: with a staged 4-item card
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-    await page.waitForTimeout(400);
+    await waitForScrollPosition(page, 'bottom');
+    await expect(actionRowLocator).toBeVisible();
+    await expect(navLocator).toBeVisible();
 
     const stagedLastContentBottom = (await findBottomMostContentBottom())!;
     const actionBoxEnd = (await actionRowLocator.boundingBox())!;
@@ -1034,7 +1087,8 @@ test.describe('Surface D: staged card placement (D10)', () => {
     await expect(cardLocator).not.toBeVisible();
 
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-    await page.waitForTimeout(400);
+    await waitForScrollPosition(page, 'bottom');
+    await expect(navLocator).toBeVisible();
 
     const unstagedLastContentBottom = (await findBottomMostContentBottom())!;
 

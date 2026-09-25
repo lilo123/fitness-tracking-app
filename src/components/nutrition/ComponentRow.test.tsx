@@ -352,6 +352,220 @@ describe('ComponentRow', () => {
     expect(onReanchor).not.toHaveBeenCalled();
   });
 
+  it('while unit change is pending, typing quantity and pressing Enter re-anchors to the pending unit instead of linear scaling', () => {
+    const item = component({ quantity: 1, unit: 'unit', calories: 200, protein: 10, carbs: 20, fat: 5, fiber: 2 });
+    const onChange = vi.fn();
+    const onReanchor = vi.fn();
+
+    render(<ComponentRow item={item} reference={item} onChange={onChange} onReanchor={onReanchor} />);
+
+    // Switch unit to ml
+    fireEvent.click(screen.getByTestId('component-unit-chip'));
+    fireEvent.click(screen.getByTestId('unit-option-ml'));
+
+    const input = screen.getByTestId('component-quantity-input') as HTMLInputElement;
+    expect(input.value).toBe('');
+    expect(screen.getByTestId('component-reanchor-hint').textContent).toContain('amount in ml for this 200 kcal');
+
+    // Type 250 and press Enter
+    fireEvent.change(input, { target: { value: '250' } });
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
+
+    expect(onReanchor).toHaveBeenCalledTimes(1);
+    expect(onChange).not.toHaveBeenCalled();
+    const reanchored = onReanchor.mock.calls[0][0] as NutritionItem;
+    expect(reanchored.quantity).toBe(250);
+    expect(reanchored.unit).toBe('ml');
+    expect(reanchored.calories).toBe(200);
+    expect(reanchored.protein).toBe(10);
+    expect(reanchored.carbs).toBe(20);
+    expect(reanchored.fat).toBe(5);
+    expect(reanchored.fiber).toBe(2);
+    expect(screen.queryByTestId('component-reanchor-hint')).toBeNull();
+  });
+
+  it('while unit change is pending, committing quantity invokes onChange when onReanchor is omitted', () => {
+    const item = component({ quantity: 1, unit: 'unit', calories: 200, protein: 10, carbs: 20, fat: 5, fiber: 2 });
+    const onChange = vi.fn();
+
+    render(<ComponentRow item={item} reference={item} onChange={onChange} />);
+
+    // Switch unit to g
+    fireEvent.click(screen.getByTestId('component-unit-chip'));
+    fireEvent.click(screen.getByTestId('unit-option-g'));
+
+    const input = screen.getByTestId('component-quantity-input');
+    fireEvent.change(input, { target: { value: '180' } });
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const reanchored = onChange.mock.calls[0][0] as NutritionItem;
+    expect(reanchored.quantity).toBe(180);
+    expect(reanchored.unit).toBe('g');
+    expect(reanchored.calories).toBe(200);
+  });
+
+  it('while unit change is pending, empty, 0, or invalid input on blur or Enter does not invoke onChange and keeps pending state', () => {
+    const item = component({ quantity: 1, unit: 'unit', calories: 200 });
+    const onChange = vi.fn();
+    const onReanchor = vi.fn();
+
+    render(<ComponentRow item={item} reference={item} onChange={onChange} onReanchor={onReanchor} />);
+
+    // Switch to ml
+    fireEvent.click(screen.getByTestId('component-unit-chip'));
+    fireEvent.click(screen.getByTestId('unit-option-ml'));
+
+    const input = screen.getByTestId('component-quantity-input') as HTMLInputElement;
+    expect(input.value).toBe('');
+    expect(screen.getByTestId('component-reanchor-hint')).toBeDefined();
+
+    // Blur on empty input
+    fireEvent.blur(input);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onReanchor).not.toHaveBeenCalled();
+    expect(screen.getByTestId('component-reanchor-hint')).toBeDefined();
+    expect(input.value).toBe('');
+
+    // Type 0 and blur
+    fireEvent.change(input, { target: { value: '0' } });
+    fireEvent.blur(input);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onReanchor).not.toHaveBeenCalled();
+    expect(screen.getByTestId('component-reanchor-hint')).toBeDefined();
+    expect(input.value).toBe('');
+
+    // Type 0 and press Enter
+    fireEvent.change(input, { target: { value: '0' } });
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onReanchor).not.toHaveBeenCalled();
+    expect(screen.getByTestId('component-reanchor-hint')).toBeDefined();
+    expect(input.value).toBe('');
+
+    // Type invalid non-numeric/negative and blur
+    fireEvent.change(input, { target: { value: '-5' } });
+    fireEvent.blur(input);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onReanchor).not.toHaveBeenCalled();
+    expect(screen.getByTestId('component-reanchor-hint')).toBeDefined();
+    expect(input.value).toBe('');
+  });
+
+  it('while unit change is pending, re-selecting the base unit cancels pending re-anchor and restores original quantity', () => {
+    const item = component({ quantity: 150, unit: 'g', calories: 182 });
+    const onChange = vi.fn();
+    const onReanchor = vi.fn();
+
+    render(<ComponentRow item={item} reference={item} onChange={onChange} onReanchor={onReanchor} />);
+
+    // Switch to unit ml
+    fireEvent.click(screen.getByTestId('component-unit-chip'));
+    fireEvent.click(screen.getByTestId('unit-option-ml'));
+
+    const input = screen.getByTestId('component-quantity-input') as HTMLInputElement;
+    expect(input.value).toBe('');
+    expect(screen.getByTestId('component-reanchor-hint')).toBeDefined();
+
+    // Re-select base unit 'g'
+    fireEvent.click(screen.getByTestId('component-unit-chip'));
+    fireEvent.click(screen.getByTestId('unit-option-g'));
+
+    // Cancels pending: restores 150, removes hint, does not invoke callbacks
+    expect(input.value).toBe('150');
+    expect(screen.queryByTestId('component-reanchor-hint')).toBeNull();
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onReanchor).not.toHaveBeenCalled();
+
+    // Subsequent edit operates in base unit
+    fireEvent.change(input, { target: { value: '300' } });
+    fireEvent.blur(input);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const scaled = onChange.mock.calls[0][0] as NutritionItem;
+    expect(scaled.quantity).toBe(300);
+    expect(scaled.unit).toBe('g');
+    expect(scaled.calories).toBeCloseTo(364, 1);
+  });
+
+  it('while unit change is pending, re-anchoring preserves per-item D7 nutrition edit and uses it for subsequent scaling', () => {
+    // Reference has initial values
+    const reference = component({ quantity: 1, unit: 'unit', calories: 100, protein: 5, carbs: 10, fat: 2, fiber: 1 });
+    // Item has custom D7 edited nutrition (e.g. corrected via ItemNutritionModal)
+    let currentItem = component({
+      quantity: 1,
+      unit: 'unit',
+      calories: 250,
+      protein: 30,
+      carbs: 15,
+      fat: 8,
+      fiber: 4,
+    });
+    let currentRef = reference;
+
+    const onChange = vi.fn((next: NutritionItem) => {
+      currentItem = next;
+    });
+    const onReanchor = vi.fn((next: NutritionItem) => {
+      currentItem = next;
+      currentRef = next;
+    });
+
+    const { rerender } = render(
+      <ComponentRow
+        item={currentItem}
+        reference={currentRef}
+        onChange={onChange}
+        onReanchor={onReanchor}
+      />
+    );
+
+    // Switch to g
+    fireEvent.click(screen.getByTestId('component-unit-chip'));
+    fireEvent.click(screen.getByTestId('unit-option-g'));
+
+    const input = screen.getByTestId('component-quantity-input') as HTMLInputElement;
+    expect(screen.getByTestId('component-reanchor-hint').textContent).toContain('amount in g for this 250 kcal');
+
+    // Type 120 and Enter
+    fireEvent.change(input, { target: { value: '120' } });
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
+
+    expect(onReanchor).toHaveBeenCalledTimes(1);
+    const reanchored = onReanchor.mock.calls[0][0] as NutritionItem;
+    expect(reanchored.quantity).toBe(120);
+    expect(reanchored.unit).toBe('g');
+    // D7 edited values preserved, NOT reset to reference's 100 kcal / 5 P
+    expect(reanchored.calories).toBe(250);
+    expect(reanchored.protein).toBe(30);
+    expect(reanchored.carbs).toBe(15);
+    expect(reanchored.fat).toBe(8);
+    expect(reanchored.fiber).toBe(4);
+
+    // Re-render with new item and reference, then scale to 240g (2x)
+    rerender(
+      <ComponentRow
+        item={currentItem}
+        reference={currentRef}
+        onChange={onChange}
+        onReanchor={onReanchor}
+      />
+    );
+
+    fireEvent.change(screen.getByTestId('component-quantity-input'), { target: { value: '240' } });
+    fireEvent.blur(screen.getByTestId('component-quantity-input'));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const scaled = onChange.mock.calls[0][0] as NutritionItem;
+    expect(scaled.quantity).toBe(240);
+    expect(scaled.unit).toBe('g');
+    // Scales linearly from the D7 edited macros: 2x 250 = 500 kcal, 2x 30 = 60 P
+    expect(scaled.calories).toBe(500);
+    expect(scaled.protein).toBe(60);
+    expect(scaled.carbs).toBe(30);
+    expect(scaled.fat).toBe(16);
+    expect(scaled.fiber).toBe(8);
+  });
+
 
   it('surfaces inline confirm affordance when multiplying row calories by >20x and handles apply/cancel', () => {
     const item = component({ quantity: 1, calories: 100, unit: 'unit' });
