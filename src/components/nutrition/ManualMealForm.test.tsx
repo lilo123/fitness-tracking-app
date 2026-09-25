@@ -1,37 +1,41 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { ManualMealForm } from './ManualMealForm';
+import { render, screen, fireEvent, renderHook, act } from '@testing-library/react';
+import { ManualMealForm, type ManualMealFormProps } from './ManualMealForm';
+import { useManualMealForm } from './useManualMealForm';
 import { expectNoA11yViolations, expectNoA11yViolationsForRules } from '../../test/a11y';
 
-function renderForm() {
-  return render(
-    <ManualMealForm
-      show={true}
-      onClose={vi.fn()}
-      selectedPhoto={null}
-      onRemovePhoto={vi.fn()}
-      manualName="Oatmeal"
-      onManualNameChange={vi.fn()}
-      manualMealType="Breakfast"
-      onManualMealTypeChange={vi.fn()}
-      manualCalories={350}
-      onManualCaloriesChange={vi.fn()}
-      manualProtein={12}
-      onManualProteinChange={vi.fn()}
-      manualCarbs={60}
-      onManualCarbsChange={vi.fn()}
-      manualFat={5}
-      onManualFatChange={vi.fn()}
-      manualFiber={8}
-      onManualFiberChange={vi.fn()}
-      manualServingSize={1}
-      onManualServingSizeChange={vi.fn()}
-      manualServingUnit="bowl"
-      onManualServingUnitChange={vi.fn()}
-      onSubmit={vi.fn()}
-      isPending={false}
-    />
-  );
+function renderForm(propsOverride: Partial<ManualMealFormProps> = {}) {
+  const defaultProps: ManualMealFormProps = {
+    show: true,
+    onClose: vi.fn(),
+    selectedPhoto: null,
+    onRemovePhoto: vi.fn(),
+    manualName: 'Oatmeal',
+    onManualNameChange: vi.fn(),
+    manualMealType: 'Breakfast',
+    onManualMealTypeChange: vi.fn(),
+    manualCalories: 350,
+    onManualCaloriesChange: vi.fn(),
+    manualProtein: 12,
+    onManualProteinChange: vi.fn(),
+    manualCarbs: 60,
+    onManualCarbsChange: vi.fn(),
+    manualFat: 5,
+    onManualFatChange: vi.fn(),
+    manualFiber: 8,
+    onManualFiberChange: vi.fn(),
+    manualServingSize: 1,
+    onManualServingSizeChange: vi.fn(),
+    manualServingUnit: 'bowl',
+    onManualServingUnitChange: vi.fn(),
+    onSubmit: vi.fn(),
+    isPending: false,
+    ...propsOverride,
+  };
+  return {
+    ...render(<ManualMealForm {...defaultProps} />),
+    props: defaultProps,
+  };
 }
 
 describe('ManualMealForm', () => {
@@ -111,5 +115,155 @@ describe('ManualMealForm', () => {
       </div>
     );
     await expectNoA11yViolationsForRules(container, ['duplicate-id', 'label']);
+  });
+
+  it('blocks submission with alert text when calorie value is negative (-5 kcal)', () => {
+    const onSubmit = vi.fn();
+    renderForm({ manualCalories: -5, onSubmit });
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toBeDefined();
+    expect(alert.textContent).toBe('Must be 0 or more');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Log Meal' }));
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('blocks submission with alert text when a macro value is negative', () => {
+    const onSubmit = vi.fn();
+    renderForm({ manualProtein: -2, onSubmit });
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toBeDefined();
+    expect(alert.textContent).toBe('Must be 0 or more');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Log Meal' }));
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('displays required markers (*) only on Name and Calories', () => {
+    renderForm();
+
+    const nameInput = screen.getByTestId('dish-name-input');
+    expect(nameInput).toHaveAttribute('required');
+
+    const caloriesInput = screen.getByTestId('calories-input');
+    expect(caloriesInput).toHaveAttribute('required');
+
+    const proteinInput = screen.getByTestId('protein-input');
+    expect(proteinInput).not.toHaveAttribute('required');
+
+    const carbsInput = screen.getByTestId('carbs-input');
+    expect(carbsInput).not.toHaveAttribute('required');
+
+    const fatInput = screen.getByTestId('fat-input');
+    expect(fatInput).not.toHaveAttribute('required');
+
+    const fiberInput = screen.getByTestId('fiber-input');
+    expect(fiberInput).not.toHaveAttribute('required');
+
+    expect(screen.getByText(/Dish \/ Meal Name/).textContent).toContain('*');
+    expect(screen.getByText(/Calories/).textContent).toContain('*');
+    expect(screen.getByText(/Protein \(g\)/).textContent).not.toContain('*');
+    expect(screen.getByText(/Carbs \(g\)/).textContent).not.toContain('*');
+    expect(screen.getByText(/Fat \(g\)/).textContent).not.toContain('*');
+    expect(screen.getByText(/Fiber \(g\)/).textContent).not.toContain('*');
+  });
+
+  it('uses inputMode="decimal" and type="number" with min="0" on all macro fields', () => {
+    renderForm();
+
+    const macroTestIds = ['calories-input', 'protein-input', 'carbs-input', 'fat-input', 'fiber-input'];
+    macroTestIds.forEach((testId) => {
+      const input = screen.getByTestId(testId);
+      expect(input.getAttribute('inputmode')).toBe('decimal');
+      expect(input.getAttribute('type')).toBe('number');
+      expect(input.getAttribute('min')).toBe('0');
+      expect(input.getAttribute('step')).toBe('any');
+    });
+  });
+
+  it('sets noValidate on the form to prevent native browser popups', () => {
+    const { container } = renderForm();
+    const form = container.querySelector('form');
+    expect(form).not.toBeNull();
+    expect(form?.noValidate).toBe(true);
+  });
+
+  describe('useManualMealForm', () => {
+    it('saves blank P/C/F/Fib as 0 in payload', () => {
+      const onSubmitLog = vi.fn();
+      const { result } = renderHook(() =>
+        useManualMealForm({
+          selectedDate: '2026-09-25',
+          onSubmitLog,
+        })
+      );
+
+      act(() => {
+        result.current.setManualDishName('Black Coffee');
+        result.current.setManualCalories(5);
+        // Protein, Carbs, Fat, Fiber remain ''
+      });
+
+      act(() => {
+        result.current.handleManualSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+      });
+
+      expect(onSubmitLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          food_name: 'Black Coffee',
+          calories: 5,
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+          fiber: 0,
+          serving_size: 1,
+          serving_unit: 'serving',
+        })
+      );
+    });
+
+    it('blocks submission when calories is negative', () => {
+      const onSubmitLog = vi.fn();
+      const { result } = renderHook(() =>
+        useManualMealForm({
+          selectedDate: '2026-09-25',
+          onSubmitLog,
+        })
+      );
+
+      act(() => {
+        result.current.setManualDishName('Test Meal');
+        result.current.setManualCalories(-5);
+      });
+
+      act(() => {
+        result.current.handleManualSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+      });
+
+      expect(onSubmitLog).not.toHaveBeenCalled();
+    });
+
+    it('blocks submission when dish name is empty', () => {
+      const onSubmitLog = vi.fn();
+      const { result } = renderHook(() =>
+        useManualMealForm({
+          selectedDate: '2026-09-25',
+          onSubmitLog,
+        })
+      );
+
+      act(() => {
+        result.current.setManualDishName('   ');
+        result.current.setManualCalories(100);
+      });
+
+      act(() => {
+        result.current.handleManualSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+      });
+
+      expect(onSubmitLog).not.toHaveBeenCalled();
+    });
   });
 });

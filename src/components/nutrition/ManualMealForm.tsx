@@ -1,4 +1,4 @@
-import React, { memo, useId } from 'react';
+import React, { memo, useId, useState } from 'react';
 import { X } from 'lucide-react';
 import type { CompressedImage } from '../../utils/imageCompression';
 
@@ -66,11 +66,81 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
   const servingSizeId = `${baseId}-serving-size`;
   const servingUnitId = `${baseId}-serving-unit`;
 
+  const [prevShow, setPrevShow] = useState(show);
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
+
+  if (prevShow !== show) {
+    setPrevShow(show);
+    if (!show) {
+      setHasAttemptedSubmit(false);
+    }
+  }
+
   if (!show) return null;
+
+  const errors: Record<string, string> = {};
+
+  if (hasAttemptedSubmit && !manualName.trim()) {
+    errors.name = 'Dish / Meal Name is required';
+  }
+
+  if (manualCalories !== '' && Number(manualCalories) < 0) {
+    errors.calories = 'Must be 0 or more';
+  } else if (hasAttemptedSubmit && manualCalories === '') {
+    errors.calories = 'Calories is required';
+  }
+
+  if (manualProtein !== '' && Number(manualProtein) < 0) {
+    errors.protein = 'Must be 0 or more';
+  }
+
+  if (manualCarbs !== '' && Number(manualCarbs) < 0) {
+    errors.carbs = 'Must be 0 or more';
+  }
+
+  if (manualFat !== '' && Number(manualFat) < 0) {
+    errors.fat = 'Must be 0 or more';
+  }
+
+  if (manualFiber !== '' && Number(manualFiber) < 0) {
+    errors.fiber = 'Must be 0 or more';
+  }
+
+  if (manualServingSize !== '' && Number(manualServingSize) < 0) {
+    errors.servingSize = 'Must be 0 or more';
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setHasAttemptedSubmit(true);
+
+    const isNameValid = Boolean(manualName.trim());
+    const isCaloriesValid = manualCalories !== '' && Number(manualCalories) >= 0;
+    const isProteinValid = manualProtein === '' || Number(manualProtein) >= 0;
+    const isCarbsValid = manualCarbs === '' || Number(manualCarbs) >= 0;
+    const isFatValid = manualFat === '' || Number(manualFat) >= 0;
+    const isFiberValid = manualFiber === '' || Number(manualFiber) >= 0;
+    const isServingSizeValid = manualServingSize === '' || Number(manualServingSize) >= 0;
+
+    if (
+      !isNameValid ||
+      !isCaloriesValid ||
+      !isProteinValid ||
+      !isCarbsValid ||
+      !isFatValid ||
+      !isFiberValid ||
+      !isServingSizeValid
+    ) {
+      return;
+    }
+
+    onSubmit(e);
+  };
 
   return (
     <form
-      onSubmit={onSubmit}
+      onSubmit={handleSubmit}
+      noValidate
       className="p-4 bg-zinc-950 border border-zinc-800 rounded-2xl space-y-3 animate-in fade-in"
     >
       <div className="flex items-center justify-between border-b border-zinc-850 pb-2">
@@ -95,7 +165,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
           />
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider">
+              <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider">
                 Pinned Meal Photo
               </span>
               <button
@@ -108,7 +178,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
-            <p className="text-[11px] text-zinc-400 truncate">
+            <p className="text-xs text-zinc-400 truncate">
               Refer to your meal photo while entering macronutrients manually
             </p>
           </div>
@@ -119,9 +189,9 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
         <div>
           <label
             htmlFor={nameId}
-            className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1"
+            className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1"
           >
-            Dish / Meal Name *
+            Dish / Meal Name <span className="text-amber-400 font-bold">*</span>
           </label>
           <input
             id={nameId}
@@ -130,14 +200,30 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             value={manualName}
             onChange={(e) => onManualNameChange(e.target.value)}
             placeholder="e.g. Scrambled Eggs & Toast"
-            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none"
+            aria-invalid={Boolean(errors.name)}
+            aria-errormessage={errors.name ? `${nameId}-error` : undefined}
+            className={`w-full bg-zinc-950 border text-white rounded-xl p-2.5 text-base sm:text-xs font-semibold outline-none scroll-mb-24 transition ${
+              errors.name
+                ? 'border-rose-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/50'
+                : 'border-border-interactive focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50'
+            }`}
             required
           />
+          {errors.name && (
+            <p
+              id={`${nameId}-error`}
+              role="alert"
+              data-testid="dish-name-error"
+              className="text-xs text-rose-400 mt-1"
+            >
+              {errors.name}
+            </p>
+          )}
         </div>
         <div>
           <label
             htmlFor={mealTypeId}
-            className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1"
+            className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1"
           >
             Meal Type
           </label>
@@ -145,7 +231,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             id={mealTypeId}
             value={manualMealType}
             onChange={(e) => onManualMealTypeChange(e.target.value)}
-            className="w-full bg-zinc-950 border border-border-interactive text-zinc-300 rounded-xl p-2 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none"
+            className="w-full bg-zinc-950 border border-border-interactive text-zinc-300 rounded-xl p-2 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none scroll-mb-24"
           >
             <option value="Breakfast">Breakfast</option>
             <option value="Lunch">Lunch</option>
@@ -161,27 +247,44 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
         <div className="col-span-2 sm:col-span-1">
           <label
             htmlFor={caloriesId}
-            className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1"
+            className="block text-xs font-bold text-amber-400 uppercase tracking-wider mb-1"
           >
-            Calories *
+            Calories <span className="text-amber-400 font-bold">*</span>
           </label>
           <input
             id={caloriesId}
             type="number"
             step="any"
-            inputMode="numeric"
+            min="0"
+            inputMode="decimal"
             data-testid="calories-input"
             value={manualCalories}
             onChange={(e) => onManualCaloriesChange(e.target.value === '' ? '' : Number(e.target.value))}
             placeholder="0"
-            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
+            aria-invalid={Boolean(errors.calories)}
+            aria-errormessage={errors.calories ? `${caloriesId}-error` : undefined}
+            className={`w-full bg-zinc-950 border text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold outline-none text-center scroll-mb-24 transition ${
+              errors.calories
+                ? 'border-rose-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/50'
+                : 'border-border-interactive focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50'
+            }`}
             required
           />
+          {errors.calories && (
+            <p
+              id={`${caloriesId}-error`}
+              role="alert"
+              data-testid="calories-error"
+              className="text-xs text-rose-400 mt-1"
+            >
+              {errors.calories}
+            </p>
+          )}
         </div>
         <div className="col-span-2 sm:col-span-1">
           <label
             htmlFor={proteinId}
-            className="block text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-1"
+            className="block text-xs font-bold text-cyan-400 uppercase tracking-wider mb-1"
           >
             Protein (g)
           </label>
@@ -189,19 +292,35 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             id={proteinId}
             type="number"
             step="any"
+            min="0"
             inputMode="decimal"
             data-testid="protein-input"
             value={manualProtein}
             onChange={(e) => onManualProteinChange(e.target.value === '' ? '' : Number(e.target.value))}
             placeholder="0"
-            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
-            required
+            aria-invalid={Boolean(errors.protein)}
+            aria-errormessage={errors.protein ? `${proteinId}-error` : undefined}
+            className={`w-full bg-zinc-950 border text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold outline-none text-center scroll-mb-24 transition ${
+              errors.protein
+                ? 'border-rose-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/50'
+                : 'border-border-interactive focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50'
+            }`}
           />
+          {errors.protein && (
+            <p
+              id={`${proteinId}-error`}
+              role="alert"
+              data-testid="protein-error"
+              className="text-xs text-rose-400 mt-1"
+            >
+              {errors.protein}
+            </p>
+          )}
         </div>
         <div className="col-span-2 sm:col-span-1">
           <label
             htmlFor={carbsId}
-            className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1"
+            className="block text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1"
           >
             Carbs (g)
           </label>
@@ -209,19 +328,35 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             id={carbsId}
             type="number"
             step="any"
+            min="0"
             inputMode="decimal"
             data-testid="carbs-input"
             value={manualCarbs}
             onChange={(e) => onManualCarbsChange(e.target.value === '' ? '' : Number(e.target.value))}
             placeholder="0"
-            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
-            required
+            aria-invalid={Boolean(errors.carbs)}
+            aria-errormessage={errors.carbs ? `${carbsId}-error` : undefined}
+            className={`w-full bg-zinc-950 border text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold outline-none text-center scroll-mb-24 transition ${
+              errors.carbs
+                ? 'border-rose-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/50'
+                : 'border-border-interactive focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50'
+            }`}
           />
+          {errors.carbs && (
+            <p
+              id={`${carbsId}-error`}
+              role="alert"
+              data-testid="carbs-error"
+              className="text-xs text-rose-400 mt-1"
+            >
+              {errors.carbs}
+            </p>
+          )}
         </div>
         <div className="col-span-3 sm:col-span-1">
           <label
             htmlFor={fatId}
-            className="block text-[10px] font-bold text-violet-400 uppercase tracking-wider mb-1"
+            className="block text-xs font-bold text-violet-400 uppercase tracking-wider mb-1"
           >
             Fat (g)
           </label>
@@ -229,19 +364,35 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             id={fatId}
             type="number"
             step="any"
+            min="0"
             inputMode="decimal"
             data-testid="fat-input"
             value={manualFat}
             onChange={(e) => onManualFatChange(e.target.value === '' ? '' : Number(e.target.value))}
             placeholder="0"
-            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
-            required
+            aria-invalid={Boolean(errors.fat)}
+            aria-errormessage={errors.fat ? `${fatId}-error` : undefined}
+            className={`w-full bg-zinc-950 border text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold outline-none text-center scroll-mb-24 transition ${
+              errors.fat
+                ? 'border-rose-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/50'
+                : 'border-border-interactive focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50'
+            }`}
           />
+          {errors.fat && (
+            <p
+              id={`${fatId}-error`}
+              role="alert"
+              data-testid="fat-error"
+              className="text-xs text-rose-400 mt-1"
+            >
+              {errors.fat}
+            </p>
+          )}
         </div>
         <div className="col-span-3 sm:col-span-1">
           <label
             htmlFor={fiberId}
-            className="block text-[10px] font-bold text-teal-400 uppercase tracking-wider mb-1"
+            className="block text-xs font-bold text-teal-400 uppercase tracking-wider mb-1"
           >
             Fiber (g)
           </label>
@@ -249,13 +400,30 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             id={fiberId}
             type="number"
             step="any"
+            min="0"
             inputMode="decimal"
             data-testid="fiber-input"
             value={manualFiber}
             onChange={(e) => onManualFiberChange(e.target.value === '' ? '' : Number(e.target.value))}
             placeholder="0"
-            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
+            aria-invalid={Boolean(errors.fiber)}
+            aria-errormessage={errors.fiber ? `${fiberId}-error` : undefined}
+            className={`w-full bg-zinc-950 border text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold outline-none text-center scroll-mb-24 transition ${
+              errors.fiber
+                ? 'border-rose-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/50'
+                : 'border-border-interactive focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50'
+            }`}
           />
+          {errors.fiber && (
+            <p
+              id={`${fiberId}-error`}
+              role="alert"
+              data-testid="fiber-error"
+              className="text-xs text-rose-400 mt-1"
+            >
+              {errors.fiber}
+            </p>
+          )}
         </div>
       </div>
 
@@ -263,7 +431,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
         <div>
           <label
             htmlFor={servingSizeId}
-            className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1"
+            className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1"
           >
             Serving Size
           </label>
@@ -271,16 +439,33 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             id={servingSizeId}
             type="number"
             step="any"
+            min="0"
             inputMode="decimal"
             value={manualServingSize}
             onChange={(e) => onManualServingSizeChange(e.target.value === '' ? '' : Number(e.target.value))}
-            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
+            aria-invalid={Boolean(errors.servingSize)}
+            aria-errormessage={errors.servingSize ? `${servingSizeId}-error` : undefined}
+            className={`w-full bg-zinc-950 border text-white rounded-xl p-2 text-base sm:text-xs font-mono outline-none text-center scroll-mb-24 transition ${
+              errors.servingSize
+                ? 'border-rose-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/50'
+                : 'border-border-interactive focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50'
+            }`}
           />
+          {errors.servingSize && (
+            <p
+              id={`${servingSizeId}-error`}
+              role="alert"
+              data-testid="serving-size-error"
+              className="text-xs text-rose-400 mt-1"
+            >
+              {errors.servingSize}
+            </p>
+          )}
         </div>
         <div>
           <label
             htmlFor={servingUnitId}
-            className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1"
+            className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1"
           >
             Serving Unit
           </label>
@@ -289,18 +474,30 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             type="text"
             value={manualServingUnit}
             onChange={(e) => onManualServingUnitChange(e.target.value)}
-            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
+            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center scroll-mb-24"
           />
         </div>
       </div>
 
-      <button
-        type="submit"
-        disabled={isPending}
-        className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black py-3 min-h-[44px] rounded-xl uppercase tracking-wider text-xs shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 transition disabled:opacity-50"
-      >
-        {isPending ? 'Logging...' : 'Log Meal'}
-      </button>
+      {/* Spacer to prevent sticky Log/Cancel row from occluding fields when scrolled */}
+      <div className="h-16 shrink-0" aria-hidden="true" />
+
+      <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] z-10 bg-zinc-950/95 backdrop-blur-md pt-2 pb-1 border-t border-zinc-850 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-xs font-bold text-zinc-400 hover:text-white px-4 py-3 min-h-[44px] rounded-xl border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800 transition active:scale-95 touch-manipulation"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={isPending}
+          className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black py-3 min-h-[44px] rounded-xl uppercase tracking-wider text-xs shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 transition disabled:opacity-50"
+        >
+          {isPending ? 'Logging...' : 'Log Meal'}
+        </button>
+      </div>
     </form>
   );
 });

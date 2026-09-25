@@ -32,14 +32,20 @@ export function useManualMealForm({ selectedDate, onSubmitLog }: UseManualMealFo
   const handleManualSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!manualDishName.trim()) return;
+    if (manualCalories === '' || Number(manualCalories) < 0) return;
+    if (manualProtein !== '' && Number(manualProtein) < 0) return;
+    if (manualCarbs !== '' && Number(manualCarbs) < 0) return;
+    if (manualFat !== '' && Number(manualFat) < 0) return;
+    if (manualFiber !== '' && Number(manualFiber) < 0) return;
+    if (manualServingSize !== '' && Number(manualServingSize) < 0) return;
 
     const payload: Partial<NutritionLog> = {
-      food_name: manualDishName,
+      food_name: manualDishName.trim(),
       calories: roundTo1Decimal(manualCalories),
-      protein: roundTo1Decimal(manualProtein),
-      carbs: roundTo1Decimal(manualCarbs),
-      fat: roundTo1Decimal(manualFat),
-      fiber: roundTo1Decimal(manualFiber),
+      protein: manualProtein === '' ? 0 : roundTo1Decimal(manualProtein),
+      carbs: manualCarbs === '' ? 0 : roundTo1Decimal(manualCarbs),
+      fat: manualFat === '' ? 0 : roundTo1Decimal(manualFat),
+      fiber: manualFiber === '' ? 0 : roundTo1Decimal(manualFiber),
       meal_type: manualMealType,
       serving_size: Number(manualServingSize) || 1,
       serving_unit: manualServingUnit,
