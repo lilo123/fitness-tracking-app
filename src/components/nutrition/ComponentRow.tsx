@@ -246,7 +246,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
               <div
                 key={colKey}
                 data-testid={`component-macro-${colKey}`}
-                className={`text-right text-xs tabular-nums ${isZero ? 'text-zinc-600 font-normal' : config.colorClass}`}
+                className={`text-right text-xs tabular-nums whitespace-nowrap ${isZero ? 'text-zinc-600 font-normal' : config.colorClass}`}
               >
                 <span data-testid={`macro-val-${colKey}`} className="tabular-nums font-normal">
                   {formatted}

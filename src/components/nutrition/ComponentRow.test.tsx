@@ -565,4 +565,17 @@ describe('ComponentRow', () => {
     expect(nameEl.className).not.toContain('truncate');
     expect(nameEl.textContent).toBe(item.name);
   });
+
+  it('applies D24 minmax responsive grid template and whitespace-nowrap on macro cells', () => {
+    const item = component();
+    render(<ComponentRow item={item} reference={item} onChange={() => {}} />);
+
+    const macrosGrid = screen.getByTestId('component-macros');
+    expect(macrosGrid.style.gridTemplateColumns).toBe(
+      'minmax(3rem, 4.5rem) minmax(2.5rem, 3.5rem) minmax(2.5rem, 3.5rem) minmax(2.5rem, 3.5rem) minmax(2.5rem, 3.5rem)'
+    );
+
+    const calCell = screen.getByTestId('component-macro-calories');
+    expect(calCell).toHaveClass('whitespace-nowrap');
+  });
 });

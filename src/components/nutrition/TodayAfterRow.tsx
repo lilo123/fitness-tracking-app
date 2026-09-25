@@ -68,7 +68,7 @@ export const DayTotalRow: React.FC<DayTotalRowProps> = ({
             <div
               key={colKey}
               data-testid={`day-total-${colKey}`}
-              className={`text-right text-xs tabular-nums ${colorClass}`}
+              className={`text-right text-xs tabular-nums whitespace-nowrap ${colorClass}`}
               aria-label={overDescription}
             >
               <span

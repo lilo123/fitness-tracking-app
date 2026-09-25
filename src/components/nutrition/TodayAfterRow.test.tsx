@@ -131,4 +131,21 @@ describe('DayTotalRow', () => {
     expect(carbsCell).toHaveClass('text-zinc-600');
     expect(screen.getByTestId('day-total-val-carbs')).toHaveTextContent('0');
   });
+
+  it('applies D24 minmax responsive grid template and whitespace-nowrap', () => {
+    render(
+      <DayTotalRow
+        macroColumns={columns}
+        mealTotals={mealTotals}
+      />
+    );
+
+    const grid = screen.getByTestId('day-total-grid');
+    expect(grid.style.gridTemplateColumns).toBe(
+      'minmax(3rem, 4.5rem) minmax(2.5rem, 3.5rem) minmax(2.5rem, 3.5rem) minmax(2.5rem, 3.5rem) minmax(2.5rem, 3.5rem)'
+    );
+
+    const calCell = screen.getByTestId('day-total-calories');
+    expect(calCell).toHaveClass('whitespace-nowrap');
+  });
 });

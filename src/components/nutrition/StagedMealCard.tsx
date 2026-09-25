@@ -187,7 +187,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
                   <div
                     key={colKey}
                     data-testid={`staged-total-${colKey}`}
-                    className={`text-right text-xs tabular-nums ${isZero ? 'text-zinc-600 font-normal' : config.colorClass}`}
+                    className={`text-right text-xs tabular-nums whitespace-nowrap ${isZero ? 'text-zinc-600 font-normal' : config.colorClass}`}
                   >
                     <span data-testid={`macro-val-${colKey}`} className={`text-sm tabular-nums ${isZero ? 'font-normal' : 'font-semibold'}`}>
                       {formatted}
@@ -228,16 +228,16 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
       <div
         data-testid="staged-card-actions"
         style={{ bottom: `${effectiveNavHeight}px` }}
-        className="sticky z-20 bg-zinc-900 border-t border-zinc-800/80 -mx-3 px-3 sm:-mx-4 sm:px-4 py-2 flex items-center gap-2 rounded-b-2xl sm:rounded-b-3xl"
+        className="sticky z-20 bg-zinc-900 border-t border-zinc-800/80 -mx-3 px-3 sm:-mx-4 sm:px-4 py-2 flex items-center gap-1.5 sm:gap-2 rounded-b-2xl sm:rounded-b-3xl"
       >
         <button
           type="button"
           onClick={onLogStagedMeal}
           disabled={isPending}
-          className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold py-2.5 px-3 min-h-[40px] rounded-xl text-xs uppercase tracking-wider shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-1.5 touch-manipulation"
+          className="flex-1 min-w-0 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold py-2.5 px-2 min-h-[40px] rounded-xl text-xs uppercase tracking-tight shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-1 touch-manipulation whitespace-nowrap"
         >
           <Check className="w-4 h-4 shrink-0" />
-          <span className="truncate">
+          <span className="whitespace-nowrap">
             {isPending
               ? 'Logging...'
               : `Log Meal (+${formatCalories(stagedMeal.calories)} kcal)`}

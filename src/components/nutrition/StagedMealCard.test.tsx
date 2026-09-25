@@ -966,5 +966,81 @@ describe('StagedMealCard', () => {
     });
   });
 
-});
 
+  it('applies D24 minmax responsive grid template and whitespace-nowrap on totals cells', () => {
+    const multiMeal: StagedMeal = {
+      name: '2-Item Meal',
+      mealType: 'Lunch',
+      explanation: 'Calculated from ingredients',
+      servingSize: 1,
+      servingUnit: 'serving',
+      calories: 300,
+      protein: 25,
+      carbs: 20,
+      fat: 10,
+      fiber: 2,
+      items: [
+        {
+          id: 'item-1',
+          name: 'Chicken Breast',
+          portion: '100g',
+          portionMultiplier: 1,
+          quantity: 100,
+          unit: 'g',
+          calories: 165,
+          protein: 31,
+          carbs: 0,
+          fat: 3.6,
+          fiber: 0,
+          baseQuantity: 100,
+          baseCalories: 165,
+          baseProtein: 31,
+          baseCarbs: 0,
+          baseFat: 3.6,
+          baseFiber: 0,
+        },
+        {
+          id: 'item-2',
+          name: 'Brown Rice',
+          portion: '100g',
+          portionMultiplier: 1,
+          quantity: 100,
+          unit: 'g',
+          calories: 135,
+          protein: 3,
+          carbs: 28,
+          fat: 1,
+          fiber: 2,
+          baseQuantity: 100,
+          baseCalories: 135,
+          baseProtein: 3,
+          baseCarbs: 28,
+          baseFat: 1,
+          baseFiber: 2,
+        },
+      ],
+    };
+
+    render(
+      <StagedMealCard
+        stagedMeal={multiMeal}
+        onUpdateStagedMeal={vi.fn()}
+        onApplyStagedItemChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onSaveItemAsCustomDish={vi.fn()}
+        onLogStagedMeal={vi.fn()}
+        onSaveStagedAsCustomDish={vi.fn()}
+        onDiscardStagedMeal={vi.fn()}
+        isPending={false}
+      />
+    );
+
+    const totalsGrid = screen.getByTestId('staged-meal-totals-grid');
+    expect(totalsGrid.style.gridTemplateColumns).toBe(
+      'minmax(3rem, 4.5rem) minmax(2.5rem, 3.5rem) minmax(2.5rem, 3.5rem) minmax(2.5rem, 3.5rem) minmax(2.5rem, 3.5rem)'
+    );
+
+    const calTotal = screen.getByTestId('staged-total-calories');
+    expect(calTotal).toHaveClass('whitespace-nowrap');
+  });
+});

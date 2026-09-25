@@ -446,6 +446,103 @@ test.describe('Surface A: Staged card with 4 items', () => {
       `Found clipped elements: ${JSON.stringify(result.clippedElements)}`
     ).toEqual([]);
   });
+
+  test('A: column alignment, controls no overlap, and log button metrics at 390px', async () => {
+    expect(page.viewportSize()?.width).toBe(390);
+    await waitForScrollSettled(page);
+
+    const result = await cardLocator.evaluate((card) => {
+      const gridRows = Array.from(
+        card.querySelectorAll<HTMLElement>(
+          '[data-testid="component-macros"], [data-testid="staged-meal-totals-grid"], [data-testid="day-total-grid"]'
+        )
+      );
+
+      const columnKeys = ['calories', 'protein', 'carbs', 'fat', 'fiber'];
+      const alignmentMismatches: Array<{
+        column: string;
+        rights: number[];
+        diff: number;
+      }> = [];
+
+      for (const col of columnKeys) {
+        const cellsForCol: HTMLElement[] = [];
+        for (const row of gridRows) {
+          const cell = row.querySelector<HTMLElement>(`[data-testid$="-${col}"]`);
+          if (cell) {
+            cellsForCol.push(cell);
+          }
+        }
+        if (cellsForCol.length > 1) {
+          const rights = cellsForCol.map((c) => Math.round(c.getBoundingClientRect().right * 10) / 10);
+          const minRight = Math.min(...rights);
+          const maxRight = Math.max(...rights);
+          if (maxRight - minRight > 1.0) {
+            alignmentMismatches.push({
+              column: col,
+              rights,
+              diff: Math.round((maxRight - minRight) * 10) / 10,
+            });
+          }
+        }
+      }
+
+      const items = Array.from(card.querySelectorAll<HTMLElement>('[data-testid="component-row"]'));
+      const controlOverlaps: Array<{ idx: number; controlsBottom: number; macroTop: number; gap: number }> = [];
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const controls = item.querySelector<HTMLElement>('[data-testid="component-right-cluster"]');
+        const macroRow = item.querySelector<HTMLElement>('[data-testid="component-macros"]');
+        if (controls && macroRow) {
+          const cRect = controls.getBoundingClientRect();
+          const mRect = macroRow.getBoundingClientRect();
+          const gap = Math.round((mRect.top - cRect.bottom) * 10) / 10;
+          if (cRect.bottom > mRect.top + 0.5) {
+            controlOverlaps.push({
+              idx: i,
+              controlsBottom: Math.round(cRect.bottom * 10) / 10,
+              macroTop: Math.round(mRect.top * 10) / 10,
+              gap,
+            });
+          }
+        }
+      }
+
+      const logBtn = card.querySelector<HTMLElement>('[data-testid="staged-card-actions"] button');
+      const logSpan = logBtn ? logBtn.querySelector<HTMLElement>('span.truncate, span') : null;
+      const logBtnMetrics = logBtn ? {
+        btnScrollWidth: logBtn.scrollWidth,
+        btnClientWidth: logBtn.clientWidth,
+        spanScrollWidth: logSpan ? logSpan.scrollWidth : null,
+        spanClientWidth: logSpan ? logSpan.clientWidth : null,
+        text: logBtn.textContent?.trim() || '',
+      } : null;
+
+      return {
+        gridRowCount: gridRows.length,
+        alignmentMismatches,
+        controlOverlaps,
+        logBtnMetrics,
+      };
+    });
+
+    console.log(
+      JSON.stringify({
+        test: 'A: column alignment, controls no overlap, and log button metrics at 390px',
+        surface: 'A',
+        alignmentMismatches: result.alignmentMismatches,
+        controlOverlaps: result.controlOverlaps,
+        logBtnMetrics: result.logBtnMetrics,
+      })
+    );
+
+    expect(result.gridRowCount).toBeGreaterThanOrEqual(6);
+    expect(result.alignmentMismatches).toEqual([]);
+    expect(result.controlOverlaps).toEqual([]);
+    if (result.logBtnMetrics && result.logBtnMetrics.spanScrollWidth !== null && result.logBtnMetrics.spanClientWidth !== null) {
+      expect(result.logBtnMetrics.spanScrollWidth).toBeLessThanOrEqual(result.logBtnMetrics.spanClientWidth + 1);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -974,5 +1071,210 @@ test.describe('Surface D: staged card placement (D10)', () => {
       unstagedLastContentBottom,
       `Unstaged case: last content bottom (${unstagedLastContentBottom}px) exceeds nav top (${navTop}px)`
     ).toBeLessThanOrEqual(navTop);
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// Surface E: Staged card at 320px width (D24)
+// ---------------------------------------------------------------------------
+
+test.describe('Surface E: Staged card at 320px width (D24)', () => {
+  let page: Page;
+  let cardLocator: Locator;
+
+  test.beforeAll(async ({ browser }) => {
+    page = await browser.newPage({
+      viewport: { width: 320, height: 844 },
+      deviceScaleFactor: 1,
+    });
+    await setupPageAndLogin(page);
+
+    await page.fill('textarea[placeholder*="Describe what you ate"]', '4-item salmon dinner');
+    await page.click('button:has-text("Analyze Meal")');
+    cardLocator = page.locator('[data-testid="staged-meal-card"]');
+    await expect(cardLocator).toBeVisible({ timeout: 15000 });
+    await waitForScrollSettled(page);
+  });
+
+  test.afterAll(async () => {
+    await page.close();
+  });
+
+  test('E: macro cells inside card content box, no row scroll overflow, columns aligned', async () => {
+    expect(page.viewportSize()?.width).toBe(320);
+    await waitForScrollSettled(page);
+
+    const result = await cardLocator.evaluate((card) => {
+      const cardRect = card.getBoundingClientRect();
+      const cardStyle = window.getComputedStyle(card);
+      const paddingRight = parseFloat(cardStyle.paddingRight) || 0;
+      const borderRight = parseFloat(cardStyle.borderRightWidth) || 0;
+      const contentBoxRight = cardRect.right - paddingRight - borderRight;
+
+      const gridRows = Array.from(
+        card.querySelectorAll<HTMLElement>(
+          '[data-testid="component-macros"], [data-testid="staged-meal-totals-grid"], [data-testid="day-total-grid"]'
+        )
+      );
+
+      const macroCells = gridRows.flatMap((row) =>
+        Array.from(row.children as HTMLCollectionOf<HTMLElement>).filter((el) => {
+          const r = el.getBoundingClientRect();
+          return r.width > 1 && r.height > 1;
+        })
+      );
+
+      const cellOverflows: Array<{ testId: string; cellRight: number; contentBoxRight: number; overflow: number }> = [];
+      for (const cell of macroCells) {
+        const r = cell.getBoundingClientRect();
+        if (r.width === 0 && r.height === 0) continue;
+        if (r.right > contentBoxRight + 0.5) {
+          cellOverflows.push({
+            testId: cell.getAttribute('data-testid') || cell.className,
+            cellRight: Math.round(r.right * 10) / 10,
+            contentBoxRight: Math.round(contentBoxRight * 10) / 10,
+            overflow: Math.round((r.right - contentBoxRight) * 10) / 10,
+          });
+        }
+      }
+
+      const rowScrollOverflows: Array<{ rowTestId: string; scrollWidth: number; clientWidth: number }> = [];
+      for (const row of gridRows) {
+        if (row.scrollWidth > row.clientWidth + 1) {
+          rowScrollOverflows.push({
+            rowTestId: row.getAttribute('data-testid') || '',
+            scrollWidth: row.scrollWidth,
+            clientWidth: row.clientWidth,
+          });
+        }
+      }
+
+      const columnKeys = ['calories', 'protein', 'carbs', 'fat', 'fiber'];
+      const alignmentMismatches: Array<{
+        column: string;
+        rights: number[];
+        minRight: number;
+        maxRight: number;
+        diff: number;
+      }> = [];
+
+      for (const col of columnKeys) {
+        const cellsForCol: HTMLElement[] = [];
+        for (const row of gridRows) {
+          const cell = row.querySelector<HTMLElement>(`[data-testid$="-${col}"]`);
+          if (cell) {
+            cellsForCol.push(cell);
+          }
+        }
+        if (cellsForCol.length > 1) {
+          const rights = cellsForCol.map((c) => Math.round(c.getBoundingClientRect().right * 10) / 10);
+          const minRight = Math.min(...rights);
+          const maxRight = Math.max(...rights);
+          if (maxRight - minRight > 1.0) {
+            alignmentMismatches.push({
+              column: col,
+              rights,
+              minRight,
+              maxRight,
+              diff: Math.round((maxRight - minRight) * 10) / 10,
+            });
+          }
+        }
+      }
+
+      // 44px change controls vs macro row below: no intersection
+      const items = Array.from(card.querySelectorAll<HTMLElement>('[data-testid="component-row"]'));
+      const controlOverlaps: Array<{ idx: number; controlsBottom: number; macroTop: number; gap: number }> = [];
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const controls = item.querySelector<HTMLElement>('[data-testid="component-right-cluster"]');
+        const macroRow = item.querySelector<HTMLElement>('[data-testid="component-macros"]');
+        if (controls && macroRow) {
+          const cRect = controls.getBoundingClientRect();
+          const mRect = macroRow.getBoundingClientRect();
+          const gap = Math.round((mRect.top - cRect.bottom) * 10) / 10;
+          if (cRect.bottom > mRect.top + 0.5) {
+            controlOverlaps.push({
+              idx: i,
+              controlsBottom: Math.round(cRect.bottom * 10) / 10,
+              macroTop: Math.round(mRect.top * 10) / 10,
+              gap,
+            });
+          }
+        }
+      }
+
+      // Log button label metrics at 320
+      const logBtn = card.querySelector<HTMLElement>('[data-testid="staged-card-actions"] button');
+      const logSpan = logBtn ? logBtn.querySelector<HTMLElement>('span.truncate, span') : null;
+      const logBtnMetrics = logBtn ? {
+        btnScrollWidth: logBtn.scrollWidth,
+        btnClientWidth: logBtn.clientWidth,
+        spanScrollWidth: logSpan ? logSpan.scrollWidth : null,
+        spanClientWidth: logSpan ? logSpan.clientWidth : null,
+        text: logBtn.textContent?.trim() || '',
+      } : null;
+
+      return {
+        cardWidth: Math.round(cardRect.width * 10) / 10,
+        contentBoxRight: Math.round(contentBoxRight * 10) / 10,
+        cellOverflows,
+        rowScrollOverflows,
+        alignmentMismatches,
+        gridRowCount: gridRows.length,
+        macroCellCount: macroCells.length,
+        controlOverlaps,
+        logBtnMetrics,
+      };
+    });
+
+    console.log(
+      JSON.stringify({
+        test: 'E: macro cells inside card content box, no row scroll overflow, columns aligned',
+        surface: 'E',
+        cardWidth: result.cardWidth,
+        contentBoxRight: result.contentBoxRight,
+        cellOverflowCount: result.cellOverflows.length,
+        cellOverflows: result.cellOverflows,
+        rowScrollOverflows: result.rowScrollOverflows,
+        alignmentMismatches: result.alignmentMismatches,
+        gridRowCount: result.gridRowCount,
+        macroCellCount: result.macroCellCount,
+        controlOverlaps: result.controlOverlaps,
+        logBtnMetrics: result.logBtnMetrics,
+      })
+    );
+
+    // Count asserts ensuring selectors do not pass vacuously
+    expect(result.gridRowCount).toBeGreaterThanOrEqual(6);
+    expect(result.macroCellCount).toBeGreaterThanOrEqual(20);
+
+    expect(
+      result.cellOverflows,
+      `Found macro cells overflowing card content-box right: ${JSON.stringify(result.cellOverflows)}`
+    ).toEqual([]);
+
+    expect(
+      result.rowScrollOverflows,
+      `Found grid rows with scrollWidth > clientWidth: ${JSON.stringify(result.rowScrollOverflows)}`
+    ).toEqual([]);
+
+    expect(
+      result.alignmentMismatches,
+      `Found misaligned columns across rows: ${JSON.stringify(result.alignmentMismatches)}`
+    ).toEqual([]);
+
+    expect(
+      result.controlOverlaps,
+      `Found controls overlapping macro row below: ${JSON.stringify(result.controlOverlaps)}`
+    ).toEqual([]);
+
+    if (result.logBtnMetrics && result.logBtnMetrics.spanScrollWidth !== null && result.logBtnMetrics.spanClientWidth !== null) {
+      expect(
+        result.logBtnMetrics.spanScrollWidth,
+        `Log button text clipped: scrollWidth ${result.logBtnMetrics.spanScrollWidth} > clientWidth ${result.logBtnMetrics.spanClientWidth}`
+      ).toBeLessThanOrEqual(result.logBtnMetrics.spanClientWidth + 1);
+    }
   });
 });
