@@ -10,6 +10,10 @@ export interface MacroRingProps {
   strokeColor: string;
   onClick?: () => void;
   testId?: string;
+  subtitle?: string;
+  isOver?: boolean;
+  statusTestId?: string;
+  statusAriaLabel?: string;
 }
 
 export const MacroRing: React.FC<MacroRingProps> = ({
@@ -21,6 +25,10 @@ export const MacroRing: React.FC<MacroRingProps> = ({
   strokeColor,
   onClick,
   testId,
+  subtitle,
+  isOver,
+  statusTestId,
+  statusAriaLabel,
 }) => {
   const safeTarget = target > 0 ? target : 1;
   const displayPercentage = Math.round((current / safeTarget) * 100);
@@ -63,33 +71,48 @@ export const MacroRing: React.FC<MacroRingProps> = ({
           />
         </svg>
         <div className="absolute flex flex-col items-center justify-center text-center">
-          <span className={`text-[10px] sm:text-xs font-black font-mono ${colorClass}`}>
+          <span className={`text-xs font-black font-mono ${colorClass}`}>
             {formattedCurrent}
           </span>
-          <span className="text-[8px] sm:text-[9px] text-zinc-500 font-mono -mt-0.5">
+          <span className="text-xs text-zinc-500 font-mono -mt-0.5">
             /{formattedTarget}
           </span>
         </div>
       </div>
       <div className="mt-1.5 sm:mt-2 text-center w-full">
-        <div className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-zinc-300 truncate">
+        <div className="text-xs font-extrabold uppercase tracking-wider text-zinc-300 truncate">
           {label}
         </div>
-        <div className="text-[8px] sm:text-[9px] text-zinc-500 font-mono">
-          {displayPercentage}% {unit}
+        {subtitle && (
+          <div
+            data-testid={statusTestId}
+            aria-label={statusAriaLabel}
+            className={`text-xs font-bold tracking-tight whitespace-nowrap ${
+              isOver ? 'text-rose-400' : colorClass
+            }`}
+          >
+            <span>{subtitle}</span>
+          </div>
+        )}
+        <div className="text-xs text-zinc-500 font-mono">
+          {displayPercentage}%
         </div>
       </div>
     </>
   );
 
   const baseClasses =
-    'flex flex-col items-center p-2 sm:p-3 bg-zinc-900/90 border border-zinc-800/80 rounded-2xl shadow-xl flex-1 w-full min-w-[56px] sm:min-w-[75px] min-h-[44px]';
+    'flex flex-col items-center px-1.5 py-2.5 sm:p-3 bg-zinc-900/90 border border-zinc-800/80 rounded-2xl shadow-xl flex-1 w-full min-w-[56px] sm:min-w-[75px] min-h-[44px]';
 
   if (onClick) {
     return (
       <button
         type="button"
         onClick={(e) => {
+          const target = e.target as HTMLElement | null;
+          if (target && target.closest('[data-testid^="remaining-fuel-"]')) {
+            return;
+          }
           e.currentTarget.focus();
           onClick();
         }}

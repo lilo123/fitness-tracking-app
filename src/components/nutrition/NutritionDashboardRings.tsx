@@ -38,6 +38,25 @@ export const NutritionDashboardRings: React.FC<NutritionDashboardRingsProps> = m
   remainingFuel,
   onSelectBreakdownNutrient,
 }) => {
+
+  const formatStatus = (label: string, fuel: { badgeLabel: string; isOver: boolean }) => {
+    const isOver = fuel.isOver;
+    const cleanDiff = fuel.badgeLabel.replace(/^\+/, '').replace(/\s*over$/, '').replace(/\s*left$/, '');
+    const text = isOver
+      ? (fuel.badgeLabel.endsWith('over') ? fuel.badgeLabel : `+${cleanDiff} over`)
+      : `${cleanDiff} left`;
+    const ariaLabel = isOver
+      ? `${label}: ${cleanDiff} over target`
+      : `${label}: ${cleanDiff} left`;
+    return { text, isOver, ariaLabel };
+  };
+
+  const calStatus = formatStatus('Calories', remainingFuel.calories);
+  const pStatus = formatStatus('Protein', remainingFuel.protein);
+  const cStatus = formatStatus('Carbs', remainingFuel.carbs);
+  const fStatus = formatStatus('Fat', remainingFuel.fat);
+  const fibStatus = formatStatus('Fiber', remainingFuel.fiber);
+
   return (
     <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-5 shadow-2xl">
       <div className="flex items-center justify-between mb-4">
@@ -56,6 +75,7 @@ export const NutritionDashboardRings: React.FC<NutritionDashboardRingsProps> = m
         />
       </div>
 
+            <span className="sr-only">Remaining Fuel:</span>
       <div className="grid grid-cols-6 sm:grid-cols-5 gap-1.5 sm:gap-2">
         <div className="col-span-2 sm:col-span-1">
           <MacroRing
@@ -67,6 +87,10 @@ export const NutritionDashboardRings: React.FC<NutritionDashboardRingsProps> = m
             strokeColor="#f59e0b"
             onClick={() => onSelectBreakdownNutrient('calories')}
             testId="macro-ring-calories"
+            subtitle={calStatus.text}
+            isOver={calStatus.isOver}
+            statusTestId="remaining-fuel-calories"
+            statusAriaLabel={calStatus.ariaLabel}
           />
         </div>
         <div className="col-span-2 sm:col-span-1">
@@ -79,6 +103,10 @@ export const NutritionDashboardRings: React.FC<NutritionDashboardRingsProps> = m
             strokeColor="#06b6d4"
             onClick={() => onSelectBreakdownNutrient('protein')}
             testId="macro-ring-protein"
+            subtitle={pStatus.text}
+            isOver={pStatus.isOver}
+            statusTestId="remaining-fuel-protein"
+            statusAriaLabel={pStatus.ariaLabel}
           />
         </div>
         <div className="col-span-2 sm:col-span-1">
@@ -91,6 +119,10 @@ export const NutritionDashboardRings: React.FC<NutritionDashboardRingsProps> = m
             strokeColor="#10b981"
             onClick={() => onSelectBreakdownNutrient('carbs')}
             testId="macro-ring-carbs"
+            subtitle={cStatus.text}
+            isOver={cStatus.isOver}
+            statusTestId="remaining-fuel-carbs"
+            statusAriaLabel={cStatus.ariaLabel}
           />
         </div>
         <div className="col-span-3 sm:col-span-1">
@@ -103,6 +135,10 @@ export const NutritionDashboardRings: React.FC<NutritionDashboardRingsProps> = m
             strokeColor="#8b5cf6"
             onClick={() => onSelectBreakdownNutrient('fat')}
             testId="macro-ring-fat"
+            subtitle={fStatus.text}
+            isOver={fStatus.isOver}
+            statusTestId="remaining-fuel-fat"
+            statusAriaLabel={fStatus.ariaLabel}
           />
         </div>
         <div className="col-span-3 sm:col-span-1">
@@ -115,70 +151,15 @@ export const NutritionDashboardRings: React.FC<NutritionDashboardRingsProps> = m
             strokeColor="#14b8a6"
             onClick={() => onSelectBreakdownNutrient('fiber')}
             testId="macro-ring-fiber"
+            subtitle={fibStatus.text}
+            isOver={fibStatus.isOver}
+            statusTestId="remaining-fuel-fiber"
+            statusAriaLabel={fibStatus.ariaLabel}
           />
         </div>
       </div>
 
-      {/* Daily Remaining Fuel Indicator */}
-      <div
-        data-testid="remaining-fuel-container"
-        className="mt-3 pt-3 border-t border-zinc-800/80 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono"
-      >
-        <span className="text-zinc-500 uppercase text-[10px] font-bold tracking-wider">Remaining Fuel:</span>
-        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-          <div
-            data-testid="remaining-fuel-calories"
-            className={`px-2 py-0.5 inline-flex items-center justify-center rounded-lg border text-[11px] font-mono font-bold ${
-              remainingFuel.calories.isOver
-                ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
-                : 'bg-amber-500/10 border-amber-500/25 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.1)]'
-            }`}
-          >
-            {remainingFuel.calories.badgeLabel}
-          </div>
-          <div
-            data-testid="remaining-fuel-protein"
-            className={`px-2 py-0.5 inline-flex items-center justify-center rounded-lg border text-[11px] font-mono font-bold ${
-              remainingFuel.protein.isOver
-                ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
-                : 'bg-cyan-500/10 border-cyan-500/25 text-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.1)]'
-            }`}
-          >
-            {remainingFuel.protein.badgeLabel}
-          </div>
-          <div
-            data-testid="remaining-fuel-carbs"
-            className={`px-2 py-0.5 inline-flex items-center justify-center rounded-lg border text-[11px] font-mono font-bold ${
-              remainingFuel.carbs.isOver
-                ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
-                : 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.1)]'
-            }`}
-          >
-            {remainingFuel.carbs.badgeLabel}
-          </div>
-          <div
-            data-testid="remaining-fuel-fat"
-            className={`px-2 py-0.5 inline-flex items-center justify-center rounded-lg border text-[11px] font-mono font-bold ${
-              remainingFuel.fat.isOver
-                ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
-                : 'bg-violet-500/10 border-violet-500/25 text-violet-400 shadow-[0_0_8px_rgba(139,92,246,0.1)]'
-            }`}
-          >
-            {remainingFuel.fat.badgeLabel}
-          </div>
-          <div
-            data-testid="remaining-fuel-fiber"
-            className={`px-2 py-0.5 inline-flex items-center justify-center rounded-lg border text-[11px] font-mono font-bold ${
-              remainingFuel.fiber.isOver
-                ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.15)]'
-                : 'bg-teal-500/10 border-teal-500/25 text-teal-400 shadow-[0_0_8px_rgba(20,184,166,0.1)]'
-            }`}
-          >
-            {remainingFuel.fiber.badgeLabel}
-          </div>
-        </div>
       </div>
-    </div>
   );
 });
 

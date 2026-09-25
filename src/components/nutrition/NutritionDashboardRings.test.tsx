@@ -36,11 +36,11 @@ function renderDashboard(propsOverride: Partial<NutritionDashboardRingsProps> = 
 }
 
 describe('NutritionDashboardRings', () => {
-  it('renders exactly 5 actionable buttons in the dashboard (one per macro ring, zero for fuel pills)', () => {
+  it('renders exactly 5 actionable buttons in the dashboard (one per macro ring) and no separate fuel strip', () => {
     renderDashboard();
 
     const buttons = screen.getAllByRole('button');
-    // Tab stops check: Exactly 5 buttons for the 5 macro rings, pills are non-interactive <div>
+    // Exactly 5 buttons for the 5 macro rings
     expect(buttons).toHaveLength(5);
 
     const testIds = buttons.map((b) => b.getAttribute('data-testid'));
@@ -52,12 +52,15 @@ describe('NutritionDashboardRings', () => {
       'macro-ring-fiber',
     ]);
 
-    // Ensure none of the remaining fuel elements have role="button"
+    // Verify separate remaining-fuel-container strip is completely removed
+    expect(screen.queryByTestId('remaining-fuel-container')).toBeNull();
+
+    // Verify each ring contains its remaining status div without button role
     const nutrients = ['calories', 'protein', 'carbs', 'fat', 'fiber'] as const;
     nutrients.forEach((nutrient) => {
-      const pill = screen.getByTestId(`remaining-fuel-${nutrient}`);
-      expect(pill.tagName.toLowerCase()).toBe('div');
-      expect(pill.getAttribute('role')).toBeNull();
+      const statusEl = screen.getByTestId(`remaining-fuel-${nutrient}`);
+      expect(statusEl.tagName.toLowerCase()).toBe('div');
+      expect(statusEl.getAttribute('role')).toBeNull();
     });
   });
 
@@ -81,7 +84,7 @@ describe('NutritionDashboardRings', () => {
     });
   });
 
-  it('does not trigger onSelectBreakdownNutrient when remaining fuel pills are clicked', () => {
+  it('does not trigger onSelectBreakdownNutrient when inner status elements stop propagation', () => {
     const onSelect = vi.fn();
     renderDashboard({ onSelectBreakdownNutrient: onSelect });
 
@@ -93,7 +96,7 @@ describe('NutritionDashboardRings', () => {
     });
   });
 
-  it('renders under-budget styling correctly for each remaining fuel pill', () => {
+  it('renders under-budget styling, numbers, and aria labels correctly for each ring status', () => {
     renderDashboard({
       remainingFuel: {
         calories: { badgeLabel: '200 kcal', isOver: false },
@@ -106,43 +109,42 @@ describe('NutritionDashboardRings', () => {
 
     const expectedTokens = {
       calories: {
-        text: '200 kcal',
-        classes: ['bg-amber-500/10', 'border-amber-500/25', 'text-amber-400', 'shadow-[0_0_8px_rgba(245,158,11,0.1)]'],
+        text: '200 kcal left',
+        colorClass: 'text-amber-400',
+        ariaLabel: 'Calories: 200 kcal left',
       },
       protein: {
-        text: '20g P',
-        classes: ['bg-cyan-500/10', 'border-cyan-500/25', 'text-cyan-400', 'shadow-[0_0_8px_rgba(6,182,212,0.1)]'],
+        text: '20g P left',
+        colorClass: 'text-cyan-400',
+        ariaLabel: 'Protein: 20g P left',
       },
       carbs: {
-        text: '20g C',
-        classes: ['bg-emerald-500/10', 'border-emerald-500/25', 'text-emerald-400', 'shadow-[0_0_8px_rgba(16,185,129,0.1)]'],
+        text: '20g C left',
+        colorClass: 'text-emerald-400',
+        ariaLabel: 'Carbs: 20g C left',
       },
       fat: {
-        text: '10g F',
-        classes: ['bg-violet-500/10', 'border-violet-500/25', 'text-violet-400', 'shadow-[0_0_8px_rgba(139,92,246,0.1)]'],
+        text: '10g F left',
+        colorClass: 'text-violet-400',
+        ariaLabel: 'Fat: 10g F left',
       },
       fiber: {
-        text: '5g Fib',
-        classes: ['bg-teal-500/10', 'border-teal-500/25', 'text-teal-400', 'shadow-[0_0_8px_rgba(20,184,166,0.1)]'],
+        text: '5g Fib left',
+        colorClass: 'text-teal-400',
+        ariaLabel: 'Fiber: 5g Fib left',
       },
     };
 
     (Object.keys(expectedTokens) as (keyof typeof expectedTokens)[]).forEach((nutrient) => {
-      const pill = screen.getByTestId(`remaining-fuel-${nutrient}`);
-      expect(pill.textContent).toBe(expectedTokens[nutrient].text);
-      expectedTokens[nutrient].classes.forEach((cls) => {
-        expect(pill.className).toContain(cls);
-      });
-      // Verify interactive and min-h-[44px] classes are dropped
-      expect(pill.className).not.toContain('cursor-pointer');
-      expect(pill.className).not.toContain('hover:brightness-110');
-      expect(pill.className).not.toContain('active:scale-95');
-      expect(pill.className).not.toContain('touch-manipulation');
-      expect(pill.className).not.toContain('min-h-[44px]');
+      const statusEl = screen.getByTestId(`remaining-fuel-${nutrient}`);
+      expect(statusEl.textContent).toBe(expectedTokens[nutrient].text);
+      expect(statusEl.className).toContain(expectedTokens[nutrient].colorClass);
+      expect(statusEl.getAttribute('aria-label')).toBe(expectedTokens[nutrient].ariaLabel);
+      expect(statusEl.className).not.toContain('after:content-');
     });
   });
 
-  it('renders over-budget styling correctly for all remaining fuel pills', () => {
+  it('renders over-budget styling in red with over-target aria labels correctly for all ring statuses', () => {
     renderDashboard({
       remainingFuel: {
         calories: { badgeLabel: '+100 kcal over', isOver: true },
@@ -153,25 +155,54 @@ describe('NutritionDashboardRings', () => {
       },
     });
 
-    const overClasses = [
-      'bg-rose-500/15',
-      'border-rose-500/30',
-      'text-rose-400',
-      'shadow-[0_0_8px_rgba(244,63,94,0.15)]',
-    ];
+    const expectedOver = {
+      calories: {
+        text: '+100 kcal over',
+        ariaLabel: 'Calories: 100 kcal over target',
+      },
+      protein: {
+        text: '+5g P over',
+        ariaLabel: 'Protein: 5g P over target',
+      },
+      carbs: {
+        text: '+15g C over',
+        ariaLabel: 'Carbs: 15g C over target',
+      },
+      fat: {
+        text: '+8g F over',
+        ariaLabel: 'Fat: 8g F over target',
+      },
+      fiber: {
+        text: '+2g Fib over',
+        ariaLabel: 'Fiber: 2g Fib over target',
+      },
+    };
 
-    const nutrients = ['calories', 'protein', 'carbs', 'fat', 'fiber'] as const;
-    nutrients.forEach((nutrient) => {
-      const pill = screen.getByTestId(`remaining-fuel-${nutrient}`);
-      overClasses.forEach((cls) => {
-        expect(pill.className).toContain(cls);
+    (Object.keys(expectedOver) as (keyof typeof expectedOver)[]).forEach((nutrient) => {
+      const statusEl = screen.getByTestId(`remaining-fuel-${nutrient}`);
+      expect(statusEl.textContent).toBe(expectedOver[nutrient].text);
+      expect(statusEl.className).toContain('text-rose-400');
+      expect(statusEl.getAttribute('aria-label')).toBe(expectedOver[nutrient].ariaLabel);
+      // When over, does not have 'after:content' left suffix
+      expect(statusEl.className).not.toContain("after:content-['_left']");
+    });
+  });
+
+  it('ensures ring labels and status texts are at least 12px (text-xs)', () => {
+    renderDashboard();
+
+    const ringNutrients = ['calories', 'protein', 'carbs', 'fat', 'fiber'] as const;
+    ringNutrients.forEach((nutrient) => {
+      const ringBtn = screen.getByTestId(`macro-ring-${nutrient}`);
+      // Find all text divs inside ring
+      const textEls = ringBtn.querySelectorAll('div, span');
+      textEls.forEach((el) => {
+        // Assert no text element uses sub-12px classes
+        expect(el.className).not.toContain('text-[8px]');
+        expect(el.className).not.toContain('text-[9px]');
+        expect(el.className).not.toContain('text-[10px]');
+        expect(el.className).not.toContain('text-[11px]');
       });
-      // Verify interactive and min-h-[44px] classes are dropped
-      expect(pill.className).not.toContain('cursor-pointer');
-      expect(pill.className).not.toContain('hover:brightness-110');
-      expect(pill.className).not.toContain('active:scale-95');
-      expect(pill.className).not.toContain('touch-manipulation');
-      expect(pill.className).not.toContain('min-h-[44px]');
     });
   });
 });
