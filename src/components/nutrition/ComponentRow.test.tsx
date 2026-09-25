@@ -98,14 +98,12 @@ describe('ComponentRow', () => {
     expect(calCell).toHaveTextContent('0 kcal');
   });
 
-  it('stepper, input, unit chip, and overflow menu are present and typing quantity invokes onChange', () => {
+  it('input, unit chip, and overflow menu are present and typing quantity invokes onChange', () => {
     const item = component({ quantity: 50, calories: 100 });
     const onChange = vi.fn();
     const onRemove = vi.fn();
     render(<ComponentRow item={item} reference={item} onChange={onChange} onRemove={onRemove} />);
 
-    expect(screen.getByLabelText(/Decrease quantity of/)).toBeDefined();
-    expect(screen.getByLabelText(/Increase quantity of/)).toBeDefined();
     expect(screen.getByTestId('component-quantity-input')).toBeDefined();
     expect(screen.getByTestId('component-unit-chip')).toBeDefined();
     expect(screen.getByTestId('component-actions')).toBeDefined();
@@ -120,25 +118,6 @@ describe('ComponentRow', () => {
     expect(scaled.calories).toBe(150);
   });
 
-  it('steps quantity up and down and scales macros linearly', () => {
-    const item = component({ quantity: 100, calories: 200, protein: 10, carbs: 20, fat: 5, fiber: 2 });
-    const onChange = vi.fn();
-    render(<ComponentRow item={item} reference={item} onChange={onChange} />);
-
-    // Step up
-    fireEvent.click(screen.getByLabelText(/Increase quantity of/));
-    expect(onChange).toHaveBeenCalledTimes(1);
-    const steppedUp = onChange.mock.calls[0][0] as NutritionItem;
-    expect(steppedUp.quantity).toBe(101);
-    expect(steppedUp.calories).toBeCloseTo(202, 1);
-
-    // Step down
-    fireEvent.click(screen.getByLabelText(/Decrease quantity of/));
-    expect(onChange).toHaveBeenCalledTimes(2);
-    const steppedDown = onChange.mock.calls[1][0] as NutritionItem;
-    expect(steppedDown.quantity).toBe(99);
-    expect(steppedDown.calories).toBeCloseTo(198, 1);
-  });
 
   it('preserves edited unit when quantity is subsequently adjusted', () => {
     // Reference has initial unit 'g'
@@ -149,8 +128,10 @@ describe('ComponentRow', () => {
 
     render(<ComponentRow item={itemWithNewUnit} reference={reference} onChange={onChange} />);
 
-    // Tap increase quantity button
-    fireEvent.click(screen.getByLabelText(/Increase quantity of/));
+    // Adjust quantity via input
+    const input = screen.getByTestId('component-quantity-input');
+    fireEvent.change(input, { target: { value: '101' } });
+    fireEvent.blur(input);
     expect(onChange).toHaveBeenCalledTimes(1);
     const result = onChange.mock.calls[0][0] as NutritionItem;
 
@@ -159,7 +140,6 @@ describe('ComponentRow', () => {
     expect(result.quantity).toBe(101);
 
     // Also verify commit via text input preserves unit
-    const input = screen.getByTestId('component-quantity-input');
     fireEvent.change(input, { target: { value: '250' } });
     fireEvent.blur(input);
 
@@ -285,12 +265,6 @@ describe('ComponentRow', () => {
     // Macros remain frozen at 600 kcal on screen
     expect(screen.getAllByText(/600 kcal/).length).toBeGreaterThanOrEqual(1);
 
-    // Steppers are disabled while pending
-    const decBtn = screen.getByLabelText(/Decrease quantity of/) as HTMLButtonElement;
-    const incBtn = screen.getByLabelText(/Increase quantity of/) as HTMLButtonElement;
-    expect(decBtn.disabled).toBe(true);
-    expect(incBtn.disabled).toBe(true);
-
     // Commit 540
     fireEvent.change(input, { target: { value: '540' } });
     fireEvent.blur(input);
@@ -373,33 +347,11 @@ describe('ComponentRow', () => {
     const input = screen.getByTestId('component-quantity-input') as HTMLInputElement;
     expect(input.value).toBe('100');
 
-    // Steppers are not disabled
-    const decBtn = screen.getByLabelText(/Decrease quantity of/) as HTMLButtonElement;
-    expect(decBtn.disabled).toBe(false);
-
     // No callbacks called
     expect(onChange).not.toHaveBeenCalled();
     expect(onReanchor).not.toHaveBeenCalled();
   });
 
-  it('disables stepper buttons while unit change is pending a committed quantity', () => {
-    const item = component({ quantity: 1, unit: 'unit' });
-    const onChange = vi.fn();
-
-    render(<ComponentRow item={item} reference={item} onChange={onChange} />);
-
-    fireEvent.click(screen.getByTestId('component-unit-chip'));
-    fireEvent.click(screen.getByTestId('unit-option-ml'));
-
-    const decBtn = screen.getByLabelText(/Decrease quantity of/) as HTMLButtonElement;
-    const incBtn = screen.getByLabelText(/Increase quantity of/) as HTMLButtonElement;
-    expect(decBtn.disabled).toBe(true);
-    expect(incBtn.disabled).toBe(true);
-
-    // Clicking steppers does nothing
-    fireEvent.click(incBtn);
-    expect(onChange).not.toHaveBeenCalled();
-  });
 
   it('surfaces inline confirm affordance when multiplying row calories by >20x and handles apply/cancel', () => {
     const item = component({ quantity: 1, calories: 100, unit: 'unit' });
@@ -447,34 +399,6 @@ describe('ComponentRow', () => {
     expect(selectSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('renders lighter stepper and unit chip in a borderless compound container with ghost buttons and muted unit text (Tweak 1)', () => {
-    const item = component();
-    render(<ComponentRow item={item} reference={item} onChange={() => {}} />);
-
-    const unitChip = screen.getByTestId('component-unit-chip');
-    // Embedded UnitChip is styled as right segment with divider and background
-    expect(unitChip.className).toContain('border-l');
-    expect(unitChip.className).toContain('bg-zinc-700/60');
-    expect(unitChip.className).toContain('text-zinc-300');
-
-    // Stepper and unit chip share compound container without heavy outer borders
-    const input = screen.getByTestId('component-quantity-input');
-    const compoundContainer = input.closest('div.inline-flex');
-    expect(compoundContainer).not.toBeNull();
-    expect(compoundContainer?.className).not.toContain('border');
-    expect(compoundContainer?.className).not.toContain('bg-zinc-950');
-    expect(compoundContainer?.contains(unitChip)).toBe(true);
-
-    // Stepper buttons are ghost buttons with transparent bg and min-40 dimensions
-    const decBtn = screen.getByLabelText(/Decrease quantity of/);
-    const incBtn = screen.getByLabelText(/Increase quantity of/);
-    expect(decBtn.className).toContain('bg-transparent');
-    expect(decBtn.className).toContain('min-h-[40px]');
-    expect(decBtn.className).toContain('min-w-[40px]');
-    expect(incBtn.className).toContain('bg-transparent');
-    expect(incBtn.className).toContain('min-h-[40px]');
-    expect(incBtn.className).toContain('min-w-[40px]');
-  });
 
   it('does not render "Edit nutrition" option in overflow menu when onEditNutrition is omitted', () => {
     const item = component();
@@ -587,5 +511,58 @@ describe('ComponentRow', () => {
     fireEvent.click(screen.getByTestId('cancel-edit-item-nutrition-btn'));
     expect(screen.queryByTestId('edit-item-nutrition-modal')).toBeNull();
     expect(document.activeElement).toBe(trigger);
+  });
+  it('saves entered quantity and invokes onChange when Enter is pressed', () => {
+    const item = component({ quantity: 50, calories: 100 });
+    const onChange = vi.fn();
+    render(<ComponentRow item={item} reference={item} onChange={onChange} />);
+
+    const input = screen.getByTestId('component-quantity-input');
+    fireEvent.change(input, { target: { value: '80' } });
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const scaled = onChange.mock.calls[0][0] as NutritionItem;
+    expect(scaled.quantity).toBe(80);
+    expect(scaled.calories).toBe(160);
+  });
+
+  it('reverts to the previous quantity when input is cleared and committed', () => {
+    const item = component({ quantity: 50, calories: 100 });
+    const onChange = vi.fn();
+    render(<ComponentRow item={item} reference={item} onChange={onChange} />);
+
+    const input = screen.getByTestId('component-quantity-input') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '' } });
+    fireEvent.blur(input);
+
+    expect(onChange).not.toHaveBeenCalled();
+    expect(input.value).toBe('50');
+  });
+
+  it('reverts to the previous quantity when 0 is entered and committed', () => {
+    const item = component({ quantity: 50, calories: 100 });
+    const onChange = vi.fn();
+    render(<ComponentRow item={item} reference={item} onChange={onChange} />);
+
+    const input = screen.getByTestId('component-quantity-input') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '0' } });
+    fireEvent.blur(input);
+
+    expect(onChange).not.toHaveBeenCalled();
+    expect(input.value).toBe('50');
+  });
+
+  it('renders item name with line-clamp-2 and break-words classes for 2-line wrapping', () => {
+    const item = component({
+      name: 'Grilled Salmon Fillet with Lemon Butter Sauce and Roasted Vegetables',
+    });
+    render(<ComponentRow item={item} reference={item} onChange={() => {}} />);
+
+    const nameEl = screen.getByTestId('component-name');
+    expect(nameEl.className).toContain('line-clamp-2');
+    expect(nameEl.className).toContain('break-words');
+    expect(nameEl.className).not.toContain('truncate');
+    expect(nameEl.textContent).toBe(item.name);
   });
 });

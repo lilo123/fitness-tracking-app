@@ -84,7 +84,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
 
   const commit = (raw: string) => {
     const parsed = parseQuantityInput(raw);
-    if (parsed === null || !onChange) {
+    if (parsed === null || parsed <= 0 || !onChange) {
       if (pendingUnit) {
         setDraft('');
       } else {
@@ -127,30 +127,6 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
     setDraft(null);
   };
 
-  const step = (delta: number) => {
-    if (!onChange || pendingUnit) return;
-    const base = parseQuantityInput(shown) ?? item.quantity;
-    const next = Math.max(0, roundTo1Decimal(base + delta));
-    const scaled = scaleItemToQuantity(effectiveRef, next);
-    const nextItem: NutritionItem = {
-      ...scaled,
-      quantity: roundTo1Decimal(scaled.quantity),
-      calories: roundTo1Decimal(scaled.calories),
-      protein: roundTo1Decimal(scaled.protein),
-      carbs: roundTo1Decimal(scaled.carbs),
-      fat: roundTo1Decimal(scaled.fat),
-      fiber: roundTo1Decimal(scaled.fiber),
-      unit: item.unit,
-    };
-
-    if (item.calories > 0 && nextItem.calories > item.calories * 20) {
-      setPendingAbsurdEdit(nextItem);
-      return;
-    }
-
-    onChange(nextItem);
-    setDraft(null);
-  };
 
   const menuItems: OverflowMenuItem[] = [];
   if (onEditNutrition) {
@@ -192,67 +168,45 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
         <div
           data-testid="component-name"
           title={item.name}
-          className="flex-1 min-w-0 truncate text-xs font-semibold text-white leading-tight"
+          className="flex-1 min-w-0 text-xs font-semibold text-white leading-tight break-words line-clamp-2"
         >
           {item.name}
         </div>
 
-        {/* RIGHT (shrink-0): compact stepper [−][field: input + UnitChip][+] + ⋯ OverflowMenu */}
+        {/* RIGHT (shrink-0): [field: input + UnitChip] + ⋯ OverflowMenu */}
         <div data-testid="component-right-cluster" className="shrink-0 flex items-center gap-1">
           {editable ? (
-            <div className="inline-flex items-center">
-              <button
-                type="button"
-                aria-label={`Decrease quantity of ${item.name}`}
-                onClick={() => step(-1)}
-                disabled={Boolean(pendingUnit)}
-                aria-disabled={Boolean(pendingUnit)}
-                className="min-h-[40px] min-w-[40px] w-10 h-10 shrink-0 rounded-lg flex items-center justify-center bg-transparent text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 active:bg-zinc-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-400 disabled:opacity-30 disabled:cursor-not-allowed touch-manipulation"
-              >
-                −
-              </button>
-              <div
-                data-testid="component-quantity-field"
-                className="w-[100px] min-h-[40px] h-10 shrink-0 rounded-lg flex items-center overflow-hidden transition focus-within:ring-1 focus-within:ring-cyan-400"
-              >
-                <input
-                  type="number"
-                  step="any"
-                  min="0"
-                  inputMode="decimal"
-                  data-testid="component-quantity-input"
-                  aria-label={`Quantity of ${item.name}`}
-                  value={shown}
-                  placeholder={pendingUnit ? `amount in ${pendingUnit} for this ${formatCalories(item.calories)} kcal` : undefined}
-                  onFocus={(e) => e.target.select()}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onBlur={(e) => commit(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      commit((e.target as HTMLInputElement).value);
-                    }
-                  }}
-                  className="min-h-[40px] h-10 w-[48px] shrink-0 bg-zinc-800/70 text-right pr-1 pl-1 text-base sm:text-xs font-semibold tabular-nums text-white outline-none border-0 m-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                />
-                <UnitChip
-                  value={activeUnit}
-                  onChange={handleUnitChange}
-                  testId="component-unit-chip"
-                  ariaLabel={`Change unit for ${item.name}, currently ${shortUnitLabel(activeUnit)}`}
-                  embedded
-                />
-              </div>
-              <button
-                type="button"
-                aria-label={`Increase quantity of ${item.name}`}
-                onClick={() => step(1)}
-                disabled={Boolean(pendingUnit)}
-                aria-disabled={Boolean(pendingUnit)}
-                className="min-h-[40px] min-w-[40px] w-10 h-10 shrink-0 rounded-lg flex items-center justify-center bg-transparent text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 active:bg-zinc-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-400 disabled:opacity-30 disabled:cursor-not-allowed touch-manipulation"
-              >
-                +
-              </button>
+            <div
+              data-testid="component-quantity-field"
+              className="w-[100px] min-h-[40px] h-10 shrink-0 rounded-lg border border-border-interactive bg-zinc-950 flex items-center overflow-hidden transition hover:border-cyan-500/70 focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-400"
+            >
+              <input
+                type="number"
+                step="any"
+                min="0"
+                inputMode="decimal"
+                data-testid="component-quantity-input"
+                aria-label={`Quantity of ${item.name}`}
+                value={shown}
+                placeholder={pendingUnit ? `amount in ${pendingUnit} for this ${formatCalories(item.calories)} kcal` : undefined}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => setDraft(e.target.value)}
+                onBlur={(e) => commit(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    commit((e.target as HTMLInputElement).value);
+                  }
+                }}
+                className="min-h-[40px] h-10 w-[46px] shrink-0 bg-transparent text-right pr-1 pl-1 text-base font-semibold tabular-nums text-white outline-none border-0 m-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+              <UnitChip
+                value={activeUnit}
+                onChange={handleUnitChange}
+                testId="component-unit-chip"
+                ariaLabel={`Change unit for ${item.name}, currently ${shortUnitLabel(activeUnit)}`}
+                embedded
+              />
             </div>
           ) : (
             <span className="text-xs font-mono font-medium text-zinc-400 px-1">

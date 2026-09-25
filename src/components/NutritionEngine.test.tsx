@@ -152,6 +152,49 @@ describe('NutritionEngine', () => {
     expect(screen.getByText('Log Meal (+470 kcal)')).toBeDefined();
   });
 
+  it('typing a quantity updates item and meal totals', async () => {
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: {
+        name: 'Eggs & Sourdough',
+        calories: 370,
+        protein: 24,
+        carbs: 32,
+        fat: 17,
+        fiber: 2,
+        explanation: '210 kcal (Eggs) + 160 kcal (Sourdough) = 370 kcal',
+        items: [
+          { name: 'Eggs', portion: '3 large', quantity: 3, unit: 'unit', calories: 210, protein: 18, carbs: 2, fat: 15, fiber: 0 },
+          { name: 'Sourdough', portion: '2 slices', quantity: 2, unit: 'unit', calories: 160, protein: 6, carbs: 30, fat: 2, fiber: 2 },
+        ],
+      },
+      error: null,
+    });
+
+    renderComponent();
+
+    const input = screen.getByPlaceholderText(
+      'Describe what you ate (e.g., 3 eggs, 2 slices sourdough, 1 tbsp butter)'
+    );
+    await userEvent.type(input, '3 eggs and 2 slices sourdough');
+    fireEvent.click(screen.getByText('Analyze Meal'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Itemized Breakdown/i)).toBeDefined();
+    });
+
+    // Check initial totals row shows 370 kcal
+    expect(screen.getByTestId('staged-meal-totals')).toHaveTextContent('370 kcal');
+
+    // Type 6 for Eggs (double from 3 to 6: 210 -> 420 kcal; total 370 + 210 = 580 kcal)
+    const eggQty = screen.getAllByTestId('component-quantity-input')[0];
+    fireEvent.change(eggQty, { target: { value: '6' } });
+    fireEvent.blur(eggQty);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('staged-meal-totals')).toHaveTextContent('580 kcal');
+    });
+  });
+
   it('allows portion adjustment and 1-tap item deletion in staged meal card', async () => {
     (supabase.functions.invoke as any).mockResolvedValue({
       data: {
@@ -189,7 +232,8 @@ describe('NutritionEngine', () => {
       screen.getAllByTestId('component-quantity-input') as HTMLInputElement[];
     expect(quantities()[0].value).toBe('3');
 
-    fireEvent.click(screen.getByLabelText('Increase quantity of Eggs'));
+    fireEvent.change(quantities()[0], { target: { value: '4' } });
+    fireEvent.blur(quantities()[0]);
 
     await waitFor(() => {
       expect(quantities()[0].value).toBe('4');

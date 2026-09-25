@@ -134,6 +134,38 @@ function makeMultiItemMeal(): StagedMeal {
 }
 
 describe('StagedMealCard', () => {
+  it('typing a quantity invokes onApplyStagedItemChange with updated scaled nutrition', () => {
+    const meal = makeMultiItemMeal();
+    const onApplyStagedItemChange = vi.fn();
+
+    render(
+      <StagedMealCard
+        stagedMeal={meal}
+        onUpdateStagedMeal={vi.fn()}
+        onApplyStagedItemChange={onApplyStagedItemChange}
+        onDeleteItem={vi.fn()}
+        onSaveItemAsCustomDish={vi.fn()}
+        onLogStagedMeal={vi.fn()}
+        onSaveStagedAsCustomDish={vi.fn()}
+        onDiscardStagedMeal={vi.fn()}
+        isPending={false}
+      />
+    );
+
+    const inputs = screen.getAllByTestId('component-quantity-input');
+    fireEvent.change(inputs[0], { target: { value: '100' } });
+    fireEvent.blur(inputs[0]);
+
+    expect(onApplyStagedItemChange).toHaveBeenCalledTimes(1);
+    expect(onApplyStagedItemChange).toHaveBeenCalledWith(
+      'item-1',
+      expect.objectContaining({
+        quantity: 100,
+        calories: 208,
+      })
+    );
+  });
+
   it('updates base* fields on re-anchor so subsequent adjustments scale from the new baseline', () => {
     let currentMeal = makeStagedMeal();
     const onUpdateStagedMeal = vi.fn((updated: StagedMeal) => {

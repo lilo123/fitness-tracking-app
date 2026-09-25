@@ -150,7 +150,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
         <button
           type="button"
           onClick={onClose}
-          className="text-zinc-500 hover:text-white text-xs"
+          className="text-zinc-500 hover:text-white text-xs min-h-[40px] min-w-[40px] px-2 flex items-center justify-center rounded-lg transition touch-manipulation"
         >
           Cancel
         </button>
@@ -231,7 +231,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             id={mealTypeId}
             value={manualMealType}
             onChange={(e) => onManualMealTypeChange(e.target.value)}
-            className="w-full bg-zinc-950 border border-border-interactive text-zinc-300 rounded-xl p-2 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none scroll-mb-24"
+            className="w-full bg-zinc-950 border border-border-interactive text-zinc-300 rounded-xl p-2 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none scroll-mb-24 min-h-[40px]"
           >
             <option value="Breakfast">Breakfast</option>
             <option value="Lunch">Lunch</option>
