@@ -257,6 +257,218 @@ describe('NutritionEngine', () => {
     expect(payload.protein).toBe(18);
   });
 
+  it('single-item meal (D14): modal edit updates item 0 nutrition and logged payload equals edited values', async () => {
+    const mockInsert = vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) });
+    (supabase.from as any).mockImplementation((table: string) => {
+      const b = createSupabaseBuilder(table, { data: [], error: null });
+      if (table === 'nutrition_logs') {
+        b.insert = mockInsert;
+      }
+      return b;
+    });
+
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: {
+        name: 'Single Salmon Fillet',
+        calories: 250,
+        protein: 30,
+        carbs: 0,
+        fat: 14,
+        fiber: 0,
+        explanation: '1 fillet = 250 kcal',
+        items: [{ name: 'Salmon Fillet', portion: '1 fillet', calories: 250, protein: 30, carbs: 0, fat: 14, fiber: 0 }],
+      },
+      error: null,
+    });
+
+    renderComponent();
+
+    const input = screen.getByPlaceholderText(
+      'Describe what you ate (e.g., 3 eggs, 2 slices sourdough, 1 tbsp butter)'
+    );
+    await userEvent.type(input, '1 salmon fillet');
+    fireEvent.click(screen.getByText('Analyze Meal'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Log Meal (+250 kcal)')).toBeDefined();
+    });
+
+    // Verify single-item card has no Itemized Breakdown header or editable macro inputs
+    expect(screen.queryByText(/Itemized Breakdown/i)).toBeNull();
+    expect(screen.queryByTestId('calories-input')).toBeNull();
+
+    // Edit item 0 via overflow menu -> Edit nutrition modal
+    fireEvent.click(screen.getByTestId('component-actions'));
+    fireEvent.click(screen.getByTestId('component-edit-nutrition'));
+
+    // Change calories to 320 and protein to 38
+    fireEvent.change(screen.getByTestId('edit-item-calories-input'), { target: { value: '320' } });
+    fireEvent.change(screen.getByTestId('edit-item-protein-input'), { target: { value: '38' } });
+    fireEvent.click(screen.getByTestId('save-edit-item-nutrition-btn'));
+
+    // Verify card Log button updated to +320 kcal
+    await waitFor(() => {
+      expect(screen.getByText('Log Meal (+320 kcal)')).toBeDefined();
+    });
+
+    // Log the meal
+    fireEvent.click(screen.getByText('Log Meal (+320 kcal)'));
+
+    await waitFor(() => {
+      expect(mockInsert).toHaveBeenCalled();
+    });
+
+    const payload = mockInsert.mock.calls[0][0][0];
+    expect(payload.food_name).toBe('Single Salmon Fillet');
+    expect(payload.calories).toBe(320);
+    expect(payload.protein).toBe(38);
+    expect(payload.carbs).toBe(0);
+    expect(payload.fat).toBe(14);
+    expect(payload.fiber).toBe(0);
+  });
+
+  it('single-item meal (D14): modal edit updates item 0 nutrition, Day total and Log button reflect edited kcal, and save-as-dish payload equals edited values', async () => {
+    const mockInsert = vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) });
+    (supabase.from as any).mockImplementation((table: string) => {
+      const b = createSupabaseBuilder(table, { data: [], error: null });
+      if (table === 'custom_dishes') {
+        b.insert = mockInsert;
+      }
+      return b;
+    });
+
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: {
+        name: 'Single Salmon Fillet',
+        calories: 250,
+        protein: 30,
+        carbs: 0,
+        fat: 14,
+        fiber: 0,
+        explanation: '1 fillet = 250 kcal',
+        items: [{ name: 'Salmon Fillet', portion: '1 fillet', calories: 250, protein: 30, carbs: 0, fat: 14, fiber: 0 }],
+      },
+      error: null,
+    });
+
+    renderComponent();
+
+    const input = screen.getByPlaceholderText(
+      'Describe what you ate (e.g., 3 eggs, 2 slices sourdough, 1 tbsp butter)'
+    );
+    await userEvent.type(input, '1 salmon fillet');
+    fireEvent.click(screen.getByText('Analyze Meal'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Log Meal (+250 kcal)')).toBeDefined();
+    });
+
+    // Edit item 0 via overflow menu -> Edit nutrition modal
+    fireEvent.click(screen.getByTestId('component-actions'));
+    fireEvent.click(screen.getByTestId('component-edit-nutrition'));
+
+    // Change calories to 350 and protein to 36
+    fireEvent.change(screen.getByTestId('edit-item-calories-input'), { target: { value: '350' } });
+    fireEvent.change(screen.getByTestId('edit-item-protein-input'), { target: { value: '36' } });
+    fireEvent.click(screen.getByTestId('save-edit-item-nutrition-btn'));
+
+    // Assert Log button reflects edited kcal (+350 kcal)
+    await waitFor(() => {
+      expect(screen.getByText('Log Meal (+350 kcal)')).toBeDefined();
+    });
+
+    // Assert Day total reflects edited kcal
+    expect(screen.getByTestId('day-total-val-calories')).toHaveTextContent('350');
+    expect(screen.getByTestId('day-total-val-protein')).toHaveTextContent('36');
+
+    // Trigger Save as Custom Dish
+    const saveDishBtn = screen.getByTitle('Save this meal as a quick-log custom dish');
+    fireEvent.click(saveDishBtn);
+
+    await waitFor(() => {
+      expect(mockInsert).toHaveBeenCalled();
+    });
+
+    const payload = mockInsert.mock.calls[0][0][0];
+    expect(payload.name).toBe('Single Salmon Fillet');
+    expect(payload.calories).toBe(350);
+    expect(payload.protein).toBe(36);
+    expect(payload.fat).toBe(14);
+    expect(payload.carbs).toBe(0);
+    expect(payload.fiber).toBe(0);
+    expect(payload.kind).toBe('food');
+  });
+
+  it('single-item meal (D14): deleting from 2 items to 1 removes breakdown header and This meal row, and logs remaining item', async () => {
+    const mockInsert = vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) });
+    (supabase.from as any).mockImplementation((table: string) => {
+      const b = createSupabaseBuilder(table, { data: [], error: null });
+      if (table === 'nutrition_logs') {
+        b.insert = mockInsert;
+      }
+      return b;
+    });
+
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: {
+        name: 'Eggs and Toast',
+        calories: 330,
+        protein: 18,
+        carbs: 24,
+        fat: 15,
+        fiber: 2,
+        explanation: 'Eggs (210) + Toast (120) = 330',
+        items: [
+          { name: 'Eggs', portion: '2 large', calories: 210, protein: 14, carbs: 1, fat: 14, fiber: 0 },
+          { name: 'Toast', portion: '1 slice', calories: 120, protein: 4, carbs: 23, fat: 1, fiber: 2 },
+        ],
+      },
+      error: null,
+    });
+
+    renderComponent();
+
+    const input = screen.getByPlaceholderText(
+      'Describe what you ate (e.g., 3 eggs, 2 slices sourdough, 1 tbsp butter)'
+    );
+    await userEvent.type(input, '2 eggs and toast');
+    fireEvent.click(screen.getByText('Analyze Meal'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Itemized Breakdown \(2\)/i)).toBeDefined();
+      expect(screen.getByTestId('this-meal-label')).toBeDefined();
+    });
+
+    // Delete Toast
+    const actionButtons = screen.getAllByTestId('component-actions');
+    fireEvent.click(actionButtons[1]);
+    fireEvent.click(screen.getByTestId('component-remove'));
+
+    // Now 1 item remains: Itemized Breakdown and This meal row disappear
+    await waitFor(() => {
+      expect(screen.queryByText(/Itemized Breakdown/i)).toBeNull();
+      expect(screen.queryByTestId('this-meal-label')).toBeNull();
+    });
+
+    // No macro inputs appear
+    expect(screen.queryByTestId('calories-input')).toBeNull();
+
+    // Log button reflects remaining item calories (+210 kcal)
+    expect(screen.getByText('Log Meal (+210 kcal)')).toBeDefined();
+
+    fireEvent.click(screen.getByText('Log Meal (+210 kcal)'));
+
+    await waitFor(() => {
+      expect(mockInsert).toHaveBeenCalled();
+    });
+
+    const payload = mockInsert.mock.calls[0][0][0];
+    expect(payload.food_name).toBe('Eggs and Toast');
+    expect(payload.calories).toBe(210);
+    expect(payload.protein).toBe(14);
+    expect(payload.items).toBeNull(); // Single item logged meal does not persist child items array
+  });
+
   it('allows 1-tap quick logging a saved custom dish', async () => {
     const mockInsert = vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) });
     (supabase.from as any).mockImplementation((table: string) => {
@@ -2172,8 +2384,9 @@ Total Fiber: 1 g`;
     fireEvent.click(screen.getByTestId('retry-analysis-button'));
 
     await waitFor(() => {
-      expect(screen.getByText(/Itemized Breakdown/i)).toBeDefined();
+      expect(screen.getByTestId('staged-meal-card')).toBeDefined();
     });
+    expect(screen.getByTestId('component-name')).toHaveTextContent('Chicken Salad');
 
     // Error banner and retry button should be cleared on success
     expect(screen.queryByTestId('retry-analysis-button')).toBeNull();
@@ -2246,7 +2459,7 @@ Total Fiber: 1 g`;
       expect(screen.getByTestId('dish-name-input')).toHaveValue('Fenced Omelette');
     });
 
-    expect(screen.getByText(/Itemized Breakdown/i)).toBeDefined();
+    expect(screen.getByText('Omelette')).toBeDefined();
   });
 
   it('opens custom dish edit modal when edit pencil button on carousel card is clicked', async () => {

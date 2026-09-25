@@ -389,13 +389,12 @@ describe('StagedMealCard', () => {
     expect(totalCarbs).toHaveTextContent(/^0\s*C$/);
   });
 
-  it('single-item meal: keeps editable total inputs and writes back to items[0] and base fields', () => {
+  it('single-item meal (D14): renders no inputs in the single-item card and hides Itemized Breakdown and This meal row', () => {
     const meal = makeStagedMeal();
-    const onUpdateStagedMeal = vi.fn();
     render(
       <StagedMealCard
         stagedMeal={meal}
-        onUpdateStagedMeal={onUpdateStagedMeal}
+        onUpdateStagedMeal={vi.fn()}
         onApplyStagedItemChange={vi.fn()}
         onDeleteItem={vi.fn()}
         onSaveItemAsCustomDish={vi.fn()}
@@ -406,15 +405,242 @@ describe('StagedMealCard', () => {
       />
     );
 
-    const calInput = screen.getByTestId('calories-input');
-    fireEvent.change(calInput, { target: { value: '650' } });
+    // No macro input fields exist on single-item card
+    expect(screen.queryByTestId('calories-input')).toBeNull();
+    expect(screen.queryByTestId('protein-input')).toBeNull();
+    expect(screen.queryByTestId('carbs-input')).toBeNull();
+    expect(screen.queryByTestId('fat-input')).toBeNull();
+    expect(screen.queryByTestId('fiber-input')).toBeNull();
 
-    expect(onUpdateStagedMeal).toHaveBeenCalled();
-    const lastCallArg = onUpdateStagedMeal.mock.calls[onUpdateStagedMeal.mock.calls.length - 1][0] as StagedMeal;
-    expect(lastCallArg.calories).toBe(650);
-    expect(lastCallArg.items[0].calories).toBe(650);
-    expect(lastCallArg.items[0].baseCalories).toBe(650);
-    expect(lastCallArg.items[0].userOverridden).toBe(true);
+    // No Itemized Breakdown header or This meal row for 1 item
+    expect(screen.queryByText(/itemized breakdown/i)).toBeNull();
+    expect(screen.queryByTestId('this-meal-label')).toBeNull();
+    expect(screen.queryByTestId('staged-meal-totals')).toBeNull();
+
+    // The single item row is displayed directly
+    expect(screen.getByTestId('component-name')).toHaveTextContent('Egg Meatloaf');
+    expect(screen.getByTestId('component-quantity-input')).toHaveValue(1);
+  });
+
+  it('single-item meal (D14): renders Day total row with 1 item when dailyTotals and targets provided', () => {
+    const meal = makeStagedMeal(); // 600 kcal, 30 P, 40 C, 20 F, 5 Fib
+    render(
+      <StagedMealCard
+        stagedMeal={meal}
+        dailyTotals={{ calories: 1200, protein: 70, carbs: 100, fat: 40, fiber: 15 }}
+        targets={{ calories: 2000, protein: 150, carbs: 200, fat: 70, fiber: 30 }}
+        onUpdateStagedMeal={vi.fn()}
+        onApplyStagedItemChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onSaveItemAsCustomDish={vi.fn()}
+        onLogStagedMeal={vi.fn()}
+        onSaveStagedAsCustomDish={vi.fn()}
+        onDiscardStagedMeal={vi.fn()}
+        isPending={false}
+      />
+    );
+
+    // Day total row is present even for a single-item meal (dropped isMultiItem gate)
+    const dayTotal = screen.getByTestId('staged-meal-day-total');
+    expect(dayTotal).toBeInTheDocument();
+    expect(screen.getByTestId('day-total-label')).toHaveTextContent('Day total');
+
+    // Day total arithmetic: 1200 + 600 = 1800 kcal, 70 + 30 = 100 P, 100 + 40 = 140 C, 40 + 20 = 60 F, 15 + 5 = 20 Fib
+    expect(screen.getByTestId('day-total-val-calories')).toHaveTextContent('1800');
+    expect(screen.getByTestId('day-total-val-protein')).toHaveTextContent('100');
+    expect(screen.getByTestId('day-total-val-carbs')).toHaveTextContent('140');
+    expect(screen.getByTestId('day-total-val-fat')).toHaveTextContent('60');
+    expect(screen.getByTestId('day-total-val-fiber')).toHaveTextContent('20');
+
+    // This meal row remains hidden for single item
+    expect(screen.queryByTestId('this-meal-label')).toBeNull();
+  });
+
+  it('single-item meal (D14): modal edit updates item 0 nutrition and recomputes meal totals', () => {
+    const meal = makeStagedMeal();
+    let currentMeal = meal;
+    const onUpdateStagedMeal = vi.fn((updated: StagedMeal) => {
+      currentMeal = updated;
+    });
+    const onLogStagedMeal = vi.fn();
+
+    const { rerender } = render(
+      <StagedMealCard
+        stagedMeal={currentMeal}
+        onUpdateStagedMeal={onUpdateStagedMeal}
+        onApplyStagedItemChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onSaveItemAsCustomDish={vi.fn()}
+        onLogStagedMeal={onLogStagedMeal}
+        onSaveStagedAsCustomDish={vi.fn()}
+        onDiscardStagedMeal={vi.fn()}
+        isPending={false}
+      />
+    );
+
+    // Open overflow menu for the item
+    fireEvent.click(screen.getByTestId('component-actions'));
+    // Click Edit nutrition
+    fireEvent.click(screen.getByTestId('component-edit-nutrition'));
+
+    // Modal is open, edit calories and protein
+    fireEvent.change(screen.getByTestId('edit-item-calories-input'), { target: { value: '750' } });
+    fireEvent.change(screen.getByTestId('edit-item-protein-input'), { target: { value: '45' } });
+    fireEvent.click(screen.getByTestId('save-edit-item-nutrition-btn'));
+
+    expect(onUpdateStagedMeal).toHaveBeenCalledTimes(1);
+    const updated = onUpdateStagedMeal.mock.calls[0][0] as StagedMeal;
+
+    // Item 0 is updated
+    expect(updated.items[0].calories).toBe(750);
+    expect(updated.items[0].protein).toBe(45);
+    expect(updated.items[0].baseCalories).toBe(750);
+    expect(updated.items[0].baseProtein).toBe(45);
+    expect(updated.items[0].userOverridden).toBe(true);
+
+    // Meal totals recomputed to match item 0
+    expect(updated.calories).toBe(750);
+    expect(updated.protein).toBe(45);
+
+    // Rerender with updated meal and verify Log Meal button reflects the edited calories
+    rerender(
+      <StagedMealCard
+        stagedMeal={updated}
+        onUpdateStagedMeal={onUpdateStagedMeal}
+        onApplyStagedItemChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onSaveItemAsCustomDish={vi.fn()}
+        onLogStagedMeal={onLogStagedMeal}
+        onSaveStagedAsCustomDish={vi.fn()}
+        onDiscardStagedMeal={vi.fn()}
+        isPending={false}
+      />
+    );
+
+    expect(screen.getByText('Log Meal (+750 kcal)')).toBeInTheDocument();
+  });
+
+  it('deleting from 2 items down to 1 (D14): removes This meal row and Itemized Breakdown header without rendering inputs', () => {
+    const multiMeal: StagedMeal = {
+      name: '2-Item Meal',
+      mealType: 'Lunch',
+      explanation: 'Calculated from ingredients',
+      servingSize: 1,
+      servingUnit: 'serving',
+      calories: 300,
+      protein: 25,
+      carbs: 20,
+      fat: 10,
+      fiber: 2,
+      items: [
+        {
+          id: 'item-1',
+          name: 'Chicken Breast',
+          portion: '100g',
+          portionMultiplier: 1,
+          quantity: 100,
+          unit: 'g',
+          calories: 165,
+          protein: 31,
+          carbs: 0,
+          fat: 3.6,
+          fiber: 0,
+          baseQuantity: 100,
+          baseCalories: 165,
+          baseProtein: 31,
+          baseCarbs: 0,
+          baseFat: 3.6,
+          baseFiber: 0,
+        },
+        {
+          id: 'item-2',
+          name: 'Brown Rice',
+          portion: '100g',
+          portionMultiplier: 1,
+          quantity: 100,
+          unit: 'g',
+          calories: 135,
+          protein: 3,
+          carbs: 28,
+          fat: 1,
+          fiber: 2,
+          baseQuantity: 100,
+          baseCalories: 135,
+          baseProtein: 3,
+          baseCarbs: 28,
+          baseFat: 1,
+          baseFiber: 2,
+        },
+      ],
+    };
+
+    const onDeleteItem = vi.fn();
+    const { rerender } = render(
+      <StagedMealCard
+        stagedMeal={multiMeal}
+        dailyTotals={{ calories: 500, protein: 30, carbs: 50, fat: 20, fiber: 5 }}
+        targets={{ calories: 2000, protein: 150, carbs: 200, fat: 70, fiber: 30 }}
+        onUpdateStagedMeal={vi.fn()}
+        onApplyStagedItemChange={vi.fn()}
+        onDeleteItem={onDeleteItem}
+        onSaveItemAsCustomDish={vi.fn()}
+        onLogStagedMeal={vi.fn()}
+        onSaveStagedAsCustomDish={vi.fn()}
+        onDiscardStagedMeal={vi.fn()}
+        isPending={false}
+      />
+    );
+
+    // Initial 2-item state: shows Itemized Breakdown (2) and This meal row
+    expect(screen.getByText(/itemized breakdown \(2\)/i)).toBeInTheDocument();
+    expect(screen.getByTestId('this-meal-label')).toHaveTextContent('This meal');
+    expect(screen.getByTestId('staged-meal-day-total')).toBeInTheDocument();
+
+    // Trigger delete on item-2
+    const actionButtons = screen.getAllByTestId('component-actions');
+    fireEvent.click(actionButtons[1]);
+    fireEvent.click(screen.getByTestId('component-remove'));
+    expect(onDeleteItem).toHaveBeenCalledWith('item-2');
+
+    // Simulate parent state update after delete down to 1 item
+    const singleMeal: StagedMeal = {
+      ...multiMeal,
+      calories: 165,
+      protein: 31,
+      carbs: 0,
+      fat: 3.6,
+      fiber: 0,
+      items: [multiMeal.items[0]],
+    };
+
+    rerender(
+      <StagedMealCard
+        stagedMeal={singleMeal}
+        dailyTotals={{ calories: 500, protein: 30, carbs: 50, fat: 20, fiber: 5 }}
+        targets={{ calories: 2000, protein: 150, carbs: 200, fat: 70, fiber: 30 }}
+        onUpdateStagedMeal={vi.fn()}
+        onApplyStagedItemChange={vi.fn()}
+        onDeleteItem={onDeleteItem}
+        onSaveItemAsCustomDish={vi.fn()}
+        onLogStagedMeal={vi.fn()}
+        onSaveStagedAsCustomDish={vi.fn()}
+        onDiscardStagedMeal={vi.fn()}
+        isPending={false}
+      />
+    );
+
+    // 1-item state: This meal row and Itemized Breakdown are gone!
+    expect(screen.queryByText(/itemized breakdown/i)).toBeNull();
+    expect(screen.queryByTestId('this-meal-label')).toBeNull();
+    expect(screen.queryByTestId('staged-meal-totals')).toBeNull();
+
+    // No inputs appear!
+    expect(screen.queryByTestId('calories-input')).toBeNull();
+    expect(screen.queryByTestId('protein-input')).toBeNull();
+
+    // Day total remains visible
+    expect(screen.getByTestId('staged-meal-day-total')).toBeInTheDocument();
+    expect(screen.getByTestId('day-total-val-calories')).toHaveTextContent('665'); // 500 + 165
   });
 
   it('Option A: wires onEditNutrition to update item nutrition and recompute staged totals', () => {

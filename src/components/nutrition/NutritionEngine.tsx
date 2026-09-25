@@ -155,13 +155,14 @@ export const NutritionEngine: React.FC = () => {
     const items = stagedMeal.items.map(stagedToItem);
     const totals = sumItems(items);
     const isSingle = items.length <= 1;
+    const item0 = items[0];
     const payload = {
       food_name: stagedMeal.name,
-      calories: isSingle ? roundTo1Decimal(stagedMeal.calories) : roundTo1Decimal(totals.calories),
-      protein: isSingle ? roundTo1Decimal(stagedMeal.protein) : roundTo1Decimal(totals.protein),
-      carbs: isSingle ? roundTo1Decimal(stagedMeal.carbs) : roundTo1Decimal(totals.carbs),
-      fat: isSingle ? roundTo1Decimal(stagedMeal.fat) : roundTo1Decimal(totals.fat),
-      fiber: isSingle ? roundTo1Decimal(stagedMeal.fiber) : roundTo1Decimal(totals.fiber),
+      calories: isSingle && item0 ? roundTo1Decimal(item0.calories) : roundTo1Decimal(totals.calories),
+      protein: isSingle && item0 ? roundTo1Decimal(item0.protein) : roundTo1Decimal(totals.protein),
+      carbs: isSingle && item0 ? roundTo1Decimal(item0.carbs) : roundTo1Decimal(totals.carbs),
+      fat: isSingle && item0 ? roundTo1Decimal(item0.fat) : roundTo1Decimal(totals.fat),
+      fiber: isSingle && item0 ? roundTo1Decimal(item0.fiber) : roundTo1Decimal(totals.fiber),
       meal_type: stagedMeal.mealType,
       serving_size: Number(stagedMeal.servingSize) || 1,
       serving_unit: stagedMeal.servingUnit || 'serving',
