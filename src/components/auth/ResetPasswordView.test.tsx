@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ResetPasswordView } from './ResetPasswordView';
 import { BrowserRouter } from 'react-router-dom';
@@ -29,6 +29,11 @@ describe('ResetPasswordView', () => {
     clearMockHistory();
     mockUpdateUser.mockResolvedValue({ data: { user: {} }, error: null });
     queryClient = new QueryClient();
+  });
+
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
   });
 
   const renderComponent = () =>
@@ -150,22 +155,23 @@ describe('ResetPasswordView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Set New Password' }));
 
     // Node identity preserved across error transition
-    expect(container.querySelector('[role="status"]')).toBe(polite);
-    expect(container.querySelector('[role="alert"]')).toBe(assertive);
-    expect(assertive!.textContent).toContain('Passwords do not match');
-    expect(polite!.textContent).toBe('');
+    await waitFor(() => {
+      expect(container.querySelector('[role="status"]')).toBe(polite);
+      expect(container.querySelector('[role="alert"]')).toBe(assertive);
+      expect(assertive!.textContent).toContain('Passwords do not match');
+      expect(polite!.textContent).toBe('');
+    });
 
     // Trigger success
     fireEvent.change(confirmPwdInput, { target: { value: 'password123' } });
     fireEvent.click(screen.getByRole('button', { name: 'Set New Password' }));
 
+    // Node identity preserved across success transition
     await waitFor(() => {
       expect(mockUpdateUser).toHaveBeenCalledWith({ password: 'password123' });
+      expect(container.querySelector('[role="status"]')).toBe(polite);
+      expect(container.querySelector('[role="alert"]')).toBe(assertive);
+      expect(polite!.textContent).toContain('Password Updated Successfully!');
     });
-
-    // Node identity preserved across success transition
-    expect(container.querySelector('[role="status"]')).toBe(polite);
-    expect(container.querySelector('[role="alert"]')).toBe(assertive);
-    expect(polite!.textContent).toContain('Password Updated Successfully!');
   });
 });

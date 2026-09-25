@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { Lock, AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react';
@@ -15,6 +15,15 @@ export const ResetPasswordView: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => {
+        navigate('/workout');
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [success, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,9 +42,6 @@ export const ResetPasswordView: React.FC = () => {
     const res = await resetPassword(password);
     if (res.success) {
       setSuccess(true);
-      setTimeout(() => {
-        navigate('/workout');
-      }, 3000);
     } else {
       setError(res.error || 'Failed to reset password');
     }
