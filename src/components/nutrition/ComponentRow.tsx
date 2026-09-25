@@ -178,7 +178,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
           {editable ? (
             <div
               data-testid="component-quantity-field"
-              className="w-[100px] min-h-[40px] h-10 shrink-0 rounded-lg border border-border-interactive bg-zinc-950 flex items-center overflow-hidden transition hover:border-cyan-500/70 focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-400"
+              className="w-[100px] min-h-[44px] h-11 -my-0.5 shrink-0 rounded-lg border border-border-interactive bg-zinc-950 flex items-center overflow-hidden transition hover:border-cyan-500/70 focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-400 [&_button]:!min-h-[44px] [&_button]:!h-11"
             >
               <input
                 type="number"
@@ -198,7 +198,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
                     commit((e.target as HTMLInputElement).value);
                   }
                 }}
-                className="min-h-[40px] h-10 w-[46px] shrink-0 bg-transparent text-right pr-1 pl-1 text-base font-semibold tabular-nums text-white outline-none border-0 m-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="min-h-[44px] h-11 w-[46px] shrink-0 bg-transparent text-right pr-1 pl-1 text-base font-semibold tabular-nums text-white outline-none border-0 m-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
               <UnitChip
                 value={activeUnit}
@@ -215,7 +215,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
           )}
 
           {!readOnly && menuItems.length > 0 && (
-            <div className="[&>div>button]:!min-h-[40px] [&>div>button]:!h-10 [&>div>button]:!min-w-[40px] [&>div>button]:!w-10 [&>div>button]:!p-0 flex items-center justify-center">
+            <div className="-my-0.5 [&>div>button]:!min-h-[44px] [&>div>button]:!h-11 [&>div>button]:!min-w-[44px] [&>div>button]:!w-11 [&>div>button]:!p-0 flex items-center justify-center">
               <OverflowMenu
                 ariaLabel={`Actions for ${item.name}`}
                 items={menuItems}
