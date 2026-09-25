@@ -22,8 +22,9 @@ function createMockDish(overrides: Partial<CustomDish & { notes?: string | null 
 }
 describe('QuickLogFavorites (Horizontal Bar Redesign)', () => {
 
-  it('renders top 5 dishes in collapsed state and provides expander button to toggle full list', () => {
-    const dishes = Array.from({ length: 7 }, (_, i) =>
+  // PART A Unit Test (1): 3 shown by default when there are 5
+  it('(1) 3 shown by default when there are 5', () => {
+    const dishes = Array.from({ length: 5 }, (_, i) =>
       createMockDish({
         id: `dish-${i + 1}`,
         name: `Dish ${i + 1}`,
@@ -42,31 +43,33 @@ describe('QuickLogFavorites (Horizontal Bar Redesign)', () => {
       />
     );
 
-    // Only top 5 dishes should be rendered in collapsed state
-    for (let i = 1; i <= 5; i++) {
+    // Only top 3 dishes should be rendered in collapsed state
+    for (let i = 1; i <= 3; i++) {
       expect(screen.getByTestId(`custom-dish-card-dish-${i}`)).toBeDefined();
     }
-    // Dishes beyond top 5 must NOT be rendered in collapsed state
-    expect(screen.queryByTestId('custom-dish-card-dish-6')).toBeNull();
-    expect(screen.queryByTestId('custom-dish-card-dish-7')).toBeNull();
+    // Dishes beyond top 3 must NOT be rendered in collapsed state
+    expect(screen.queryByTestId('custom-dish-card-dish-4')).toBeNull();
+    expect(screen.queryByTestId('custom-dish-card-dish-5')).toBeNull();
 
-    // Expander button is present and indicates 7 total favorites
+    // Expander button is present and indicates 5 total favorites
     const expandBtn = screen.getByTestId('open-favorites-sheet-btn');
     expect(expandBtn).toBeDefined();
-    expect(expandBtn.textContent).toContain('Show all 7 favorites');
+    expect(expandBtn.textContent).toContain('Show all 5 favorites');
 
-    // Click expander: renders all 7 dishes
+    // Click expander: renders all 5 dishes
     fireEvent.click(expandBtn);
-    for (let i = 1; i <= 7; i++) {
+    for (let i = 1; i <= 5; i++) {
       expect(screen.getByTestId(`custom-dish-card-dish-${i}`)).toBeDefined();
     }
     expect(expandBtn.textContent).toContain('Collapse to top favorites');
 
-    // Click expander again: collapses back to top 5
+    // Click expander again: collapses back to top 3
     fireEvent.click(expandBtn);
-    expect(screen.getByTestId('custom-dish-card-dish-5')).toBeDefined();
-    expect(screen.queryByTestId('custom-dish-card-dish-6')).toBeNull();
-    expect(screen.queryByTestId('custom-dish-card-dish-7')).toBeNull();
+    expect(screen.getByTestId('custom-dish-card-dish-1')).toBeDefined();
+    expect(screen.getByTestId('custom-dish-card-dish-2')).toBeDefined();
+    expect(screen.getByTestId('custom-dish-card-dish-3')).toBeDefined();
+    expect(screen.queryByTestId('custom-dish-card-dish-4')).toBeNull();
+    expect(screen.queryByTestId('custom-dish-card-dish-5')).toBeNull();
   });
 
   it('renders clean empty state when no custom dishes exist', () => {
@@ -204,13 +207,13 @@ describe('QuickLogFavorites (Horizontal Bar Redesign)', () => {
       />
     );
 
-    // Order should be: Dish B (10), Dish D (5, newer), Dish C (5, older), Dish A (3), Dish E (2)
-    // Dish F (1) is 6th and should not be inline initially
+    // Order should be: Dish B (10), Dish D (5, newer), Dish C (5, older), Dish A (3), Dish E (2), Dish F (1)
+    // In collapsed state per D26, top 3 (B, D, C) are rendered; A, E, F are beyond top 3
     expect(screen.getByTestId('custom-dish-card-dish-b')).toBeDefined();
     expect(screen.getByTestId('custom-dish-card-dish-d')).toBeDefined();
     expect(screen.getByTestId('custom-dish-card-dish-c')).toBeDefined();
-    expect(screen.getByTestId('custom-dish-card-dish-a')).toBeDefined();
-    expect(screen.getByTestId('custom-dish-card-dish-e')).toBeDefined();
+    expect(screen.queryByTestId('custom-dish-card-dish-a')).toBeNull();
+    expect(screen.queryByTestId('custom-dish-card-dish-e')).toBeNull();
     expect(screen.queryByTestId('custom-dish-card-dish-f')).toBeNull();
 
     // Verify NO pin UI exists (strictly forbidden by locked decisions)
@@ -336,8 +339,8 @@ describe('QuickLogFavorites (Horizontal Bar Redesign)', () => {
     expect(screen.getByText('Protein Shake Vanilla')).toBeDefined();
   });
 
-  // §5 Required Test 4: The adaptive row classes are present on the right rows
-  it('row 5 carries the max-height:799px hidden variant (class contract, not a layout measurement)', () => {
+  // D26: visible rows in collapsed state are strictly 3 without media-query hiding
+  it('rendered rows in collapsed state do not carry height hiding variants (superseded by D26 fixed top 3 slice)', () => {
     const dishes = Array.from({ length: 5 }, (_, i) =>
       createMockDish({ id: `dish-${i + 1}`, name: `Dish ${i + 1}` })
     );
@@ -353,20 +356,13 @@ describe('QuickLogFavorites (Horizontal Bar Redesign)', () => {
       />
     );
 
-    // Rows 1-3 (indices 0, 1, 2) must NOT carry height hiding variants
+    // Exactly 3 rows rendered in collapsed state
     for (let i = 0; i < 3; i++) {
       const row = screen.getByTestId(`favorite-row-${i}`);
       expect(row.className).not.toContain('max-height');
     }
-
-    // Row 4 (index 3) must carry max-height:699px variant, but NOT max-height:799px
-    const row4 = screen.getByTestId('favorite-row-3');
-    expect(row4.className).toContain('[@media(max-height:699px)]:hidden');
-    expect(row4.className).not.toContain('[@media(max-height:799px)]:hidden');
-
-    // Row 5 (index 4) must carry max-height:799px variant on its row container
-    const row5 = screen.getByTestId('favorite-row-4');
-    expect(row5.className).toContain('[@media(max-height:799px)]:hidden');
+    expect(screen.queryByTestId('favorite-row-3')).toBeNull();
+    expect(screen.queryByTestId('favorite-row-4')).toBeNull();
   });
 
   // §5 Required Test 5: Bar density contract
@@ -495,8 +491,8 @@ describe('QuickLogFavorites (Horizontal Bar Redesign)', () => {
     expect(screen.getByText('(1 of 3)')).toBeDefined();
   });
 
-  // Attack G1 & G2: Expander renders for 4-dish list carrying min-height:700px variant and aria-expanded contract
-  it('Attack G1 & G2: expander renders for 4-dish list carrying min-height:700px variant and aria-expanded contract', () => {
+  // Attack G1 & G2: Expander renders for 4-dish list without min-height hiding variant and aria-expanded contract
+  it('Attack G1 & G2: expander renders for 4-dish list without min-height hiding variant and aria-expanded contract', () => {
     const dishes = Array.from({ length: 4 }, (_, i) =>
       createMockDish({ id: `dish-${i + 1}`, name: `Dish ${i + 1}` })
     );
@@ -515,7 +511,7 @@ describe('QuickLogFavorites (Horizontal Bar Redesign)', () => {
     const expandBtn = screen.getByTestId('open-favorites-sheet-btn');
     expect(expandBtn).toBeDefined();
     expect(expandBtn.getAttribute('aria-expanded')).toBe('false');
-    expect(expandBtn.className).toContain('[@media(min-height:700px)]:hidden');
+    expect(expandBtn.className).not.toContain('min-height');
     expect(expandBtn.textContent).toContain('Show all 4 favorites');
 
     fireEvent.click(expandBtn);
@@ -523,8 +519,8 @@ describe('QuickLogFavorites (Horizontal Bar Redesign)', () => {
     expect(expandBtn.textContent).toContain('Collapse to top favorites');
   });
 
-  // Attack G1: Expander renders for 5-dish list carrying min-height:800px variant
-  it('Attack G1: expander renders for 5-dish list carrying min-height:800px variant', () => {
+  // Attack G1: Expander renders for 5-dish list without min-height hiding variant
+  it('Attack G1: expander renders for 5-dish list without min-height hiding variant', () => {
     const dishes = Array.from({ length: 5 }, (_, i) =>
       createMockDish({ id: `dish-${i + 1}`, name: `Dish ${i + 1}` })
     );
@@ -542,7 +538,7 @@ describe('QuickLogFavorites (Horizontal Bar Redesign)', () => {
 
     const expandBtn = screen.getByTestId('open-favorites-sheet-btn');
     expect(expandBtn).toBeDefined();
-    expect(expandBtn.className).toContain('[@media(min-height:800px)]:hidden');
+    expect(expandBtn.className).not.toContain('min-height');
     expect(expandBtn.textContent).toContain('Show all 5 favorites');
   });
 
@@ -596,5 +592,124 @@ describe('QuickLogFavorites (Horizontal Bar Redesign)', () => {
     expect(statusRegions).toContain(noResults);
     expect(noResults.getAttribute('aria-live')).toBe('polite');
   });
-});
 
+  // PART A Unit Test (2): exactly 4 favorites -> expander shows, clicking it reveals the 4th
+  it('(2) exactly 4 favorites -> expander shows, clicking it reveals the 4th', () => {
+    const dishes = Array.from({ length: 4 }, (_, i) =>
+      createMockDish({
+        id: `dish-${i + 1}`,
+        name: `Dish ${i + 1}`,
+        use_count: 10 - i,
+      })
+    );
+
+    render(
+      <QuickLogFavorites
+        customDishes={dishes}
+        onOpenNewDishModal={vi.fn()}
+        onStageCustomDish={vi.fn()}
+        onOpenEditDishModal={vi.fn()}
+        onQuickLogCustomDishDirect={vi.fn()}
+        onDismissToast={vi.fn()}
+      />
+    );
+
+    // Only top 3 dishes should be rendered in collapsed state
+    expect(screen.getByTestId('custom-dish-card-dish-1')).toBeDefined();
+    expect(screen.getByTestId('custom-dish-card-dish-2')).toBeDefined();
+    expect(screen.getByTestId('custom-dish-card-dish-3')).toBeDefined();
+    expect(screen.queryByTestId('custom-dish-card-dish-4')).toBeNull();
+
+    // Expander button is present and indicates 4 total favorites
+    const expandBtn = screen.getByTestId('open-favorites-sheet-btn');
+    expect(expandBtn).toBeDefined();
+    expect(expandBtn.textContent).toContain('Show all 4 favorites');
+
+    // Click expander: reveals the 4th dish
+    fireEvent.click(expandBtn);
+    expect(screen.getByTestId('custom-dish-card-dish-4')).toBeDefined();
+    expect(expandBtn.textContent).toContain('Collapse to top favorites');
+  });
+
+  // PART A Unit Test (3): <=3 favorites (test 3 and 1) -> no expander
+  it('(3) <=3 favorites (test 3 and 1) -> no expander', () => {
+    // Sub-case 3A: exactly 3 favorites
+    const dishes3 = Array.from({ length: 3 }, (_, i) =>
+      createMockDish({ id: `dish-3-${i + 1}`, name: `Dish 3-${i + 1}` })
+    );
+
+    const { unmount } = render(
+      <QuickLogFavorites
+        customDishes={dishes3}
+        onOpenNewDishModal={vi.fn()}
+        onStageCustomDish={vi.fn()}
+        onOpenEditDishModal={vi.fn()}
+        onQuickLogCustomDishDirect={vi.fn()}
+        onDismissToast={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId('custom-dish-card-dish-3-1')).toBeDefined();
+    expect(screen.getByTestId('custom-dish-card-dish-3-2')).toBeDefined();
+    expect(screen.getByTestId('custom-dish-card-dish-3-3')).toBeDefined();
+    expect(screen.queryByTestId('open-favorites-sheet-btn')).toBeNull();
+
+    unmount();
+
+    // Sub-case 3B: exactly 1 favorite
+    const dishes1 = [createMockDish({ id: 'dish-1-single', name: 'Single Favorite' })];
+    render(
+      <QuickLogFavorites
+        customDishes={dishes1}
+        onOpenNewDishModal={vi.fn()}
+        onStageCustomDish={vi.fn()}
+        onOpenEditDishModal={vi.fn()}
+        onQuickLogCustomDishDirect={vi.fn()}
+        onDismissToast={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId('custom-dish-card-dish-1-single')).toBeDefined();
+    expect(screen.queryByTestId('open-favorites-sheet-btn')).toBeNull();
+  });
+
+  // PART A Unit Test (4): search filters across ALL favorites (including ones beyond the first 3)
+  it('(4) search filters across ALL favorites (including ones beyond the first 3)', () => {
+    const dishes = Array.from({ length: 6 }, (_, i) =>
+      createMockDish({
+        id: `dish-${i + 1}`,
+        name: i === 4 ? 'Target Salmon Bowl' : `Filler Dish ${i + 1}`,
+        use_count: 10 - i,
+      })
+    );
+
+    render(
+      <QuickLogFavorites
+        customDishes={dishes}
+        onOpenNewDishModal={vi.fn()}
+        onStageCustomDish={vi.fn()}
+        onOpenEditDishModal={vi.fn()}
+        onQuickLogCustomDishDirect={vi.fn()}
+        onDismissToast={vi.fn()}
+      />
+    );
+
+    // Dish 5 is ranked 5th, beyond default cap of 3
+    expect(screen.queryByTestId('custom-dish-card-dish-5')).toBeNull();
+
+    // Perform search matching Dish 5
+    const searchInput = screen.getByTestId('search-favorites-input');
+    fireEvent.change(searchInput, { target: { value: 'salmon' } });
+
+    // Dish 5 MUST now be rendered in the DOM
+    expect(screen.getByTestId('custom-dish-card-dish-5')).toBeDefined();
+    // Non-matching dishes must not be rendered
+    expect(screen.queryByTestId('custom-dish-card-dish-1')).toBeNull();
+    expect(screen.queryByTestId('custom-dish-card-dish-2')).toBeNull();
+    expect(screen.queryByTestId('custom-dish-card-dish-3')).toBeNull();
+    expect(screen.queryByTestId('custom-dish-card-dish-4')).toBeNull();
+    expect(screen.queryByTestId('custom-dish-card-dish-6')).toBeNull();
+    // Result count reflects (1 of 6)
+    expect(screen.getByText('(1 of 6)')).toBeDefined();
+  });
+});

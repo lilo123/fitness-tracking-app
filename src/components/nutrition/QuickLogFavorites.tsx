@@ -50,10 +50,10 @@ export const QuickLogFavorites: React.FC<QuickLogFavoritesProps> = ({
     );
   }, [sortedDishes, isSearching, trimmedQuery]);
 
-  // Determine which dishes to render:
+  // Determine which dishes to render (D26):
   // - When searching: all matching dishes rendered (bypasses cap)
   // - When expanded: all dishes rendered
-  // - When collapsed: top 5 rendered (CSS media queries hide rows 4 and 5 depending on viewport height)
+  // - When collapsed: top 3 rendered
   const dishesToRender = useMemo(() => {
     if (isSearching) {
       return filteredDishes;
@@ -61,39 +61,13 @@ export const QuickLogFavorites: React.FC<QuickLogFavoritesProps> = ({
     if (isExpanded) {
       return sortedDishes;
     }
-    return sortedDishes.slice(0, 5);
+    return sortedDishes.slice(0, 3);
   }, [isSearching, isExpanded, filteredDishes, sortedDishes]);
 
-  // Adaptive CSS classes for collapsed mode top 5:
-  // >= 800px: 5 rows
-  // 700px-799px: 4 rows (row 5 / index 4 hidden)
-  // < 700px: 3 rows (rows 4 & 5 / indices 3 & 4 hidden)
-  const getAdaptiveRowClass = (index: number) => {
-    if (index === 3) {
-      return '[@media(max-height:699px)]:hidden';
-    }
-    if (index === 4) {
-      return '[@media(max-height:799px)]:hidden';
-    }
-    return undefined;
-  };
-
-  // Adaptive expander visibility (Attack G1):
-  // - > 5 dishes: always render expander
-  // - 5 dishes: render expander, but hide at >=800px where all 5 already show
-  // - 4 dishes: render expander, but hide at >=700px where all 4 already show
+  // Expander visibility (D26):
+  // - > 3 dishes: render expander to toggle between top 3 and full list
   // - <= 3 dishes: no expander needed
   const hasOverflow = sortedDishes.length > 3;
-
-  const getExpanderAdaptiveClass = (count: number) => {
-    if (count === 4) {
-      return '[@media(min-height:700px)]:hidden';
-    }
-    if (count === 5) {
-      return '[@media(min-height:800px)]:hidden';
-    }
-    return undefined;
-  };
 
   return (
     <section className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-4 sm:p-5 shadow-2xl space-y-3">
@@ -174,16 +148,10 @@ export const QuickLogFavorites: React.FC<QuickLogFavoritesProps> = ({
               }`}
             >
               {dishesToRender.map((dish, index) => {
-                const adaptiveClass =
-                  !isExpanded && !isSearching
-                    ? getAdaptiveRowClass(index)
-                    : undefined;
-
                 return (
                   <div
                     key={dish.id}
                     data-testid={`favorite-row-${index}`}
-                    className={adaptiveClass}
                   >
                     <QuickLogDishCard
                       dish={dish}
@@ -206,9 +174,7 @@ export const QuickLogFavorites: React.FC<QuickLogFavoritesProps> = ({
               aria-expanded={isExpanded}
               /* Preserved verbatim: data-testid="open-favorites-sheet-btn" for test backwards compatibility */
               data-testid="open-favorites-sheet-btn"
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-zinc-950 hover:bg-zinc-850 border border-border-interactive text-xs font-semibold text-zinc-300 hover:text-white transition touch-manipulation min-h-[44px] group shadow-sm ${
-                getExpanderAdaptiveClass(sortedDishes.length) ?? ''
-              }`.trimEnd()}
+              className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-zinc-950 hover:bg-zinc-850 border border-border-interactive text-xs font-semibold text-zinc-300 hover:text-white transition touch-manipulation min-h-[44px] group shadow-sm"
             >
               <span className="text-zinc-300 group-hover:text-white">
                 {isExpanded

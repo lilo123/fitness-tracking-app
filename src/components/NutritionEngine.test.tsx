@@ -2803,12 +2803,12 @@ Total Fiber: 1 g`;
       expect(screen.getByTestId('custom-dish-card-dish-perf-1')).toBeDefined();
     });
 
-    // Verify top 5 dishes are rendered inline in collapsed state
-    for (let i = 1; i <= 5; i++) {
+    // Verify top 3 dishes are rendered inline in collapsed state (D26)
+    for (let i = 1; i <= 3; i++) {
       expect(screen.getByTestId(`custom-dish-card-dish-perf-${i}`)).toBeDefined();
     }
-    // Verify dishes beyond top 5 are NOT rendered inline in collapsed state
-    for (let i = 6; i <= 10; i++) {
+    // Verify dishes beyond top 3 are NOT rendered inline in collapsed state
+    for (let i = 4; i <= 10; i++) {
       expect(screen.queryByTestId(`custom-dish-card-dish-perf-${i}`)).toBeNull();
     }
 
