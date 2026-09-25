@@ -67,7 +67,7 @@ export const MacroRing: React.FC<MacroRingProps> = ({
             strokeDashoffset={strokeDashoffset}
             strokeLinecap="round"
             fill="transparent"
-            className="transition-all duration-700 ease-out"
+            className="transition-all duration-700 ease-out motion-reduce:transition-none"
           />
         </svg>
         <div className="absolute flex flex-col items-center justify-center text-center">
