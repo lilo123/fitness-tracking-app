@@ -19,10 +19,6 @@ export interface EditMealModalProps {
 
 const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Pre-Workout', 'Post-Workout'];
 
-// The message mapper moved to utils so MealLogRow can share it; re-exported
-// here because this module was its original home and both callers and tests
-// import it from this path.
-export { friendlyError };
 
 interface EditMealFormProps {
   meal: NutritionLog;

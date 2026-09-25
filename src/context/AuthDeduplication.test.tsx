@@ -104,7 +104,10 @@ describe('F-15: In-Flight Promise Deduplication', () => {
     let authContextVal: any = null;
 
     const DualCallerConsumer: React.FC = () => {
-      authContextVal = useAuth();
+      const auth = useAuth();
+      React.useEffect(() => {
+        authContextVal = auth;
+      });
       return <div>DualCaller</div>;
     };
 
@@ -146,7 +149,10 @@ describe('F-15: In-Flight Promise Deduplication', () => {
     let authContextVal: any = null;
 
     const Consumer: React.FC = () => {
-      authContextVal = useAuth();
+      const auth = useAuth();
+      React.useEffect(() => {
+        authContextVal = auth;
+      });
       return <div>Consumer</div>;
     };
 
@@ -178,8 +184,12 @@ describe('F-15: In-Flight Promise Deduplication', () => {
     let authContextVal: any = null;
 
     const CoachConsumer: React.FC = () => {
-      authContextVal = useAuth();
-      coachContextVal = useCoach();
+      const auth = useAuth();
+      const coach = useCoach();
+      React.useEffect(() => {
+        authContextVal = auth;
+        coachContextVal = coach;
+      });
       return <div>CoachConsumer</div>;
     };
 
@@ -227,8 +237,12 @@ describe('F-15: In-Flight Promise Deduplication', () => {
     let authContextVal: any = null;
 
     const CoachConsumer: React.FC = () => {
-      authContextVal = useAuth();
-      coachContextVal = useCoach();
+      const auth = useAuth();
+      const coach = useCoach();
+      React.useEffect(() => {
+        authContextVal = auth;
+        coachContextVal = coach;
+      });
       return <div>CoachConsumer</div>;
     };
 
