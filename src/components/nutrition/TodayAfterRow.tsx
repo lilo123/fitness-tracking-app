@@ -92,5 +92,3 @@ export const DayTotalRow: React.FC<DayTotalRowProps> = ({
   );
 };
 
-export const TodayAfterRow = DayTotalRow;
-export type TodayAfterRowProps = DayTotalRowProps;

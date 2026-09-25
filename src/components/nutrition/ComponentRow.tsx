@@ -26,10 +26,9 @@ export interface ComponentRowProps {
  * Compact item row for staged meals and meal logs (Fixes D1, D2, D6, R3).
  *
  * Layout:
- *   Left  (flex-1 min-w-0): name (line 1, truncate) stacked above non-zero macros
+ *   Left  (flex-1 min-w-0): name (line 1, up to 2 lines) stacked above non-zero macros
  *         (line 2, kcal first in amber, then non-zero P/C/F/Fib in macro colors).
- *   Right (shrink-0): compact stepper [ - ][ editable qty input ][ + ] with inline UnitChip,
- *         followed by the OverflowMenu (⋯).
+ *   Right (shrink-0): bordered [qty input][UnitChip] field (D17), followed by the OverflowMenu (⋯).
  *
  * Maintains touch target sizes >= 40x40 px and typography >= 12 px (text-xs).
  */
@@ -163,7 +162,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
       data-testid="component-row"
       className="py-0.5 border-b border-zinc-800/80 last:border-b-0 min-h-[44px] flex flex-col justify-center gap-0.5"
     >
-      {/* LINE 1: Name (left, flex-1, may truncate) + stepper and ⋯ (right) */}
+      {/* LINE 1: Name (left, flex-1, may wrap) + [qty][unit] field and ⋯ (right) */}
       <div className="flex items-center justify-between gap-1.5 sm:gap-2">
         <div
           data-testid="component-name"
