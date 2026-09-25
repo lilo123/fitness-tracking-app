@@ -131,7 +131,7 @@ describe('NutritionEngine', () => {
     const input = screen.getByPlaceholderText(
       'Describe what you ate (e.g., 3 eggs, 2 slices sourdough, 1 tbsp butter)'
     );
-    await userEvent.type(input, '3 eggs, 2 slices sourdough, 1 tbsp butter');
+    fireEvent.change(input, { target: { value: '3 eggs, 2 slices sourdough, 1 tbsp butter' } });
 
     const analyzeBtn = screen.getByText('Analyze Meal');
     fireEvent.click(analyzeBtn);
@@ -3797,9 +3797,8 @@ Total Fiber: 1 g`;
       fireEvent.click(logBtn);
 
       await waitFor(() => {
-        expect(screen.getByTestId('status-message')).toBeInTheDocument();
+        expect(screen.getByTestId('status-message')).toHaveTextContent(/Failed to save log: Database write failed/i);
       });
-      expect(screen.getByTestId('status-message')).toHaveTextContent(/Failed to save log: Database write failed/i);
       expect(screen.getByTestId('staged-meal-card')).toBeInTheDocument();
     });
 
@@ -3844,9 +3843,8 @@ Total Fiber: 1 g`;
       fireEvent.click(saveDishBtn);
 
       await waitFor(() => {
-        expect(screen.getByTestId('status-message')).toBeInTheDocument();
+        expect(screen.getByTestId('status-message')).toHaveTextContent(/Failed to save custom dish/i);
       });
-      expect(screen.getByTestId('status-message')).toHaveTextContent(/Failed to save custom dish/i);
       expect(screen.getByTestId('staged-meal-card')).toBeInTheDocument();
     });
 
@@ -4011,6 +4009,7 @@ Total Fiber: 1 g`;
 
       await waitFor(() => {
         expect(screen.getByTestId('staged-meal-card')).toBeDefined();
+        expect(screen.getByTestId('dish-name-input')).toBe(document.activeElement);
       });
 
       const dateInput = screen.getByTestId('nutrition-date-input');
@@ -4023,6 +4022,7 @@ Total Fiber: 1 g`;
 
       await waitFor(() => {
         expect(screen.queryByTestId('staged-meal-card')).toBeNull();
+        expect(document.activeElement).toBe(dateInput);
       });
 
       // Focus should remain on the date input, NOT moved to AI textarea
@@ -4053,6 +4053,7 @@ Total Fiber: 1 g`;
 
       await waitFor(() => {
         expect(screen.getByTestId('staged-meal-card')).toBeDefined();
+        expect(screen.getByTestId('dish-name-input')).toBe(document.activeElement);
       });
 
       // Focus an element inside the staged card first
@@ -4074,6 +4075,7 @@ Total Fiber: 1 g`;
 
       await waitFor(() => {
         expect(screen.queryByTestId('staged-meal-card')).toBeNull();
+        expect(document.activeElement).toBe(dateInput);
       });
 
       // Focus must remain on the outside element, not stolen back to textarea
