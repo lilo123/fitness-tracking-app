@@ -363,6 +363,8 @@ export const NutritionEngine: React.FC = () => {
       {stagedMeal && (
         <StagedMealCard
           stagedMeal={stagedMeal}
+          dailyTotals={dailyTotals}
+          targets={targets}
           onUpdateStagedMeal={setStagedMeal}
           onApplyStagedItemChange={applyStagedItemChange}
           onDeleteItem={handleDeleteItem}

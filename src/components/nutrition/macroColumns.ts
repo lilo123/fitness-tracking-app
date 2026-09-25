@@ -79,3 +79,19 @@ export function computeVisibleMacroColumns(
 export function getMacroGridTemplateColumns(columns: MacroColumnKey[]): string {
   return columns.map((col) => (col === 'calories' ? '4.5rem' : '3.5rem')).join(' ');
 }
+
+/**
+ * Computes the warning status for budget progress:
+ * - 'danger' if newVal > target
+ * - 'warn' if newVal >= 0.9 * target
+ * - 'neutral' if newVal < 0.9 * target or target is zero/missing
+ */
+export function getBudgetWarningStatus(
+  newVal: number,
+  target: number
+): 'neutral' | 'warn' | 'danger' {
+  if (target <= 0) return 'neutral';
+  if (newVal > target) return 'danger';
+  if (newVal >= 0.9 * target) return 'warn';
+  return 'neutral';
+}

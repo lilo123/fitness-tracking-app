@@ -461,4 +461,88 @@ describe('StagedMealCard', () => {
     // Totals recomputed: 484 - 104 + 150 = 530 kcal
     expect(updated.calories).toBe(530);
   });
+
+  it('Task 5 (revised D8): renders This meal label on totals and Day total row directly under bold totals when dailyTotals and targets provided', () => {
+    const meal = makeMultiItemMeal();
+    render(
+      <StagedMealCard
+        stagedMeal={meal}
+        dailyTotals={{ calories: 1000, protein: 50, carbs: 0, fat: 30, fiber: 0 }}
+        targets={{ calories: 2000, protein: 120, carbs: 200, fat: 70, fiber: 30 }}
+        onUpdateStagedMeal={vi.fn()}
+        onApplyStagedItemChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onSaveItemAsCustomDish={vi.fn()}
+        onLogStagedMeal={vi.fn()}
+        onSaveStagedAsCustomDish={vi.fn()}
+        onDiscardStagedMeal={vi.fn()}
+        isPending={false}
+      />
+    );
+
+    // This meal label on totals
+    expect(screen.getByTestId('this-meal-label')).toHaveTextContent('This meal');
+
+    // Day total row
+    const dayTotal = screen.getByTestId('staged-meal-day-total');
+    expect(dayTotal).toBeInTheDocument();
+    expect(screen.getByTestId('day-total-label')).toHaveTextContent('Day total');
+
+    // Multi-item meal has totals: 484 kcal, 39.5 P, 34.5 F
+    // Daily totals: 1000 kcal, 50 P, 30 F
+    // Day total: 1484 kcal, 89.5 P, 64.5 F
+    expect(screen.getByTestId('day-total-val-calories')).toHaveTextContent('1484');
+    expect(screen.getByTestId('day-total-val-protein')).toHaveTextContent('89.5');
+    expect(screen.getByTestId('day-total-val-fat')).toHaveTextContent('64.5');
+  });
+
+  it('Task 5: omits Day total row when neither dailyTotals nor targets provided', () => {
+    const meal = makeMultiItemMeal();
+    render(
+      <StagedMealCard
+        stagedMeal={meal}
+        onUpdateStagedMeal={vi.fn()}
+        onApplyStagedItemChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onSaveItemAsCustomDish={vi.fn()}
+        onLogStagedMeal={vi.fn()}
+        onSaveStagedAsCustomDish={vi.fn()}
+        onDiscardStagedMeal={vi.fn()}
+        isPending={false}
+      />
+    );
+
+    expect(screen.queryByTestId('staged-meal-day-total')).toBeNull();
+  });
+
+  it('Task 5: highlights red and adds accessible text when over target, keeps standard macro colors otherwise', () => {
+    const meal = makeMultiItemMeal(); // 484 kcal, 39.5 P
+    render(
+      <StagedMealCard
+        stagedMeal={meal}
+        dailyTotals={{ calories: 1600, protein: 75, carbs: 0, fat: 20, fiber: 0 }}
+        targets={{ calories: 2000, protein: 120, carbs: 200, fat: 80, fiber: 30 }}
+        onUpdateStagedMeal={vi.fn()}
+        onApplyStagedItemChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onSaveItemAsCustomDish={vi.fn()}
+        onLogStagedMeal={vi.fn()}
+        onSaveStagedAsCustomDish={vi.fn()}
+        onDiscardStagedMeal={vi.fn()}
+        isPending={false}
+      />
+    );
+
+    // Calories: 1600 + 484 = 2084 > 2000 -> red (text-red-400), accessible description present
+    const calCell = screen.getByTestId('day-total-calories');
+    expect(calCell).toHaveClass('text-red-400');
+    expect(screen.getByTestId('day-total-over-calories')).toHaveTextContent('over target by 84 kcal');
+
+    // Protein: 75 + 39.5 = 114.5 <= 120 -> cyan-400 (no amber tier, no red)
+    const pCell = screen.getByTestId('day-total-protein');
+    expect(pCell).toHaveClass('text-cyan-400');
+    expect(pCell).not.toHaveClass('text-red-400');
+    expect(screen.queryByTestId('day-total-over-protein')).toBeNull();
+  });
 });
+

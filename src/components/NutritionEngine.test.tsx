@@ -3120,6 +3120,70 @@ Total Fiber: 1 g`;
       expect(dishBanner.textContent).toContain('Failed to load saved dishes');
       expect(dishBanner.textContent).toContain('column custom_dishes.kind does not exist');
     });
+
+    it('threads dailyTotals and targets to StagedMealCard showing Today after row', async () => {
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'nutrition_logs') {
+          return createSupabaseBuilder(table, {
+            data: [
+              {
+                id: 'log-1',
+                user_id: 'test-user',
+                food_name: 'Previous meal',
+                meal_type: 'Breakfast',
+                calories: 500,
+                protein: 40,
+                carbs: 50,
+                fat: 20,
+                fiber: 5,
+                serving_size: 1,
+                serving_unit: 'serving',
+                logged_at: new Date().toISOString(),
+                logged_date: new Date().toISOString().split('T')[0],
+                created_at: new Date().toISOString(),
+                has_components: false,
+              },
+            ],
+            error: null,
+          });
+        }
+        return createSupabaseBuilder(table, { data: [], error: null });
+      });
+
+      (supabase.functions.invoke as any).mockResolvedValue({
+        data: {
+          name: 'Chicken and Rice',
+          calories: 600,
+          protein: 50,
+          carbs: 60,
+          fat: 10,
+          fiber: 2,
+          explanation: 'Chicken + Rice = 600 kcal',
+          items: [
+            { name: 'Chicken', portion: '150g', calories: 250, protein: 45, carbs: 0, fat: 5, fiber: 0, quantity: 150, unit: 'g' },
+            { name: 'Rice', portion: '200g', calories: 350, protein: 5, carbs: 60, fat: 5, fiber: 2, quantity: 200, unit: 'g' },
+          ],
+        },
+        error: null,
+      });
+
+      renderComponent();
+
+      const input = screen.getByPlaceholderText(
+        'Describe what you ate (e.g., 3 eggs, 2 slices sourdough, 1 tbsp butter)'
+      );
+      await userEvent.type(input, 'chicken and rice');
+      fireEvent.click(screen.getByText('Analyze Meal'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('staged-meal-day-total')).toBeDefined();
+      });
+
+      // Daily totals: 500 kcal, 40 P. Meal totals: 600 kcal, 50 P.
+      // Day total: 500 + 600 = 1100 kcal, 40 + 50 = 90 P.
+      expect(screen.getByTestId('day-total-val-calories')).toHaveTextContent('1100');
+      expect(screen.getByTestId('day-total-val-protein')).toHaveTextContent('90');
+    });
   });
 });
 

@@ -14,9 +14,12 @@ import {
   type StagedMeal,
 } from './nutritionEngineHelpers';
 import { computeVisibleMacroColumns, MACRO_COLUMNS_CONFIG, getMacroGridTemplateColumns } from './macroColumns';
+import { DayTotalRow, type MacroTotalsShape } from './TodayAfterRow';
 
 export interface StagedMealCardProps {
   stagedMeal: StagedMeal;
+  dailyTotals?: Partial<MacroTotalsShape>;
+  targets?: Partial<MacroTotalsShape>;
   onUpdateStagedMeal: (updated: StagedMeal) => void;
   onApplyStagedItemChange: (id: string, next: NutritionItem) => void;
   onDeleteItem: (id: string) => void;
@@ -31,6 +34,8 @@ type MacroField = 'calories' | 'protein' | 'carbs' | 'fat' | 'fiber';
 
 export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
   stagedMeal,
+  dailyTotals,
+  targets,
   onUpdateStagedMeal,
   onApplyStagedItemChange,
   onDeleteItem,
@@ -124,10 +129,10 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
   return (
     <div
       data-testid="staged-meal-card"
-      className="bg-zinc-900/90 border border-cyan-500/50 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-[0_0_30px_rgba(6,182,212,0.15)] space-y-2 sm:space-y-2.5 animate-in fade-in"
+      className="bg-zinc-900/90 border border-cyan-500/50 rounded-2xl sm:rounded-3xl px-3 py-2 sm:p-4 shadow-[0_0_30px_rgba(6,182,212,0.15)] space-y-1.5 sm:space-y-2 animate-in fade-in"
     >
       {/* Header row: Dish Name & Meal Type (1 row on mobile & desktop) */}
-      <div className="flex items-center gap-2 border-b border-zinc-800 pb-2">
+      <div className="flex items-center gap-2 border-b border-zinc-800 pb-1.5">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {stagedMeal.photoUrl ? (
             <div className="w-8 h-8 rounded-lg overflow-hidden border border-cyan-500/40 shrink-0 bg-zinc-950 shadow-md">
@@ -214,35 +219,62 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
         {isMultiItem && (
           <div
             data-testid="staged-meal-totals"
-            className="grid pt-1.5 border-t border-zinc-700/80 text-xs tabular-nums leading-tight"
-            style={{ gridTemplateColumns: getMacroGridTemplateColumns(macroColumns) }}
+            className="pt-1.5 border-t border-zinc-700/80 text-xs tabular-nums leading-tight"
             aria-label="Totals are the sum of items"
             title="Totals are the sum of items · edit an item via ⋯"
           >
-            <span className="sr-only">Totals are the sum of items</span>
-            {macroColumns.map((colKey) => {
-              const config = MACRO_COLUMNS_CONFIG[colKey];
-              const rawVal = stagedMeal[colKey];
-              const num = roundTo1Decimal(rawVal);
-              const isZero = colKey === 'calories' ? Math.abs(num) < 0.5 : Math.abs(num) < 0.05;
-              const formatted = isZero ? '0' : (colKey === 'calories' ? formatCalories(rawVal) : formatMacro(rawVal));
+            <div
+              data-testid="this-meal-label"
+              className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-0.5 leading-none"
+            >
+              This meal
+            </div>
+            <div
+              data-testid="staged-meal-totals-grid"
+              className="grid text-xs tabular-nums leading-tight"
+              style={{ gridTemplateColumns: getMacroGridTemplateColumns(macroColumns) }}
+            >
+              <span className="sr-only">Totals are the sum of items</span>
+              {macroColumns.map((colKey) => {
+                const config = MACRO_COLUMNS_CONFIG[colKey];
+                const rawVal = stagedMeal[colKey];
+                const num = roundTo1Decimal(rawVal);
+                const isZero = colKey === 'calories' ? Math.abs(num) < 0.5 : Math.abs(num) < 0.05;
+                const formatted = isZero ? '0' : (colKey === 'calories' ? formatCalories(rawVal) : formatMacro(rawVal));
 
-              return (
-                <div
-                  key={colKey}
-                  data-testid={`staged-total-${colKey}`}
-                  className={`text-right text-xs tabular-nums ${isZero ? 'text-zinc-600 font-normal' : config.colorClass}`}
-                >
-                  <span data-testid={`macro-val-${colKey}`} className={`tabular-nums ${isZero ? 'font-normal' : 'font-semibold'}`}>
-                    {formatted}
-                  </span>{' '}
-                  <span className="opacity-70 font-normal">
-                    {config.label}
-                  </span>
-                </div>
-              );
-            })}
+                return (
+                  <div
+                    key={colKey}
+                    data-testid={`staged-total-${colKey}`}
+                    className={`text-right text-xs tabular-nums ${isZero ? 'text-zinc-600 font-normal' : config.colorClass}`}
+                  >
+                    <span data-testid={`macro-val-${colKey}`} className={`tabular-nums ${isZero ? 'font-normal' : 'font-semibold'}`}>
+                      {formatted}
+                    </span>{' '}
+                    <span className="opacity-70 font-normal">
+                      {config.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
+        )}
+
+        {/* Day total row (Fix D8 redesign) */}
+        {isMultiItem && (dailyTotals || targets) && (
+          <DayTotalRow
+            macroColumns={macroColumns}
+            mealTotals={{
+              calories: stagedMeal.calories,
+              protein: stagedMeal.protein,
+              carbs: stagedMeal.carbs,
+              fat: stagedMeal.fat,
+              fiber: stagedMeal.fiber,
+            }}
+            dailyTotals={dailyTotals}
+            targets={targets}
+          />
         )}
       </div>
 
@@ -368,7 +400,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
       )}
 
       {/* Action Buttons Bar */}
-      <div className="flex items-center gap-2 pt-1">
+      <div className="flex items-center gap-2 pt-2">
         <button
           type="button"
           onClick={onLogStagedMeal}
