@@ -712,4 +712,71 @@ describe('QuickLogFavorites (Horizontal Bar Redesign)', () => {
     // Result count reflects (1 of 6)
     expect(screen.getByText('(1 of 6)')).toBeDefined();
   });
+
+  // D18 Type Scale Contract: NO font-mono anywhere, tabular-nums for numbers, all fonts >= 12px
+  it('D18 type scale contract: no font-mono anywhere in Quick Log, tabular-nums on numbers, every font >= 12px', () => {
+    const dishes = Array.from({ length: 5 }, (_, i) =>
+      createMockDish({
+        id: `dish-${i + 1}`,
+        name: `Favorite Dish ${i + 1}`,
+        calories: 350 + i * 20,
+        protein: 30 + i * 5,
+        use_count: 10 - i,
+      })
+    );
+
+    const { container } = render(
+      <QuickLogFavorites
+        customDishes={dishes}
+        onOpenNewDishModal={vi.fn()}
+        onStageCustomDish={vi.fn()}
+        onOpenEditDishModal={vi.fn()}
+        onQuickLogCustomDishDirect={vi.fn()}
+        onDismissToast={vi.fn()}
+      />
+    );
+
+    // Verify NO font-mono class exists anywhere in Quick Log Favorites container
+    const monoElements = container.querySelectorAll('.font-mono, [class*="font-mono"]');
+    expect(monoElements.length).toBe(0);
+
+    // Verify tabular-nums exists on numbers (macro subtitle, count, expander)
+    const tabularElements = container.querySelectorAll('.tabular-nums');
+    expect(tabularElements.length).toBeGreaterThan(0);
+
+    // Verify no text-[10px] or text-[11px] exists anywhere
+    const sub12Elements = container.querySelectorAll('[class*="text-[10px]"], [class*="text-[11px]"], [class*="text-[9px]"]');
+    expect(sub12Elements.length).toBe(0);
+
+    // Verify no font-black (900) or font-extrabold (800) or font-medium (500)
+    const disallowedWeights = container.querySelectorAll('.font-black, .font-extrabold, .font-medium, .font-thin, .font-light');
+    expect(disallowedWeights.length).toBe(0);
+  });
+
+  // Long dish names: title attribute preservation for accessibility when truncated
+  it('preserves full dish name in title attribute and aria-label for truncated names', () => {
+    const longName = 'Extra Long Name Grilled Atlantic Salmon Fillet with Garlic Butter Glaze and Rosemary';
+    const dish = createMockDish({
+      id: 'dish-long-name',
+      name: longName,
+    });
+
+    render(
+      <QuickLogFavorites
+        customDishes={[dish]}
+        onOpenNewDishModal={vi.fn()}
+        onStageCustomDish={vi.fn()}
+        onOpenEditDishModal={vi.fn()}
+        onQuickLogCustomDishDirect={vi.fn()}
+        onDismissToast={vi.fn()}
+      />
+    );
+
+    const dishNameEl = screen.getByTitle(longName);
+    expect(dishNameEl).toBeDefined();
+    expect(dishNameEl.className).toContain('truncate');
+
+    const cardBtn = screen.getByTestId('custom-dish-card-dish-long-name');
+    expect(cardBtn.getAttribute('aria-label')).toContain(longName);
+  });
 });

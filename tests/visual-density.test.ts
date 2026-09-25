@@ -4,6 +4,79 @@ import { test, expect, type Page, type Locator } from '@playwright/test';
 // Fixtures
 // ---------------------------------------------------------------------------
 
+const FIXTURE_CUSTOM_DISHES = [
+  {
+    id: 'dish-1',
+    user_id: 'test-user',
+    name: 'Keto Bar',
+    calories: 150,
+    protein: 10,
+    carbs: 5,
+    fat: 10,
+    fiber: 3,
+    created_at: '2026-03-01T10:00:00Z',
+    kind: 'dish',
+    use_count: 20,
+    notes: 'Low carb snack',
+  },
+  {
+    id: 'dish-2',
+    user_id: 'test-user',
+    name: 'Raw Japonica Rice',
+    calories: 180,
+    protein: 3.5,
+    carbs: 40,
+    fat: 0.5,
+    fiber: 1,
+    created_at: '2026-03-02T10:00:00Z',
+    kind: 'dish',
+    use_count: 15,
+    notes: null,
+  },
+  {
+    id: 'dish-3',
+    user_id: 'test-user',
+    name: 'Very Long Dish Name For Protein Ice Cream Bowl With Extra Berries',
+    calories: 665,
+    protein: 84,
+    carbs: 45,
+    fat: 12,
+    fiber: 6,
+    created_at: '2026-03-03T10:00:00Z',
+    kind: 'recipe',
+    use_count: 12,
+    notes: null,
+  },
+  {
+    id: 'dish-4',
+    user_id: 'test-user',
+    name: 'Whey Protein Powder',
+    calories: 140,
+    protein: 24,
+    carbs: 3,
+    fat: 2,
+    fiber: 1,
+    created_at: '2026-03-04T10:00:00Z',
+    kind: 'dish',
+    use_count: 10,
+    notes: null,
+  },
+  {
+    id: 'dish-5',
+    user_id: 'test-user',
+    name: 'Beef Pho Broth with Protein and Fresh Herbs',
+    calories: 310,
+    protein: 40,
+    carbs: 15,
+    fat: 8,
+    fiber: 2,
+    created_at: '2026-03-05T10:00:00Z',
+    kind: 'recipe',
+    use_count: 8,
+    notes: null,
+  },
+];
+
 const FIXTURE_4_ITEMS = {
   name: 'Grilled Salmon Dinner Plate',
   calories: 705,
@@ -112,6 +185,29 @@ async function setupPageAndLogin(page: Page) {
       contentType: 'application/json',
       headers: { 'access-control-allow-origin': '*' },
       body: JSON.stringify(fixture),
+    });
+  });
+
+  await page.route('**/rest/v1/custom_dishes*', async (route) => {
+    if (route.request().method() === 'OPTIONS') {
+      await route.fulfill({
+        status: 200,
+        headers: {
+          'access-control-allow-origin': '*',
+          'access-control-allow-headers': 'authorization, x-client-info, apikey, content-type',
+          'access-control-allow-methods': 'GET, POST, OPTIONS',
+        },
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: {
+        'access-control-allow-origin': '*',
+        'content-range': `0-${FIXTURE_CUSTOM_DISHES.length - 1}/${FIXTURE_CUSTOM_DISHES.length}`,
+      },
+      body: JSON.stringify(FIXTURE_CUSTOM_DISHES),
     });
   });
 
@@ -366,8 +462,12 @@ async function checkClipping(surface: Locator) {
       candidateCount++;
       const s = window.getComputedStyle(el);
 
-      // Inputs scroll horizontally by design, so exempt them from horizontal scrollWidth clipping check
-      if (el.tagName !== 'INPUT' && el.scrollWidth > el.clientWidth + 1) {
+      // Inputs scroll horizontally by design; intentional ellipsis truncation is allowed if full name is available
+      const isIntentionalTruncate =
+        (s.textOverflow === 'ellipsis' || el.classList.contains('truncate')) &&
+        (el.hasAttribute('title') || Boolean(el.closest('[aria-label]')));
+
+      if (el.tagName !== 'INPUT' && !isIntentionalTruncate && el.scrollWidth > el.clientWidth + 1) {
         clippedElements.push({
           selector: getSel(el),
           text: (el.textContent || '').trim().slice(0, 40),
@@ -1712,5 +1812,173 @@ test.describe('Surface F: Manual-staged card and Add-item at 390×844', () => {
       cardHeight: Math.round(cardBox.height * 10) / 10,
     }));
     expect(cardBox.height).toBeLessThanOrEqual(500);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Surface G: Quick Log surface at 390×844 and 320×568 (D26 / D18)
+// ---------------------------------------------------------------------------
+
+test.describe('Surface G: Quick Log surface at 390×844 (D26)', () => {
+  let page: Page;
+  let sectionLocator: Locator;
+
+  test.beforeAll(async ({ browser }) => {
+    page = await browser.newPage({
+      viewport: { width: 390, height: 844 },
+      deviceScaleFactor: 1,
+    });
+    await setupPageAndLogin(page);
+    sectionLocator = page.locator('section').filter({ hasText: 'Quick Log Favorites' });
+    await expect(sectionLocator).toBeVisible();
+    await sectionLocator.scrollIntoViewIfNeeded();
+  });
+
+  test.afterAll(async () => {
+    await page.close();
+  });
+
+  test('G: 390 section height <= 450px and row heights ~56px', async () => {
+    const measurements = await sectionLocator.evaluate((root) => {
+      const sRect = root.getBoundingClientRect();
+      const rows = Array.from(root.querySelectorAll('[data-testid^="favorite-row-"]'));
+      const rowHeights = rows.map((r) => Math.round(r.getBoundingClientRect().height * 10) / 10);
+      return {
+        sectionHeight: Math.round(sRect.height * 10) / 10,
+        rowCount: rows.length,
+        rowHeights,
+      };
+    });
+
+    console.log(JSON.stringify({
+      test: 'G: 390 section height <= 450px and row heights ~56px',
+      surface: 'G-390',
+      measurements,
+    }));
+
+    // Collapsed mode renders top 3 rows
+    expect(measurements.rowCount).toBe(3);
+    // Section height budget
+    expect(measurements.sectionHeight).toBeLessThanOrEqual(450);
+    // Row heights ~56px (52px to 60px)
+    for (const h of measurements.rowHeights) {
+      expect(h).toBeGreaterThanOrEqual(52);
+      expect(h).toBeLessThanOrEqual(60);
+    }
+  });
+
+  test('G: 390 font >= 12px', async () => {
+    const result = await checkFontSizes(sectionLocator);
+    console.log(JSON.stringify({
+      test: 'G: 390 font >= 12px',
+      surface: 'G-390',
+      minFontSize: result.minFontSize,
+      minFontElement: result.minFontElement,
+      offenders: result.offenders,
+    }));
+    expect(result.offenders).toEqual([]);
+  });
+
+  test('G: 390 taps >= 40px', async () => {
+    const result = await checkTapTargets(sectionLocator);
+    console.log(JSON.stringify({
+      test: 'G: 390 taps >= 40px',
+      surface: 'G-390',
+      tapsUnder48: result.tapsUnder48,
+      offendersUnder40: result.offendersUnder40,
+    }));
+    expect(result.offendersUnder40).toEqual([]);
+  });
+
+  test('G: 390 no clipping', async () => {
+    const result = await checkClipping(sectionLocator);
+    console.log(JSON.stringify({
+      test: 'G: 390 no clipping',
+      surface: 'G-390',
+      clippedElements: result.clippedElements,
+    }));
+    expect(result.clippedElements).toEqual([]);
+  });
+});
+
+test.describe('Surface G: Quick Log surface at 320×568 (D26)', () => {
+  let page: Page;
+  let sectionLocator: Locator;
+
+  test.beforeAll(async ({ browser }) => {
+    page = await browser.newPage({
+      viewport: { width: 320, height: 568 },
+      deviceScaleFactor: 1,
+    });
+    await setupPageAndLogin(page);
+    sectionLocator = page.locator('section').filter({ hasText: 'Quick Log Favorites' });
+    await expect(sectionLocator).toBeVisible();
+    await sectionLocator.scrollIntoViewIfNeeded();
+  });
+
+  test.afterAll(async () => {
+    await page.close();
+  });
+
+  test('G: 320 section height <= 450px and row heights ~56px', async () => {
+    const measurements = await sectionLocator.evaluate((root) => {
+      const sRect = root.getBoundingClientRect();
+      const rows = Array.from(root.querySelectorAll('[data-testid^="favorite-row-"]'));
+      const rowHeights = rows.map((r) => Math.round(r.getBoundingClientRect().height * 10) / 10);
+      return {
+        sectionHeight: Math.round(sRect.height * 10) / 10,
+        rowCount: rows.length,
+        rowHeights,
+      };
+    });
+
+    console.log(JSON.stringify({
+      test: 'G: 320 section height <= 450px and row heights ~56px',
+      surface: 'G-320',
+      measurements,
+    }));
+
+    // Collapsed mode renders top 3 rows
+    expect(measurements.rowCount).toBe(3);
+    // Section height budget
+    expect(measurements.sectionHeight).toBeLessThanOrEqual(450);
+    // Row heights ~56px (52px to 60px)
+    for (const h of measurements.rowHeights) {
+      expect(h).toBeGreaterThanOrEqual(52);
+      expect(h).toBeLessThanOrEqual(60);
+    }
+  });
+
+  test('G: 320 font >= 12px', async () => {
+    const result = await checkFontSizes(sectionLocator);
+    console.log(JSON.stringify({
+      test: 'G: 320 font >= 12px',
+      surface: 'G-320',
+      minFontSize: result.minFontSize,
+      minFontElement: result.minFontElement,
+      offenders: result.offenders,
+    }));
+    expect(result.offenders).toEqual([]);
+  });
+
+  test('G: 320 taps >= 40px', async () => {
+    const result = await checkTapTargets(sectionLocator);
+    console.log(JSON.stringify({
+      test: 'G: 320 taps >= 40px',
+      surface: 'G-320',
+      tapsUnder48: result.tapsUnder48,
+      offendersUnder40: result.offendersUnder40,
+    }));
+    expect(result.offendersUnder40).toEqual([]);
+  });
+
+  test('G: 320 no clipping', async () => {
+    const result = await checkClipping(sectionLocator);
+    console.log(JSON.stringify({
+      test: 'G: 320 no clipping',
+      surface: 'G-320',
+      clippedElements: result.clippedElements,
+    }));
+    expect(result.clippedElements).toEqual([]);
   });
 });

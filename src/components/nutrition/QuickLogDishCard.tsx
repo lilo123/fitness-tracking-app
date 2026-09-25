@@ -24,7 +24,7 @@ export const QuickLogDishCard: React.FC<QuickLogDishCardProps> = memo(({
   return (
     <article
       aria-labelledby={`dish-name-${dish.id}`}
-      className="bg-zinc-950 hover:bg-zinc-850 border border-zinc-800 hover:border-cyan-500/40 rounded-2xl p-2 flex items-center justify-between gap-2.5 transition shadow-sm group select-none"
+      className="h-14 min-h-[56px] bg-zinc-950 hover:bg-zinc-850 border border-zinc-800 hover:border-cyan-500/40 rounded-2xl p-2 flex items-center justify-between gap-2 transition shadow-sm group select-none"
     >
       {/* Primary Hit Zone: Staging the Dish (Semantic Button carrying staging onClick, Resolves NEW-10) */}
       <button
@@ -32,16 +32,17 @@ export const QuickLogDishCard: React.FC<QuickLogDishCardProps> = memo(({
         onClick={() => onStageCustomDish(dish)}
         data-testid={`custom-dish-card-${dish.id}`}
         aria-label={`Stage ${dish.name}, ${dish.calories ?? 0} calories, ${dish.protein ?? 0} grams protein${hasNote ? ', note attached' : ''}`}
-        className="flex items-center gap-2.5 min-w-0 flex-1 text-left py-0.5 outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 rounded-xl touch-manipulation"
+        className="flex items-center gap-2.5 min-w-0 flex-1 text-left min-h-[40px] h-10 outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 rounded-xl touch-manipulation"
       >
         <div className="w-7 h-7 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0 group-hover:border-cyan-500/30 transition-colors">
           {getDishIcon(dish.name)}
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 min-w-0">
             <span
               id={`dish-name-${dish.id}`}
+              title={dish.name}
               className="text-xs font-bold text-white group-hover:text-cyan-300 transition truncate block"
             >
               {dish.name}
@@ -57,9 +58,9 @@ export const QuickLogDishCard: React.FC<QuickLogDishCardProps> = memo(({
             )}
           </div>
 
-          <div className="text-[10px] font-mono text-zinc-400 whitespace-nowrap mt-0.5">
+          <div className="text-xs text-zinc-400 tabular-nums whitespace-nowrap mt-0.5 leading-tight flex items-center gap-1.5">
             <span className="text-amber-400 font-bold">{formatCalories(dish.calories)} kcal</span>
-            <span className="text-zinc-600"> • </span>
+            <span className="text-zinc-600 font-normal">•</span>
             <span className="text-cyan-400 font-semibold">{formatMacro(dish.protein)}g P</span>
           </div>
         </div>
@@ -78,7 +79,7 @@ export const QuickLogDishCard: React.FC<QuickLogDishCardProps> = memo(({
             title="Edit Custom Dish"
             aria-label={`Edit ${dish.name}`}
             data-testid={`edit-dish-btn-${dish.id}`}
-            className="min-w-[44px] min-h-[44px] rounded-xl text-zinc-400 hover:text-cyan-300 hover:bg-zinc-800 transition flex items-center justify-center touch-manipulation"
+            className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-xl text-zinc-400 hover:text-cyan-300 hover:bg-zinc-800 transition flex items-center justify-center touch-manipulation"
           >
             <Edit2 className="w-3.5 h-3.5" />
           </button>
@@ -89,7 +90,7 @@ export const QuickLogDishCard: React.FC<QuickLogDishCardProps> = memo(({
           title="1-Tap Log Meal"
           aria-label={`Quick log 1 serving of ${dish.name}`}
           data-testid={`quick-log-btn-${dish.id}`}
-          className="min-w-[44px] min-h-[44px] rounded-xl bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30 flex items-center justify-center transition active:scale-95 touch-manipulation"
+          className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-xl bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30 flex items-center justify-center transition active:scale-95 touch-manipulation"
         >
           <Plus className="w-4 h-4" />
         </button>

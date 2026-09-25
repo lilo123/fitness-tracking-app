@@ -75,12 +75,12 @@ export const QuickLogFavorites: React.FC<QuickLogFavoritesProps> = ({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Star className="w-4 h-4 text-amber-400 fill-amber-400/20" />
-          <h3 className="text-xs font-black text-white uppercase tracking-wider">
+          <h3 className="text-xs font-bold text-white uppercase tracking-wider">
             Quick Log Favorites
           </h3>
           <output
             aria-live="polite"
-            className="text-[10px] font-mono text-zinc-500"
+            className="text-xs font-normal tabular-nums text-zinc-500"
           >
             {isSearching
               ? `(${filteredDishes.length} of ${sortedDishes.length})`
@@ -174,14 +174,14 @@ export const QuickLogFavorites: React.FC<QuickLogFavoritesProps> = ({
               aria-expanded={isExpanded}
               /* Preserved verbatim: data-testid="open-favorites-sheet-btn" for test backwards compatibility */
               data-testid="open-favorites-sheet-btn"
-              className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-zinc-950 hover:bg-zinc-850 border border-border-interactive text-xs font-semibold text-zinc-300 hover:text-white transition touch-manipulation min-h-[44px] group shadow-sm"
+              className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-zinc-950 hover:bg-zinc-850 border border-border-interactive text-xs font-semibold tabular-nums text-zinc-300 hover:text-white transition touch-manipulation min-h-[44px] group shadow-sm"
             >
               <span className="text-zinc-300 group-hover:text-white">
                 {isExpanded
                   ? 'Collapse to top favorites'
                   : `Show all ${sortedDishes.length} favorites`}
               </span>
-              <div className="flex items-center gap-1 text-[11px] font-mono text-zinc-500 group-hover:text-cyan-300">
+              <div className="flex items-center gap-1 text-xs font-normal text-zinc-500 group-hover:text-cyan-300">
                 <span>{isExpanded ? 'Collapse' : 'Expand'}</span>
                 {isExpanded ? (
                   <ChevronUp className="w-3.5 h-3.5" />
