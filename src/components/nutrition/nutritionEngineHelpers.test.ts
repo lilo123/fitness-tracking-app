@@ -1,10 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { renderHook, act } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
 import {
   buildStagedItem,
   stagedReference,
   recomputeStagedTotals,
   updateStagedItemNutrition,
   buildStagedMealFromManualData,
+  useStagedCardFocus,
   type StagedItem,
 } from './nutritionEngineHelpers';
 import { scaleItemToQuantity } from '../../utils/itemModel';
@@ -350,5 +352,61 @@ describe('buildStagedMealFromManualData', () => {
     expect(staged.mealType).toBe('Breakfast');
     expect(staged.items[0].unit).toBe('unit');
     expect(staged.photoUrl).toBeUndefined();
+  });
+});
+
+describe('useStagedCardFocus', () => {
+  it('focuses section heading when textarea is not rendered and card unmounts with focus inside (F5)', () => {
+    let isStaged = true;
+    const { result, rerender } = renderHook(() => useStagedCardFocus(isStaged));
+
+    const mockHeading = document.createElement('h3');
+    mockHeading.tabIndex = -1;
+    document.body.appendChild(mockHeading);
+    const focusSpy = vi.spyOn(mockHeading, 'focus');
+
+    // Attach heading ref but leave textarea ref null
+    (result.current.headingRef as any).current = mockHeading;
+    expect(result.current.textareaRef.current).toBeNull();
+
+    // Simulate focus inside the staged card
+    act(() => {
+      result.current.markFocusInside();
+    });
+
+    // Card unmounts
+    isStaged = false;
+    rerender();
+
+    expect(focusSpy).toHaveBeenCalledTimes(1);
+    document.body.removeChild(mockHeading);
+  });
+
+  it('prioritizes focusing textarea when both textarea and heading are rendered (F5)', () => {
+    let isStaged = true;
+    const { result, rerender } = renderHook(() => useStagedCardFocus(isStaged));
+
+    const mockTextarea = document.createElement('textarea');
+    const mockHeading = document.createElement('h3');
+    document.body.appendChild(mockTextarea);
+    document.body.appendChild(mockHeading);
+    const textareaFocusSpy = vi.spyOn(mockTextarea, 'focus');
+    const headingFocusSpy = vi.spyOn(mockHeading, 'focus');
+
+    (result.current.textareaRef as any).current = mockTextarea;
+    (result.current.headingRef as any).current = mockHeading;
+
+    act(() => {
+      result.current.markFocusInside();
+    });
+
+    isStaged = false;
+    rerender();
+
+    expect(textareaFocusSpy).toHaveBeenCalledTimes(1);
+    expect(headingFocusSpy).not.toHaveBeenCalled();
+
+    document.body.removeChild(mockTextarea);
+    document.body.removeChild(mockHeading);
   });
 });

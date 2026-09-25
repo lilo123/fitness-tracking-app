@@ -16,6 +16,8 @@ import { CameraSource } from '@capacitor/camera';
 import { StatusBanner } from '../common/StatusBanner';
 
 export interface NutritionAiInputProps {
+  textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
+  headingRef?: React.RefObject<HTMLHeadingElement | null>;
   nlInput: string;
   onNlInputChange: (text: string) => void;
   selectedPhoto: CompressedImage | null;
@@ -35,6 +37,8 @@ export interface NutritionAiInputProps {
 }
 
 export const NutritionAiInput: React.FC<NutritionAiInputProps> = memo(({
+  textareaRef,
+  headingRef,
   nlInput,
   onNlInputChange,
   selectedPhoto,
@@ -60,7 +64,7 @@ export const NutritionAiInput: React.FC<NutritionAiInputProps> = memo(({
             <Sparkles className="w-4 h-4 text-zinc-950 font-black" />
           </div>
           <div>
-            <h3 className="text-sm font-black text-white uppercase tracking-wider">
+            <h3 ref={headingRef} tabIndex={-1} className="text-sm font-black text-white uppercase tracking-wider outline-none">
               Log Food
             </h3>
             <p className="text-[11px] text-zinc-400">
@@ -140,6 +144,7 @@ export const NutritionAiInput: React.FC<NutritionAiInputProps> = memo(({
         )}
 
         <textarea
+          ref={textareaRef}
           value={nlInput}
           onChange={(e) => onNlInputChange(e.target.value)}
           placeholder={

@@ -3849,6 +3849,185 @@ Total Fiber: 1 g`;
       expect(screen.getByTestId('status-message')).toHaveTextContent(/Failed to save custom dish/i);
       expect(screen.getByTestId('staged-meal-card')).toBeInTheDocument();
     });
+
+    it('restores focus to AI input textarea when staged card closes on discard (F5)', async () => {
+      (supabase.functions.invoke as any).mockResolvedValue({
+        data: {
+          name: 'Protein Shake',
+          calories: 200,
+          protein: 30,
+          carbs: 5,
+          fat: 2,
+          fiber: 1,
+          items: [
+            { name: 'Whey', portion: '1 scoop', calories: 200, protein: 30, carbs: 5, fat: 2, fiber: 1, quantity: 1, unit: 'scoop' },
+          ],
+        },
+        error: null,
+      });
+
+      renderComponent();
+
+      const input = screen.getByPlaceholderText(/Describe what you ate/i);
+      await userEvent.type(input, 'whey protein shake');
+      fireEvent.click(screen.getByText('Analyze Meal'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('staged-meal-card')).toBeDefined();
+      });
+
+      const discardBtn = screen.getByRole('button', { name: /Discard staged meal/i });
+      discardBtn.focus();
+      expect(document.activeElement).toBe(discardBtn);
+
+      fireEvent.click(discardBtn);
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('staged-meal-card')).toBeNull();
+      });
+
+      const restoredInput = screen.getByPlaceholderText(/Describe what you ate/i);
+      expect(document.activeElement).not.toBe(document.body);
+      expect(document.activeElement).toBe(restoredInput);
+    });
+
+    it('restores focus to AI input textarea when staged card closes on log success (F5)', async () => {
+      const mockInsert = vi.fn().mockReturnValue({
+        select: vi.fn().mockResolvedValue({ data: [], error: null }),
+      });
+      (supabase.from as any).mockImplementation((table: string) => {
+        const b = createSupabaseBuilder(table, { data: [], error: null });
+        if (table === 'nutrition_logs') {
+          b.insert = mockInsert;
+        }
+        return b;
+      });
+
+      (supabase.functions.invoke as any).mockResolvedValue({
+        data: {
+          name: 'Protein Shake',
+          calories: 200,
+          protein: 30,
+          carbs: 5,
+          fat: 2,
+          fiber: 1,
+          items: [
+            { name: 'Whey', portion: '1 scoop', calories: 200, protein: 30, carbs: 5, fat: 2, fiber: 1, quantity: 1, unit: 'scoop' },
+          ],
+        },
+        error: null,
+      });
+
+      renderComponent();
+
+      const input = screen.getByPlaceholderText(/Describe what you ate/i);
+      await userEvent.type(input, 'whey protein shake');
+      fireEvent.click(screen.getByText('Analyze Meal'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('staged-meal-card')).toBeDefined();
+      });
+
+      const logBtn = screen.getByRole('button', { name: /Log Meal/i });
+      logBtn.focus();
+      expect(document.activeElement).toBe(logBtn);
+
+      fireEvent.click(logBtn);
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('staged-meal-card')).toBeNull();
+      });
+
+      const restoredInput = screen.getByPlaceholderText(/Describe what you ate/i);
+      expect(document.activeElement).not.toBe(document.body);
+      expect(document.activeElement).toBe(restoredInput);
+    });
+
+    it('restores focus to AI input textarea when last item is removed (F5)', async () => {
+      (supabase.functions.invoke as any).mockResolvedValue({
+        data: {
+          name: 'Single Item',
+          calories: 100,
+          protein: 10,
+          carbs: 5,
+          fat: 2,
+          fiber: 0,
+          items: [
+            { name: 'Apple', portion: '1 medium', calories: 100, protein: 10, carbs: 5, fat: 2, fiber: 0, quantity: 1, unit: 'unit' },
+          ],
+        },
+        error: null,
+      });
+
+      renderComponent();
+
+      const input = screen.getByPlaceholderText(/Describe what you ate/i);
+      await userEvent.type(input, 'apple');
+      fireEvent.click(screen.getByText('Analyze Meal'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('staged-meal-card')).toBeDefined();
+      });
+
+      const actionsBtn = screen.getByTestId('component-actions');
+      actionsBtn.focus();
+      fireEvent.click(actionsBtn);
+
+      const removeBtn = screen.getByTestId('component-remove');
+      removeBtn.focus();
+      expect(document.activeElement).toBe(removeBtn);
+      fireEvent.click(removeBtn);
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('staged-meal-card')).toBeNull();
+      });
+
+      const restoredInput = screen.getByPlaceholderText(/Describe what you ate/i);
+      expect(document.activeElement).not.toBe(document.body);
+      expect(document.activeElement).toBe(restoredInput);
+    });
+
+    it('does not move focus when card unmounts if focus was outside the card (F5)', async () => {
+      (supabase.functions.invoke as any).mockResolvedValue({
+        data: {
+          name: 'Protein Shake',
+          calories: 200,
+          protein: 30,
+          carbs: 5,
+          fat: 2,
+          fiber: 1,
+          items: [
+            { name: 'Whey', portion: '1 scoop', calories: 200, protein: 30, carbs: 5, fat: 2, fiber: 1, quantity: 1, unit: 'scoop' },
+          ],
+        },
+        error: null,
+      });
+
+      renderComponent();
+
+      const input = screen.getByPlaceholderText(/Describe what you ate/i);
+      await userEvent.type(input, 'whey protein shake');
+      fireEvent.click(screen.getByText('Analyze Meal'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('staged-meal-card')).toBeDefined();
+      });
+
+      const dateInput = screen.getByTestId('nutrition-date-input');
+      dateInput.focus();
+      expect(document.activeElement).toBe(dateInput);
+
+      // Discard while focus is on date input
+      const discardBtn = screen.getByRole('button', { name: /Discard staged meal/i });
+      fireEvent.click(discardBtn);
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('staged-meal-card')).toBeNull();
+      });
+
+      // Focus should remain on the date input, NOT moved to AI textarea
+      expect(document.activeElement).toBe(dateInput);
+    });
   });
 
 });

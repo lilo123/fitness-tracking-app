@@ -10,7 +10,8 @@ import {
 import { MealLogRow } from './MealLogRow';
 import { NutrientBreakdownModal, type BreakdownNutrient } from './NutrientBreakdownModal';
 import {
-  stagedToItem, buildStagedItem, recomputeStagedTotals, buildStagedMealFromManualData, type StagedItem, type StagedMeal,
+  stagedToItem, buildStagedItem, recomputeStagedTotals, buildStagedMealFromManualData,
+  useStagedCardFocus, type StagedItem, type StagedMeal,
 } from './nutritionEngineHelpers';
 import { useNutritionData } from './useNutritionData';
 import { useNutritionAi } from './useNutritionAi';
@@ -57,28 +58,15 @@ export const NutritionEngine: React.FC = () => {
   });
 
   const [editingMealLog, setEditingMealLog] = useState<NutritionLog | null>(null);
+  const { cardContainerRef, textareaRef: aiTextareaRef, headingRef: sectionHeadingRef, markFocusInside, cardFocusProps } =
+    useStagedCardFocus(Boolean(stagedMeal));
 
   const {
-    customDishes,
-    todayLogs,
-    dailyTotals,
-    targets,
-    remainingFuel,
-    mutation,
-    scaleLogMutation,
-    saveCustomDishMutation,
-    deleteCustomDishMutation,
-    activeToast,
-    dismissToast,
-    triggerToast,
-    isTimerActive,
-    isNutritionLogsError,
-    nutritionLogsError,
-    refetchNutritionLogs,
-    isCustomDishesError,
-    customDishesError,
-    refetchCustomDishes,
-    fetchDishDetail,
+    customDishes, todayLogs, dailyTotals, targets, remainingFuel,
+    mutation, scaleLogMutation, saveCustomDishMutation, deleteCustomDishMutation,
+    activeToast, dismissToast, triggerToast, isTimerActive,
+    isNutritionLogsError, nutritionLogsError, refetchNutritionLogs,
+    isCustomDishesError, customDishesError, refetchCustomDishes, fetchDishDetail,
   } = useNutritionData({
     targetUserId,
     selectedDate,
@@ -149,6 +137,7 @@ export const NutritionEngine: React.FC = () => {
     if (!stagedMeal) return;
     const updatedItems = stagedMeal.items.filter((it) => it.id !== itemId);
     if (updatedItems.length === 0) {
+      if (cardContainerRef.current?.contains(document.activeElement)) markFocusInside();
       setStagedMeal(null);
       return;
     }
@@ -157,6 +146,7 @@ export const NutritionEngine: React.FC = () => {
 
   const handleLogStagedMeal = () => {
     if (!stagedMeal) return;
+    if (cardContainerRef.current?.contains(document.activeElement)) markFocusInside();
     const items = stagedMeal.items.map(stagedToItem);
     const totals = sumItems(items);
     const isSingle = items.length <= 1;
@@ -358,21 +348,28 @@ export const NutritionEngine: React.FC = () => {
       ) : null}
 
       {stagedMeal ? (
-        <StagedMealCard
-          stagedMeal={stagedMeal}
-          dailyTotals={dailyTotals}
-          targets={targets}
-          onUpdateStagedMeal={setStagedMeal}
-          onApplyStagedItemChange={applyStagedItemChange}
-          onDeleteItem={handleDeleteItem}
-          onSaveItemAsCustomDish={handleSaveItemAsCustomDish}
-          onLogStagedMeal={handleLogStagedMeal}
-          onSaveStagedAsCustomDish={handleSaveStagedAsCustomDish}
-          onDiscardStagedMeal={() => setStagedMeal(null)}
-          isPending={mutation.isPending}
-        />
+        <div {...cardFocusProps}>
+          <StagedMealCard
+            stagedMeal={stagedMeal}
+            dailyTotals={dailyTotals}
+            targets={targets}
+            onUpdateStagedMeal={setStagedMeal}
+            onApplyStagedItemChange={applyStagedItemChange}
+            onDeleteItem={handleDeleteItem}
+            onSaveItemAsCustomDish={handleSaveItemAsCustomDish}
+            onLogStagedMeal={handleLogStagedMeal}
+            onSaveStagedAsCustomDish={handleSaveStagedAsCustomDish}
+            onDiscardStagedMeal={() => {
+              if (cardContainerRef.current?.contains(document.activeElement)) markFocusInside();
+              setStagedMeal(null);
+            }}
+            isPending={mutation.isPending}
+          />
+        </div>
       ) : (
         <NutritionAiInput
+          textareaRef={aiTextareaRef}
+          headingRef={sectionHeadingRef}
           nlInput={ai.nlInput}
           onNlInputChange={ai.setNlInput}
           selectedPhoto={ai.selectedPhoto}

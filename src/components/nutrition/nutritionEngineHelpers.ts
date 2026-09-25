@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export const getScrollBehavior = (): ScrollBehavior => {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
@@ -340,5 +340,57 @@ export function buildStagedMealFromManualData(
     servingSize: data.serving_size,
     servingUnit: data.serving_unit,
     photoUrl,
+  };
+}
+
+/**
+ * Restores focus to the AI input textarea (or section heading if unrendered)
+ * when the staged meal card closes, provided focus was inside the card.
+ */
+export function useStagedCardFocus(isStaged: boolean) {
+  const cardContainerRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const headingRef = useRef<HTMLHeadingElement | null>(null);
+  const focusWasInsideRef = useRef(false);
+  const prevIsStagedRef = useRef(isStaged);
+
+  const markFocusInside = () => {
+    focusWasInsideRef.current = true;
+  };
+
+  const handleFocusCapture = () => {
+    focusWasInsideRef.current = true;
+  };
+
+  const handleBlurCapture = (e: React.FocusEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      focusWasInsideRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    if (prevIsStagedRef.current && !isStaged) {
+      if (focusWasInsideRef.current) {
+        focusWasInsideRef.current = false;
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+        } else if (headingRef.current) {
+          headingRef.current.focus();
+        }
+      }
+    }
+    prevIsStagedRef.current = isStaged;
+  }, [isStaged]);
+
+  return {
+    cardContainerRef,
+    textareaRef,
+    headingRef,
+    markFocusInside,
+    cardFocusProps: {
+      ref: cardContainerRef,
+      onFocusCapture: handleFocusCapture,
+      onBlurCapture: handleBlurCapture,
+    },
   };
 }
