@@ -360,18 +360,25 @@ describe('useStagedCardFocus', () => {
     let isStaged = true;
     const { result, rerender } = renderHook(() => useStagedCardFocus(isStaged));
 
+    const card = document.createElement('div');
+    const childBtn = document.createElement('button');
+    card.appendChild(childBtn);
     const mockHeading = document.createElement('h3');
     mockHeading.tabIndex = -1;
+    document.body.appendChild(card);
     document.body.appendChild(mockHeading);
     const focusSpy = vi.spyOn(mockHeading, 'focus');
 
     // Attach heading ref but leave textarea ref null
+    (result.current.cardContainerRef as any).current = card;
     (result.current.headingRef as any).current = mockHeading;
     expect(result.current.textareaRef.current).toBeNull();
 
-    // Simulate focus inside the staged card
+    childBtn.focus();
+    expect(document.activeElement).toBe(childBtn);
+
     act(() => {
-      result.current.markFocusInside();
+      result.current.decideFocusRestore();
     });
 
     // Card unmounts
@@ -379,6 +386,7 @@ describe('useStagedCardFocus', () => {
     rerender();
 
     expect(focusSpy).toHaveBeenCalledTimes(1);
+    document.body.removeChild(card);
     document.body.removeChild(mockHeading);
   });
 
@@ -386,18 +394,26 @@ describe('useStagedCardFocus', () => {
     let isStaged = true;
     const { result, rerender } = renderHook(() => useStagedCardFocus(isStaged));
 
+    const card = document.createElement('div');
+    const childBtn = document.createElement('button');
+    card.appendChild(childBtn);
     const mockTextarea = document.createElement('textarea');
     const mockHeading = document.createElement('h3');
+    document.body.appendChild(card);
     document.body.appendChild(mockTextarea);
     document.body.appendChild(mockHeading);
     const textareaFocusSpy = vi.spyOn(mockTextarea, 'focus');
     const headingFocusSpy = vi.spyOn(mockHeading, 'focus');
 
+    (result.current.cardContainerRef as any).current = card;
     (result.current.textareaRef as any).current = mockTextarea;
     (result.current.headingRef as any).current = mockHeading;
 
+    childBtn.focus();
+    expect(document.activeElement).toBe(childBtn);
+
     act(() => {
-      result.current.markFocusInside();
+      result.current.decideFocusRestore();
     });
 
     isStaged = false;
@@ -406,6 +422,7 @@ describe('useStagedCardFocus', () => {
     expect(textareaFocusSpy).toHaveBeenCalledTimes(1);
     expect(headingFocusSpy).not.toHaveBeenCalled();
 
+    document.body.removeChild(card);
     document.body.removeChild(mockTextarea);
     document.body.removeChild(mockHeading);
   });

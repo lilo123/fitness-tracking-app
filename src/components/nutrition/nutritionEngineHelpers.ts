@@ -361,10 +361,6 @@ export function useStagedCardFocus(isStaged: boolean) {
     );
   };
 
-  const markFocusInside = (override = true) => {
-    shouldRestoreFocusRef.current = override;
-  };
-
   useEffect(() => {
     if (prevIsStagedRef.current && !isStaged) {
       if (shouldRestoreFocusRef.current) {
@@ -384,7 +380,6 @@ export function useStagedCardFocus(isStaged: boolean) {
     textareaRef,
     headingRef,
     decideFocusRestore,
-    markFocusInside,
     cardFocusProps: {
       ref: cardContainerRef,
     },
