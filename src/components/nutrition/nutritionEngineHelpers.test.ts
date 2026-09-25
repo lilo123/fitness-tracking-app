@@ -409,4 +409,68 @@ describe('useStagedCardFocus', () => {
     document.body.removeChild(mockTextarea);
     document.body.removeChild(mockHeading);
   });
+  it('decides to restore focus when activeElement is inside cardContainerRef', () => {
+    let isStaged = true;
+    const { result, rerender } = renderHook(() => useStagedCardFocus(isStaged));
+
+    const card = document.createElement('div');
+    const childBtn = document.createElement('button');
+    card.appendChild(childBtn);
+    const mockTextarea = document.createElement('textarea');
+    document.body.appendChild(card);
+    document.body.appendChild(mockTextarea);
+
+    const textareaFocusSpy = vi.spyOn(mockTextarea, 'focus');
+
+    (result.current.cardContainerRef as any).current = card;
+    (result.current.textareaRef as any).current = mockTextarea;
+
+    childBtn.focus();
+    expect(document.activeElement).toBe(childBtn);
+
+    act(() => {
+      result.current.decideFocusRestore();
+    });
+
+    isStaged = false;
+    rerender();
+
+    expect(textareaFocusSpy).toHaveBeenCalledTimes(1);
+
+    document.body.removeChild(card);
+    document.body.removeChild(mockTextarea);
+  });
+
+  it('decides NOT to restore focus when activeElement is outside cardContainerRef', () => {
+    let isStaged = true;
+    const { result, rerender } = renderHook(() => useStagedCardFocus(isStaged));
+
+    const card = document.createElement('div');
+    const outsideInput = document.createElement('input');
+    const mockTextarea = document.createElement('textarea');
+    document.body.appendChild(card);
+    document.body.appendChild(outsideInput);
+    document.body.appendChild(mockTextarea);
+
+    const textareaFocusSpy = vi.spyOn(mockTextarea, 'focus');
+
+    (result.current.cardContainerRef as any).current = card;
+    (result.current.textareaRef as any).current = mockTextarea;
+
+    outsideInput.focus();
+    expect(document.activeElement).toBe(outsideInput);
+
+    act(() => {
+      result.current.decideFocusRestore();
+    });
+
+    isStaged = false;
+    rerender();
+
+    expect(textareaFocusSpy).not.toHaveBeenCalled();
+
+    document.body.removeChild(card);
+    document.body.removeChild(outsideInput);
+    document.body.removeChild(mockTextarea);
+  });
 });

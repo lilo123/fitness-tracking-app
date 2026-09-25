@@ -56,7 +56,7 @@ export const NutritionEngine: React.FC = () => {
   });
 
   const [editingMealLog, setEditingMealLog] = useState<NutritionLog | null>(null);
-  const { cardContainerRef, textareaRef: aiTextareaRef, headingRef: sectionHeadingRef, markFocusInside, cardFocusProps } =
+  const { textareaRef: aiTextareaRef, headingRef: sectionHeadingRef, decideFocusRestore, cardFocusProps } =
     useStagedCardFocus(Boolean(stagedMeal));
 
   const {
@@ -70,6 +70,7 @@ export const NutritionEngine: React.FC = () => {
     selectedDate,
     profile,
     onMutationSuccessReset: () => {
+      decideFocusRestore();
       setStagedMeal(null);
       ai.setSelectedPhoto(null);
       setShowManualForm(false);
@@ -135,7 +136,7 @@ export const NutritionEngine: React.FC = () => {
     if (!stagedMeal) return;
     const updatedItems = stagedMeal.items.filter((it) => it.id !== itemId);
     if (updatedItems.length === 0) {
-      if (cardContainerRef.current?.contains(document.activeElement)) markFocusInside();
+      decideFocusRestore();
       setStagedMeal(null);
       return;
     }
@@ -144,7 +145,6 @@ export const NutritionEngine: React.FC = () => {
 
   const handleLogStagedMeal = () => {
     if (!stagedMeal) return;
-    if (cardContainerRef.current?.contains(document.activeElement)) markFocusInside();
     const items = stagedMeal.items.map(stagedToItem);
     const totals = sumItems(items);
     const isSingle = items.length <= 1;
@@ -358,7 +358,7 @@ export const NutritionEngine: React.FC = () => {
             onLogStagedMeal={handleLogStagedMeal}
             onSaveStagedAsCustomDish={handleSaveStagedAsCustomDish}
             onDiscardStagedMeal={() => {
-              if (cardContainerRef.current?.contains(document.activeElement)) markFocusInside();
+              decideFocusRestore();
               setStagedMeal(null);
             }}
             isPending={mutation.isPending}

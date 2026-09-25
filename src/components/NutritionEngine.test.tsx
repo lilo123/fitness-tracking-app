@@ -4028,6 +4028,58 @@ Total Fiber: 1 g`;
       // Focus should remain on the date input, NOT moved to AI textarea
       expect(document.activeElement).toBe(dateInput);
     });
+
+    it('does not restore focus if an inside element blurred with relatedTarget=null and outside element is focused before discard (F5)', async () => {
+      (supabase.functions.invoke as any).mockResolvedValue({
+        data: {
+          name: 'Protein Shake',
+          calories: 200,
+          protein: 30,
+          carbs: 5,
+          fat: 2,
+          fiber: 1,
+          items: [
+            { name: 'Whey', portion: '1 scoop', calories: 200, protein: 30, carbs: 5, fat: 2, fiber: 1, quantity: 1, unit: 'scoop' },
+          ],
+        },
+        error: null,
+      });
+
+      renderComponent();
+
+      const input = screen.getByPlaceholderText(/Describe what you ate/i);
+      await userEvent.type(input, 'whey protein shake');
+      fireEvent.click(screen.getByText('Analyze Meal'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('staged-meal-card')).toBeDefined();
+      });
+
+      // Focus an element inside the staged card first
+      const mealTypeSelect = screen.getByRole('combobox', { name: /Meal type/i });
+      mealTypeSelect.focus();
+      expect(document.activeElement).toBe(mealTypeSelect);
+
+      // Dispatch a blur event on the inside element with relatedTarget=null (simulates jsdom Node 22 blur)
+      fireEvent.blur(mealTypeSelect, { relatedTarget: null });
+
+      // Focus an outside element before discard
+      const dateInput = screen.getByTestId('nutrition-date-input');
+      dateInput.focus();
+      expect(document.activeElement).toBe(dateInput);
+
+      // Discard while outside element is focused
+      const discardBtn = screen.getByRole('button', { name: /Discard staged meal/i });
+      fireEvent.click(discardBtn);
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('staged-meal-card')).toBeNull();
+      });
+
+      // Focus must remain on the outside element, not stolen back to textarea
+      expect(document.activeElement).toBe(dateInput);
+    });
+
   });
 
 });

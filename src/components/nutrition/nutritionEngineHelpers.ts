@@ -351,27 +351,24 @@ export function useStagedCardFocus(isStaged: boolean) {
   const cardContainerRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
-  const focusWasInsideRef = useRef(false);
+  const shouldRestoreFocusRef = useRef(false);
   const prevIsStagedRef = useRef(isStaged);
 
-  const markFocusInside = () => {
-    focusWasInsideRef.current = true;
+  const decideFocusRestore = () => {
+    const activeEl = document.activeElement;
+    shouldRestoreFocusRef.current = Boolean(
+      activeEl && cardContainerRef.current?.contains(activeEl)
+    );
   };
 
-  const handleFocusCapture = () => {
-    focusWasInsideRef.current = true;
-  };
-
-  const handleBlurCapture = (e: React.FocusEvent<HTMLDivElement>) => {
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-      focusWasInsideRef.current = false;
-    }
+  const markFocusInside = (override = true) => {
+    shouldRestoreFocusRef.current = override;
   };
 
   useEffect(() => {
     if (prevIsStagedRef.current && !isStaged) {
-      if (focusWasInsideRef.current) {
-        focusWasInsideRef.current = false;
+      if (shouldRestoreFocusRef.current) {
+        shouldRestoreFocusRef.current = false;
         if (textareaRef.current) {
           textareaRef.current.focus();
         } else if (headingRef.current) {
@@ -386,11 +383,10 @@ export function useStagedCardFocus(isStaged: boolean) {
     cardContainerRef,
     textareaRef,
     headingRef,
+    decideFocusRestore,
     markFocusInside,
     cardFocusProps: {
       ref: cardContainerRef,
-      onFocusCapture: handleFocusCapture,
-      onBlurCapture: handleBlurCapture,
     },
   };
 }
