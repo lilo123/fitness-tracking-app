@@ -259,18 +259,18 @@ test.describe('Nutrition Flow E2E', () => {
     await expect(page.locator('text=Itemized Breakdown')).toBeVisible();
     await expect(page.locator('text=Eggs').first()).toBeVisible();
 
-    // The x0.5 stepper is gone: the quantity is a real amount in a canonical
-    // unit. This used to be `button[title*="portion"]`, which after the change
-    // matched nothing and — being guarded by `count() > 0` — asserted nothing.
+    // D17 replaced the -/+ stepper with a typed [qty][unit] box.
+    // The input meets the >= 40px touch target, and typing quantity + Enter saves.
     const quantityInput = page.locator('[data-testid="component-quantity-input"]').first();
     await expect(quantityInput).toBeVisible();
-    const increaseBtn = page.getByLabel(/^Increase quantity of /).first();
-    await expect(increaseBtn).toBeVisible();
-    const stepperBox = await increaseBtn.boundingBox();
-    if (stepperBox) {
-      expect(stepperBox.width).toBeGreaterThanOrEqual(40);
-      expect(stepperBox.height).toBeGreaterThanOrEqual(40);
+    const inputBox = await quantityInput.boundingBox();
+    if (inputBox) {
+      expect(inputBox.width).toBeGreaterThanOrEqual(40);
+      expect(inputBox.height).toBeGreaterThanOrEqual(40);
     }
+    await quantityInput.fill('4');
+    await quantityInput.press('Enter');
+    await expect(quantityInput).toHaveValue('4');
 
     // Verify Log Meal button is visible on staged card and commit
     const commitStagedBtn = stagedCard.locator('button:has-text("Log Meal")');
