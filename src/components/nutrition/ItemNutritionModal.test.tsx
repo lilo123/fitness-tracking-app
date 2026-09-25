@@ -53,10 +53,11 @@ describe('ItemNutritionModal', () => {
     expect(fInput.value).toBe('6.5');
     expect(fibInput.value).toBe('0');
 
-    // All inputs have inputMode='decimal' and mobile utility input-text-xs
+    // All inputs have inputMode='decimal', 16px font (text-base), and tabular-nums
     for (const input of [calInput, pInput, cInput, fInput, fibInput]) {
       expect(input.getAttribute('inputmode')).toBe('decimal');
-      expect(input.className).toContain('input-text-xs');
+      expect(input.className).toContain('text-base');
+      expect(input.className).toContain('tabular-nums');
       expect(input.className).toContain('min-h-[44px]');
     }
 

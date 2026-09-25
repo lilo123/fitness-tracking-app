@@ -17,7 +17,7 @@ function newItemId(): string {
 }
 
 const MACRO_FIELDS = [
-  { key: 'calories', label: 'Calories', tone: 'text-amber-400', mode: 'numeric' },
+  { key: 'calories', label: 'Calories', tone: 'text-amber-400', mode: 'decimal' },
   { key: 'protein', label: 'Protein (g)', tone: 'text-cyan-400', mode: 'decimal' },
   { key: 'carbs', label: 'Carbs (g)', tone: 'text-emerald-400', mode: 'decimal' },
   { key: 'fat', label: 'Fat (g)', tone: 'text-violet-400', mode: 'decimal' },
@@ -88,7 +88,7 @@ export const CustomDishEditor: React.FC<CustomDishEditorProps> = ({ items, onCha
   return (
     <div className="space-y-2" data-testid="custom-dish-editor">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+        <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">
           Components ({items.length})
         </span>
         <button
@@ -122,7 +122,7 @@ export const CustomDishEditor: React.FC<CustomDishEditorProps> = ({ items, onCha
                   value={item.name}
                   onChange={(e) => patch(index, { name: e.target.value })}
                   placeholder="e.g. Rolled oats"
-                  className="min-h-[44px] w-full min-w-0 flex-1 rounded-lg border border-border-interactive bg-zinc-900 px-2 text-base font-semibold text-white outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 sm:text-xs"
+                  className="min-h-[44px] w-full min-w-0 flex-1 rounded-xl border border-border-interactive bg-zinc-950 px-2.5 text-base font-semibold text-white outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50"
                 />
                 <button
                   type="button"
@@ -139,7 +139,7 @@ export const CustomDishEditor: React.FC<CustomDishEditorProps> = ({ items, onCha
                 <div className="col-span-2">
                   <label
                     htmlFor={qtyId}
-                    className="mb-0.5 block text-[9px] font-bold uppercase tracking-wider text-zinc-500"
+                    className="mb-1 block text-xs font-bold uppercase tracking-wider text-zinc-500"
                   >
                     Qty
                   </label>
@@ -156,11 +156,11 @@ export const CustomDishEditor: React.FC<CustomDishEditorProps> = ({ items, onCha
                       const parsed = parseQuantityInput(e.target.value);
                       patch(index, { quantity: parsed != null ? roundTo1Decimal(parsed) : 0 });
                     }}
-                    className="min-h-[44px] w-full rounded-lg border border-border-interactive bg-zinc-900 p-1 text-center text-base font-mono font-bold text-white outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 sm:text-xs"
+                    className="min-h-[44px] w-full rounded-xl border border-border-interactive bg-zinc-950 p-2 text-center text-base tabular-nums font-bold text-white outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50"
                   />
                 </div>
                 <div className="col-span-2">
-                  <span className="mb-0.5 block text-[9px] font-bold uppercase tracking-wider text-zinc-500">
+                  <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-zinc-500">
                     Unit
                   </span>
                   <div className="flex min-h-[44px] items-center">
@@ -177,7 +177,7 @@ export const CustomDishEditor: React.FC<CustomDishEditorProps> = ({ items, onCha
                     <div key={field.key} className="col-span-2">
                       <label
                         htmlFor={macroId}
-                        className={`mb-0.5 block text-[9px] font-bold uppercase tracking-wider ${field.tone}`}
+                        className={`mb-1 block text-xs font-bold uppercase tracking-wider ${field.tone}`}
                       >
                         {field.label}
                       </label>
@@ -191,7 +191,7 @@ export const CustomDishEditor: React.FC<CustomDishEditorProps> = ({ items, onCha
                         aria-label={`Component ${index + 1} ${field.label}`}
                         value={roundTo1Decimal(item[field.key])}
                         onChange={(e) => patchMacro(index, field.key, e.target.value)}
-                        className="min-h-[44px] w-full rounded-lg border border-border-interactive bg-zinc-900 p-1 text-center text-base font-mono font-bold text-white outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 sm:text-xs"
+                        className="min-h-[44px] w-full rounded-xl border border-border-interactive bg-zinc-950 p-2 text-center text-base tabular-nums font-bold text-white outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50"
                       />
                     </div>
                   );
@@ -199,7 +199,7 @@ export const CustomDishEditor: React.FC<CustomDishEditorProps> = ({ items, onCha
               </div>
 
             {item.displayPortion && (
-              <span className="block font-mono text-[10px] text-zinc-500">
+              <span className="block tabular-nums text-xs text-zinc-500">
                 was &ldquo;{item.displayPortion}&rdquo; &middot; {roundTo1Decimal(item.quantity)}{' '}
                 {shortUnitLabel(item.unit)}
               </span>
@@ -212,7 +212,7 @@ export const CustomDishEditor: React.FC<CustomDishEditorProps> = ({ items, onCha
       {items.length > 0 && (
         <div
           data-testid="dish-derived-totals"
-          className="flex flex-wrap items-center gap-1.5 rounded-xl border border-zinc-800/80 bg-zinc-950 p-2.5 font-mono text-[11px] text-zinc-400"
+          className="flex flex-wrap items-center gap-1.5 rounded-xl border border-zinc-800/80 bg-zinc-950 p-2.5 tabular-nums text-xs text-zinc-400"
         >
           <span className="font-bold uppercase tracking-wider text-zinc-500">Dish total</span>
           <span className="font-bold text-amber-400">{formatCalories(totals.calories)} kcal</span>

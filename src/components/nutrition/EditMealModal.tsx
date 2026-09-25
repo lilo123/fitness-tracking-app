@@ -159,7 +159,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
       className="bg-zinc-900 border border-zinc-800 rounded-t-3xl sm:rounded-3xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom,1.25rem))] max-w-md w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto"
     >
         <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-          <h3 id="edit-meal-modal-title" className="text-base font-black text-white flex items-center gap-2">
+          <h3 id="edit-meal-modal-title" className="text-base font-bold text-white flex items-center gap-2">
             <Utensils className="w-4 h-4 text-cyan-400" />
             <span>Edit Meal</span>
           </h3>
@@ -185,7 +185,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
           <div>
             <label
               htmlFor={`${formId}-food-name`}
-              className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1"
+              className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1"
             >
               Meal Name
             </label>
@@ -196,7 +196,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
               onChange={(e) => setFoodName(e.target.value)}
               placeholder="e.g. Grilled Chicken & Rice"
               data-testid="edit-meal-name-input"
-              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none"
+              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none min-h-[44px]"
               required
             />
           </div>
@@ -204,7 +204,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
           <div>
             <label
               htmlFor={`${formId}-meal-type`}
-              className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1"
+              className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1"
             >
               Meal Type
             </label>
@@ -213,7 +213,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
               value={mealType}
               onChange={(e) => setMealType(e.target.value)}
               data-testid="edit-meal-type-select"
-              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none min-h-[44px]"
+              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none min-h-[44px]"
             >
               {MEAL_TYPES.map((t) => (
                 <option key={t} value={t}>
@@ -230,7 +230,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
             <div>
               <label
                 htmlFor={`${formId}-serving-size`}
-                className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1"
+                className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1"
               >
                 Serving Size
               </label>
@@ -244,13 +244,13 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
                 onChange={(e) => setServingSize(e.target.value)}
                 placeholder="1"
                 data-testid="edit-meal-serving-size-input"
-                className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px]"
+                className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base tabular-nums font-normal focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px]"
               />
             </div>
             <div>
               <label
                 htmlFor={`${formId}-serving-unit`}
-                className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1"
+                className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1"
               >
                 Serving Unit
               </label>
@@ -261,7 +261,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
                 onChange={(e) => setServingUnit(e.target.value)}
                 placeholder="e.g. serving, g, oz"
                 data-testid="edit-meal-serving-unit-input"
-                className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px]"
+                className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px]"
               />
             </div>
           </div>
@@ -269,7 +269,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
           {hasBreakdown && (
             <p
               data-testid="edit-meal-derived-note"
-              className="text-[11px] text-zinc-400"
+              className="text-xs text-zinc-400"
             >
               Totals are calculated from this meal&rsquo;s {items!.length} components and
               cannot be edited here.
@@ -280,7 +280,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
             <div className="col-span-2 sm:col-span-1">
               <label
                 htmlFor={`${formId}-calories`}
-                className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1"
+                className="block text-xs font-bold text-amber-400 uppercase tracking-wider mb-1"
               >
                 Calories
               </label>
@@ -289,21 +289,21 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
                 type="number"
                 step="any"
                 min="0"
-                inputMode="numeric"
+                inputMode="decimal"
                 value={derived ? roundTo1Decimal(derived.calories) : calories}
                 onChange={(e) => setCalories(e.target.value)}
                 readOnly={hasBreakdown}
                 aria-readonly={hasBreakdown}
                 placeholder="0"
                 data-testid="edit-meal-calories-input"
-                className={`w-full border border-border-interactive rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px] ${hasBreakdown ? 'bg-zinc-900 text-zinc-400 cursor-not-allowed' : 'bg-zinc-950 text-white'}`}
+                className={`w-full border border-border-interactive rounded-xl p-2 text-base tabular-nums font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px] ${hasBreakdown ? 'bg-zinc-900 text-zinc-400 cursor-not-allowed' : 'bg-zinc-950 text-white'}`}
                 required
               />
             </div>
             <div className="col-span-2 sm:col-span-1">
               <label
                 htmlFor={`${formId}-protein`}
-                className="block text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-1"
+                className="block text-xs font-bold text-cyan-400 uppercase tracking-wider mb-1"
               >
                 Protein (g)
               </label>
@@ -319,13 +319,13 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
                 aria-readonly={hasBreakdown}
                 placeholder="0"
                 data-testid="edit-meal-protein-input"
-                className={`w-full border border-border-interactive rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px] ${hasBreakdown ? 'bg-zinc-900 text-zinc-400 cursor-not-allowed' : 'bg-zinc-950 text-white'}`}
+                className={`w-full border border-border-interactive rounded-xl p-2 text-base tabular-nums font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px] ${hasBreakdown ? 'bg-zinc-900 text-zinc-400 cursor-not-allowed' : 'bg-zinc-950 text-white'}`}
               />
             </div>
             <div className="col-span-2 sm:col-span-1">
               <label
                 htmlFor={`${formId}-carbs`}
-                className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1"
+                className="block text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1"
               >
                 Carbs (g)
               </label>
@@ -341,13 +341,13 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
                 aria-readonly={hasBreakdown}
                 placeholder="0"
                 data-testid="edit-meal-carbs-input"
-                className={`w-full border border-border-interactive rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px] ${hasBreakdown ? 'bg-zinc-900 text-zinc-400 cursor-not-allowed' : 'bg-zinc-950 text-white'}`}
+                className={`w-full border border-border-interactive rounded-xl p-2 text-base tabular-nums font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px] ${hasBreakdown ? 'bg-zinc-900 text-zinc-400 cursor-not-allowed' : 'bg-zinc-950 text-white'}`}
               />
             </div>
             <div className="col-span-3 sm:col-span-1">
               <label
                 htmlFor={`${formId}-fat`}
-                className="block text-[10px] font-bold text-violet-400 uppercase tracking-wider mb-1"
+                className="block text-xs font-bold text-violet-400 uppercase tracking-wider mb-1"
               >
                 Fat (g)
               </label>
@@ -363,13 +363,13 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
                 aria-readonly={hasBreakdown}
                 placeholder="0"
                 data-testid="edit-meal-fat-input"
-                className={`w-full border border-border-interactive rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px] ${hasBreakdown ? 'bg-zinc-900 text-zinc-400 cursor-not-allowed' : 'bg-zinc-950 text-white'}`}
+                className={`w-full border border-border-interactive rounded-xl p-2 text-base tabular-nums font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px] ${hasBreakdown ? 'bg-zinc-900 text-zinc-400 cursor-not-allowed' : 'bg-zinc-950 text-white'}`}
               />
             </div>
             <div className="col-span-3 sm:col-span-1">
               <label
                 htmlFor={`${formId}-fiber`}
-                className="block text-[10px] font-bold text-teal-400 uppercase tracking-wider mb-1"
+                className="block text-xs font-bold text-teal-400 uppercase tracking-wider mb-1"
               >
                 Fiber (g)
               </label>
@@ -385,12 +385,12 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
                 aria-readonly={hasBreakdown}
                 placeholder="0"
                 data-testid="edit-meal-fiber-input"
-                className={`w-full border border-border-interactive rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px] ${hasBreakdown ? 'bg-zinc-900 text-zinc-400 cursor-not-allowed' : 'bg-zinc-950 text-white'}`}
+                className={`w-full border border-border-interactive rounded-xl p-2 text-base tabular-nums font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px] ${hasBreakdown ? 'bg-zinc-900 text-zinc-400 cursor-not-allowed' : 'bg-zinc-950 text-white'}`}
               />
             </div>
           </div>
 
-          <div className="bg-zinc-950 border border-zinc-800/80 rounded-xl p-2.5 flex items-center justify-between text-[11px] font-mono text-zinc-400">
+          <div className="bg-zinc-950 border border-zinc-800/80 rounded-xl p-2.5 flex items-center justify-between text-xs tabular-nums text-zinc-400">
             <span>Summary:</span>
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-amber-400 font-bold">{formatCalories(derived ? derived.calories : calories)} kcal</span>
@@ -418,7 +418,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
               type="submit"
               disabled={updateMutation.isPending}
               data-testid="save-edit-meal-btn"
-              className="px-5 py-2 min-h-[44px] rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-black shadow-neon-cyan font-black disabled:opacity-50 touch-manipulation"
+              className="px-5 py-2 min-h-[44px] rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-black shadow-neon-cyan disabled:opacity-50 touch-manipulation"
             >
               {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
             </button>

@@ -99,7 +99,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
         className="bg-zinc-900 border border-zinc-800 rounded-t-3xl sm:rounded-3xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom,1.25rem))] max-w-md w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto"
       >
         <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-          <h3 id="dish-modal-title" className="text-base font-black text-white flex items-center gap-2">
+          <h3 id="dish-modal-title" className="text-base font-bold text-white flex items-center gap-2">
             <Star className="w-4 h-4 text-amber-400" />
             {editingDish ? 'Edit Custom Dish' : 'New Custom Dish'}
           </h3>
@@ -117,7 +117,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
           <div>
             <label
               htmlFor={nameId}
-              className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1"
+              className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1"
             >
               Dish Name
             </label>
@@ -127,7 +127,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
               value={dishModalName}
               onChange={(e) => setDishModalName(e.target.value)}
               placeholder="e.g. Protein Oatmeal"
-              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none"
+              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none min-h-[44px]"
               required
             />
           </div>
@@ -136,7 +136,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
           <div>
             <span
               id={`${baseId}-kind-label`}
-              className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1"
+              className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1"
             >
               Dish Type
             </span>
@@ -184,7 +184,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
               </label>
             </div>
             {isFoodDisabled && (
-              <p className="text-[11px] text-zinc-400 mt-1">
+              <p className="text-xs text-zinc-400 mt-1">
                 Remove ingredients first to switch to Food.
               </p>
             )}
@@ -198,7 +198,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
               <div className="col-span-2 sm:col-span-1">
                 <label
                   htmlFor={calId}
-                  className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1"
+                  className="block text-xs font-bold text-amber-400 uppercase tracking-wider mb-1"
                 >
                   Calories
                 </label>
@@ -206,20 +206,20 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
                   id={calId}
                   type="number"
                   step="any"
-                  inputMode="numeric"
+                  inputMode="decimal"
                   value={dishModalCalories === '' ? '' : roundTo1Decimal(dishModalCalories)}
                   onChange={(e) =>
                     setDishModalCalories(e.target.value === '' ? '' : roundTo1Decimal(Number(e.target.value)))
                   }
                   placeholder="0"
-                  className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
+                  className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base tabular-nums font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px]"
                   required
                 />
               </div>
               <div className="col-span-2 sm:col-span-1">
                 <label
                   htmlFor={proteinId}
-                  className="block text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-1"
+                  className="block text-xs font-bold text-cyan-400 uppercase tracking-wider mb-1"
                 >
                   Protein (g)
                 </label>
@@ -233,14 +233,14 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
                     setDishModalProtein(e.target.value === '' ? '' : roundTo1Decimal(Number(e.target.value)))
                   }
                   placeholder="0"
-                  className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
+                  className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base tabular-nums font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px]"
                   required
                 />
               </div>
               <div className="col-span-2 sm:col-span-1">
                 <label
                   htmlFor={carbsId}
-                  className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1"
+                  className="block text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1"
                 >
                   Carbs (g)
                 </label>
@@ -254,14 +254,14 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
                     setDishModalCarbs(e.target.value === '' ? '' : roundTo1Decimal(Number(e.target.value)))
                   }
                   placeholder="0"
-                  className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
+                  className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base tabular-nums font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px]"
                   required
                 />
               </div>
               <div className="col-span-3 sm:col-span-1">
                 <label
                   htmlFor={fatId}
-                  className="block text-[10px] font-bold text-violet-400 uppercase tracking-wider mb-1"
+                  className="block text-xs font-bold text-violet-400 uppercase tracking-wider mb-1"
                 >
                   Fat (g)
                 </label>
@@ -275,14 +275,14 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
                     setDishModalFat(e.target.value === '' ? '' : roundTo1Decimal(Number(e.target.value)))
                   }
                   placeholder="0"
-                  className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
+                  className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base tabular-nums font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px]"
                   required
                 />
               </div>
               <div className="col-span-3 sm:col-span-1">
                 <label
                   htmlFor={fiberId}
-                  className="block text-[10px] font-bold text-teal-400 uppercase tracking-wider mb-1"
+                  className="block text-xs font-bold text-teal-400 uppercase tracking-wider mb-1"
                 >
                   Fiber (g)
                 </label>
@@ -296,7 +296,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
                     setDishModalFiber(e.target.value === '' ? '' : roundTo1Decimal(Number(e.target.value)))
                   }
                   placeholder="0"
-                  className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
+                  className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base tabular-nums font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center min-h-[44px]"
                 />
               </div>
             </div>
@@ -309,7 +309,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
           {recipeNeedsIngredient && (
             <p
               data-testid="recipe-needs-ingredient"
-              className="text-[10px] font-bold text-amber-400"
+              className="text-xs font-bold text-amber-400"
             >
               Add at least one ingredient, or switch to Food to enter macros directly.
             </p>
@@ -350,7 +350,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
               <button
                 type="submit"
                 disabled={isSaving || recipeNeedsIngredient}
-                className="px-5 py-2 min-h-[44px] rounded-xl text-xs font-black bg-cyan-500 hover:bg-cyan-400 text-black shadow-neon-cyan transition disabled:opacity-50 touch-manipulation"
+                className="px-5 py-2 min-h-[44px] rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-black shadow-neon-cyan transition disabled:opacity-50 touch-manipulation"
               >
                 {isSaving ? 'Saving...' : 'Save Dish'}
               </button>
@@ -361,7 +361,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
         {/* List of existing custom dishes */}
         {customDishes.length > 0 && (
           <div className="border-t border-zinc-800 pt-3 space-y-2">
-            <span className="text-[10px] font-extrabold uppercase text-zinc-500 tracking-wider block">
+            <span className="text-xs font-bold uppercase text-zinc-500 tracking-wider block">
               Saved Dishes ({customDishes.length})
             </span>
             <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
@@ -377,7 +377,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
                       </div>
                       <span>{dish.name}</span>
                     </div>
-                    <div className="text-[10px] font-mono text-zinc-400 mt-0.5">
+                    <div className="text-xs tabular-nums text-zinc-400 mt-0.5">
                       <span className="text-amber-400 font-bold">{formatCalories(dish.calories)} kcal</span>
                       <span> • </span>
                       <span className="text-cyan-400">P: {formatMacro(dish.protein)}g</span>
@@ -390,7 +390,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
                     </div>
                     {dish.notes && dish.notes.trim().length > 0 && (
                       <p
-                        className="text-[11px] text-zinc-400 italic line-clamp-1 mt-1"
+                        className="text-xs text-zinc-400 italic line-clamp-1 mt-1"
                         data-testid={`dish-row-note-${dish.id}`}
                       >
                         {dish.notes}

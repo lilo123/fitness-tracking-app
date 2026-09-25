@@ -153,7 +153,7 @@ const ItemNutritionForm: React.FC<ItemNutritionFormProps> = ({ item, onClose, on
       {/* Header */}
       <div className="flex items-start justify-between gap-2 border-b border-zinc-800 pb-3">
         <div className="min-w-0 flex-1">
-          <h3 id="edit-item-nutrition-title" className="text-sm sm:text-base font-bold text-white truncate">
+          <h3 id="edit-item-nutrition-title" className="text-sm font-bold text-white truncate">
             Edit nutrition · {item.name}
           </h3>
           <p className="text-xs text-zinc-400 mt-0.5" data-testid="edit-item-nutrition-subtitle">
@@ -204,7 +204,7 @@ const ItemNutritionForm: React.FC<ItemNutritionFormProps> = ({ item, onClose, on
                   onChange={(e) => handleChange(field.key, e.target.value)}
                   aria-invalid={hasFieldError}
                   aria-errormessage={hasFieldError ? errorId : undefined}
-                  className={`w-full bg-zinc-950 border rounded-xl p-2 text-center text-base sm:text-xs font-mono font-bold text-white outline-none min-h-[44px] input-text-xs transition ${
+                  className={`w-full bg-zinc-950 border rounded-xl p-2 text-center text-base tabular-nums font-bold text-white outline-none min-h-[44px] transition ${
                     hasFieldError
                       ? 'border-rose-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/50'
                       : 'border-border-interactive focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50'
@@ -240,7 +240,7 @@ const ItemNutritionForm: React.FC<ItemNutritionFormProps> = ({ item, onClose, on
             disabled={isSaveDisabled}
             aria-disabled={isSaveDisabled}
             data-testid="save-edit-item-nutrition-btn"
-            className="px-5 py-2 min-h-[40px] rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-black shadow-neon-cyan font-black disabled:opacity-50 disabled:cursor-not-allowed transition touch-manipulation"
+            className="px-5 py-2 min-h-[40px] rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-black shadow-neon-cyan disabled:opacity-50 disabled:cursor-not-allowed transition touch-manipulation"
           >
             Save
           </button>
