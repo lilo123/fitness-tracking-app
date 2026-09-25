@@ -110,7 +110,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
     <div
       ref={cardRef}
       data-testid="staged-meal-card"
-      className="bg-zinc-900/90 border border-cyan-500/50 rounded-2xl sm:rounded-3xl px-3 pt-2 pb-0 sm:pt-4 sm:px-4 sm:pb-0 shadow-[0_0_30px_rgba(6,182,212,0.15)] space-y-1.5 sm:space-y-2 animate-in fade-in scroll-mt-16 sm:scroll-mt-20"
+      className="bg-zinc-900/90 border border-cyan-500/50 rounded-2xl sm:rounded-3xl px-3 pt-2 pb-0 sm:pt-4 sm:px-4 sm:pb-0 shadow-[0_0_30px_rgba(6,182,212,0.15)] space-y-1.5 sm:space-y-2 animate-in fade-in motion-reduce:animate-none scroll-mt-16 sm:scroll-mt-20"
     >
       {/* Header row: Dish Name & Meal Type (1 row on mobile & desktop) */}
       <div className="flex items-center gap-2 border-b border-zinc-800 pb-1.5">
@@ -169,7 +169,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
               type="button"
               data-testid="add-item-button"
               onClick={() => setIsAddingItem(true)}
-              className="text-cyan-400 hover:text-cyan-300 font-bold text-xs uppercase tracking-wider min-h-[40px] px-2.5 py-1 flex items-center justify-center -my-1 rounded-lg transition touch-manipulation"
+              className="text-cyan-400 hover:text-cyan-300 font-bold text-xs uppercase tracking-wider min-h-[40px] px-2.5 py-1 flex items-center justify-center -my-1 rounded-lg transition motion-reduce:transition-none touch-manipulation"
             >
               + Add item
             </button>
@@ -300,7 +300,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
           type="button"
           onClick={onLogStagedMeal}
           disabled={isPending}
-          className="flex-1 min-w-0 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold py-2.5 px-2 min-h-[40px] rounded-xl text-xs uppercase tracking-tight shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-1 touch-manipulation whitespace-nowrap"
+          className="flex-1 min-w-0 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold py-2.5 px-2 min-h-[40px] rounded-xl text-xs uppercase tracking-tight shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 transition motion-reduce:transition-none disabled:opacity-50 flex items-center justify-center gap-1 touch-manipulation whitespace-nowrap"
         >
           <Check className="w-4 h-4 shrink-0" />
           <span className="whitespace-nowrap">
@@ -314,7 +314,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
           type="button"
           aria-label="Save as Custom Dish"
           onClick={onSaveStagedAsCustomDish}
-          className="bg-zinc-800 hover:bg-zinc-700 text-amber-300 font-bold py-2.5 px-3 min-h-[40px] rounded-xl text-xs border border-border-interactive transition flex items-center gap-1.5 touch-manipulation shrink-0"
+          className="bg-zinc-800 hover:bg-zinc-700 text-amber-300 font-bold py-2.5 px-3 min-h-[40px] rounded-xl text-xs border border-border-interactive transition motion-reduce:transition-none flex items-center gap-1.5 touch-manipulation shrink-0"
           title="Save this meal as a quick-log custom dish"
         >
           <Star className="w-3.5 h-3.5 fill-amber-400 shrink-0" />
@@ -325,7 +325,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
           type="button"
           aria-label="Discard staged meal"
           onClick={onDiscardStagedMeal}
-          className="bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white p-2.5 min-h-[40px] min-w-[40px] rounded-xl transition border border-border-interactive flex items-center justify-center touch-manipulation shrink-0"
+          className="bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white p-2.5 min-h-[40px] min-w-[40px] rounded-xl transition motion-reduce:transition-none border border-border-interactive flex items-center justify-center touch-manipulation shrink-0"
           title="Discard"
         >
           <X className="w-4 h-4 shrink-0" />

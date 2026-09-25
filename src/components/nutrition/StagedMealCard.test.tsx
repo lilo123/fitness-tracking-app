@@ -1288,5 +1288,25 @@ describe('StagedMealCard', () => {
       const mealTypeSelect = screen.getByRole('combobox', { name: 'Meal type' });
       expect(mealTypeSelect).toHaveClass('text-base');
     });
+
+    it('applies motion-reduce variants to animations and transitions (F9)', () => {
+      const meal = makeStagedMeal();
+      render(
+        <StagedMealCard
+          stagedMeal={meal}
+          onUpdateStagedMeal={vi.fn()}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={vi.fn()}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={false}
+        />
+      );
+
+      const card = screen.getByTestId('staged-meal-card');
+      expect(card).toHaveClass('motion-reduce:animate-none');
+    });
   });
 });
