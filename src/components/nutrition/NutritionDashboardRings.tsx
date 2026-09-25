@@ -42,9 +42,8 @@ export const NutritionDashboardRings: React.FC<NutritionDashboardRingsProps> = m
   const formatStatus = (label: string, fuel: { badgeLabel: string; isOver: boolean }) => {
     const isOver = fuel.isOver;
     const cleanDiff = fuel.badgeLabel.replace(/^\+/, '').replace(/\s*over$/, '').replace(/\s*left$/, '');
-    const text = isOver
-      ? (fuel.badgeLabel.endsWith('over') ? fuel.badgeLabel : `+${cleanDiff} over`)
-      : `${cleanDiff} left`;
+    const num = fuel.badgeLabel.replace(/^[^\d.]*/, '').replace(/[^\d.].*$/, '') || '0';
+    const text = isOver ? `${num} over` : `${num} left`;
     const ariaLabel = isOver
       ? `${label}: ${cleanDiff} over target`
       : `${label}: ${cleanDiff} left`;

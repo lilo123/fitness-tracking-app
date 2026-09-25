@@ -109,27 +109,27 @@ describe('NutritionDashboardRings', () => {
 
     const expectedTokens = {
       calories: {
-        text: '200 kcal left',
+        text: '200 left',
         colorClass: 'text-amber-400',
         ariaLabel: 'Calories: 200 kcal left',
       },
       protein: {
-        text: '20g P left',
+        text: '20 left',
         colorClass: 'text-cyan-400',
         ariaLabel: 'Protein: 20g P left',
       },
       carbs: {
-        text: '20g C left',
+        text: '20 left',
         colorClass: 'text-emerald-400',
         ariaLabel: 'Carbs: 20g C left',
       },
       fat: {
-        text: '10g F left',
+        text: '10 left',
         colorClass: 'text-violet-400',
         ariaLabel: 'Fat: 10g F left',
       },
       fiber: {
-        text: '5g Fib left',
+        text: '5 left',
         colorClass: 'text-teal-400',
         ariaLabel: 'Fiber: 5g Fib left',
       },
@@ -139,8 +139,13 @@ describe('NutritionDashboardRings', () => {
       const statusEl = screen.getByTestId(`remaining-fuel-${nutrient}`);
       expect(statusEl.textContent).toBe(expectedTokens[nutrient].text);
       expect(statusEl.className).toContain(expectedTokens[nutrient].colorClass);
+      expect(statusEl.className).toContain('font-normal');
+      expect(statusEl.className).toContain('opacity-70');
       expect(statusEl.getAttribute('aria-label')).toBe(expectedTokens[nutrient].ariaLabel);
       expect(statusEl.className).not.toContain('after:content-');
+      // Assert visible text contains no unit (no 'kcal', no 'g ')
+      expect(statusEl.textContent).not.toContain('kcal');
+      expect(statusEl.textContent).not.toContain('g ');
     });
   });
 
@@ -157,23 +162,23 @@ describe('NutritionDashboardRings', () => {
 
     const expectedOver = {
       calories: {
-        text: '+100 kcal over',
+        text: '100 over',
         ariaLabel: 'Calories: 100 kcal over target',
       },
       protein: {
-        text: '+5g P over',
+        text: '5 over',
         ariaLabel: 'Protein: 5g P over target',
       },
       carbs: {
-        text: '+15g C over',
+        text: '15 over',
         ariaLabel: 'Carbs: 15g C over target',
       },
       fat: {
-        text: '+8g F over',
+        text: '8 over',
         ariaLabel: 'Fat: 8g F over target',
       },
       fiber: {
-        text: '+2g Fib over',
+        text: '2 over',
         ariaLabel: 'Fiber: 2g Fib over target',
       },
     };
@@ -182,9 +187,14 @@ describe('NutritionDashboardRings', () => {
       const statusEl = screen.getByTestId(`remaining-fuel-${nutrient}`);
       expect(statusEl.textContent).toBe(expectedOver[nutrient].text);
       expect(statusEl.className).toContain('text-rose-400');
+      expect(statusEl.className).toContain('font-normal');
+      expect(statusEl.className).not.toContain('opacity-70');
       expect(statusEl.getAttribute('aria-label')).toBe(expectedOver[nutrient].ariaLabel);
       // When over, does not have 'after:content' left suffix
       expect(statusEl.className).not.toContain("after:content-['_left']");
+      // Assert visible text contains no unit (no 'kcal', no 'g ')
+      expect(statusEl.textContent).not.toContain('kcal');
+      expect(statusEl.textContent).not.toContain('g ');
     });
   });
 

@@ -87,8 +87,8 @@ export const MacroRing: React.FC<MacroRingProps> = ({
           <div
             data-testid={statusTestId}
             aria-label={statusAriaLabel}
-            className={`text-xs font-bold tracking-tight whitespace-nowrap ${
-              isOver ? 'text-rose-400' : colorClass
+            className={`text-xs font-normal tracking-tight whitespace-nowrap ${
+              isOver ? 'text-rose-400' : `${colorClass} opacity-70`
             }`}
           >
             <span>{subtitle}</span>
