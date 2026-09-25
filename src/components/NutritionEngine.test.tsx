@@ -3753,6 +3753,102 @@ Total Fiber: 1 g`;
       expect(restoredInput).toBeDefined();
       expect(restoredInput).toHaveValue('');
     });
+
+    it('renders status-message error banner when logging a staged meal fails and keeps staged card open (F1)', async () => {
+      const mockInsert = vi.fn().mockReturnValue({
+        select: vi.fn().mockRejectedValue(new Error('Database write failed')),
+      });
+      (supabase.from as any).mockImplementation((table: string) => {
+        const b = createSupabaseBuilder(table, { data: [], error: null });
+        if (table === 'nutrition_logs') {
+          b.insert = mockInsert;
+        }
+        return b;
+      });
+
+      (supabase.functions.invoke as any).mockResolvedValue({
+        data: {
+          name: 'Protein Shake',
+          calories: 200,
+          protein: 30,
+          carbs: 5,
+          fat: 2,
+          fiber: 1,
+          items: [
+            { name: 'Whey', portion: '1 scoop', calories: 200, protein: 30, carbs: 5, fat: 2, fiber: 1, quantity: 1, unit: 'scoop' },
+          ],
+        },
+        error: null,
+      });
+
+      renderComponent();
+
+      const input = screen.getByPlaceholderText(/Describe what you ate/i);
+      await userEvent.type(input, 'whey protein shake');
+      fireEvent.click(screen.getByText('Analyze Meal'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('staged-meal-card')).toBeDefined();
+      });
+
+      expect(screen.getByTestId('status-message')).toHaveTextContent(/Analyzed/i);
+
+      const logBtn = screen.getByRole('button', { name: /Log Meal/i });
+      fireEvent.click(logBtn);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('status-message')).toBeInTheDocument();
+      });
+      expect(screen.getByTestId('status-message')).toHaveTextContent(/Failed to save log: Database write failed/i);
+      expect(screen.getByTestId('staged-meal-card')).toBeInTheDocument();
+    });
+
+    it('renders status-message error banner when saving staged meal as custom dish fails (F1)', async () => {
+      const mockInsert = vi.fn().mockImplementation(() => {
+        return Promise.resolve({ data: null, error: { message: 'Dish save constraint violated' } });
+      });
+      (supabase.from as any).mockImplementation((table: string) => {
+        const b = createSupabaseBuilder(table, { data: [], error: null });
+        if (table === 'custom_dishes') {
+          b.insert = mockInsert;
+        }
+        return b;
+      });
+
+      (supabase.functions.invoke as any).mockResolvedValue({
+        data: {
+          name: 'Protein Shake',
+          calories: 200,
+          protein: 30,
+          carbs: 5,
+          fat: 2,
+          fiber: 1,
+          items: [
+            { name: 'Whey', portion: '1 scoop', calories: 200, protein: 30, carbs: 5, fat: 2, fiber: 1, quantity: 1, unit: 'scoop' },
+          ],
+        },
+        error: null,
+      });
+
+      renderComponent();
+
+      const input = screen.getByPlaceholderText(/Describe what you ate/i);
+      await userEvent.type(input, 'whey protein shake');
+      fireEvent.click(screen.getByText('Analyze Meal'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('staged-meal-card')).toBeDefined();
+      });
+
+      const saveDishBtn = screen.getByRole('button', { name: /Save as Custom Dish/i });
+      fireEvent.click(saveDishBtn);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('status-message')).toBeInTheDocument();
+      });
+      expect(screen.getByTestId('status-message')).toHaveTextContent(/Failed to save custom dish/i);
+      expect(screen.getByTestId('staged-meal-card')).toBeInTheDocument();
+    });
   });
 
 });

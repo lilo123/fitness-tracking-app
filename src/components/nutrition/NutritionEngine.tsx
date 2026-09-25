@@ -341,6 +341,22 @@ export const NutritionEngine: React.FC = () => {
         }
       />
 
+      {stagedMeal && status ? (
+        <StatusBanner
+          message={status}
+          tone={isError ? 'error' : 'info'}
+          testId="status-message"
+          className="shadow-lg"
+          icon={
+            isError ? (
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" aria-hidden="true" />
+            )
+          }
+        />
+      ) : null}
+
       {stagedMeal ? (
         <StagedMealCard
           stagedMeal={stagedMeal}
