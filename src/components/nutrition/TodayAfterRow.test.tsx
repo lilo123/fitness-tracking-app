@@ -93,7 +93,7 @@ describe('DayTotalRow', () => {
     expect(screen.queryByTestId('day-total-over-protein')).toBeNull();
   });
 
-  it('turns red (text-red-400) and adds accessible over-target description ONLY when over target', () => {
+  it('turns red (text-rose-400) and adds accessible over-target description ONLY when over target', () => {
     render(
       <DayTotalRow
         macroColumns={['calories', 'protein']}
@@ -105,7 +105,7 @@ describe('DayTotalRow', () => {
 
     // Calories is over target
     const calCell = screen.getByTestId('day-total-calories');
-    expect(calCell).toHaveClass('text-red-400');
+    expect(calCell).toHaveClass('text-rose-400');
     expect(calCell).not.toHaveClass('text-amber-400');
     const calOver = screen.getByTestId('day-total-over-calories');
     expect(calOver).toHaveTextContent('over target by 100 kcal');
@@ -113,7 +113,7 @@ describe('DayTotalRow', () => {
     // Protein is not over target (uses cyan-400)
     const pCell = screen.getByTestId('day-total-protein');
     expect(pCell).toHaveClass('text-cyan-400');
-    expect(pCell).not.toHaveClass('text-red-400');
+    expect(pCell).not.toHaveClass('text-rose-400');
     expect(screen.queryByTestId('day-total-over-protein')).toBeNull();
   });
 

@@ -94,9 +94,11 @@ export const MacroRing: React.FC<MacroRingProps> = ({
             <span>{subtitle}</span>
           </div>
         )}
-        <div className="text-xs text-zinc-500 font-mono">
-          {displayPercentage}%
-        </div>
+        {!subtitle && (
+          <div className="text-xs text-zinc-500 font-mono">
+            {displayPercentage}%
+          </div>
+        )}
       </div>
     </>
   );

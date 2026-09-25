@@ -759,15 +759,15 @@ describe('StagedMealCard', () => {
       />
     );
 
-    // Calories: 1600 + 484 = 2084 > 2000 -> red (text-red-400), accessible description present
+    // Calories: 1600 + 484 = 2084 > 2000 -> red (text-rose-400), accessible description present
     const calCell = screen.getByTestId('day-total-calories');
-    expect(calCell).toHaveClass('text-red-400');
+    expect(calCell).toHaveClass('text-rose-400');
     expect(screen.getByTestId('day-total-over-calories')).toHaveTextContent('over target by 84 kcal');
 
     // Protein: 75 + 39.5 = 114.5 <= 120 -> cyan-400 (no amber tier, no red)
     const pCell = screen.getByTestId('day-total-protein');
     expect(pCell).toHaveClass('text-cyan-400');
-    expect(pCell).not.toHaveClass('text-red-400');
+    expect(pCell).not.toHaveClass('text-rose-400');
     expect(screen.queryByTestId('day-total-over-protein')).toBeNull();
   });
 });

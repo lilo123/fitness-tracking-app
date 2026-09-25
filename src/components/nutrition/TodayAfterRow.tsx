@@ -55,7 +55,7 @@ export const DayTotalRow: React.FC<DayTotalRowProps> = ({
           const formatted = isZero ? '0' : (colKey === 'calories' ? formatCalories(newVal) : formatMacro(newVal));
 
           const colorClass = isOver
-            ? 'text-red-400'
+            ? 'text-rose-400'
             : isZero
             ? 'text-zinc-600 font-normal'
             : config.colorClass;
