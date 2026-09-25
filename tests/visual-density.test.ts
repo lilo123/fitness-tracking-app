@@ -287,6 +287,45 @@ async function checkClipping(surface: Locator) {
   });
 }
 
+// Check 4 helper: Wait for smooth scroll animation to settle across animation frames
+async function waitForScrollSettled(page: Page, targetSelector: string = '[data-testid="staged-meal-card"]') {
+  await page.evaluate(() => {
+    delete (window as unknown as { __scrollSettleState?: unknown }).__scrollSettleState;
+  });
+
+  await page.waitForFunction(
+    (sel) => {
+      const w = window as unknown as {
+        __scrollSettleState?: { y: number; top: number; count: number };
+      };
+      const target = sel ? document.querySelector(sel) : null;
+      if (!target) return false;
+      const top = target.getBoundingClientRect().top;
+      const currentY = window.scrollY;
+
+      if (!w.__scrollSettleState) {
+        w.__scrollSettleState = { y: currentY, top, count: 0 };
+        return false;
+      }
+
+      const yDiff = Math.abs(currentY - w.__scrollSettleState.y);
+      const topDiff = Math.abs(top - w.__scrollSettleState.top);
+
+      if (yDiff < 0.5 && topDiff < 0.5) {
+        w.__scrollSettleState.count++;
+      } else {
+        w.__scrollSettleState.y = currentY;
+        w.__scrollSettleState.top = top;
+        w.__scrollSettleState.count = 0;
+      }
+
+      return w.__scrollSettleState.count >= 3;
+    },
+    targetSelector,
+    { timeout: 5000 }
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Surface A: Staged card with 4 items
 // ---------------------------------------------------------------------------
@@ -306,6 +345,7 @@ test.describe('Surface A: Staged card with 4 items', () => {
     await page.click('button:has-text("Analyze Meal")');
     cardLocator = page.locator('[data-testid="staged-meal-card"]');
     await expect(cardLocator).toBeVisible({ timeout: 15000 });
+    await waitForScrollSettled(page);
   });
 
   test.afterAll(async () => {
@@ -313,10 +353,22 @@ test.describe('Surface A: Staged card with 4 items', () => {
   });
 
   test('A: card height <= 500px', async () => {
-    const cardBox = (await cardLocator.boundingBox())!;
-    const firstRowBox = (await cardLocator.locator('[data-testid="component-row"]').first().boundingBox())!;
-    const discardBtn = cardLocator.locator('button[aria-label="Discard staged meal"]');
-    const actionRowBox = (await discardBtn.locator('..').boundingBox())!;
+    await waitForScrollSettled(page);
+    const { cardBox, firstRowBox, actionRowBox } = await cardLocator.evaluate((card) => {
+      const cardRect = card.getBoundingClientRect();
+      const firstRow = card.querySelector('[data-testid="component-row"]');
+      if (!firstRow) throw new Error('first component-row not found in staged card');
+      const firstRowRect = firstRow.getBoundingClientRect();
+      const discardBtn = card.querySelector('button[aria-label="Discard staged meal"]');
+      const actionRow = discardBtn ? discardBtn.parentElement : null;
+      if (!actionRow) throw new Error('action row (Discard button parent) not found in staged card');
+      const actionRowRect = actionRow.getBoundingClientRect();
+      return {
+        cardBox: { x: cardRect.x, y: cardRect.y, width: cardRect.width, height: cardRect.height },
+        firstRowBox: { x: firstRowRect.x, y: firstRowRect.y, width: firstRowRect.width, height: firstRowRect.height },
+        actionRowBox: { x: actionRowRect.x, y: actionRowRect.y, width: actionRowRect.width, height: actionRowRect.height },
+      };
+    });
 
     const measurements = {
       test: 'A: card height <= 500px',
@@ -415,6 +467,7 @@ test.describe('Surface B: Staged card with 1 item', () => {
     await page.click('button:has-text("Analyze Meal")');
     cardLocator = page.locator('[data-testid="staged-meal-card"]');
     await expect(cardLocator).toBeVisible({ timeout: 15000 });
+    await waitForScrollSettled(page);
   });
 
   test.afterAll(async () => {
@@ -422,10 +475,22 @@ test.describe('Surface B: Staged card with 1 item', () => {
   });
 
   test('B: card height <= 320px', async () => {
-    const cardBox = (await cardLocator.boundingBox())!;
-    const firstRowBox = (await cardLocator.locator('[data-testid="component-row"]').first().boundingBox())!;
-    const discardBtn = cardLocator.locator('button[aria-label="Discard staged meal"]');
-    const actionRowBox = (await discardBtn.locator('..').boundingBox())!;
+    await waitForScrollSettled(page);
+    const { cardBox, firstRowBox, actionRowBox } = await cardLocator.evaluate((card) => {
+      const cardRect = card.getBoundingClientRect();
+      const firstRow = card.querySelector('[data-testid="component-row"]');
+      if (!firstRow) throw new Error('first component-row not found in staged card');
+      const firstRowRect = firstRow.getBoundingClientRect();
+      const discardBtn = card.querySelector('button[aria-label="Discard staged meal"]');
+      const actionRow = discardBtn ? discardBtn.parentElement : null;
+      if (!actionRow) throw new Error('action row (Discard button parent) not found in staged card');
+      const actionRowRect = actionRow.getBoundingClientRect();
+      return {
+        cardBox: { x: cardRect.x, y: cardRect.y, width: cardRect.width, height: cardRect.height },
+        firstRowBox: { x: firstRowRect.x, y: firstRowRect.y, width: firstRowRect.width, height: firstRowRect.height },
+        actionRowBox: { x: actionRowRect.x, y: actionRowRect.y, width: actionRowRect.width, height: actionRowRect.height },
+      };
+    });
 
     const measurements = {
       test: 'B: card height <= 320px',
@@ -656,6 +721,7 @@ test.describe('Surface D: staged card placement (D10)', () => {
     await page.click('button:has-text("Analyze Meal")');
     cardLocator = page.locator('[data-testid="staged-meal-card"]');
     await expect(cardLocator).toBeVisible({ timeout: 15000 });
+    await waitForScrollSettled(page);
 
     const discardBtn = cardLocator.locator('button[aria-label="Discard staged meal"]');
     actionRowLocator = discardBtn.locator('..');
@@ -668,7 +734,7 @@ test.describe('Surface D: staged card placement (D10)', () => {
 
   test('D1: after staging card top in [0, 200]', async () => {
     // Wait for smooth scroll to settle
-    await page.waitForTimeout(600);
+    await waitForScrollSettled(page);
 
     const cardBox = (await cardLocator.boundingBox())!;
     const cardTop = Math.round(cardBox.y * 10) / 10;
@@ -801,7 +867,7 @@ test.describe('Surface D: staged card placement (D10)', () => {
     // Staged card replaces AI input again
     await page.click('button:has-text("Analyze Meal")');
     await expect(cardLocator).toBeVisible({ timeout: 15000 });
-    await page.waitForTimeout(400);
+    await waitForScrollSettled(page);
 
     const cardBox = (await cardLocator.boundingBox())!;
     const cardTop = Math.round(cardBox.y * 10) / 10;
