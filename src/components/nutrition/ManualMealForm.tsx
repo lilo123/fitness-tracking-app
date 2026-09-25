@@ -257,6 +257,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             step="any"
             min="0"
             inputMode="decimal"
+            enterKeyHint="next"
             data-testid="calories-input"
             value={manualCalories}
             onChange={(e) => onManualCaloriesChange(e.target.value === '' ? '' : Number(e.target.value))}
@@ -294,6 +295,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             step="any"
             min="0"
             inputMode="decimal"
+            enterKeyHint="next"
             data-testid="protein-input"
             value={manualProtein}
             onChange={(e) => onManualProteinChange(e.target.value === '' ? '' : Number(e.target.value))}
@@ -330,6 +332,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             step="any"
             min="0"
             inputMode="decimal"
+            enterKeyHint="next"
             data-testid="carbs-input"
             value={manualCarbs}
             onChange={(e) => onManualCarbsChange(e.target.value === '' ? '' : Number(e.target.value))}
@@ -366,6 +369,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             step="any"
             min="0"
             inputMode="decimal"
+            enterKeyHint="next"
             data-testid="fat-input"
             value={manualFat}
             onChange={(e) => onManualFatChange(e.target.value === '' ? '' : Number(e.target.value))}
@@ -402,6 +406,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             step="any"
             min="0"
             inputMode="decimal"
+            enterKeyHint="next"
             data-testid="fiber-input"
             value={manualFiber}
             onChange={(e) => onManualFiberChange(e.target.value === '' ? '' : Number(e.target.value))}
@@ -441,6 +446,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
             step="any"
             min="0"
             inputMode="decimal"
+            enterKeyHint="next"
             value={manualServingSize}
             onChange={(e) => onManualServingSizeChange(e.target.value === '' ? '' : Number(e.target.value))}
             aria-invalid={Boolean(errors.servingSize)}
@@ -472,6 +478,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
           <input
             id={servingUnitId}
             type="text"
+            enterKeyHint="done"
             value={manualServingUnit}
             onChange={(e) => onManualServingUnitChange(e.target.value)}
             className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2 text-base font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center scroll-mb-24"

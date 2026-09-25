@@ -179,7 +179,7 @@ const ItemNutritionForm: React.FC<ItemNutritionFormProps> = ({ item, onClose, on
       {/* Form */}
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-          {FIELDS.map((field) => {
+          {FIELDS.map((field, index) => {
             const result = validationResults[field.key];
             const hasFieldError = result.error !== null;
             const errorId = `${field.id}-error`;
@@ -199,6 +199,7 @@ const ItemNutritionForm: React.FC<ItemNutritionFormProps> = ({ item, onClose, on
                   id={field.id}
                   type="text"
                   inputMode="decimal"
+                  enterKeyHint={index === FIELDS.length - 1 ? 'done' : 'next'}
                   data-testid={field.testId}
                   value={formState[field.key]}
                   onChange={(e) => handleChange(field.key, e.target.value)}

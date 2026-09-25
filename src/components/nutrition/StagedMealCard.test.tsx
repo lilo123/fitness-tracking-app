@@ -1284,6 +1284,9 @@ describe('StagedMealCard', () => {
 
       const saveDishBtn = screen.getByRole('button', { name: 'Save as Custom Dish' });
       expect(saveDishBtn).toHaveAttribute('aria-label', 'Save as Custom Dish');
+
+      const mealTypeSelect = screen.getByRole('combobox', { name: 'Meal type' });
+      expect(mealTypeSelect).toHaveClass('text-base');
     });
   });
 });

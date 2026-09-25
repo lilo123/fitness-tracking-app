@@ -39,6 +39,8 @@ describe('ComponentRow', () => {
     // Stepper, input, unit chip
     expect(screen.getByTestId('component-quantity-input')).toBeDefined();
     expect((screen.getByTestId('component-quantity-input') as HTMLInputElement).value).toBe('150');
+    expect(screen.getByTestId('component-quantity-input')).toHaveAttribute('enterkeyhint', 'done');
+    expect(screen.getByTestId('component-quantity-input')).toHaveAttribute('inputmode', 'decimal');
     expect(screen.getByTestId('component-unit-chip')).toBeDefined();
   });
 

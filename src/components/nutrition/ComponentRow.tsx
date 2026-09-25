@@ -185,6 +185,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
                 step="any"
                 min="0"
                 inputMode="decimal"
+                enterKeyHint="done"
                 data-testid="component-quantity-input"
                 aria-label={`Quantity of ${item.name}`}
                 value={shown}

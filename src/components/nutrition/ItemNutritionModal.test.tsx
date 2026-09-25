@@ -60,6 +60,11 @@ describe('ItemNutritionModal', () => {
       expect(input.className).toContain('tabular-nums');
       expect(input.className).toContain('min-h-[44px]');
     }
+    expect(calInput.getAttribute('enterkeyhint')).toBe('next');
+    expect(pInput.getAttribute('enterkeyhint')).toBe('next');
+    expect(cInput.getAttribute('enterkeyhint')).toBe('next');
+    expect(fInput.getAttribute('enterkeyhint')).toBe('next');
+    expect(fibInput.getAttribute('enterkeyhint')).toBe('done');
 
     // Buttons >= 40px
     const cancelBtn = screen.getByTestId('cancel-edit-item-nutrition-btn');

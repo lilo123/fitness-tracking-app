@@ -39,6 +39,19 @@ function renderForm(propsOverride: Partial<ManualMealFormProps> = {}) {
 }
 
 describe('ManualMealForm', () => {
+  it('numeric inputs have inputMode="decimal" and appropriate enterKeyHint (F4)', () => {
+    renderForm();
+    const cal = screen.getByTestId('calories-input');
+    const p = screen.getByTestId('protein-input');
+    const c = screen.getByTestId('carbs-input');
+    const f = screen.getByTestId('fat-input');
+    const fib = screen.getByTestId('fiber-input');
+
+    for (const input of [cal, p, c, f, fib]) {
+      expect(input.getAttribute('inputmode')).toBe('decimal');
+      expect(input.getAttribute('enterkeyhint')).toBe('next');
+    }
+  });
   it('has no accessibility violations', async () => {
     const { container } = renderForm();
     await expectNoA11yViolations(container);
