@@ -307,12 +307,20 @@ describe('StagedMealCard', () => {
 
     // Verify visible read-only non-zero figures via individual testids with exact-number assertions
     expect(screen.getByTestId('staged-total-calories')).toHaveTextContent(/^484\s*kcal$/);
-    expect(screen.getByTestId('staged-total-protein')).toHaveTextContent(/^P\s*39\.5$/);
-    expect(screen.getByTestId('staged-total-fat')).toHaveTextContent(/^F\s*34\.5$/);
+    expect(screen.getByTestId('staged-total-protein')).toHaveTextContent(/^39\.5\s*P$/);
+    expect(screen.getByTestId('staged-total-fat')).toHaveTextContent(/^34\.5\s*F$/);
 
     // Verify zero macros are not rendered (assert absence via queryByTestId === null)
     expect(screen.queryByTestId('staged-total-carbs')).toBeNull();
     expect(screen.queryByTestId('staged-total-fiber')).toBeNull();
+
+    // Verify column headers are absent per user feedback (dropped header row)
+    expect(screen.queryByTestId('macro-columns-header')).toBeNull();
+    expect(screen.queryByTestId('header-macro-calories')).toBeNull();
+    expect(screen.queryByTestId('header-macro-protein')).toBeNull();
+    expect(screen.queryByTestId('header-macro-fat')).toBeNull();
+    expect(screen.queryByTestId('header-macro-carbs')).toBeNull();
+    expect(screen.queryByTestId('header-macro-fiber')).toBeNull();
 
     expect(screen.getByText(/totals are the sum of items/i)).toBeDefined();
 
@@ -326,6 +334,8 @@ describe('StagedMealCard', () => {
 
   it('renders all macro figures when all macros are non-zero', () => {
     const meal = makeMultiItemMeal();
+    meal.items[0].carbs = 20;
+    meal.items[0].fiber = 5;
     meal.carbs = 20;
     meal.fiber = 5;
     render(
@@ -343,10 +353,40 @@ describe('StagedMealCard', () => {
     );
 
     expect(screen.getByTestId('staged-total-calories')).toHaveTextContent(/^484\s*kcal$/);
-    expect(screen.getByTestId('staged-total-protein')).toHaveTextContent(/^P\s*39\.5$/);
-    expect(screen.getByTestId('staged-total-carbs')).toHaveTextContent(/^C\s*20$/);
-    expect(screen.getByTestId('staged-total-fat')).toHaveTextContent(/^F\s*34\.5$/);
-    expect(screen.getByTestId('staged-total-fiber')).toHaveTextContent(/^Fib\s*5$/);
+    expect(screen.getByTestId('staged-total-protein')).toHaveTextContent(/^39\.5\s*P$/);
+    expect(screen.getByTestId('staged-total-carbs')).toHaveTextContent(/^20\s*C$/);
+    expect(screen.getByTestId('staged-total-fat')).toHaveTextContent(/^34\.5\s*F$/);
+    expect(screen.getByTestId('staged-total-fiber')).toHaveTextContent(/^5\s*Fib$/);
+
+    // Verify header row is absent
+    expect(screen.queryByTestId('macro-columns-header')).toBeNull();
+  });
+
+  it('renders muted 0 C in totals when a visible column has a 0 total', () => {
+    const meal = makeMultiItemMeal();
+    // One item has carbs so carbs is visible across the meal, but total carbs is 0
+    meal.items[0].carbs = 0;
+    meal.items[1].carbs = 0;
+    meal.items[2].carbs = 0.06;
+    meal.items[3].carbs = -0.06;
+    meal.carbs = 0;
+    render(
+      <StagedMealCard
+        stagedMeal={meal}
+        onUpdateStagedMeal={vi.fn()}
+        onApplyStagedItemChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onSaveItemAsCustomDish={vi.fn()}
+        onLogStagedMeal={vi.fn()}
+        onSaveStagedAsCustomDish={vi.fn()}
+        onDiscardStagedMeal={vi.fn()}
+        isPending={false}
+      />
+    );
+
+    // Totals carbs renders muted 0 C
+    const totalCarbs = screen.getByTestId('staged-total-carbs');
+    expect(totalCarbs).toHaveTextContent(/^0\s*C$/);
   });
 
   it('single-item meal: keeps editable total inputs and writes back to items[0] and base fields', () => {

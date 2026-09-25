@@ -13,6 +13,7 @@ import {
   type StagedItem,
   type StagedMeal,
 } from './nutritionEngineHelpers';
+import { computeVisibleMacroColumns, MACRO_COLUMNS_CONFIG, getMacroGridTemplateColumns } from './macroColumns';
 
 export interface StagedMealCardProps {
   stagedMeal: StagedMeal;
@@ -49,6 +50,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
   const [drafts, setDrafts] = useState<Partial<Record<MacroField, string>>>({});
 
   const isMultiItem = stagedMeal.items && stagedMeal.items.length > 1;
+  const macroColumns = computeVisibleMacroColumns(stagedMeal.items);
 
   const commitSingleItemField = (field: MacroField, num: number) => {
     if (!stagedMeal.items || stagedMeal.items.length === 0) {
@@ -122,10 +124,10 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
   return (
     <div
       data-testid="staged-meal-card"
-      className="bg-zinc-900/90 border border-cyan-500/50 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-[0_0_30px_rgba(6,182,212,0.15)] space-y-2.5 sm:space-y-3 animate-in fade-in"
+      className="bg-zinc-900/90 border border-cyan-500/50 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-[0_0_30px_rgba(6,182,212,0.15)] space-y-2 sm:space-y-2.5 animate-in fade-in"
     >
       {/* Header row: Dish Name & Meal Type (1 row on mobile & desktop) */}
-      <div className="flex items-center gap-2 border-b border-zinc-800 pb-2.5">
+      <div className="flex items-center gap-2 border-b border-zinc-800 pb-2">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {stagedMeal.photoUrl ? (
             <div className="w-8 h-8 rounded-lg overflow-hidden border border-cyan-500/40 shrink-0 bg-zinc-950 shadow-md">
@@ -167,7 +169,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
       </div>
 
       {/* Itemized Ingredient Breakdown */}
-      <div className="space-y-1">
+      <div className="space-y-0.5">
         <div className="flex items-center justify-between text-xs font-bold uppercase text-zinc-400 tracking-wider">
           <span>Itemized Breakdown ({stagedMeal.items.length})</span>
         </div>
@@ -178,6 +180,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
               key={item.id}
               item={stagedToItem(item)}
               reference={stagedReference(item)}
+              macroColumns={macroColumns}
               onChange={(next) => onApplyStagedItemChange(item.id, next)}
               onReanchor={(next) => {
                 const updatedItems = stagedMeal.items.map((it) =>
@@ -206,6 +209,41 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
             />
           ))}
         </div>
+
+        {/* Macro Totals: Read-only for multi-item (Fix D5) directly under the rows */}
+        {isMultiItem && (
+          <div
+            data-testid="staged-meal-totals"
+            className="grid pt-1.5 border-t border-zinc-700/80 text-xs tabular-nums leading-tight"
+            style={{ gridTemplateColumns: getMacroGridTemplateColumns(macroColumns) }}
+            aria-label="Totals are the sum of items"
+            title="Totals are the sum of items · edit an item via ⋯"
+          >
+            <span className="sr-only">Totals are the sum of items</span>
+            {macroColumns.map((colKey) => {
+              const config = MACRO_COLUMNS_CONFIG[colKey];
+              const rawVal = stagedMeal[colKey];
+              const num = roundTo1Decimal(rawVal);
+              const isZero = colKey === 'calories' ? Math.abs(num) < 0.5 : Math.abs(num) < 0.05;
+              const formatted = isZero ? '0' : (colKey === 'calories' ? formatCalories(rawVal) : formatMacro(rawVal));
+
+              return (
+                <div
+                  key={colKey}
+                  data-testid={`staged-total-${colKey}`}
+                  className={`text-right text-xs tabular-nums ${isZero ? 'text-zinc-600 font-normal' : config.colorClass}`}
+                >
+                  <span data-testid={`macro-val-${colKey}`} className={`tabular-nums ${isZero ? 'font-normal' : 'font-semibold'}`}>
+                    {formatted}
+                  </span>{' '}
+                  <span className="opacity-70 font-normal">
+                    {config.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Accessible math explanation for screen readers (Fix D4: visual formula box removed) */}
@@ -213,40 +251,8 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
         <span className="sr-only">{stagedMeal.explanation}</span>
       )}
 
-      {/* Macro Totals: Read-only for multi-item (Fix D5), editable for single-item */}
-      {isMultiItem ? (
-        <div
-          data-testid="staged-meal-totals"
-          className="rounded-xl bg-zinc-950/80 border border-zinc-800/80 px-2.5 py-1.5 flex flex-wrap items-baseline gap-x-3 text-xs tabular-nums text-zinc-400 leading-tight"
-          aria-label="Totals are the sum of items"
-          title="Totals are the sum of items · edit an item via ⋯"
-        >
-          <span className="sr-only">Totals are the sum of items</span>
-          <span data-testid="staged-total-calories" className="text-amber-400 font-semibold shrink-0">
-            {formatCalories(stagedMeal.calories)} kcal
-          </span>
-          {roundTo1Decimal(stagedMeal.protein) > 0 && (
-            <span data-testid="staged-total-protein" className="text-cyan-400 font-semibold shrink-0">
-              P {formatMacro(stagedMeal.protein)}
-            </span>
-          )}
-          {roundTo1Decimal(stagedMeal.carbs) > 0 && (
-            <span data-testid="staged-total-carbs" className="text-emerald-400 font-semibold shrink-0">
-              C {formatMacro(stagedMeal.carbs)}
-            </span>
-          )}
-          {roundTo1Decimal(stagedMeal.fat) > 0 && (
-            <span data-testid="staged-total-fat" className="text-violet-400 font-semibold shrink-0">
-              F {formatMacro(stagedMeal.fat)}
-            </span>
-          )}
-          {roundTo1Decimal(stagedMeal.fiber) > 0 && (
-            <span data-testid="staged-total-fiber" className="text-teal-400 font-semibold shrink-0">
-              Fib {formatMacro(stagedMeal.fiber)}
-            </span>
-          )}
-        </div>
-      ) : (
+      {/* Macro Totals: editable for single-item */}
+      {!isMultiItem && (
         <div className="grid grid-cols-5 gap-1.5 pt-0.5">
           <div>
             <label

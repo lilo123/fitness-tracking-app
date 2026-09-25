@@ -29,11 +29,12 @@ describe('ComponentRow', () => {
     expect(screen.queryByTestId('component-portion-chip')).toBeNull();
 
     // Non-zero macros
-    expect(screen.getByText(/182 kcal/)).toBeDefined();
-    expect(screen.getByText(/P 12.5/)).toBeDefined();
-    expect(screen.getByText(/C 3.2/)).toBeDefined();
-    expect(screen.getByText(/F 13.1/)).toBeDefined();
-    expect(screen.getByText(/Fib 1.2/)).toBeDefined();
+    expect(screen.getByTestId('component-macro-calories')).toHaveTextContent('182 kcal');
+    expect(screen.getByTestId('component-macro-protein')).toHaveTextContent('12.5 P');
+    expect(screen.getByTestId('component-macro-carbs')).toHaveTextContent('3.2 C');
+    expect(screen.getByTestId('component-macro-fat')).toHaveTextContent('13.1 F');
+    expect(screen.getByTestId('component-macro-fiber')).toHaveTextContent('1.2 Fib');
+    expect(screen.getByText(/182 kcal, protein 12.5 g, carbs 3.2 g, fat 13.1 g, fiber 1.2 g/)).toBeDefined();
 
     // Stepper, input, unit chip
     expect(screen.getByTestId('component-quantity-input')).toBeDefined();
@@ -53,7 +54,7 @@ describe('ComponentRow', () => {
     expect(screen.queryByText('1 serving')).toBeNull();
   });
 
-  it('hides zero-value macros while displaying non-zero macros (D2)', () => {
+  it('hides zero-value macros when filtered, and displays muted 0 + suffix in visible columns (D2)', () => {
     const item = component({
       calories: 104,
       protein: 10,
@@ -61,16 +62,29 @@ describe('ComponentRow', () => {
       fat: 6.5,
       fiber: 0,
     });
-    render(<ComponentRow item={item} reference={item} onChange={() => {}} />);
+    const { rerender } = render(
+      <ComponentRow
+        item={item}
+        reference={item}
+        macroColumns={['calories', 'protein', 'fat']}
+        onChange={() => {}}
+      />
+    );
 
-    expect(screen.getByText(/104 kcal/)).toBeDefined();
-    expect(screen.getByText(/P 10/)).toBeDefined();
-    expect(screen.getByText(/F 6.5/)).toBeDefined();
-    expect(screen.queryByText(/C 0/)).toBeNull();
-    expect(screen.queryByText(/Fib 0/)).toBeNull();
+    // Visible columns kcal, P, F only
+    expect(screen.getByTestId('component-macro-calories')).toHaveTextContent('104 kcal');
+    expect(screen.getByTestId('component-macro-protein')).toHaveTextContent('10 P');
+    expect(screen.getByTestId('component-macro-fat')).toHaveTextContent('6.5 F');
+    expect(screen.queryByTestId('component-macro-carbs')).toBeNull();
+    expect(screen.queryByTestId('component-macro-fiber')).toBeNull();
+
+    // When all 5 columns are visible, 0 values display muted 0 with suffix
+    rerender(<ComponentRow item={item} reference={item} onChange={() => {}} />);
+    expect(screen.getByTestId('component-macro-carbs')).toHaveTextContent('0 C');
+    expect(screen.getByTestId('component-macro-fiber')).toHaveTextContent('0 Fib');
   });
 
-  it('displays 0 kcal when calories is 0 (kcal always shown even if 0)', () => {
+  it('displays muted 0 kcal when calories is 0', () => {
     const item = component({
       calories: 0,
       protein: 0,
@@ -80,11 +94,8 @@ describe('ComponentRow', () => {
     });
     render(<ComponentRow item={item} reference={item} onChange={() => {}} />);
 
-    expect(screen.getByText(/0 kcal/)).toBeDefined();
-    expect(screen.queryByText(/P /)).toBeNull();
-    expect(screen.queryByText(/C /)).toBeNull();
-    expect(screen.queryByText(/F /)).toBeNull();
-    expect(screen.queryByText(/Fib /)).toBeNull();
+    const calCell = screen.getByTestId('component-macro-calories');
+    expect(calCell).toHaveTextContent('0 kcal');
   });
 
   it('stepper, input, unit chip, and overflow menu are present and typing quantity invokes onChange', () => {
@@ -202,15 +213,16 @@ describe('ComponentRow', () => {
     render(<ComponentRow item={item} reference={item} onChange={() => {}} />);
 
     // Macro color classes
-    expect(screen.getByText(/182 kcal/).className).toContain('text-amber-400');
-    expect(screen.getByText(/P 12.5/).className).toContain('text-cyan-400');
-    expect(screen.getByText(/C 3.2/).className).toContain('text-emerald-400');
-    expect(screen.getByText(/F 13.1/).className).toContain('text-violet-400');
-    expect(screen.getByText(/Fib 1.2/).className).toContain('text-teal-400');
+    expect(screen.getByTestId('component-macro-calories').className).toContain('text-amber-400');
+    expect(screen.getByTestId('component-macro-protein').className).toContain('text-cyan-400');
+    expect(screen.getByTestId('component-macro-carbs').className).toContain('text-emerald-400');
+    expect(screen.getByTestId('component-macro-fat').className).toContain('text-violet-400');
+    expect(screen.getByTestId('component-macro-fiber').className).toContain('text-teal-400');
 
     // Stepper input should be elegantly constrained rather than stretching full-width
     const input = screen.getByTestId('component-quantity-input');
-    expect(input.className).toContain('w-16');
+    const field = screen.getByTestId('component-quantity-field');
+    expect(field.className).toContain('w-[100px]');
     expect(input.className).not.toContain('w-full');
     // text-base on mobile prevents iOS Safari auto-zoom on input focus
     expect(input.className).toContain('text-base');
@@ -440,10 +452,10 @@ describe('ComponentRow', () => {
     render(<ComponentRow item={item} reference={item} onChange={() => {}} />);
 
     const unitChip = screen.getByTestId('component-unit-chip');
-    // Embedded UnitChip strips border and background, uses muted text
-    expect(unitChip.className).toContain('border-0');
-    expect(unitChip.className).toContain('bg-transparent');
-    expect(unitChip.className).toContain('text-zinc-400');
+    // Embedded UnitChip is styled as right segment with divider and background
+    expect(unitChip.className).toContain('border-l');
+    expect(unitChip.className).toContain('bg-zinc-700/60');
+    expect(unitChip.className).toContain('text-zinc-300');
 
     // Stepper and unit chip share compound container without heavy outer borders
     const input = screen.getByTestId('component-quantity-input');

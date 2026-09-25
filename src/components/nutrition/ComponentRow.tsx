@@ -6,11 +6,13 @@ import { OverflowMenu, type OverflowMenuItem } from '../common/OverflowMenu';
 import { UnitChip } from './UnitChip';
 import { ItemNutritionModal } from './ItemNutritionModal';
 import type { EditedItemNutrition } from './nutritionEngineHelpers';
+import { DEFAULT_MACRO_COLUMNS, MACRO_COLUMNS_CONFIG, getMacroGridTemplateColumns, type MacroColumnKey } from './macroColumns';
 
 export interface ComponentRowProps {
   item: NutritionItem;
   /** The item at its reference quantity. Scaling is relative to this, so there is no accumulating drift and no dead end. */
   reference: NutritionItem;
+  macroColumns?: MacroColumnKey[];
   onChange?: (next: NutritionItem) => void;
   onReanchor?: (next: NutritionItem) => void;
   onRemove?: () => void;
@@ -34,6 +36,7 @@ export interface ComponentRowProps {
 export const ComponentRow: React.FC<ComponentRowProps> = ({
   item,
   reference,
+  macroColumns,
   onChange,
   onReanchor,
   onRemove,
@@ -41,6 +44,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
   onEditNutrition,
   readOnly = false,
 }) => {
+  const columns = macroColumns ?? DEFAULT_MACRO_COLUMNS;
   // The input is free text so an in-progress value like "" or "12." is not
   // clobbered by the controlled numeric round trip.
   const [draft, setDraft] = useState<string | null>(null);
@@ -50,6 +54,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const shown = draft ?? (pendingUnit !== null ? '' : String(roundTo1Decimal(item.quantity)));
+  const activeUnit = pendingUnit ?? item.unit;
 
   const editable = !readOnly && Boolean(onChange);
 
@@ -162,54 +167,37 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
     menuItems.push({ label: 'Remove', onSelect: onRemove, tone: 'danger', testId: 'component-remove' });
   }
 
-  const p = roundTo1Decimal(item.protein);
-  const c = roundTo1Decimal(item.carbs);
-  const f = roundTo1Decimal(item.fat);
-  const fib = roundTo1Decimal(item.fiber);
-  const hasMacros = p > 0 || c > 0 || f > 0 || fib > 0;
+  const accessibleParts: string[] = [`${formatCalories(item.calories)} kcal`];
+  if (columns.includes('protein') && roundTo1Decimal(item.protein) > 0) {
+    accessibleParts.push(`protein ${formatMacro(item.protein)} g`);
+  }
+  if (columns.includes('carbs') && roundTo1Decimal(item.carbs) > 0) {
+    accessibleParts.push(`carbs ${formatMacro(item.carbs)} g`);
+  }
+  if (columns.includes('fat') && roundTo1Decimal(item.fat) > 0) {
+    accessibleParts.push(`fat ${formatMacro(item.fat)} g`);
+  }
+  if (columns.includes('fiber') && roundTo1Decimal(item.fiber) > 0) {
+    accessibleParts.push(`fiber ${formatMacro(item.fiber)} g`);
+  }
+  const accessibleRowText = `${item.name}: ${accessibleParts.join(', ')}`;
 
   return (
     <div
       data-testid="component-row"
-      className="py-1 border-b border-zinc-800/80 last:border-b-0 min-h-[44px] flex flex-col justify-center"
+      className="py-0.5 border-b border-zinc-800/80 last:border-b-0 min-h-[44px] flex flex-col justify-center gap-0.5"
     >
+      {/* LINE 1: Name (left, flex-1, may truncate) + stepper and ⋯ (right) */}
       <div className="flex items-center justify-between gap-1.5 sm:gap-2">
-        {/* LEFT (flex-1, min-w-0): name (line 1, text-xs/semibold, may truncate) above macros line (line 2, text-xs, font-mono, kcal first in amber, then non-zero P/C/F/Fib in their macro colors; kcal never truncated) */}
-        <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
-          {/* Line 1: Name */}
-          <div
-            data-testid="component-name"
-            title={item.name}
-            className="truncate text-xs font-semibold text-white leading-tight"
-          >
-            {item.name}
-          </div>
-
-          {/* Line 2: Macros line */}
-          <div
-            data-testid="component-macros"
-            className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs tabular-nums text-zinc-400 leading-tight"
-          >
-            <span className="font-bold text-amber-400 shrink-0">
-              {formatCalories(item.calories)} kcal
-            </span>
-            {hasMacros && <span className="text-zinc-600 shrink-0">·</span>}
-            {p > 0 && (
-              <span className="text-cyan-400 shrink-0">P {formatMacro(item.protein)}</span>
-            )}
-            {c > 0 && (
-              <span className="text-emerald-400 shrink-0">C {formatMacro(item.carbs)}</span>
-            )}
-            {f > 0 && (
-              <span className="text-violet-400 shrink-0">F {formatMacro(item.fat)}</span>
-            )}
-            {fib > 0 && (
-              <span className="text-teal-400 shrink-0">Fib {formatMacro(item.fiber)}</span>
-            )}
-          </div>
+        <div
+          data-testid="component-name"
+          title={item.name}
+          className="flex-1 min-w-0 truncate text-xs font-semibold text-white leading-tight"
+        >
+          {item.name}
         </div>
 
-        {/* RIGHT (shrink-0): compact stepper [−][editable qty input][inline UnitChip][+] + ⋯ OverflowMenu */}
+        {/* RIGHT (shrink-0): compact stepper [−][field: input + UnitChip][+] + ⋯ OverflowMenu */}
         <div data-testid="component-right-cluster" className="shrink-0 flex items-center gap-1">
           {editable ? (
             <div className="inline-flex items-center">
@@ -223,32 +211,38 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
               >
                 −
               </button>
-              <input
-                type="number"
-                step="any"
-                min="0"
-                inputMode="decimal"
-                data-testid="component-quantity-input"
-                aria-label={`Quantity of ${item.name}`}
-                value={shown}
-                placeholder={pendingUnit ? `amount in ${pendingUnit} for this ${formatCalories(item.calories)} kcal` : undefined}
-                onFocus={(e) => e.target.select()}
-                onChange={(e) => setDraft(e.target.value)}
-                onBlur={(e) => commit(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    commit((e.target as HTMLInputElement).value);
-                  }
-                }}
-                className="min-h-[40px] w-9 sm:w-16 min-w-0 bg-transparent text-right pr-0.5 text-base sm:text-xs font-semibold tabular-nums text-white outline-none border-b border-zinc-700/60 focus:border-cyan-400 input-text-xs"
-              />
-              <UnitChip
-                value={pendingUnit ?? item.unit}
-                onChange={handleUnitChange}
-                testId="component-unit-chip"
-                embedded
-              />
+              <div
+                data-testid="component-quantity-field"
+                className="w-[100px] min-h-[40px] h-10 shrink-0 rounded-lg flex items-center overflow-hidden transition focus-within:ring-1 focus-within:ring-cyan-400"
+              >
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  inputMode="decimal"
+                  data-testid="component-quantity-input"
+                  aria-label={`Quantity of ${item.name}`}
+                  value={shown}
+                  placeholder={pendingUnit ? `amount in ${pendingUnit} for this ${formatCalories(item.calories)} kcal` : undefined}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onBlur={(e) => commit(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      commit((e.target as HTMLInputElement).value);
+                    }
+                  }}
+                  className="min-h-[40px] h-10 w-[48px] shrink-0 bg-zinc-800/70 text-right pr-1 pl-1 text-base sm:text-xs font-semibold tabular-nums text-white outline-none border-0 m-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <UnitChip
+                  value={activeUnit}
+                  onChange={handleUnitChange}
+                  testId="component-unit-chip"
+                  ariaLabel={`Change unit for ${item.name}, currently ${shortUnitLabel(activeUnit)}`}
+                  embedded
+                />
+              </div>
               <button
                 type="button"
                 aria-label={`Increase quantity of ${item.name}`}
@@ -267,12 +261,48 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
           )}
 
           {!readOnly && menuItems.length > 0 && (
-            <OverflowMenu
-              ariaLabel={`Actions for ${item.name}`}
-              items={menuItems}
-              testId="component-actions"
-            />
+            <div className="[&>div>button]:!min-h-[40px] [&>div>button]:!h-10 [&>div>button]:!min-w-[40px] [&>div>button]:!w-10 [&>div>button]:!p-0 flex items-center justify-center">
+              <OverflowMenu
+                ariaLabel={`Actions for ${item.name}`}
+                items={menuItems}
+                testId="component-actions"
+              />
+            </div>
           )}
+        </div>
+      </div>
+
+      {/* LINE 2: Fixed-column-width macro grid */}
+      <div className="w-full">
+        <span className="sr-only">{accessibleRowText}</span>
+        <div
+          data-testid="component-macros"
+          aria-hidden="true"
+          className="grid text-xs tabular-nums text-zinc-400 leading-tight"
+          style={{ gridTemplateColumns: getMacroGridTemplateColumns(columns) }}
+        >
+          {columns.map((colKey) => {
+            const config = MACRO_COLUMNS_CONFIG[colKey];
+            const rawVal = item[colKey];
+            const num = roundTo1Decimal(rawVal);
+            const isZero = colKey === 'calories' ? Math.abs(num) < 0.5 : Math.abs(num) < 0.05;
+            const formatted = isZero ? '0' : (colKey === 'calories' ? formatCalories(rawVal) : formatMacro(rawVal));
+
+            return (
+              <div
+                key={colKey}
+                data-testid={`component-macro-${colKey}`}
+                className={`text-right text-xs tabular-nums ${isZero ? 'text-zinc-600 font-normal' : config.colorClass}`}
+              >
+                <span data-testid={`macro-val-${colKey}`} className="tabular-nums font-normal">
+                  {formatted}
+                </span>{' '}
+                <span className="opacity-70 font-normal">
+                  {config.label}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
 

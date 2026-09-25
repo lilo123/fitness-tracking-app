@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { CANONICAL_UNITS, shortUnitLabel, type CanonicalUnit } from '../../utils/unitConverter';
 
 export interface UnitChipProps {
@@ -8,6 +9,7 @@ export interface UnitChipProps {
   testId?: string;
   /** When true, outer borders and backgrounds are stripped for nesting inside compound controls (Card E2). */
   embedded?: boolean;
+  ariaLabel?: string;
 }
 
 const FULL_UNIT_NAMES: Record<CanonicalUnit, string> = {
@@ -37,6 +39,7 @@ export const UnitChip: React.FC<UnitChipProps> = ({
   disabled,
   testId,
   embedded = false,
+  ariaLabel,
 }) => {
   const [open, setOpen] = React.useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -64,17 +67,20 @@ export const UnitChip: React.FC<UnitChipProps> = ({
         type="button"
         disabled={disabled}
         data-testid={testId}
-        aria-label={`Unit: ${value}. Change unit`}
+        aria-label={ariaLabel || `Unit: ${value}. Change unit`}
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen(true)}
-        className={`shrink-0 min-w-[40px] max-w-[64px] truncate min-h-[40px] px-1 flex items-center text-xs transition touch-manipulation disabled:opacity-50 ${
+        className={`shrink-0 min-h-[40px] h-10 flex items-center text-xs transition touch-manipulation disabled:opacity-50 ${
           embedded
-            ? 'border-0 bg-transparent hover:bg-zinc-800/60 hover:text-zinc-200 text-zinc-400 font-medium rounded-lg justify-start pl-1'
-            : 'rounded-lg border border-border-interactive bg-zinc-950 hover:border-cyan-500 font-bold text-cyan-300 justify-center'
+            ? 'w-[52px] min-w-[52px] max-w-[52px] border-0 border-l border-zinc-700/80 bg-zinc-700/60 hover:bg-zinc-700/80 hover:text-zinc-200 text-zinc-300 font-medium justify-between pl-1.5 pr-1'
+            : 'min-w-[40px] max-w-[64px] rounded-lg border border-border-interactive bg-zinc-950 hover:border-cyan-500 font-bold text-cyan-300 justify-center px-1'
         }`}
       >
-        {shortUnitLabel(value)}
+        <span className="truncate text-left min-w-0">{shortUnitLabel(value)}</span>
+        {embedded && (
+          <ChevronDown className="w-3 h-3 shrink-0 text-zinc-300" aria-hidden="true" />
+        )}
       </button>
 
       {open && (
