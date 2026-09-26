@@ -808,4 +808,16 @@ describe('Canonical Date Utility (src/utils/date.ts)', () => {
       });
     });
   });
+
+  describe("ghostSets date re-exports identity", () => {
+    it("re-exports pure date helpers with identical references from ghostSets", async () => {
+      const ghostSets = await import("./ghostSets");
+      const dateModule = await import("./date");
+      expect(ghostSets.getLocalDateStr).toBe(dateModule.getLocalDateStr);
+      expect(ghostSets.normalizeDateStr).toBe(dateModule.normalizeDateStr);
+      expect(ghostSets.getDayOfWeekAbbr).toBe(dateModule.getDayOfWeekAbbr);
+      expect(ghostSets.formatShortDate).toBe(dateModule.formatShortDate);
+      expect(ghostSets.formatLocalTimestamp).toBe(dateModule.formatLocalTimestamp);
+    });
+  });
 });

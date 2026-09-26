@@ -50,6 +50,9 @@ jobs:
       - name: TypeScript typecheck
         run: npx tsc -b --force
 
+      - name: Run date-sensitive timezone tests (H19)
+        run: npm run test:tz
+
       - name: Build application
         run: npm run build
 
@@ -112,6 +115,9 @@ jobs:
 
       - name: Run complete test suite (test:all)
         run: npm run test:all
+
+      - name: Run visual density gate (W38)
+        run: npm run test:density
 
       # Non-blocking pending human decision H-3: /workout payload measures ~182-194 KB vs the 153,600 B ceiling.
       # The ceiling must not be relaxed to make it pass. The breach remains visible in CI output.

@@ -1,3 +1,41 @@
+
+function getNestedValue(obj: any, path: string): any {
+  if (!obj || typeof obj !== "object") return undefined;
+  if (path in obj) return obj[path];
+  const parts = path.split(".");
+  let curr = obj;
+  for (const part of parts) {
+    if (curr == null || typeof curr !== "object") return undefined;
+    curr = curr[part];
+  }
+  return curr;
+}
+
+function compareValues(valA: any, valB: any, ascending: boolean = true, nullsFirst?: boolean): number {
+  const isNullA = valA === null || valA === undefined;
+  const isNullB = valB === null || valB === undefined;
+  if (isNullA && isNullB) return 0;
+  if (isNullA) {
+    const first = nullsFirst !== undefined ? nullsFirst : !ascending;
+    return first ? -1 : 1;
+  }
+  if (isNullB) {
+    const first = nullsFirst !== undefined ? nullsFirst : !ascending;
+    return first ? 1 : -1;
+  }
+  let diff = 0;
+  if (typeof valA === "number" && typeof valB === "number") {
+    diff = valA - valB;
+  } else if (typeof valA === "boolean" && typeof valB === "boolean") {
+    diff = (valA ? 1 : 0) - (valB ? 1 : 0);
+  } else {
+    const strA = String(valA);
+    const strB = String(valB);
+    diff = strA.localeCompare(strB);
+  }
+  return ascending ? diff : -diff;
+}
+
 import { vi } from 'vitest';
 
 export interface RecordedSelect {
@@ -303,6 +341,43 @@ export class SupabaseQueryBuilderMock implements PromiseLike<{ data: any; error:
   private formatResult(rawData: any, rawError: any): { data: any; error: any } {
     let data = rawData;
     let error = rawError;
+
+    if (Array.isArray(data) && !error) {
+      // 1. Order (PostgREST evaluates ORDER BY before LIMIT/OFFSET)
+      const topLevelOrders = this.orderParams.filter((o) => !o.options?.foreignTable);
+      if (topLevelOrders.length > 0) {
+        data = [...data].sort((a, b) => {
+          for (const order of topLevelOrders) {
+            const valA = getNestedValue(a, order.column);
+            const valB = getNestedValue(b, order.column);
+            const cmp = compareValues(valA, valB, order.options?.ascending !== false, order.options?.nullsFirst);
+            if (cmp !== 0) return cmp;
+          }
+          return 0;
+        });
+      }
+
+      // 2. Range (PostgREST Range header: from-to inclusive)
+      if (this.rangeBounds && !this.rangeBounds.options?.foreignTable) {
+        const from = Math.max(0, this.rangeBounds.from);
+        const to = this.rangeBounds.to;
+        if (to < from) {
+          data = [];
+        } else {
+          data = data.slice(from, to + 1);
+        }
+      }
+
+      // 3. Limit (PostgREST limit query parameter)
+      const topLevelLimits = this.limitCalls.filter((c) => !c.referencedTable);
+      const topLevelLimit = topLevelLimits.length > 0
+        ? topLevelLimits[topLevelLimits.length - 1].count
+        : (this.limitCalls.length === 0 ? this.limitValue : undefined);
+
+      if (typeof topLevelLimit === "number" && topLevelLimit >= 0) {
+        data = data.slice(0, topLevelLimit);
+      }
+    }
 
     if (this.isSingle) {
       if (Array.isArray(data)) {

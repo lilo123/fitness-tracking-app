@@ -26,7 +26,11 @@
     "check:mocks": "node scripts/check-mock-fidelity.js",
     "check:payload": "node scripts/check-payload-projections.js",
     "verify:residue": "node scripts/verify-db-residue.js",
-    "cap:sync": "npm run build && npx cap sync"
+    "cap:sync": "npm run build && npx cap sync",
+    "test:tz:la": "TZ=America/Los_Angeles vitest run src/utils/date.test.ts src/utils/nutritionDayGrouping.test.ts src/utils/nutritionDayKey.test.ts src/utils/ghostSets.test.ts src/utils/timelineGrouping.test.ts src/components/nutrition/useNutritionData.test.tsx src/components/NutritionEngine.dateChange.test.tsx",
+    "test:tz:tokyo": "TZ=Asia/Tokyo vitest run src/utils/date.test.ts src/utils/nutritionDayGrouping.test.ts src/utils/nutritionDayKey.test.ts src/utils/ghostSets.test.ts src/utils/timelineGrouping.test.ts src/components/nutrition/useNutritionData.test.tsx src/components/NutritionEngine.dateChange.test.tsx",
+    "test:tz": "npm run test:tz:la && npm run test:tz:tokyo",
+    "test:density": "playwright test -c playwright.density.config.ts"
   },
   "dependencies": {
     "@capacitor/camera": "^7.0.5",

@@ -5,13 +5,8 @@ import {
   DEFAULT_WORKOUT_TEMPLATES,
 } from '../../utils/ghostSets';
 
-export const UUID_REGEX =
-  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-
-export const isValidUUID = (val: unknown): val is string =>
-  typeof val === 'string' && UUID_REGEX.test(val);
-
-export const isUUID = (val: string): boolean => isValidUUID(val);
+import { UUID_REGEX, isValidUUID, isUUID } from '../../utils/uuid';
+export { UUID_REGEX, isValidUUID, isUUID };
 
 export function resolveCleanExerciseName(
   rawVal: string,

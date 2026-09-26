@@ -487,15 +487,11 @@ describe('dataExport utilities', () => {
       }));
 
       const workoutBuilders: SupabaseQueryBuilderMock[] = [];
+      const allWorkouts = [...page1, ...page2];
       const fromSpy = vi.spyOn(mockSupabase, 'from').mockImplementation((table: string) => {
         if (table === 'workouts') {
           const b = new SupabaseQueryBuilderMock('workouts', {
-            resolver: (builder) => {
-              if (builder.rangeBounds?.from === 0) {
-                return page1;
-              }
-              return page2;
-            },
+            data: allWorkouts,
           });
           workoutBuilders.push(b);
           return b;
@@ -509,16 +505,18 @@ describe('dataExport utilities', () => {
       });
 
       const progressLogs: string[] = [];
-      const bundle = await fetchExportBundle(baseOptions, (msg) => progressLogs.push(msg));
+      try {
+        const bundle = await fetchExportBundle(baseOptions, (msg) => progressLogs.push(msg));
 
-      expect(bundle.data.workouts).toHaveLength(260);
-      expect(progressLogs.some((msg) => msg.includes('workouts'))).toBe(true);
+        expect(bundle.data.workouts).toHaveLength(260);
+        expect(progressLogs.some((msg) => msg.includes('workouts'))).toBe(true);
 
-      expect(workoutBuilders.length).toBe(2);
-      expect(workoutBuilders[0].rangeBounds).toEqual({ from: 0, to: 249, options: undefined });
-      expect(workoutBuilders[1].rangeBounds).toEqual({ from: 250, to: 499, options: undefined });
-
-      fromSpy.mockRestore();
+        expect(workoutBuilders.length).toBe(2);
+        expect(workoutBuilders[0].rangeBounds).toEqual({ from: 0, to: 249, options: undefined });
+        expect(workoutBuilders[1].rangeBounds).toEqual({ from: 250, to: 499, options: undefined });
+      } finally {
+        fromSpy.mockRestore();
+      }
     });
 
     it('defense-in-depth: excludes custom_dishes when isSelfExport is false (Coach export)', async () => {

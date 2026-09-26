@@ -186,7 +186,8 @@ describe('useNutritionData (src/components/nutrition/useNutritionData.ts)', () =
     // The authoritative client filter strips rows from adjacent days (IDs 1 and 5)
     // using normalizeDateStr fallback for legacy null-logged_date rows, leaving exactly IDs 2, 3, 4.
     expect(result.current.nutritionLogs.length - result.current.todayLogs.length).toBe(2);
-    expect(result.current.todayLogs.map((l) => l.id)).toEqual(['2', '3', '4']);
+    // Expected order matches .order('logged_at', { ascending: false }): latest logs first (4, 3, 2)
+    expect(result.current.todayLogs.map((l) => l.id)).toEqual(['4', '3', '2']);
     expect(result.current.dailyTotals.calories).toBe(400 + 700 + 300);
     expect(result.current.dailyTotals.protein).toBe(25 + 45 + 20);
     expect(result.current.dailyTotals.carbs).toBe(50 + 60 + 20);
@@ -645,11 +646,12 @@ describe('useNutritionData (src/components/nutrition/useNutritionData.ts)', () =
           expect(isWithinDayBounds(ts, targetDate, tz)).toBe(true);
         }
 
-        // 2. Component integration via useNutritionData
-        const mockLogs = timestamps.map((ts, idx) => ({
-          id: `log-${tz}-${idx}`,
+        // 2. Component integration via useNutritionData (ordered descending to match .order('logged_at', { ascending: false }))
+        const descTimestamps = [...timestamps].reverse();
+        const mockLogs = descTimestamps.map((ts, idx) => ({
+          id: `log-${tz}-${24 - idx}`,
           user_id: 'user-tz-test',
-          food_name: `Meal hour ${idx}`,
+          food_name: `Meal hour ${24 - idx}`,
           meal_type: 'snack',
           calories: 100,
           protein: 10,

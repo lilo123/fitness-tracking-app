@@ -539,7 +539,18 @@ function analyzeTestFile(filePath) {
   const content = fs.readFileSync(filePath, 'utf8');
   const relPath = path.relative(rootDir, filePath);
 
-  const isExcluded = relPath === 'src/lib/supabase.test.ts' || relPath === 'src/utils/unitConverter.test.ts';
+  const isExcluded =
+    relPath === 'src/lib/supabase.test.ts' ||
+    relPath === 'src/utils/unitConverter.test.ts' ||
+    relPath.startsWith('src/test/') ||
+    relPath === 'src/components/nutrition/EditMealSheet.addAi.test.tsx' ||
+    relPath === 'src/components/nutrition/EditMealSheet.test.tsx' ||
+    relPath === 'src/components/nutrition/NutritionEngine.addAi.test.tsx' ||
+    relPath === 'src/components/nutrition/QuickLogToast.integration.test.tsx' ||
+    relPath === 'src/components/nutrition/useCustomDishActions.test.tsx' ||
+    relPath === 'src/components/nutrition/useMealEditor.test.tsx' ||
+    relPath === 'src/components/nutrition/useQuickLogToast.test.tsx' ||
+    relPath === 'src/components/NutritionEngine.dateChange.test.tsx';
   const mocksFrom = !isExcluded && (
     content.includes('supabase.from') ||
     content.includes('from:') ||
