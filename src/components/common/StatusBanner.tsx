@@ -67,6 +67,17 @@ export interface StatusBannerProps {
   className?: string;
   /** Applied to the *visible* banner, so existing test selectors keep working. */
   testId?: string;
+  /** Inline styles applied to the visible banner container. */
+  style?: React.CSSProperties;
+  /**
+   * Optional custom body for special surfaces like the D41 quick-log toast.
+   * When provided, replaces the default heading/detail layout inside the visible container.
+   */
+  children?: React.ReactNode;
+  /**
+   * When true, disables the default layout classes so custom layout can be provided in `className`.
+   */
+  rawLayout?: boolean;
 }
 
 const TONE_STYLES: Record<StatusTone, string> = {
@@ -83,11 +94,14 @@ export const StatusBanner: React.FC<StatusBannerProps> = ({
   action,
   className = '',
   testId,
+  style,
+  children,
+  rawLayout = false,
 }) => {
   const heading = title ?? '';
   const detail = message ?? '';
   const isError = tone === 'error';
-  const hasContent = Boolean(heading || detail);
+  const hasContent = Boolean(heading || detail || children);
 
   // The two tiers are separate elements on screen but one utterance to a
   // screen reader, which reads the region's whole text content in one pass.
@@ -126,8 +140,13 @@ export const StatusBanner: React.FC<StatusBannerProps> = ({
       </div>
 
       {hasContent ? (
-        <div data-testid={testId} className={`${layout} ${TONE_STYLES[tone]} ${className}`}>
-          {heading ? (
+        <div data-testid={testId} style={style} className={rawLayout ? `${TONE_STYLES[tone]} ${className}` : `${layout} ${TONE_STYLES[tone]} ${className}`}>
+          {children ? (
+            <>
+              {children}
+              {action}
+            </>
+          ) : heading ? (
             <div className="flex min-w-0 items-center gap-2.5">
               {icon}
               <div className="min-w-0">
@@ -143,7 +162,7 @@ export const StatusBanner: React.FC<StatusBannerProps> = ({
               <span className="min-w-0 flex-1 break-words">{detail}</span>
             </>
           )}
-          {action}
+          {!children && action}
         </div>
       ) : null}
     </>

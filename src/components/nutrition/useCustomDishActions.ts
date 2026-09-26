@@ -20,12 +20,16 @@ import {
 export interface AddedFavoriteBanner {
   message: string;
   onUndo: () => void;
+  dishName?: string;
+  addedCalories?: number;
 }
 
 interface BannerState {
   forMeal: StagedMeal;
   preMeal: StagedMeal;
   message: string;
+  dishName: string;
+  addedCalories: number;
   onUndo: () => void;
 }
 
@@ -37,7 +41,7 @@ export interface UseCustomDishActionsOptions {
   setDishFetchError?: (error: { message: string; retry: () => void } | null) => void;
   fetchDishDetail?: (dishId: string) => Promise<CustomDishDetail | null>;
   mutation: { mutate: (payload: any) => void; isPending?: boolean };
-  triggerToast?: (dish: CustomDish) => void;
+  triggerToast?: (dish: CustomDish | { name: string; calories: number | null }, options?: any) => void;
 }
 
 export function buildItemsFromDish(dish: CustomDish, detail: CustomDishDetail | null): StagedItem[] {
@@ -256,11 +260,23 @@ export function useCustomDishActions({
         setBannerState(null);
       };
 
+      const dishCalories = roundTo1Decimal(dish.calories ?? 0);
       setBannerState({
         forMeal: nextStagedMeal,
         preMeal: snapshot,
         message: `Added ${dish.name} to staged meal`,
+        dishName: dish.name,
+        addedCalories: dishCalories,
         onUndo,
+      });
+
+      triggerToast?.(dish, {
+        variant: 'added',
+        dishName: dish.name,
+        calories: dishCalories,
+        onUndo,
+        forMeal: nextStagedMeal,
+        preMeal: snapshot,
       });
 
       bannerTimerRef.current = setTimeout(() => {
@@ -268,13 +284,15 @@ export function useCustomDishActions({
         bannerTimerRef.current = null;
       }, 5000);
     },
-    [fetchDishDetail, incrementDishUseCount, setDishFetchError, setStagedMeal]
+    [fetchDishDetail, incrementDishUseCount, setDishFetchError, setStagedMeal, triggerToast]
   );
 
   const handleQuickLogCustomDishDirect = useCallback(
     (dish: CustomDish, e?: React.MouseEvent) => {
       e?.stopPropagation();
       if (mutationRef.current?.isPending) return;
+      setBannerState(null);
+      previousStagedMealRef.current = null;
       const payload = {
         food_name: dish.name,
         calories: roundTo1Decimal(dish.calories),
@@ -309,6 +327,8 @@ export function useCustomDishActions({
     addedFavoriteBanner: isBannerActive
       ? {
           message: bannerState.message,
+          dishName: bannerState.dishName,
+          addedCalories: bannerState.addedCalories,
           onUndo: bannerState.onUndo,
         }
       : null,

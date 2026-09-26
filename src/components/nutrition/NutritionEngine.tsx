@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import type { NutritionLog } from '../../types/database';
 import { getLocalDateStr, formatLocalTimestamp } from '../../utils/date';
@@ -26,13 +26,11 @@ import { useCustomDishSaving } from './useCustomDishSaving';
 import { useCustomDishActions } from './useCustomDishActions';
 import { CustomDishesModal } from './CustomDishesModal';
 import { Utensils, CheckCircle2, AlertCircle, RotateCcw } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
-import { useQueryClient } from '@tanstack/react-query';
 import { StatusBanner } from '../common/StatusBanner';
+import { QuickLogToast } from './QuickLogToast';
 
 export const NutritionEngine: React.FC = () => {
   const { user, profile } = useAuth();
-  const queryClient = useQueryClient();
   const targetUserId = user?.id || '';
 
   const [selectedDate, setSelectedDate] = useState<string>(() => {
@@ -61,7 +59,7 @@ export const NutritionEngine: React.FC = () => {
 
   const {
     customDishes, todayLogs, dailyTotals, targets, remainingFuel,
-    mutation, scaleLogMutation, saveCustomDishMutation, deleteCustomDishMutation,
+    mutation, deleteMutation, scaleLogMutation, saveCustomDishMutation, deleteCustomDishMutation,
     activeToast, dismissToast, triggerToast, isTimerActive,
     isNutritionLogsError, nutritionLogsError, refetchNutritionLogs,
     isCustomDishesError, customDishesError, refetchCustomDishes, fetchDishDetail,
@@ -174,10 +172,20 @@ export const NutritionEngine: React.FC = () => {
     setIsError,
   });
 
-  const { handleStageCustomDish, handleQuickLogCustomDishDirect, handleAddCustomDishToStaged, addedFavoriteBanner } =
+  const { handleStageCustomDish, handleQuickLogCustomDishDirect, handleAddCustomDishToStaged } =
     useCustomDishActions({
       targetUserId, selectedDate, stagedMeal, setStagedMeal, setDishFetchError, fetchDishDetail, mutation, triggerToast,
     });
+
+  useEffect(() => {
+    if (
+      activeToast?.variant === 'added' &&
+      (!stagedMeal ||
+        (stagedMeal !== activeToast.forMeal && stagedMeal !== activeToast.preMeal))
+    ) {
+      dismissToast();
+    }
+  }, [stagedMeal, activeToast, dismissToast]);
 
   // Saved-dish failures surface here, beside Quick Log Favorites, rather than in the nutrition
   // logs banner. They are independent queries; folding them together reported a custom_dishes
@@ -255,25 +263,7 @@ export const NutritionEngine: React.FC = () => {
         />
       ) : null}
 
-      <StatusBanner
-        message={stagedMeal ? addedFavoriteBanner?.message : null}
-        tone="success"
-        testId="add-favorite-status-banner"
-        className="shadow-lg"
-        icon={<CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" aria-hidden="true" />}
-        action={
-          addedFavoriteBanner && (
-            <button
-              type="button"
-              data-testid="undo-add-favorite-btn"
-              onClick={addedFavoriteBanner.onUndo}
-              className="shrink-0 rounded border border-emerald-400/40 bg-emerald-500/20 min-h-[40px] h-10 min-w-[48px] px-3 text-xs font-bold text-emerald-200 hover:bg-emerald-500/30 touch-manipulation cursor-pointer flex items-center justify-center"
-            >
-              Undo
-            </button>
-          )
-        }
-      />
+
 
       {stagedMeal ? (
         <div {...cardFocusProps}>
@@ -408,18 +398,7 @@ export const NutritionEngine: React.FC = () => {
                 onEdit={setEditingMealLog}
                 onDelete={(l) => {
                   if (window.confirm(`Delete "${l.food_name}" from today's log?`)) {
-                    void (async () => {
-                      try {
-                        const { error } = await supabase.from('nutrition_logs').delete().eq('id', l.id);
-                        if (error) throw error;
-                        queryClient.invalidateQueries({ queryKey: ['nutrition_logs', targetUserId] });
-                        setStatus('Meal deleted');
-                        setIsError(false);
-                      } catch (err: any) {
-                        setStatus('Failed to delete meal: ' + err.message);
-                        setIsError(true);
-                      }
-                    })();
+                    void deleteMutation.mutateAsync(l.id);
                   }
                 }}
                 onItemsChange={(l, items) => scaleLogMutation.mutateAsync({ log: l, items })}
@@ -459,39 +438,13 @@ export const NutritionEngine: React.FC = () => {
         onOpenEditDishModal={dishModal.handleOpenEditDishModal}
       />
 
-      {/* Floating Quick-Log Toast */}
-      <div
-        onClick={activeToast ? dismissToast : undefined}
-        className={activeToast ? undefined : 'contents'}
-      >
-        <StatusBanner
-          message={activeToast ? activeToast.name : null}
-          tone="success"
-          testId="quick-log-toast"
-          className={`fixed ${
-            isTimerActive
-              ? 'bottom-[calc(9.25rem+env(safe-area-inset-bottom,0px))]'
-              : 'bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))]'
-          } left-1/2 -translate-x-1/2 z-50 max-w-sm w-[calc(100%-2rem)] bg-zinc-900/95 border border-cyan-500/50 backdrop-blur-xl shadow-2xl shadow-cyan-500/20 rounded-2xl p-3.5 flex items-center justify-between gap-3 text-xs font-bold text-white transition-all duration-200 animate-in fade-in slide-in-from-bottom-3 cursor-pointer touch-manipulation select-none`}
-          icon={
-            activeToast && (
-              <div className="flex items-center gap-2.5 min-w-0 shrink-0">
-                <div className="w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
-                </div>
-                <span className="text-zinc-400 font-medium">Logged:&nbsp;</span>
-              </div>
-            )
-          }
-          action={
-            activeToast && (
-              <div className="shrink-0 px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-400 font-mono text-[11px] font-black">
-                +{activeToast.calories} kcal
-              </div>
-            )
-          }
-        />
-      </div>
+      {/* Floating Quick-Log Toast (D41 & D42) */}
+      <QuickLogToast
+        toast={activeToast}
+        onDismiss={dismissToast}
+        isStaged={Boolean(stagedMeal)}
+        isTimerActive={isTimerActive}
+      />
 
       {/* Edit Meal Modal */}
       <EditMealModal

@@ -785,10 +785,11 @@ test('manual form stages meal, adds item with updated totals, and logs to timeli
     // Click plus button to append Roasted Almonds
     await plusBtn.click();
 
-    // Banner with Undo is visible
-    const banner = page.locator('[data-testid="add-favorite-status-banner"]');
-    await expect(banner).toBeVisible();
-    await expect(banner).toContainText('Added Roasted Almonds to staged meal');
+    // Toast with Undo is visible (D41)
+    const toast = page.locator('[data-testid="quick-log-toast"]');
+    await expect(toast).toBeVisible();
+    await expect(toast).toContainText('Added to meal');
+    await expect(toast).toContainText('Roasted Almonds');
 
     // Totals updated: 150 + 160 = 310 kcal
     const commitBtn = stagedCard.locator('button:has-text("Log Meal (+310 kcal)")');
@@ -805,5 +806,85 @@ test('manual form stages meal, adds item with updated totals, and logs to timeli
 
     // Net-neutral: remove the row
     await deleteMealRow(page, manualMealName);
+  });
+
+  test('direct quick log -> Undo removes created row from timeline (D42)', async ({ page }) => {
+    const dishName = `Quick Dish ${Date.now()}`;
+    const favoriteDish = {
+      id: `dish-d42-${Date.now()}`,
+      user_id: 'test-user',
+      name: dishName,
+      calories: 220,
+      protein: 20,
+      carbs: 10,
+      fat: 10,
+      fiber: 2,
+      created_at: new Date().toISOString(),
+      kind: 'dish',
+      use_count: 5,
+      notes: null,
+    };
+
+    await page.route('**/rest/v1/custom_dishes*', async (route) => {
+      if (route.request().method() === 'OPTIONS') {
+        await route.fulfill({
+          status: 200,
+          headers: {
+            'access-control-allow-origin': '*',
+            'access-control-allow-headers': 'authorization, x-client-info, apikey, content-type',
+            'access-control-allow-methods': 'GET, POST, OPTIONS',
+          },
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: {
+          'access-control-allow-origin': '*',
+          'content-range': '0-0/1',
+        },
+        body: JSON.stringify([favoriteDish]),
+      });
+    });
+
+    await page.route('**/rest/v1/rpc/increment_dish_use_count*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: { 'access-control-allow-origin': '*' },
+        body: JSON.stringify({}),
+      });
+    });
+
+    await safeGoto(page, '/nutrition');
+    await page.waitForSelector("text=Today's Nutrition");
+
+    // Click 1-tap quick log button
+    const quickLogBtn = page.locator(`[data-testid="quick-log-btn-${favoriteDish.id}"]`);
+    await expect(quickLogBtn).toBeVisible();
+    await quickLogBtn.click();
+
+    // Floating toast appears with "Logged", dish name, kcal and Undo button (D41 & D42)
+    const toast = page.locator('[data-testid="quick-log-toast"]');
+    await expect(toast).toBeVisible();
+    await expect(toast).toContainText('Logged');
+    await expect(toast).toContainText(dishName);
+    await expect(toast).toContainText('+220 kcal');
+
+    // Entry appeared in timeline
+    const loggedRow = page.locator('[data-testid="meal-log-item"]').filter({ hasText: dishName }).first();
+    await expect(loggedRow).toBeVisible();
+
+    // Click Undo on toast
+    const undoBtn = toast.locator('[data-testid="toast-undo-btn"]');
+    await expect(undoBtn).toBeVisible();
+    await undoBtn.click();
+
+    // Toast dismissed
+    await expect(toast).not.toBeVisible();
+
+    // Entry removed from timeline (D42)
+    await expect(loggedRow).not.toBeVisible();
   });
 });

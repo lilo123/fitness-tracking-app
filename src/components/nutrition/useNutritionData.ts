@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useSyncExternalStore } from 'react';
+import { useState, useMemo, useRef, useCallback, useSyncExternalStore } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import type { Database } from '../../types/supabase';
@@ -209,7 +209,15 @@ export function useNutritionData({
       }
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      const created = Array.isArray(data) ? data[0] : (data as any);
+      if (created?.id) {
+        lastCreatedLogIdRef.current = created.id;
+        if (pendingLogIdResolveRef.current) {
+          pendingLogIdResolveRef.current(created.id);
+          pendingLogIdResolveRef.current = null;
+        }
+      }
       setStatus('Saved');
       setIsError(false);
       queryClient.invalidateQueries({ queryKey: ['nutrition_logs', targetUserId] });
@@ -228,9 +236,16 @@ export function useNutritionData({
       logItemsMemoryCache.delete(logId);
       const { error } = await supabase.from('nutrition_logs').delete().eq('id', logId);
       if (error) throw error;
+      return logId;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['nutrition_logs', targetUserId] });
+      setStatus('Meal deleted');
+      setIsError(false);
+    },
+    onError: (err: any) => {
+      setStatus('Failed to delete meal: ' + (err?.message || 'Error deleting meal'));
+      setIsError(true);
     },
   });
 
@@ -343,39 +358,101 @@ export function useNutritionData({
   });
 
   // Floating Quick-Log Toast state
-  const [activeToast, setActiveToast] = useState<{ id: string; name: string; calories: number } | null>(null);
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [activeToast, setActiveToast] = useState<{
+    id: string;
+    variant: 'logged' | 'added';
+    dishName: string;
+    name: string;
+    calories: number;
+    onUndo?: () => Promise<void> | void;
+    forMeal?: any;
+    preMeal?: any;
+  } | null>(null);
+  const lastCreatedLogIdRef = useRef<string | null>(null);
+  const pendingLogIdResolveRef = useRef<((id: string) => void) | null>(null);
+  const pendingLogIdPromiseRef = useRef<Promise<string> | null>(null);
 
-  const dismissToast = () => {
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = null;
-    }
+  const dismissToast = useCallback(() => {
     setActiveToast(null);
-  };
-
-  const triggerToast = (dish: { name: string; calories: number | null }) => {
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-    }
-    setActiveToast({
-      id: String(Date.now()),
-      name: dish.name,
-      calories: roundTo1Decimal(dish.calories ?? 0),
-    });
-    toastTimerRef.current = setTimeout(() => {
-      setActiveToast(null);
-      toastTimerRef.current = null;
-    }, 2800);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) {
-        clearTimeout(toastTimerRef.current);
-      }
-    };
   }, []);
+
+  const triggerToast = useCallback(
+    (
+      dish: { name: string; calories: number | null },
+      options?: {
+        variant?: 'logged' | 'added';
+        onUndo?: () => Promise<void> | void;
+        forMeal?: any;
+        preMeal?: any;
+        dishName?: string;
+        calories?: number;
+      }
+    ) => {
+      const isAdded = options?.variant === 'added';
+      const dishName = options?.dishName || dish.name;
+      const calories = roundTo1Decimal(options?.calories ?? dish.calories ?? 0);
+
+      if (isAdded) {
+        setActiveToast({
+          id: String(Date.now()),
+          variant: 'added',
+          dishName,
+          name: dishName,
+          calories,
+          onUndo: options?.onUndo,
+          forMeal: options?.forMeal,
+          preMeal: options?.preMeal,
+        });
+        return;
+      }
+
+      // Direct log path (variant: 'logged')
+      let resolveId: ((id: string) => void) | null = null;
+      const idPromise = new Promise<string>((resolve) => {
+        resolveId = resolve;
+      });
+      pendingLogIdResolveRef.current = resolveId;
+      pendingLogIdPromiseRef.current = idPromise;
+
+      let alreadyUndone = false;
+      const myIdPromise = idPromise;
+      const onUndo = async () => {
+        if (alreadyUndone) return;
+        alreadyUndone = true;
+        dismissToast();
+        let logId = lastCreatedLogIdRef.current;
+        if (!logId && myIdPromise) {
+          try {
+            logId = await Promise.race([
+              myIdPromise,
+              new Promise<string>((_, reject) =>
+                setTimeout(() => reject(new Error('Timeout waiting for log ID')), 3000)
+              ),
+            ]);
+          } catch {
+            return;
+          }
+        }
+        if (!logId) return;
+
+        try {
+          await deleteMutation.mutateAsync(logId);
+        } catch {
+          // onError on deleteMutation handles setStatus and setIsError
+        }
+      };
+
+      setActiveToast({
+        id: String(Date.now()),
+        variant: 'logged',
+        dishName,
+        name: dishName,
+        calories,
+        onUndo,
+      });
+    },
+    [dismissToast, deleteMutation]
+  );
 
   const timerState = useSyncExternalStore(
     restTimerStore.subscribe,

@@ -200,6 +200,24 @@ async function setupPageAndLogin(page: Page) {
       });
       return;
     }
+    const url = new URL(route.request().url());
+    const acceptHeader = route.request().headers()['accept'] || '';
+    const idParam = url.searchParams.get('id');
+
+    if (acceptHeader.includes('vnd.pgrst.object+json') || (idParam && idParam.startsWith('eq.'))) {
+      const id = idParam ? idParam.replace('eq.', '') : '';
+      const dish = FIXTURE_CUSTOM_DISHES.find((d) => d.id === id) || FIXTURE_CUSTOM_DISHES[0];
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: {
+          'access-control-allow-origin': '*',
+        },
+        body: JSON.stringify({ ...dish, custom_dish_items: [] }),
+      });
+      return;
+    }
+
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -588,7 +606,12 @@ async function checkClipping(surface: Locator) {
         Boolean(el.id && el.id.startsWith('dish-name-')) &&
         el.classList.contains('truncate');
 
-      const isIntentionalTruncate = isStagedMealNameInput || isQuickLogDishName;
+      // Exemption 3 (D41): Quick Log toast dish text uses CSS truncate with title attribute by design
+      const isToastDishText =
+        el.getAttribute('data-testid') === 'toast-dish-text' &&
+        el.classList.contains('truncate');
+
+      const isIntentionalTruncate = isStagedMealNameInput || isQuickLogDishName || isToastDishText;
 
       if (el.tagName !== 'INPUT' && !isIntentionalTruncate && el.scrollWidth > el.clientWidth + 1) {
         clippedElements.push({
@@ -3256,4 +3279,147 @@ test.describe('D23 kcal-vs-macros hint', () => {
       await page.close();
     }
   });
+});
+
+
+// ---------------------------------------------------------------------------
+// Surface F: D41 Floating Toast (320px and 390px)
+// ---------------------------------------------------------------------------
+
+test.describe('D41 floating toast', () => {
+  for (const width of [390, 320]) {
+    test(`D41: direct log toast clearance, typography, tap target and no clipping at ${width}px`, async ({ browser }) => {
+      const page = await browser.newPage({
+        viewport: { width, height: 844 },
+        deviceScaleFactor: 1,
+      });
+      try {
+        await setupPageAndLogin(page);
+
+        const quickLogBtn = page.locator('[data-testid^="quick-log-btn-"]').first();
+        await expect(quickLogBtn).toBeVisible({ timeout: 10000 });
+        await quickLogBtn.click();
+
+        const toast = page.locator('[data-testid="quick-log-toast"]');
+        await expect(toast).toBeVisible({ timeout: 5000 });
+
+        // 1. Toast rect has 0 overlap with bottom nav
+        const nav = page.locator('nav').filter({ has: page.locator('[data-testid="nav-nutrition"]') });
+        await expect(nav).toBeVisible();
+
+        const toastBox = (await toast.boundingBox())!;
+        const navBox = (await nav.boundingBox())!;
+        const toastBottom = toastBox.y + toastBox.height;
+
+        expect(toastBottom, `Toast bottom (${toastBottom}px) exceeds nav top (${navBox.y}px)`).toBeLessThanOrEqual(navBox.y);
+        expect(navBox.y - toastBottom, 'Gap between toast bottom and nav top should be >= 4px').toBeGreaterThanOrEqual(4);
+
+        // 2. Fonts >= 12px, line 2 is 14px
+        const fontResult = await checkFontSizes(toast);
+        expect(fontResult.offenders, `Found fonts smaller than 12px in toast: ${JSON.stringify(fontResult.offenders)}`).toEqual([]);
+
+        const dishText = toast.locator('[data-testid="toast-dish-text"]');
+        await expect(dishText).toBeVisible();
+        const dishFontSize = await dishText.evaluate((el) => parseFloat(window.getComputedStyle(el).fontSize));
+        expect(dishFontSize, 'Line 2 dish text must be 14px').toBe(14);
+
+        // 3. Undo button height >= 44px
+        const undoBtn = toast.locator('[data-testid="toast-undo-btn"]');
+        await expect(undoBtn).toBeVisible();
+        const undoBox = (await undoBtn.boundingBox())!;
+        expect(undoBox.height, `Undo button height (${undoBox.height}px) must be >= 44px`).toBeGreaterThanOrEqual(44);
+        expect(undoBox.width, `Undo button width (${undoBox.width}px) must be >= 44px`).toBeGreaterThanOrEqual(44);
+
+        // 4. No clipping
+        const clipResult = await checkClipping(toast);
+        expect(clipResult.clippedElements, `Found clipped elements in toast: ${JSON.stringify(clipResult.clippedElements)}`).toEqual([]);
+
+        // 5. Verify D42 Undo button click dismisses toast and deletes created log
+        await undoBtn.click();
+        await expect(toast).not.toBeVisible();
+
+        console.log(JSON.stringify({
+          test: `D41: direct log toast at ${width}px`,
+          width,
+          toastBottom,
+          navTop: navBox.y,
+          gapToNav: navBox.y - toastBottom,
+          dishFontSize,
+          undoHeight: undoBox.height,
+          undoWidth: undoBox.width,
+        }));
+      } finally {
+        await page.close();
+      }
+    });
+
+    test(`D41: staged meal add toast clearance and no layout shift at ${width}px`, async ({ browser }) => {
+      const page = await browser.newPage({
+        viewport: { width, height: 844 },
+        deviceScaleFactor: 1,
+      });
+      try {
+        await setupPageAndLogin(page);
+
+        // Stage a meal via AI input
+        await page.fill('textarea[placeholder*="Describe what you ate"]', 'single 1-item salmon');
+        await page.click('button:has-text("Analyze Meal")');
+        const stagedCard = page.locator('[data-testid="staged-meal-card"]');
+        await expect(stagedCard).toBeVisible({ timeout: 15000 });
+        await waitForScrollSettled(page);
+
+        // Record staged card layout position in document before toast
+        const offsetTopBefore = await stagedCard.evaluate((el) => (el as HTMLElement).offsetTop);
+
+        // Click '+' on a favorite to add to staged meal (D33)
+        const addFavBtn = page.locator('[data-testid^="quick-log-btn-"]').first();
+        await expect(addFavBtn).toBeVisible();
+        await addFavBtn.click();
+
+        const toast = page.locator('[data-testid="quick-log-toast"]');
+        await expect(toast).toBeVisible({ timeout: 5000 });
+        await expect(toast).toContainText('Added to meal');
+
+        // Verify staged card offsetTop in document is unchanged (no layout shift from inline banner!)
+        const offsetTopAfter = await stagedCard.evaluate((el) => (el as HTMLElement).offsetTop);
+        expect(offsetTopAfter, `Staged card offsetTop shifted from ${offsetTopBefore}px to ${offsetTopAfter}px`).toBe(offsetTopBefore);
+
+        // Toast floats above sticky staged-card-actions
+        const actionsRow = stagedCard.locator('[data-testid="staged-card-actions"]');
+        await expect(actionsRow).toBeVisible();
+        const actionsBox = (await actionsRow.boundingBox())!;
+        const toastBox = (await toast.boundingBox())!;
+        const toastBottom = toastBox.y + toastBox.height;
+
+        expect(toastBottom, `Toast bottom (${toastBottom}px) exceeds staged actions top (${actionsBox.y}px)`).toBeLessThanOrEqual(actionsBox.y);
+        expect(actionsBox.y - toastBottom, 'Gap between toast bottom and staged actions top should be >= 4px').toBeGreaterThanOrEqual(4);
+
+        // Also clears bottom nav
+        const nav = page.locator('nav').filter({ has: page.locator('[data-testid="nav-nutrition"]') });
+        const navBox = (await nav.boundingBox())!;
+        expect(toastBottom, `Toast bottom (${toastBottom}px) exceeds nav top (${navBox.y}px)`).toBeLessThanOrEqual(navBox.y);
+
+        // Undo button works to revert staged meal addition
+        const undoBtn = toast.locator('[data-testid="toast-undo-btn"]');
+        await expect(undoBtn).toBeVisible();
+        await undoBtn.click();
+
+        // Toast dismissed after Undo
+        await expect(toast).not.toBeVisible();
+
+        console.log(JSON.stringify({
+          test: `D41: staged meal add toast at ${width}px`,
+          width,
+          offsetTopBefore,
+          offsetTopAfter,
+          toastBottom,
+          actionsTop: actionsBox.y,
+          gapToActions: actionsBox.y - toastBottom,
+          navTop: navBox.y,
+        }));
+      } finally {
+        await page.close();
+      }
+    });
+  }
 });

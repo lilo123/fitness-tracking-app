@@ -3173,7 +3173,7 @@ Total Fiber: 1 g`;
     expect(speakingStatus).toBeDefined();
   });
 
-  it('auto-dismisses floating Quick-Log Toast widget after 2.8s', async () => {
+  it('auto-dismisses floating Quick-Log Toast widget after 5s (D41)', async () => {
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'custom_dishes') {
         return createSupabaseBuilder('custom_dishes', {
@@ -3198,9 +3198,9 @@ Total Fiber: 1 g`;
 
     expect(screen.getByTestId('quick-log-toast')).toBeDefined();
 
-    // Advance 2800ms
+    // Advance 5000ms (D41)
     await act(async () => {
-      vi.advanceTimersByTime(2800);
+      vi.advanceTimersByTime(5000);
     });
 
     expect(screen.queryByTestId('quick-log-toast')).toBeNull();
@@ -3235,27 +3235,27 @@ Total Fiber: 1 g`;
     expect(within(screen.getByTestId('quick-log-toast')).getByText('Meal A')).toBeDefined();
     expect(within(screen.getByTestId('quick-log-toast')).getByText('+400 kcal')).toBeDefined();
 
-    // Advance 1500ms
+    // Advance 2500ms
     await act(async () => {
-      vi.advanceTimersByTime(1500);
+      vi.advanceTimersByTime(2500);
     });
     expect(screen.getByTestId('quick-log-toast')).toBeDefined();
 
-    // Click Dish B before 2.8s timer finishes
+    // Click Dish B before 5s timer finishes (D41)
     fireEvent.click(screen.getByTestId('quick-log-btn-dish-b'));
     expect(within(screen.getByTestId('quick-log-toast')).getByText('Meal B')).toBeDefined();
     expect(within(screen.getByTestId('quick-log-toast')).getByText('+250 kcal')).toBeDefined();
 
-    // Advance 1500ms (total 3000ms from start, but only 1500ms since Dish B tap)
+    // Advance 2500ms (total 5000ms from start, but only 2500ms since Dish B tap)
     await act(async () => {
-      vi.advanceTimersByTime(1500);
+      vi.advanceTimersByTime(2500);
     });
     // Toast must still be visible!
     expect(screen.getByTestId('quick-log-toast')).toBeDefined();
 
-    // Advance remaining 1300ms (reaches 2800ms since Dish B tap)
+    // Advance remaining 2500ms (reaches 5000ms since Dish B tap)
     await act(async () => {
-      vi.advanceTimersByTime(1300);
+      vi.advanceTimersByTime(2500);
     });
     // Toast should now be dismissed
     expect(screen.queryByTestId('quick-log-toast')).toBeNull();
