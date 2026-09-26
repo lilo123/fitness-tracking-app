@@ -171,6 +171,60 @@ describe('EditMealSheet', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('D46: Escape in the Scale box cancels the scale edit and keeps the sheet open', () => {
+    const client = createClient();
+    const onClose = vi.fn();
+    render(
+      <QueryClientProvider client={client}>
+        <EditMealSheet isOpen={true} meal={meal([component()])} onClose={onClose} />
+      </QueryClientProvider>
+    );
+
+    fireEvent.click(screen.getByTestId('meal-scale-button'));
+    const input = screen.getByTestId('meal-scale-input');
+    fireEvent.change(input, { target: { value: '2' } });
+    fireEvent.keyDown(input, { key: 'Escape' });
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.queryByTestId('meal-scale-input')).toBeNull();
+    expect(screen.getByTestId('component-quantity-input')).toHaveValue(200);
+    expect(screen.getByTestId('save-edit-meal-btn')).toBeDisabled();
+  });
+
+  it('D46: Scale x0.5 marks the draft dirty, scale x1 makes it clean again, and Save writes the scaled item', async () => {
+    const client = createClient();
+    render(
+      <QueryClientProvider client={client}>
+        <EditMealSheet isOpen={true} meal={meal([component()])} onClose={vi.fn()} />
+      </QueryClientProvider>
+    );
+    const scaleTo = (value: string) => {
+      fireEvent.click(screen.getByTestId('meal-scale-button'));
+      const input = screen.getByTestId('meal-scale-input');
+      fireEvent.change(input, { target: { value } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+    };
+
+    scaleTo('0.5');
+    expect(screen.getByTestId('component-quantity-input')).toHaveValue(100);
+    expect(screen.getByTestId('meal-scale-button')).toHaveTextContent('×0.5');
+    expect(screen.getByTestId('save-edit-meal-btn')).not.toBeDisabled();
+
+    scaleTo('1');
+    expect(screen.getByTestId('component-quantity-input')).toHaveValue(200);
+    expect(screen.getByTestId('meal-scale-button')).toHaveTextContent('Scale');
+    expect(screen.getByTestId('save-edit-meal-btn')).toBeDisabled();
+
+    scaleTo('0.5');
+    fireEvent.click(screen.getByTestId('save-edit-meal-btn'));
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ calories: 250, protein: 25, fat: 15, serving_size: 100 })
+      );
+    });
+  });
+
   it('closes on Escape and backdrop click when draft is NOT dirty', () => {
     const client = createClient();
     const currentMeal = meal([component()]);

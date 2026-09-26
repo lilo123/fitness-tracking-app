@@ -1617,10 +1617,10 @@ describe('StagedMealCard mode="edit" vs mode="stage"', () => {
     expect(c1.firstElementChild?.outerHTML).toBe(c2.firstElementChild?.outerHTML);
   });
 
-  it('renders edit mode elements: date row, whole-dish scale bar, Save changes button, Cancel button, and star', () => {
+  it('renders edit mode elements: date row, Scale chip (no scale bar), Save changes button, Cancel button, and star', () => {
     const meal = makeMultiItemMeal();
     const onDateChange = vi.fn();
-    const onScale = vi.fn();
+    const onUpdateStagedMeal = vi.fn();
     const onCancel = vi.fn();
     const onSave = vi.fn();
 
@@ -1632,10 +1632,9 @@ describe('StagedMealCard mode="edit" vs mode="stage"', () => {
         isDirty={false}
         isPending={false}
         onDateChange={onDateChange}
-        onScale={onScale}
         onCancel={onCancel}
         onLogStagedMeal={onSave}
-        onUpdateStagedMeal={vi.fn()}
+        onUpdateStagedMeal={onUpdateStagedMeal}
         onApplyStagedItemChange={vi.fn()}
         onDeleteItem={vi.fn()}
         onSaveItemAsCustomDish={vi.fn()}
@@ -1651,12 +1650,16 @@ describe('StagedMealCard mode="edit" vs mode="stage"', () => {
     fireEvent.change(dateInput, { target: { value: '2026-09-25' } });
     expect(onDateChange).toHaveBeenCalledWith('2026-09-25');
 
-    // 2. Whole-dish scale bar above items
-    const scaleBar = screen.getByTestId('dish-scale-bar');
-    expect(scaleBar).toBeInTheDocument();
-    const scaleHalf = screen.getByTestId('dish-scale-0.5');
-    fireEvent.click(scaleHalf);
-    expect(onScale).toHaveBeenCalledWith(0.5);
+    // 2. D46: the x0.5-x2 bar is gone; the header Scale chip scales the draft
+    expect(screen.queryByTestId('dish-scale-bar')).toBeNull();
+    fireEvent.click(screen.getByTestId('meal-scale-button'));
+    const scaleInput = screen.getByTestId('meal-scale-input');
+    fireEvent.change(scaleInput, { target: { value: '0.5' } });
+    fireEvent.keyDown(scaleInput, { key: 'Enter' });
+    expect(onUpdateStagedMeal).toHaveBeenCalledTimes(1);
+    const scaled = onUpdateStagedMeal.mock.calls[0][0] as StagedMeal;
+    expect(scaled.scale).toBe(0.5);
+    expect(scaled.calories).toBeCloseTo(meal.calories / 2, 0);
 
     // 3. Primary button reads 'Save changes' and is disabled when not dirty
     const saveBtn = screen.getByTestId('save-edit-meal-btn');
@@ -1686,10 +1689,9 @@ describe('StagedMealCard mode="edit" vs mode="stage"', () => {
         isDirty={true}
         isPending={false}
         onDateChange={onDateChange}
-        onScale={onScale}
         onCancel={onCancel}
         onLogStagedMeal={onSave}
-        onUpdateStagedMeal={vi.fn()}
+        onUpdateStagedMeal={onUpdateStagedMeal}
         onApplyStagedItemChange={vi.fn()}
         onDeleteItem={vi.fn()}
         onSaveItemAsCustomDish={vi.fn()}
@@ -1708,10 +1710,9 @@ describe('StagedMealCard mode="edit" vs mode="stage"', () => {
         isDirty={true}
         isPending={true}
         onDateChange={onDateChange}
-        onScale={onScale}
         onCancel={onCancel}
         onLogStagedMeal={onSave}
-        onUpdateStagedMeal={vi.fn()}
+        onUpdateStagedMeal={onUpdateStagedMeal}
         onApplyStagedItemChange={vi.fn()}
         onDeleteItem={vi.fn()}
         onSaveItemAsCustomDish={vi.fn()}
@@ -1723,3 +1724,94 @@ describe('StagedMealCard mode="edit" vs mode="stage"', () => {
     expect(saveBtn).toBeDisabled();
   });
 });
+
+describe('D46 Scale chip on the staged card', () => {
+  const baseProps = {
+    onApplyStagedItemChange: vi.fn(),
+    onDeleteItem: vi.fn(),
+    onSaveItemAsCustomDish: vi.fn(),
+    onLogStagedMeal: vi.fn(),
+    onSaveStagedAsCustomDish: vi.fn(),
+    onDiscardStagedMeal: vi.fn(),
+    isPending: false,
+    navHeight: 66,
+  };
+
+  it('sits next to "+ Add" in stage mode and scales every item and the totals', () => {
+    const meal = makeMultiItemMeal();
+    const onUpdateStagedMeal = vi.fn();
+    render(<StagedMealCard {...baseProps} stagedMeal={meal} onUpdateStagedMeal={onUpdateStagedMeal} />);
+
+    const scaleBtn = screen.getByTestId('meal-scale-button');
+    const addBtn = screen.getByTestId('add-item-button');
+    expect(scaleBtn.parentElement).toBe(addBtn.parentElement);
+    expect(screen.queryByTestId('dish-scale-bar')).toBeNull();
+
+    fireEvent.click(scaleBtn);
+    const input = screen.getByTestId('meal-scale-input');
+    fireEvent.change(input, { target: { value: '0.2' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(onUpdateStagedMeal).toHaveBeenCalledTimes(1);
+    const next = onUpdateStagedMeal.mock.calls[0][0] as StagedMeal;
+    expect(next.scale).toBe(0.2);
+    expect(next.items.map((it) => it.quantity)).toEqual(meal.items.map((it) => Math.round(it.quantity * 0.2 * 10000) / 10000));
+    expect(next.calories).toBeCloseTo(next.items.reduce((a, it) => a + it.calories, 0), 5);
+    expect(next.name).toBe(meal.name);
+    expect(next.mealType).toBe(meal.mealType);
+  });
+
+  it('shows the active factor and the Log button reflects the scaled total', () => {
+    const meal = makeMultiItemMeal();
+    const { rerender } = render(<StagedMealCard {...baseProps} stagedMeal={meal} onUpdateStagedMeal={vi.fn()} />);
+    fireEvent.click(screen.getByTestId('meal-scale-button'));
+    const input = screen.getByTestId('meal-scale-input');
+    fireEvent.change(input, { target: { value: '0.5' } });
+    const onUpdate = vi.fn();
+    rerender(<StagedMealCard {...baseProps} stagedMeal={meal} onUpdateStagedMeal={onUpdate} />);
+    fireEvent.keyDown(screen.getByTestId('meal-scale-input'), { key: 'Enter' });
+    const scaled = onUpdate.mock.calls[0][0] as StagedMeal;
+
+    rerender(<StagedMealCard {...baseProps} stagedMeal={scaled} onUpdateStagedMeal={vi.fn()} />);
+    expect(screen.getByTestId('meal-scale-button')).toHaveTextContent('×0.5');
+    expect(screen.getByRole('button', { name: /Log Meal \(\+242 kcal\)/ })).toBeInTheDocument();
+  });
+
+  it('is available on a single-item card too and scales servingSize', () => {
+    const meal = makeStagedMeal();
+    const onUpdate = vi.fn();
+    render(<StagedMealCard {...baseProps} stagedMeal={meal} onUpdateStagedMeal={onUpdate} />);
+    expect(screen.getByTestId('meal-scale-button')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('meal-scale-button'));
+    const input = screen.getByTestId('meal-scale-input');
+    fireEvent.change(input, { target: { value: '2' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    const scaled = onUpdate.mock.calls[0][0] as StagedMeal;
+    expect(scaled.scale).toBe(2);
+    expect(scaled.servingSize).toBe(meal.items[0].quantity * 2);
+  });
+
+  it('renders a short "Items (n)" label for narrow screens alongside the full label', () => {
+    render(<StagedMealCard {...baseProps} stagedMeal={makeMultiItemMeal()} onUpdateStagedMeal={vi.fn()} />);
+    expect(screen.getByText('Itemized Breakdown (4)')).toHaveClass('max-[389px]:hidden');
+    expect(screen.getByText('Items (4)')).toHaveClass('hidden', 'max-[389px]:inline');
+  });
+
+  it('no-ops when re-typing the displayed quantity in ComponentRow without calling onApplyStagedItemChange', () => {
+    const meal = makeMultiItemMeal();
+    const onApply = vi.fn();
+    render(<StagedMealCard {...baseProps} stagedMeal={meal} onUpdateStagedMeal={vi.fn()} onApplyStagedItemChange={onApply} />);
+    const inputs = screen.getAllByTestId('component-quantity-input');
+    const firstInput = inputs[0] as HTMLInputElement;
+    const currentVal = firstInput.value;
+
+    fireEvent.change(firstInput, { target: { value: currentVal } });
+    fireEvent.blur(firstInput);
+
+    expect(onApply).not.toHaveBeenCalled();
+  });
+});
+

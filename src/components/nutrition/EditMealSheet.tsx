@@ -137,7 +137,6 @@ const EditMealSheetContent: React.FC<EditMealSheetContentProps> = ({
     isDirty,
     isSaving,
     errorMessage,
-    applyScale,
     applyStagedItemChange,
     handleDeleteItem,
     save,
@@ -257,7 +256,6 @@ const EditMealSheetContent: React.FC<EditMealSheetContentProps> = ({
           onSaveStagedAsCustomDish={handleSaveStagedAsCustomDish}
           onDiscardStagedMeal={handleCancel}
           onCancel={handleCancel}
-          onScale={applyScale}
           isPending={isSaving}
           navHeight={0}
           customDishes={customDishes}

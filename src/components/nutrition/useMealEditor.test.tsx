@@ -3,6 +3,7 @@ import { renderHook, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { useMealEditor } from './useMealEditor';
+import { scaleStagedMeal } from './nutritionEngineHelpers';
 import type { NutritionLog } from '../../types/database';
 import type { NutritionItem } from '../../utils/itemModel';
 import { createSupabaseBuilder, clearMockHistory } from '../../test/supabaseBuilderMock';
@@ -152,7 +153,7 @@ describe('useMealEditor', () => {
     expect(result.current.isDirty).toBe(false);
   });
 
-  it('anchors whole-dish scale (x0.5/x1/x1.5/x2) to draft at open, x1 restores exactly', () => {
+  it('D46: whole-meal scale is relative to the draft at open, x1 restores exactly', () => {
     const items = [
       makeComponent({ id: 'c1', name: 'Rice', quantity: 200, unit: 'g', calories: 260, protein: 5, carbs: 57, fat: 1, fiber: 1 }),
       makeComponent({ id: 'c2', name: 'Chicken', quantity: 150, unit: 'g', calories: 247, protein: 46, carbs: 0, fat: 5, fiber: 0 }),
@@ -172,7 +173,7 @@ describe('useMealEditor', () => {
 
     // Scale to x0.5
     act(() => {
-      result.current.applyScale(0.5);
+      result.current.setDraft((prev) => (prev ? scaleStagedMeal(prev, 0.5) : prev));
     });
     expect(result.current.draft?.items[0].quantity).toBe(100);
     expect(result.current.draft?.items[0].calories).toBe(130);
@@ -182,7 +183,7 @@ describe('useMealEditor', () => {
 
     // Scale to x2 (anchored from open, so 2x of original 200g & 150g)
     act(() => {
-      result.current.applyScale(2);
+      result.current.setDraft((prev) => (prev ? scaleStagedMeal(prev, 2) : prev));
     });
     expect(result.current.draft?.items[0].quantity).toBe(400);
     expect(result.current.draft?.items[0].calories).toBe(520);
@@ -191,13 +192,46 @@ describe('useMealEditor', () => {
 
     // Scale to x1 restores original quantities exactly
     act(() => {
-      result.current.applyScale(1);
+      result.current.setDraft((prev) => (prev ? scaleStagedMeal(prev, 1) : prev));
     });
     expect(result.current.draft?.items[0].quantity).toBe(200);
     expect(result.current.draft?.items[0].calories).toBe(260);
     expect(result.current.draft?.items[1].quantity).toBe(150);
     expect(result.current.draft?.calories).toBe(507);
     expect(result.current.isDirty).toBe(false);
+  });
+
+  it('D46: scaling keeps a per-item quantity edit made while scaled (old bar reset it)', () => {
+    const items = [
+      makeComponent({ id: 'c1', name: 'Rice', quantity: 200, unit: 'g', calories: 260, protein: 5, carbs: 57, fat: 1, fiber: 1 }),
+      makeComponent({ id: 'c2', name: 'Chicken', quantity: 150, unit: 'g', calories: 247, protein: 46, carbs: 0, fat: 5, fiber: 0 }),
+    ];
+    const log = makeMeal(items, { calories: 507 });
+
+    const { result } = renderHook(
+      () => useMealEditor({ meal: log, isOpen: true, onClose: vi.fn() }),
+      { wrapper: createWrapper() }
+    );
+
+    act(() => {
+      result.current.setDraft((prev) => (prev ? scaleStagedMeal(prev, 0.5) : prev));
+    });
+    // Rice is now 100 g; the user bumps it to 150 g while at x0.5.
+    const rice = result.current.draft!.items[0];
+    act(() => {
+      result.current.applyStagedItemChange(rice.id, { ...rice, quantity: 150 } as never);
+    });
+    expect(result.current.draft?.items[0].quantity).toBe(150);
+
+    // Back to x1: the edit is kept (150 g at x0.5 -> 300 g), chicken returns to 150 g.
+    act(() => {
+      result.current.setDraft((prev) => (prev ? scaleStagedMeal(prev, 1) : prev));
+    });
+    expect(result.current.draft?.items[0].quantity).toBe(300);
+    expect(result.current.draft?.items[0].calories).toBe(390);
+    expect(result.current.draft?.items[1].quantity).toBe(150);
+    expect(result.current.draft?.items[1].calories).toBe(247);
+    expect(result.current.draft?.scale).toBeUndefined();
   });
 
   it('tracks dirty flag on name, mealType, date, and item modifications', () => {

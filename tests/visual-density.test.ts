@@ -330,20 +330,60 @@ async function checkSelectChevronGeometry(card: Locator) {
   });
 }
 
+// D46: the Scale chip sits next to + Add without overlap, clipping or tap stealing.
+function expectScaleChipFits(result: Awaited<ReturnType<typeof checkBreakdownHeaderGeometry>>) {
+  const s = result.scale;
+  expect(s.present, 'D46 Scale chip must be in the breakdown header').toBe(true);
+  expect(s.height, `Scale chip tap height (${s.height}px) < 40px`).toBeGreaterThanOrEqual(40);
+  expect(s.width, `Scale chip tap width (${s.width}px) < 40px`).toBeGreaterThanOrEqual(40);
+  expect(s.labelIntersectionArea, 'Scale chip overlaps the header label').toBe(0);
+  expect(s.addIntersectionArea, 'Scale chip overlaps + Add').toBe(0);
+  expect(s.centerHitsScale, 'Center of Scale chip must hit the chip').toBe(true);
+  expect(s.headerOverflows, 'Breakdown header overflows horizontally').toBe(false);
+}
+
 // Check helper: Breakdown header row height and Add item button geometry (D28)
 async function checkBreakdownHeaderGeometry(card: Locator) {
   return await card.evaluate((cardEl) => {
     const addItemBtn = cardEl.querySelector<HTMLElement>('[data-testid="add-item-button"]');
     if (!addItemBtn) throw new Error('add-item-button not found');
 
-    const headerRow = addItemBtn.parentElement;
-    if (!headerRow) throw new Error('header row (add-item-button parent) not found');
+    // D46: + Add now shares an action group with the Scale chip; the row is breakdown-header.
+    const headerRow = addItemBtn.closest<HTMLElement>('[data-testid="breakdown-header"]') ?? addItemBtn.parentElement;
+    if (!headerRow) throw new Error('header row (breakdown-header) not found');
 
     const headerRowRect = headerRow.getBoundingClientRect();
     const btnRect = addItemBtn.getBoundingClientRect();
 
-    const headerLabel = headerRow.querySelector('span:not(.sr-only)');
+    // The visible label (full or D46 short variant); display:none spans have a 0-width rect.
+    const headerLabel = Array.from(headerRow.querySelectorAll<HTMLElement>(':scope > span:not(.sr-only)'))
+      .find((el) => el.getBoundingClientRect().width > 0) ?? null;
     const labelRect = headerLabel ? headerLabel.getBoundingClientRect() : null;
+
+    // D46 Scale chip geometry
+    const scaleBtn = headerRow.querySelector<HTMLElement>('[data-testid="meal-scale-button"]');
+    const scaleRect = scaleBtn ? scaleBtn.getBoundingClientRect() : null;
+    const overlap = (a: DOMRect | null, b: DOMRect | null) => {
+      if (!a || !b) return 0;
+      const h = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+      const v = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+      return h * v;
+    };
+    let scaleCenterHitsScale: boolean | null = null;
+    if (scaleRect && scaleBtn) {
+      const el = document.elementFromPoint(scaleRect.left + scaleRect.width / 2, scaleRect.top + scaleRect.height / 2);
+      scaleCenterHitsScale = el === scaleBtn || scaleBtn.contains(el);
+    }
+    const scale = {
+      present: !!scaleBtn,
+      height: scaleRect ? Math.round(scaleRect.height * 10) / 10 : 0,
+      width: scaleRect ? Math.round(scaleRect.width * 10) / 10 : 0,
+      labelIntersectionArea: overlap(scaleRect, labelRect),
+      addIntersectionArea: overlap(scaleRect, btnRect),
+      centerHitsScale: scaleCenterHitsScale,
+      headerOverflows: headerRow.scrollWidth > headerRow.clientWidth + 1,
+      visibleLabel: headerLabel?.textContent?.trim() ?? null,
+    };
 
     const firstRow = cardEl.querySelector('[data-testid="component-row"]');
     if (!firstRow) throw new Error('first component-row not found');
@@ -423,6 +463,7 @@ async function checkBreakdownHeaderGeometry(card: Locator) {
     const isClipped = addItemBtn.scrollWidth > addItemBtn.clientWidth + 1;
 
     return {
+      scale,
       headerRowHeight: Math.round(headerRowRect.height * 10) / 10,
       buttonWidth: Math.round(btnRect.width * 10) / 10,
       buttonHeight: Math.round(btnRect.height * 10) / 10,
@@ -1055,6 +1096,7 @@ test.describe('Surface A: Staged card with 4 items', () => {
     await waitForScrollSettled(page);
 
     const result = await checkBreakdownHeaderGeometry(cardLocator);
+    expectScaleChipFits(result);
     console.log(JSON.stringify({ test: 'A: breakdown header geometry at 390px', surface: 'A', ...result }));
 
     // Header row height <= pre-D22 value (16px) with +0.5px tolerance max
@@ -1158,6 +1200,49 @@ test.describe('Surface A: Staged card with 4 items', () => {
     }
   });
 
+  test('A: D46 Scale box open at 390px keeps the header on one line, 16px input, no overlap, and Escape restores', async () => {
+    expect(page.viewportSize()?.width).toBe(390);
+    await cardLocator.locator('[data-testid="meal-scale-button"]').click();
+    const input = cardLocator.locator('[data-testid="meal-scale-input"]');
+    await expect(input).toBeFocused();
+
+    const m = await cardLocator.evaluate((cardEl) => {
+      const header = cardEl.querySelector<HTMLElement>('[data-testid="breakdown-header"]')!;
+      const field = cardEl.querySelector<HTMLElement>('[data-testid="meal-scale-field"]')!;
+      const inputEl = cardEl.querySelector<HTMLInputElement>('[data-testid="meal-scale-input"]')!;
+      const add = cardEl.querySelector<HTMLElement>('[data-testid="add-item-button"]')!;
+      const label = Array.from(header.querySelectorAll<HTMLElement>(':scope > span:not(.sr-only)'))
+        .find((el) => el.getBoundingClientRect().width > 0)!;
+      const r = (el: Element) => el.getBoundingClientRect();
+      const ov = (a: DOMRect, b: DOMRect) =>
+        Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) *
+        Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+      return {
+        headerHeight: Math.round(r(header).height * 10) / 10,
+        headerOverflows: header.scrollWidth > header.clientWidth + 1,
+        fieldHeight: Math.round(r(field).height * 10) / 10,
+        inputFontSize: parseFloat(getComputedStyle(inputEl).fontSize),
+        fieldAddOverlap: ov(r(field), r(add)),
+        fieldLabelOverlap: ov(r(field), r(label)),
+        labelText: label.textContent?.trim(),
+        fieldInsideCard: r(field).right <= r(cardEl).right && r(field).left >= r(cardEl).left,
+      };
+    });
+    console.log(JSON.stringify({ test: 'A: D46 scale box open at 390px', ...m }));
+
+    expect(m.labelText, 'At 390px the header keeps the full label').toBe('Itemized Breakdown (4)');
+    expect(m.headerOverflows, 'Header overflows with the Scale box open').toBe(false);
+    expect(m.headerHeight, `Header height (${m.headerHeight}px) grew with the Scale box open`).toBeLessThanOrEqual(16.5);
+    expect(m.fieldHeight, `Scale box tap height (${m.fieldHeight}px) < 40px`).toBeGreaterThanOrEqual(40);
+    expect(m.inputFontSize, 'Scale input must be 16px (iOS no-zoom)').toBe(16);
+    expect(m.fieldAddOverlap, 'Scale box overlaps + Add').toBe(0);
+    expect(m.fieldLabelOverlap, 'Scale box overlaps the label').toBe(0);
+    expect(m.fieldInsideCard, 'Scale box must stay inside the card').toBe(true);
+
+    await input.press('Escape');
+    await expect(cardLocator.locator('[data-testid="meal-scale-button"]')).toBeFocused();
+    await expect(cardLocator.locator('[data-testid="meal-scale-button"]')).toHaveText('Scale');
+  });
 });
 
 
@@ -1287,6 +1372,7 @@ test.describe('Surface B: Staged card with 1 item', () => {
     await waitForScrollSettled(page);
 
     const result = await checkBreakdownHeaderGeometry(cardLocator);
+    expectScaleChipFits(result);
     console.log(JSON.stringify({ test: 'B: breakdown header geometry at 390px', surface: 'B', ...result }));
 
     expect(result.headerRowHeight, `Header row height (${result.headerRowHeight}px) exceeds 16px (+0.5px tolerance)`).toBeLessThanOrEqual(16.5);
@@ -1958,6 +2044,7 @@ test.describe('Surface E: Staged card at 320px width (D24)', () => {
     await waitForScrollSettled(page);
 
     const result = await checkBreakdownHeaderGeometry(cardLocator);
+    expectScaleChipFits(result);
     console.log(JSON.stringify({ test: 'E: breakdown header geometry at 320px', surface: 'E', ...result }));
 
     // D34: label text '+ Manual', aria-label 'Add manual item', no clip
@@ -2062,6 +2149,50 @@ test.describe('Surface E: Staged card at 320px width (D24)', () => {
     }
   });
 
+  test('E: D46 Scale box open at 320px keeps the header on one line, 16px input, no overlap, and Escape restores', async () => {
+    expect(page.viewportSize()?.width).toBe(320);
+    await cardLocator.locator('[data-testid="meal-scale-button"]').click();
+    const input = cardLocator.locator('[data-testid="meal-scale-input"]');
+    await expect(input).toBeFocused();
+
+    const m = await cardLocator.evaluate((cardEl) => {
+      const header = cardEl.querySelector<HTMLElement>('[data-testid="breakdown-header"]')!;
+      const field = cardEl.querySelector<HTMLElement>('[data-testid="meal-scale-field"]')!;
+      const inputEl = cardEl.querySelector<HTMLInputElement>('[data-testid="meal-scale-input"]')!;
+      const add = cardEl.querySelector<HTMLElement>('[data-testid="add-item-button"]')!;
+      const label = Array.from(header.querySelectorAll<HTMLElement>(':scope > span:not(.sr-only)'))
+        .find((el) => el.getBoundingClientRect().width > 0)!;
+      const r = (el: Element) => el.getBoundingClientRect();
+      const ov = (a: DOMRect, b: DOMRect) =>
+        Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) *
+        Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+      return {
+        headerHeight: Math.round(r(header).height * 10) / 10,
+        headerOverflows: header.scrollWidth > header.clientWidth + 1,
+        fieldHeight: Math.round(r(field).height * 10) / 10,
+        inputFontSize: parseFloat(getComputedStyle(inputEl).fontSize),
+        fieldAddOverlap: ov(r(field), r(add)),
+        fieldLabelOverlap: ov(r(field), r(label)),
+        labelText: label.textContent?.trim(),
+        fieldInsideCard: r(field).right <= r(cardEl).right && r(field).left >= r(cardEl).left,
+      };
+    });
+    console.log(JSON.stringify({ test: 'E: D46 scale box open at 320px', ...m }));
+
+    expect(m.labelText, 'Below 390px the header uses the short label').toBe('Items (4)');
+    expect(m.headerOverflows, 'Header overflows with the Scale box open').toBe(false);
+    expect(m.headerHeight, `Header height (${m.headerHeight}px) grew with the Scale box open`).toBeLessThanOrEqual(16.5);
+    expect(m.fieldHeight, `Scale box tap height (${m.fieldHeight}px) < 40px`).toBeGreaterThanOrEqual(40);
+    expect(m.inputFontSize, 'Scale input must be 16px (iOS no-zoom)').toBe(16);
+    expect(m.fieldAddOverlap, 'Scale box overlaps + Add').toBe(0);
+    expect(m.fieldLabelOverlap, 'Scale box overlaps the label').toBe(0);
+    expect(m.fieldInsideCard, 'Scale box must stay inside the card').toBe(true);
+
+    await input.press('Escape');
+    await expect(cardLocator.locator('[data-testid="meal-scale-button"]')).toBeFocused();
+    await expect(cardLocator.locator('[data-testid="meal-scale-button"]')).toHaveText('Scale');
+  });
+
   test('E: single-item and manual card breakdown header geometry at 320px (D34)', async () => {
     expect(page.viewportSize()?.width).toBe(320);
 
@@ -2074,6 +2205,7 @@ test.describe('Surface E: Staged card at 320px width (D24)', () => {
     await waitForScrollSettled(page);
 
     const singleResult = await checkBreakdownHeaderGeometry(cardLocator);
+    expectScaleChipFits(singleResult);
     console.log(JSON.stringify({ test: 'E: single-item breakdown header geometry at 320px', surface: 'E', ...singleResult }));
 
     expect(singleResult.headerRowHeight, `Header row height (${singleResult.headerRowHeight}px) exceeds 16px (+0.5px tolerance)`).toBeLessThanOrEqual(16.5);
@@ -2103,6 +2235,7 @@ test.describe('Surface E: Staged card at 320px width (D24)', () => {
     await waitForScrollSettled(page);
 
     const manualResult = await checkBreakdownHeaderGeometry(cardLocator);
+    expectScaleChipFits(manualResult);
     console.log(JSON.stringify({ test: 'E: manual card breakdown header geometry at 320px', surface: 'E', ...manualResult }));
 
     expect(manualResult.headerRowHeight, `Header row height (${manualResult.headerRowHeight}px) exceeds 16px (+0.5px tolerance)`).toBeLessThanOrEqual(16.5);
@@ -2186,6 +2319,7 @@ test.describe('Surface F: Manual-staged card and Add-item at 390×844', () => {
     await waitForScrollSettled(page);
 
     const result = await checkBreakdownHeaderGeometry(cardLocator);
+    expectScaleChipFits(result);
     console.log(JSON.stringify({ test: 'F: breakdown header geometry at 390px', surface: 'F', ...result }));
 
     expect(result.headerRowHeight, `Header row height (${result.headerRowHeight}px) exceeds 16px (+0.5px tolerance)`).toBeLessThanOrEqual(16.5);
@@ -3919,6 +4053,7 @@ test.describe('D45 add composer', () => {
 
         // 1. Breakdown header fits on one line with "+ Add" (no wrap)
         const headerResult = await checkBreakdownHeaderGeometry(cardLocator);
+        expectScaleChipFits(headerResult);
         expect(headerResult.headerRowHeight, `Header row height (${headerResult.headerRowHeight}px) exceeds 16.5px`).toBeLessThanOrEqual(16.5);
         expect(headerResult.buttonText, 'Breakdown header button label must be "+ Add"').toBe('+ Add');
         expect(headerResult.ariaLabel, 'Breakdown header button aria-label must be "Add item"').toBe('Add item');

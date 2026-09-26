@@ -106,6 +106,12 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
       return;
     }
 
+    if (roundTo1Decimal(parsed) === roundTo1Decimal(item.quantity)) {
+      setDraft(null);
+      setPendingAbsurdEdit(null);
+      return;
+    }
+
     const scaled = scaleItemToQuantity(effectiveRef, roundTo1Decimal(parsed));
     const nextItem: NutritionItem = {
       ...scaled,
@@ -125,6 +131,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
 
     onChange(nextItem);
     setDraft(null);
+    setPendingAbsurdEdit(null);
   };
 
 

@@ -1583,7 +1583,10 @@ Total Fiber: 1 g`;
       target: { value: 'Avocado Toast & 2 Poached Eggs' },
     });
     // Scale dish by x2
-    fireEvent.click(screen.getByTestId('dish-scale-2'));
+    // D46: scale via the header Scale chip
+    fireEvent.click(screen.getByTestId('meal-scale-button'));
+    fireEvent.change(screen.getByTestId('meal-scale-input'), { target: { value: '2' } });
+    fireEvent.keyDown(screen.getByTestId('meal-scale-input'), { key: 'Enter' });
 
     // Submit
     fireEvent.click(screen.getByTestId('save-edit-meal-btn'));
@@ -1784,7 +1787,10 @@ Total Fiber: 1 g`;
     expect(screen.getByTestId('edit-meal-sheet')).toBeDefined();
 
     // Scale dish by x1.5
-    fireEvent.click(screen.getByTestId('dish-scale-1.5'));
+    // D46: scale via the header Scale chip
+    fireEvent.click(screen.getByTestId('meal-scale-button'));
+    fireEvent.change(screen.getByTestId('meal-scale-input'), { target: { value: '1.5' } });
+    fireEvent.keyDown(screen.getByTestId('meal-scale-input'), { key: 'Enter' });
 
     // Save
     fireEvent.click(screen.getByTestId('save-edit-meal-btn'));
@@ -3445,7 +3451,10 @@ Total Fiber: 1 g`;
     fireEvent.click(screen.getByTestId('edit-meal-today-log-scale'));
 
     expect(await screen.findByTestId('edit-meal-sheet')).toBeDefined();
-    fireEvent.click(screen.getByTestId('dish-scale-0.5'));
+    // D46: scale via the header Scale chip
+    fireEvent.click(screen.getByTestId('meal-scale-button'));
+    fireEvent.change(screen.getByTestId('meal-scale-input'), { target: { value: '0.5' } });
+    fireEvent.keyDown(screen.getByTestId('meal-scale-input'), { key: 'Enter' });
 
     // Save changes
     fireEvent.click(screen.getByTestId('save-edit-meal-btn'));

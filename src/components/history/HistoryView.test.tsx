@@ -349,7 +349,10 @@ describe('HistoryView', () => {
     openMealAction('log-items', 'edit');
 
     expect(await screen.findByTestId('edit-meal-sheet')).toBeDefined();
-    fireEvent.click(screen.getByTestId('dish-scale-0.5'));
+    // D46: scale via the header Scale chip
+    fireEvent.click(screen.getByTestId('meal-scale-button'));
+    fireEvent.change(screen.getByTestId('meal-scale-input'), { target: { value: '0.5' } });
+    fireEvent.keyDown(screen.getByTestId('meal-scale-input'), { key: 'Enter' });
     fireEvent.click(screen.getByTestId('save-edit-meal-btn'));
 
     await waitFor(() => expect(rejectingEq).toHaveBeenCalledWith('id', 'log-items'));
@@ -423,8 +426,11 @@ describe('HistoryView', () => {
     await screen.findByTestId('meal-actions-log-scale-test');
     openMealAction('log-scale-test', 'edit');
     expect(await screen.findByTestId('edit-meal-sheet')).toBeDefined();
-    const scaleBtn = await screen.findByTestId('dish-scale-0.5');
-    fireEvent.click(scaleBtn);
+    await screen.findByTestId('meal-scale-button');
+    // D46: scale via the header Scale chip
+    fireEvent.click(screen.getByTestId('meal-scale-button'));
+    fireEvent.change(screen.getByTestId('meal-scale-input'), { target: { value: '0.5' } });
+    fireEvent.keyDown(screen.getByTestId('meal-scale-input'), { key: 'Enter' });
     fireEvent.click(screen.getByTestId('save-edit-meal-btn'));
 
     await waitFor(() => {

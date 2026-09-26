@@ -43,7 +43,7 @@ export const useNavHeight = (): number => {
 
 import { convertPortion, type CanonicalUnit } from '../../utils/unitConverter';
 import { roundTo1Decimal, formatCalories } from '../../utils/nutrition';
-import { sumItems, scaleItemToQuantity, type NutritionItem } from '../../utils/itemModel';
+import { sumItems, scaleItem, scaleItemToQuantity, type NutritionItem } from '../../utils/itemModel';
 import type { ManualMealStagedData } from './useManualMealForm';
 
 export interface StagedItem {
@@ -205,6 +205,12 @@ export interface StagedMeal {
   servingUnit: string;
   photoUrl?: string;
   notes?: string | null;
+  /**
+   * D46: whole-meal scale relative to the meal as it was staged / opened
+   * (1 or undefined = as staged). UI state only: never persisted, the items
+   * themselves carry the scaled amounts.
+   */
+  scale?: number;
 }
 
 let itemSequence = 0;
@@ -377,6 +383,110 @@ export function recomputeStagedTotals(items: StagedItem[]) {
     fat: roundTo1Decimal(totals.fat),
     fiber: roundTo1Decimal(totals.fiber),
     explanation,
+  };
+}
+
+/** D46: allowed range for the whole-meal scale factor. */
+export const MIN_MEAL_SCALE = 0.01;
+export const MAX_MEAL_SCALE = 20;
+
+/**
+ * Parse what the user typed into the Scale box. Accepts "0.2", ".2", "0,2",
+ * a leading "x"/"×", and a simple fraction ("1/5") for keyboards that have
+ * a slash. Returns the factor rounded to 2 decimals, or null when it is not a
+ * usable number in [MIN_MEAL_SCALE, MAX_MEAL_SCALE].
+ */
+export function parseMealScaleInput(raw: string): number | null {
+  const cleaned = raw.trim().replace(/^[x×*]\s*/i, '').replace(',', '.');
+  if (cleaned === '') return null;
+  let value: number;
+  const fraction = /^(\d*\.?\d+)\s*\/\s*(\d*\.?\d+)$/.exec(cleaned);
+  if (fraction) {
+    const den = Number(fraction[2]);
+    if (!(den > 0)) return null;
+    value = Number(fraction[1]) / den;
+  } else if (/^\d*\.?\d+$/.test(cleaned)) {
+    value = Number(cleaned);
+  } else {
+    return null;
+  }
+  const rounded = Math.round(value * 100) / 100;
+  if (!Number.isFinite(rounded) || rounded < MIN_MEAL_SCALE || rounded > MAX_MEAL_SCALE) {
+    return null;
+  }
+  return rounded;
+}
+
+/** "0.2", "1.5", "2": at most 2 decimals, no trailing zeros. */
+export function formatMealScale(scale: number): string {
+  return String(Math.round(scale * 100) / 100);
+}
+
+/** Quantities keep 4 decimals so ×0.33 then ×1 returns exactly to the start. */
+function roundQuantity(q: number): number {
+  return Math.round(q * 10000) / 10000;
+}
+
+/**
+ * D46: scale every item of a meal to `nextScale`, where the scale is relative
+ * to the meal as it was staged/opened (1 = as staged).
+ *
+ * The change is applied as a ratio to the CURRENT items (next / current), so
+ * per-item edits made while scaled are kept. Macros are always recomputed
+ * from each item's base reference, so repeated scaling never drifts.
+ */
+export function scaleStagedMeal(meal: StagedMeal, nextScale: number): StagedMeal {
+  const current = meal.scale && meal.scale > 0 ? meal.scale : 1;
+  if (!(nextScale > 0) || !Number.isFinite(nextScale)) return meal;
+  const ratio = nextScale / current;
+  if (ratio === 1) return meal;
+
+  const items = meal.items.map((it) => {
+    if (!(it.quantity > 0) || !(it.baseQuantity > 0)) {
+      // No quantity to scale against (e.g. "1 serving" parsed as 0): scale
+      // the macros themselves and leave the quantity as it is.
+      const direct = scaleItem(stagedToItem(it), ratio);
+      return {
+        ...it,
+        calories: roundTo1Decimal(direct.calories),
+        protein: roundTo1Decimal(direct.protein),
+        carbs: roundTo1Decimal(direct.carbs),
+        fat: roundTo1Decimal(direct.fat),
+        fiber: roundTo1Decimal(direct.fiber),
+      };
+    }
+    const q = roundQuantity(it.quantity * ratio);
+    const scaled = scaleItemToQuantity(stagedReference(it), q);
+    return {
+      ...it,
+      quantity: q,
+      portion: `${roundTo1Decimal(q)} ${it.unit}`,
+      calories: roundTo1Decimal(scaled.calories),
+      protein: roundTo1Decimal(scaled.protein),
+      carbs: roundTo1Decimal(scaled.carbs),
+      fat: roundTo1Decimal(scaled.fat),
+      fiber: roundTo1Decimal(scaled.fiber),
+    };
+  });
+
+  const totals = recomputeStagedTotals(items);
+  const single = items.length === 1 ? items[0] : null;
+  return {
+    ...meal,
+    items,
+    ...totals,
+    ...(single
+      ? {
+          explanation: `${formatCalories(totals.calories)} kcal (${meal.name})`,
+          ...(single.quantity > 0
+            ? {
+                servingSize: single.quantity,
+                servingUnit: single.unit,
+              }
+            : {}),
+        }
+      : {}),
+    scale: nextScale === 1 ? undefined : nextScale,
   };
 }
 

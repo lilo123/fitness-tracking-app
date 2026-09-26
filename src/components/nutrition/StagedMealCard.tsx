@@ -11,6 +11,7 @@ import {
   updateStagedItemNutrition,
   buildStagedItem,
   mergeOrAppendStagedItems,
+  scaleStagedMeal,
   getScrollBehavior,
   useNavHeight,
   type StagedItem,
@@ -19,6 +20,7 @@ import {
 import type { CustomDish } from '../../types/database';
 import { AddItemForm, type AddItemFormData } from './AddItemForm';
 import { AddItemsComposer } from './AddItemsComposer';
+import { MealScaleControl } from './MealScaleControl';
 import { computeVisibleMacroColumns, getMacroGridTemplateColumns } from './macroColumns';
 import { MacroCell } from './MacroCell';
 import { DayTotalRow, type MacroTotalsShape } from './TodayAfterRow';
@@ -28,7 +30,6 @@ export interface StagedMealCardProps {
   isDirty?: boolean;
   date?: string;
   onDateChange?: (date: string) => void;
-  onScale?: (factor: number) => void;
   onCancel?: () => void;
   navHeight?: number;
   stagedMeal: StagedMeal;
@@ -51,7 +52,6 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
   isDirty = false,
   date,
   onDateChange,
-  onScale,
   onCancel,
   stagedMeal,
   dailyTotals,
@@ -286,46 +286,38 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
 
       {/* Itemized Ingredient Breakdown */}
       <div className="space-y-0.5 pt-0.5">
-        <div className="flex items-center justify-between text-xs font-bold uppercase text-zinc-400 tracking-wider">
+        <div
+          data-testid="breakdown-header"
+          className="flex items-center justify-between gap-2 min-w-0 text-xs font-bold uppercase text-zinc-400 tracking-wider"
+        >
           {isMultiItem ? (
-            <span>Itemized Breakdown ({stagedMeal.items.length})</span>
+            <>
+              {/* D46: the short label keeps label + Scale + Add on one line below 390px */}
+              <span className="max-[389px]:hidden">Itemized Breakdown ({stagedMeal.items.length})</span>
+              <span className="hidden max-[389px]:inline">Items ({stagedMeal.items.length})</span>
+            </>
           ) : (
             <span className="sr-only">Items</span>
           )}
-          {!isAddingItem && !isComposerOpen && (
-            <button
-              ref={addItemBtnRef}
-              type="button"
-              data-testid="add-item-button"
-              aria-label="Add item"
-              onClick={() => setIsComposerOpen(true)}
-              className="ml-auto text-cyan-400 hover:text-cyan-300 font-bold text-xs min-h-[40px] h-10 px-2.5 flex items-center justify-center -my-3 rounded-lg transition motion-reduce:transition-none touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
-            >
-              + Add
-            </button>
-          )}
-        </div>
-
-        {/* Whole-dish scale bar in edit mode */}
-        {isEditMode && onScale && (
-          <fieldset
-            aria-label="Scale whole dish"
-            data-testid="dish-scale-bar"
-            className="flex w-full items-stretch gap-0.5 rounded-lg border border-zinc-800 bg-zinc-950 p-0.5 pt-1 mb-1.5 min-w-0"
-          >
-            {[0.5, 1, 1.5, 2].map((factor) => (
+          <div className="ml-auto flex items-center gap-1">
+            <MealScaleControl
+              scale={stagedMeal.scale ?? 1}
+              onScale={(factor) => onUpdateStagedMeal(scaleStagedMeal(stagedMeal, factor))}
+            />
+            {!isAddingItem && !isComposerOpen && (
               <button
-                key={factor}
+                ref={addItemBtnRef}
                 type="button"
-                data-testid={`dish-scale-${factor}`}
-                onClick={() => onScale(factor)}
-                className="min-h-[40px] h-10 flex-1 rounded text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 touch-manipulation"
+                data-testid="add-item-button"
+                aria-label="Add item"
+                onClick={() => setIsComposerOpen(true)}
+                className="text-cyan-400 hover:text-cyan-300 font-bold text-xs min-h-[40px] h-10 px-2.5 flex items-center justify-center -my-3 rounded-lg transition motion-reduce:transition-none touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
               >
-                &times;{factor}
+                + Add
               </button>
-            ))}
-          </fieldset>
-        )}
+            )}
+          </div>
+        </div>
 
         <div className="divide-y divide-zinc-800/80 pt-3.5">
           {stagedMeal.items.map((item) => (
@@ -340,10 +332,22 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
                     it.id === item.id ? reanchorStagedItem(it, next) : it
                   );
                   const totals = recomputeStagedTotals(updatedItems);
+                  const single = updatedItems.length === 1 ? updatedItems[0] : null;
                   onUpdateStagedMeal({
                     ...stagedMeal,
                     items: updatedItems,
                     ...totals,
+                    ...(single
+                      ? {
+                          explanation: `${formatCalories(totals.calories)} kcal (${stagedMeal.name})`,
+                          ...(single.quantity > 0
+                            ? {
+                                servingSize: single.quantity,
+                                servingUnit: single.unit,
+                              }
+                            : {}),
+                        }
+                      : {}),
                   });
                 }}
                 onRemove={() => onDeleteItem(item.id)}

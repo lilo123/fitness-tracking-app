@@ -19,7 +19,6 @@ import {
   normalizeItems,
   itemsForPersist,
   sumItems,
-  scaleItems,
   scaleItemToQuantity,
   type NutritionItem,
 } from '../../utils/itemModel';
@@ -277,29 +276,6 @@ export function useMealEditor({
     return !areSnapshotsEqual(initialSnapshot, currentSnapshot);
   }, [draft, draftDate, initialSnapshot]);
 
-  const applyScale = useCallback((factor: number) => {
-    if (!initialAnchorItems) return;
-    const anchor = initialAnchorItems;
-    const scaledItems = scaleItems(anchor.map(stagedToItem), factor);
-    const updated = anchor.map((anchorIt, idx) => {
-      const sc = scaledItems[idx];
-      const q = roundTo1Decimal(sc.quantity);
-      return {
-        ...anchorIt,
-        quantity: q,
-        portion: `${q} ${anchorIt.unit}`,
-        calories: roundTo1Decimal(sc.calories),
-        protein: roundTo1Decimal(sc.protein),
-        carbs: roundTo1Decimal(sc.carbs),
-        fat: roundTo1Decimal(sc.fat),
-        fiber: roundTo1Decimal(sc.fiber),
-        portionMultiplier: factor,
-      };
-    });
-    const totals = recomputeStagedTotals(updated);
-    setDraft((prev) => (prev ? { ...prev, items: updated, ...totals } : prev));
-  }, [initialAnchorItems]);
-
   const applyStagedItemChange = useCallback((id: string, next: NutritionItem) => {
     setDraft((prev) => {
       if (!prev) return prev;
@@ -489,7 +465,6 @@ export function useMealEditor({
     isDirty,
     isSaving,
     errorMessage,
-    applyScale,
     applyStagedItemChange,
     handleDeleteItem,
     save,
