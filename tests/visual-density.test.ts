@@ -1109,14 +1109,14 @@ test.describe('Surface A: Staged card with 4 items', () => {
     }
 
     // Verify tapping over the chip's x-centre at y+1 and y+43 opens unit dialog
-    const firstField = rows.first().locator('[data-testid="component-quantity-field"]');
-    await firstField.click({ position: { x: 74, y: 1 } });
+    const firstChip = rows.first().locator('[data-testid="component-unit-chip"]');
+    await firstChip.click({ position: { x: 26, y: 1 } });
     const unitSheet = page.locator('[data-testid="unit-sheet"]');
     await expect(unitSheet).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(unitSheet).not.toBeVisible();
 
-    await firstField.click({ position: { x: 74, y: 43 } });
+    await firstChip.click({ position: { x: 26, y: 43 } });
     await expect(unitSheet).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(unitSheet).not.toBeVisible();
@@ -2013,14 +2013,14 @@ test.describe('Surface E: Staged card at 320px width (D24)', () => {
     }
 
     // Verify tapping over the chip's x-centre at y+1 and y+43 opens unit dialog
-    const firstField = rows.first().locator('[data-testid="component-quantity-field"]');
-    await firstField.click({ position: { x: 74, y: 1 } });
+    const firstChip = rows.first().locator('[data-testid="component-unit-chip"]');
+    await firstChip.click({ position: { x: 26, y: 1 } });
     const unitSheet = page.locator('[data-testid="unit-sheet"]');
     await expect(unitSheet).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(unitSheet).not.toBeVisible();
 
-    await firstField.click({ position: { x: 74, y: 43 } });
+    await firstChip.click({ position: { x: 26, y: 43 } });
     await expect(unitSheet).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(unitSheet).not.toBeVisible();

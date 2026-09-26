@@ -1,3 +1,4 @@
+import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ComponentRow } from './ComponentRow';
@@ -204,7 +205,9 @@ describe('ComponentRow', () => {
     // Stepper input should be elegantly constrained rather than stretching full-width
     const input = screen.getByTestId('component-quantity-input');
     const field = screen.getByTestId('component-quantity-field');
-    expect(field.className).toContain('w-[100px]');
+    const box = screen.getByTestId('component-quantity-box');
+    expect(box.className).toContain('w-[100px]');
+    expect(field.className).toContain('w-[46px]');
     expect(input.className).not.toContain('w-full');
     // text-base on mobile prevents iOS Safari auto-zoom on input focus
     expect(input.className).toContain('text-base');
@@ -793,5 +796,38 @@ describe('ComponentRow', () => {
 
     const calCell = screen.getByTestId('component-macro-calories');
     expect(calCell).toHaveClass('whitespace-nowrap');
+  });
+
+  it('clicking inside the open unit sheet (backdrop and non-option area) does NOT focus qty input and choosing an option changes unit', async () => {
+    const user = userEvent.setup();
+    const item = component({ quantity: 100, unit: 'g' });
+    const onChange = vi.fn();
+    render(<ComponentRow item={item} reference={item} onChange={onChange} />);
+
+    const input = screen.getByTestId('component-quantity-input');
+    const chip = screen.getByTestId('component-unit-chip');
+
+    // 1. Open the unit sheet
+    await user.click(chip);
+    const unitSheet = screen.getByTestId('unit-sheet');
+    expect(unitSheet).toBeDefined();
+
+    // Blur input so we can test what clicking the sheet does
+    input.blur();
+    expect(document.activeElement).not.toBe(input);
+
+    // 2. Click on a non-option area inside the sheet (the "Unit" header text)
+    const header = screen.getByText('Unit');
+    await user.click(header);
+    expect(document.activeElement).not.toBe(input);
+
+    // 3. Click on the backdrop (unitSheet itself) to close
+    await user.click(unitSheet);
+    expect(document.activeElement).not.toBe(input);
+
+    // 4. Choosing an option still changes the unit (sets pending unit in ComponentRow)
+    await user.click(chip);
+    await user.click(screen.getByTestId('unit-option-ml'));
+    expect(screen.getByTestId('component-reanchor-hint')).toBeDefined();
   });
 });

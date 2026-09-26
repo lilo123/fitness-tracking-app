@@ -176,14 +176,14 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
         {/* RIGHT (shrink-0): [field: input + UnitChip] + ⋯ OverflowMenu */}
         <div data-testid="component-right-cluster" className="shrink-0 flex items-center gap-1">
           {editable ? (
-            <label
-              htmlFor={`component-quantity-input-${item.id}`}
-              data-testid="component-quantity-field"
-              className="relative w-[100px] min-h-[44px] h-11 -my-1.5 shrink-0 flex items-center cursor-text touch-manipulation"
+            <div
+              data-testid="component-quantity-box"
+              className="relative w-[100px] h-8 rounded-lg border border-border-interactive bg-zinc-950 flex items-center transition hover:border-cyan-500/70 focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-400"
             >
-              <div
-                data-testid="component-quantity-box"
-                className="w-full h-8 rounded-lg border border-border-interactive bg-zinc-950 flex items-center transition hover:border-cyan-500/70 focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-400"
+              <label
+                htmlFor={`component-quantity-input-${item.id}`}
+                data-testid="component-quantity-field"
+                className="relative w-[46px] min-h-[44px] h-11 -my-1.5 shrink-0 flex items-center cursor-text touch-manipulation"
               >
                 <input
                   id={`component-quantity-input-${item.id}`}
@@ -207,15 +207,15 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
                   }}
                   className="h-8 w-[46px] shrink-0 bg-transparent text-right pr-1 pl-1 text-base font-semibold tabular-nums text-white outline-none border-0 m-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
-                <UnitChip
-                  value={activeUnit}
-                  onChange={handleUnitChange}
-                  testId="component-unit-chip"
-                  ariaLabel={`Change unit for ${item.name}, currently ${shortUnitLabel(activeUnit)}`}
-                  embedded
-                />
-              </div>
-            </label>
+              </label>
+              <UnitChip
+                value={activeUnit}
+                onChange={handleUnitChange}
+                testId="component-unit-chip"
+                ariaLabel={`Change unit for ${item.name}, currently ${shortUnitLabel(activeUnit)}`}
+                embedded
+              />
+            </div>
           ) : (
             <span className="text-xs tabular-nums font-normal text-zinc-400 px-1">
               {roundTo1Decimal(item.quantity)}{shortUnitLabel(item.unit)}
