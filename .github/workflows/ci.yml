@@ -117,6 +117,12 @@ jobs:
       - name: Run complete test suite (test:all)
         run: npm run test:all
 
+      # The app uses the system font stack (-apple-system, ..., Roboto, Helvetica, Arial). Local
+      # gLinux and Android resolve it to Roboto; ubuntu-latest has no Roboto and falls back to a
+      # wider sans, which shifts the px-exact density measurements. Match the local renderer.
+      - name: Install Roboto for the density gate
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-roboto && fc-cache -f && fc-match Roboto
+
       - name: Run visual density gate (W38)
         run: npm run test:density
 
