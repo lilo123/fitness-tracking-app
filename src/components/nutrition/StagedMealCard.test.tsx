@@ -1061,7 +1061,8 @@ describe('StagedMealCard', () => {
         />
       );
       expect(screen.getByTestId('add-item-button')).toBeDefined();
-      expect(screen.getByText('+ Add item')).toBeDefined();
+      expect(screen.getByText('+ Manual')).toBeDefined();
+      expect(screen.getByRole('button', { name: 'Add manual item' })).toBeDefined();
       unmount();
 
       const multiMeal = makeMultiItemMeal();
@@ -1079,6 +1080,92 @@ describe('StagedMealCard', () => {
         />
       );
       expect(screen.getByTestId('add-item-button')).toBeDefined();
+    });
+
+    it('D34: renders "+ Manual" button with aria-label on single, multi-component, AI and manual staged cards and opens add-item form', () => {
+      const cardTypes: Array<{ type: string; meal: StagedMeal }> = [
+        {
+          type: 'single-item',
+          meal: makeStagedMeal(),
+        },
+        {
+          type: 'multi-component',
+          meal: makeMultiItemMeal(),
+        },
+        {
+          type: 'AI-parsed',
+          meal: {
+            ...makeMultiItemMeal(),
+            name: 'AI Parsed Salmon & Rice',
+            explanation: 'AI detected 4 items: salmon, rice, broccoli, oil',
+          },
+        },
+        {
+          type: 'manual',
+          meal: {
+            name: 'Quick Chicken Manual',
+            explanation: 'Manual entry',
+            mealType: 'Lunch',
+            servingSize: 1,
+            servingUnit: 'serving',
+            calories: 350,
+            protein: 40,
+            carbs: 0,
+            fat: 8,
+            fiber: 0,
+            items: [
+              {
+                id: 'manual-1',
+                name: 'Grilled Chicken Breast',
+                portion: '200 g',
+                portionMultiplier: 1,
+                quantity: 200,
+                unit: 'g',
+                calories: 350,
+                protein: 40,
+                carbs: 0,
+                fat: 8,
+                fiber: 0,
+                baseQuantity: 200,
+                baseCalories: 350,
+                baseProtein: 40,
+                baseCarbs: 0,
+                baseFat: 8,
+                baseFiber: 0,
+              },
+            ],
+          },
+        },
+      ];
+
+      for (const { type: _type, meal } of cardTypes) {
+        const { unmount } = render(
+          <StagedMealCard
+            stagedMeal={meal}
+            onUpdateStagedMeal={vi.fn()}
+            onApplyStagedItemChange={vi.fn()}
+            onDeleteItem={vi.fn()}
+            onSaveItemAsCustomDish={vi.fn()}
+            onLogStagedMeal={vi.fn()}
+            onSaveStagedAsCustomDish={vi.fn()}
+            onDiscardStagedMeal={vi.fn()}
+            isPending={false}
+          />
+        );
+
+        const btn = screen.getByTestId('add-item-button');
+        expect(btn).toBeDefined();
+        expect(btn.textContent?.trim()).toBe('+ Manual');
+        expect(btn.getAttribute('aria-label')).toBe('Add manual item');
+        expect(screen.getByRole('button', { name: 'Add manual item' })).toBeDefined();
+
+        // Clicking + Manual opens the inline AddItemForm
+        expect(screen.queryByTestId('add-item-form')).toBeNull();
+        fireEvent.click(btn);
+        expect(screen.getByTestId('add-item-form')).toBeDefined();
+
+        unmount();
+      }
     });
 
     it('clicking + Add item opens the inline form, and Cancel closes it without changes', () => {

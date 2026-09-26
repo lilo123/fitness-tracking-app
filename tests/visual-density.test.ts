@@ -400,10 +400,19 @@ async function checkBreakdownHeaderGeometry(card: Locator) {
       ? Math.round((btnTextCenterY - labelCenterY) * 10) / 10
       : null;
 
+    const buttonText = addItemBtn.textContent?.trim() || '';
+    const ariaLabel = addItemBtn.getAttribute('aria-label');
+    const isClipped = addItemBtn.scrollWidth > addItemBtn.clientWidth + 1;
+
     return {
       headerRowHeight: Math.round(headerRowRect.height * 10) / 10,
       buttonWidth: Math.round(btnRect.width * 10) / 10,
       buttonHeight: Math.round(btnRect.height * 10) / 10,
+      buttonText,
+      ariaLabel,
+      isClipped,
+      buttonScrollWidth: addItemBtn.scrollWidth,
+      buttonClientWidth: addItemBtn.clientWidth,
       labelIntersectionArea: Math.round(labelIntersectionArea * 10) / 10,
       firstRowIntersectionArea: Math.round(firstRowIntersectionArea * 10) / 10,
       selectIntersectionArea: Math.round(selectIntersectionArea * 10) / 10,
@@ -1021,6 +1030,11 @@ test.describe('Surface A: Staged card with 4 items', () => {
     // Header row height <= pre-D22 value (16px) with +0.5px tolerance max
     expect(result.headerRowHeight, `Header row height (${result.headerRowHeight}px) exceeds pre-D22 value 16px (+0.5px tolerance)`).toBeLessThanOrEqual(16.5);
 
+    // D34: label text '+ Manual', aria-label 'Add manual item', no clip
+    expect(result.buttonText, 'Breakdown header button label must be "+ Manual"').toBe('+ Manual');
+    expect(result.ariaLabel, 'Breakdown header button aria-label must be "Add manual item"').toBe('Add manual item');
+    expect(result.isClipped, 'Breakdown header button must fit with no clipping').toBe(false);
+
     // Add item tap box >= 40 tall and >= 40 wide
     expect(result.buttonHeight, `Add item tap height (${result.buttonHeight}px) < 40px`).toBeGreaterThanOrEqual(40);
     expect(result.buttonWidth, `Add item tap width (${result.buttonWidth}px) < 40px`).toBeGreaterThanOrEqual(40);
@@ -1113,6 +1127,7 @@ test.describe('Surface A: Staged card with 4 items', () => {
       await input.evaluate((el) => el.blur());
     }
   });
+
 });
 
 
@@ -1235,6 +1250,27 @@ test.describe('Surface B: Staged card with 1 item', () => {
       result.clippedElements,
       `Found clipped elements: ${JSON.stringify(result.clippedElements)}`
     ).toEqual([]);
+  });
+
+  test('B: breakdown header row height <= 16px, + Manual button geometry at 390px (D34)', async () => {
+    expect(page.viewportSize()?.width).toBe(390);
+    await waitForScrollSettled(page);
+
+    const result = await checkBreakdownHeaderGeometry(cardLocator);
+    console.log(JSON.stringify({ test: 'B: breakdown header geometry at 390px', surface: 'B', ...result }));
+
+    expect(result.headerRowHeight, `Header row height (${result.headerRowHeight}px) exceeds 16px (+0.5px tolerance)`).toBeLessThanOrEqual(16.5);
+    expect(result.buttonText, 'Breakdown header button label must be "+ Manual"').toBe('+ Manual');
+    expect(result.ariaLabel, 'Breakdown header button aria-label must be "Add manual item"').toBe('Add manual item');
+    expect(result.isClipped, 'Breakdown header button must fit with no clipping').toBe(false);
+    expect(result.buttonHeight, `+ Manual button tap height (${result.buttonHeight}px) < 40px`).toBeGreaterThanOrEqual(40);
+    expect(result.buttonWidth, `+ Manual button tap width (${result.buttonWidth}px) < 40px`).toBeGreaterThanOrEqual(40);
+    expect(result.labelIntersectionArea, `+ Manual button intersects header label with area ${result.labelIntersectionArea}px²`).toBe(0);
+    expect(result.firstRowIntersectionArea, `+ Manual button intersects first item row with area ${result.firstRowIntersectionArea}px²`).toBe(0);
+    expect(result.selectIntersectionArea, `+ Manual button intersects meal type select with area ${result.selectIntersectionArea}px²`).toBe(0);
+    expect(result.hitResults.top.isBtnOrDescendant, 'Top edge of + Manual button must hit button').toBe(true);
+    expect(result.hitResults.center.isBtnOrDescendant, 'Center of + Manual button must hit button').toBe(true);
+    expect(result.hitResults.bottom.isBtnOrDescendant, 'Bottom edge of + Manual button must hit button').toBe(true);
   });
 });
 
@@ -1890,6 +1926,11 @@ test.describe('Surface E: Staged card at 320px width (D24)', () => {
     const result = await checkBreakdownHeaderGeometry(cardLocator);
     console.log(JSON.stringify({ test: 'E: breakdown header geometry at 320px', surface: 'E', ...result }));
 
+    // D34: label text '+ Manual', aria-label 'Add manual item', no clip
+    expect(result.buttonText, 'Breakdown header button label must be "+ Manual"').toBe('+ Manual');
+    expect(result.ariaLabel, 'Breakdown header button aria-label must be "Add manual item"').toBe('Add manual item');
+    expect(result.isClipped, 'Breakdown header button must fit with no clipping').toBe(false);
+
     // Header row height <= pre-D22 value (16px) with +0.5px tolerance max
     expect(result.headerRowHeight, `Header row height (${result.headerRowHeight}px) exceeds pre-D22 value 16px (+0.5px tolerance)`).toBeLessThanOrEqual(16.5);
 
@@ -1986,6 +2027,63 @@ test.describe('Surface E: Staged card at 320px width (D24)', () => {
       await input.evaluate((el) => el.blur());
     }
   });
+
+  test('E: single-item and manual card breakdown header geometry at 320px (D34)', async () => {
+    expect(page.viewportSize()?.width).toBe(320);
+
+    // 1. Single-item card at 320px
+    const discardBtn = cardLocator.locator('button[aria-label="Discard staged meal"]');
+    await discardBtn.click();
+    await page.fill('textarea[placeholder*="Describe what you ate"]', '1-item single salmon');
+    await page.click('button:has-text("Analyze Meal")');
+    await expect(cardLocator).toBeVisible({ timeout: 15000 });
+    await waitForScrollSettled(page);
+
+    const singleResult = await checkBreakdownHeaderGeometry(cardLocator);
+    console.log(JSON.stringify({ test: 'E: single-item breakdown header geometry at 320px', surface: 'E', ...singleResult }));
+
+    expect(singleResult.headerRowHeight, `Header row height (${singleResult.headerRowHeight}px) exceeds 16px (+0.5px tolerance)`).toBeLessThanOrEqual(16.5);
+    expect(singleResult.buttonText, 'Breakdown header button label must be "+ Manual"').toBe('+ Manual');
+    expect(singleResult.ariaLabel, 'Breakdown header button aria-label must be "Add manual item"').toBe('Add manual item');
+    expect(singleResult.isClipped, 'Breakdown header button must fit with no clipping').toBe(false);
+    expect(singleResult.buttonHeight, `+ Manual button tap height (${singleResult.buttonHeight}px) < 40px`).toBeGreaterThanOrEqual(40);
+    expect(singleResult.buttonWidth, `+ Manual button tap width (${singleResult.buttonWidth}px) < 40px`).toBeGreaterThanOrEqual(40);
+    expect(singleResult.labelIntersectionArea, `+ Manual button intersects header label with area ${singleResult.labelIntersectionArea}px²`).toBe(0);
+    expect(singleResult.firstRowIntersectionArea, `+ Manual button intersects first item row with area ${singleResult.firstRowIntersectionArea}px²`).toBe(0);
+    expect(singleResult.selectIntersectionArea, `+ Manual button intersects meal type select with area ${singleResult.selectIntersectionArea}px²`).toBe(0);
+    expect(singleResult.hitResults.top.isBtnOrDescendant, 'Top edge of + Manual button must hit button').toBe(true);
+    expect(singleResult.hitResults.center.isBtnOrDescendant, 'Center of + Manual button must hit button').toBe(true);
+    expect(singleResult.hitResults.bottom.isBtnOrDescendant, 'Bottom edge of + Manual button must hit button').toBe(true);
+
+    // 2. Manual card at 320px
+    await cardLocator.locator('button[aria-label="Discard staged meal"]').click();
+    const manualBtn = page.locator('button:has-text("Manual Entry")');
+    await manualBtn.click();
+    await page.fill('[data-testid="dish-name-input"]', 'Chicken Rice');
+    await page.fill('[data-testid="calories-input"]', '400');
+    await page.fill('[data-testid="protein-input"]', '40');
+    await page.fill('[data-testid="carbs-input"]', '30');
+    await page.fill('[data-testid="fat-input"]', '10');
+    await page.locator('button:has-text("Log Meal")').last().click();
+    await expect(cardLocator).toBeVisible({ timeout: 15000 });
+    await waitForScrollSettled(page);
+
+    const manualResult = await checkBreakdownHeaderGeometry(cardLocator);
+    console.log(JSON.stringify({ test: 'E: manual card breakdown header geometry at 320px', surface: 'E', ...manualResult }));
+
+    expect(manualResult.headerRowHeight, `Header row height (${manualResult.headerRowHeight}px) exceeds 16px (+0.5px tolerance)`).toBeLessThanOrEqual(16.5);
+    expect(manualResult.buttonText, 'Breakdown header button label must be "+ Manual"').toBe('+ Manual');
+    expect(manualResult.ariaLabel, 'Breakdown header button aria-label must be "Add manual item"').toBe('Add manual item');
+    expect(manualResult.isClipped, 'Breakdown header button must fit with no clipping').toBe(false);
+    expect(manualResult.buttonHeight, `+ Manual button tap height (${manualResult.buttonHeight}px) < 40px`).toBeGreaterThanOrEqual(40);
+    expect(manualResult.buttonWidth, `+ Manual button tap width (${manualResult.buttonWidth}px) < 40px`).toBeGreaterThanOrEqual(40);
+    expect(manualResult.labelIntersectionArea, `+ Manual button intersects header label with area ${manualResult.labelIntersectionArea}px²`).toBe(0);
+    expect(manualResult.firstRowIntersectionArea, `+ Manual button intersects first item row with area ${manualResult.firstRowIntersectionArea}px²`).toBe(0);
+    expect(manualResult.selectIntersectionArea, `+ Manual button intersects meal type select with area ${manualResult.selectIntersectionArea}px²`).toBe(0);
+    expect(manualResult.hitResults.top.isBtnOrDescendant, 'Top edge of + Manual button must hit button').toBe(true);
+    expect(manualResult.hitResults.center.isBtnOrDescendant, 'Center of + Manual button must hit button').toBe(true);
+    expect(manualResult.hitResults.bottom.isBtnOrDescendant, 'Bottom edge of + Manual button must hit button').toBe(true);
+  });
 });
 
 
@@ -2048,6 +2146,26 @@ test.describe('Surface F: Manual-staged card and Add-item at 390×844', () => {
       cardHeight: Math.round(cardBox.height * 10) / 10,
     }));
     expect(cardBox.height).toBeLessThanOrEqual(260);
+  });
+
+  test('F: breakdown header row height <= 16px, + Manual button geometry on manual-staged card at 390px (D34)', async () => {
+    await waitForScrollSettled(page);
+
+    const result = await checkBreakdownHeaderGeometry(cardLocator);
+    console.log(JSON.stringify({ test: 'F: breakdown header geometry at 390px', surface: 'F', ...result }));
+
+    expect(result.headerRowHeight, `Header row height (${result.headerRowHeight}px) exceeds 16px (+0.5px tolerance)`).toBeLessThanOrEqual(16.5);
+    expect(result.buttonText, 'Breakdown header button label must be "+ Manual"').toBe('+ Manual');
+    expect(result.ariaLabel, 'Breakdown header button aria-label must be "Add manual item"').toBe('Add manual item');
+    expect(result.isClipped, 'Breakdown header button must fit with no clipping').toBe(false);
+    expect(result.buttonHeight, `+ Manual button tap height (${result.buttonHeight}px) < 40px`).toBeGreaterThanOrEqual(40);
+    expect(result.buttonWidth, `+ Manual button tap width (${result.buttonWidth}px) < 40px`).toBeGreaterThanOrEqual(40);
+    expect(result.labelIntersectionArea, `+ Manual button intersects header label with area ${result.labelIntersectionArea}px²`).toBe(0);
+    expect(result.firstRowIntersectionArea, `+ Manual button intersects first item row with area ${result.firstRowIntersectionArea}px²`).toBe(0);
+    expect(result.selectIntersectionArea, `+ Manual button intersects meal type select with area ${result.selectIntersectionArea}px²`).toBe(0);
+    expect(result.hitResults.top.isBtnOrDescendant, 'Top edge of + Manual button must hit button').toBe(true);
+    expect(result.hitResults.center.isBtnOrDescendant, 'Center of + Manual button must hit button').toBe(true);
+    expect(result.hitResults.bottom.isBtnOrDescendant, 'Bottom edge of + Manual button must hit button').toBe(true);
   });
 
   test('F: font >= 12px', async () => {

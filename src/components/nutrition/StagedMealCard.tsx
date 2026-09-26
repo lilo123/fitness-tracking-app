@@ -174,15 +174,16 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
               ref={addItemBtnRef}
               type="button"
               data-testid="add-item-button"
+              aria-label="Add manual item"
               onClick={() => setIsAddingItem(true)}
               className="ml-auto text-cyan-400 hover:text-cyan-300 font-bold text-xs uppercase tracking-wider min-h-[40px] h-10 px-2.5 flex items-center justify-center -my-3 rounded-lg transition motion-reduce:transition-none touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
             >
-              + Add item
+              + Manual
             </button>
           )}
         </div>
 
-        <div className="divide-y divide-zinc-800/80 pt-2.5">
+        <div className="divide-y divide-zinc-800/80 pt-3.5">
           {stagedMeal.items.map((item) => (
             <div key={item.id} data-item-id={item.id}>
               <ComponentRow
@@ -300,7 +301,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
       <div
         data-testid="staged-card-actions"
         style={{ bottom: `${effectiveNavHeight}px` }}
-        className="sticky z-20 bg-zinc-900 border-t border-zinc-800/80 -mx-3 px-3 sm:-mx-4 sm:px-4 py-2 flex items-center gap-1.5 sm:gap-2 rounded-b-2xl sm:rounded-b-3xl"
+        className="sticky z-20 bg-zinc-900 border-t border-zinc-800/80 -mx-3 px-3 sm:-mx-4 sm:px-4 py-1.5 flex items-center gap-1.5 sm:gap-2 rounded-b-2xl sm:rounded-b-3xl"
       >
         <button
           type="button"
