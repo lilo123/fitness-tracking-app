@@ -5,7 +5,7 @@ import { formatCalories } from '../../utils/nutrition';
 
 export interface QuickLogToastItem {
   id?: string;
-  variant: 'logged' | 'added';
+  variant: 'logged' | 'added' | 'updated';
   dishName: string;
   calories: number;
   onUndo?: () => void | Promise<void>;
@@ -155,9 +155,14 @@ export const QuickLogToast: React.FC<QuickLogToastProps> = ({
   };
 
   const isAdded = toast?.variant === 'added';
-  const verb = isAdded ? 'Added to meal' : 'Logged';
+  const isUpdated = toast?.variant === 'updated';
+  const verb = isUpdated ? 'Updated' : isAdded ? 'Added to meal' : 'Logged';
   const dishName = toast?.dishName ?? '';
-  const formattedKcal = toast ? `+${formatCalories(toast.calories)} kcal` : '';
+  const formattedKcal = toast
+    ? isUpdated
+      ? `${formatCalories(toast.calories)} kcal`
+      : `+${formatCalories(toast.calories)} kcal`
+    : '';
   const line2Title = toast ? `${dishName} · ${formattedKcal}` : '';
 
   // Announcement for screen-reader via StatusBanner always-mounted polite live region
@@ -198,7 +203,7 @@ export const QuickLogToast: React.FC<QuickLogToastProps> = ({
           <button
             type="button"
             data-testid="toast-undo-btn"
-            aria-label={isAdded ? `Undo add ${dishName}` : `Undo log ${dishName}`}
+            aria-label={isUpdated ? `Undo update ${dishName}` : isAdded ? `Undo add ${dishName}` : `Undo log ${dishName}`}
             onClick={handleUndoClick}
             onFocus={handleUndoFocus}
             onBlur={handleUndoBlur}

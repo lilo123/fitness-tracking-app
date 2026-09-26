@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import type { WorkoutSet, NutritionLog } from '../../types/database';
 import { normalizeDateStr } from '../../utils/ghostSets';
 import { Calendar, Dumbbell, Activity, Utensils, AlertCircle, Shield, RotateCcw } from 'lucide-react';
-import { EditMealModal } from '../nutrition/EditMealModal';
+import { EditMealSheet } from '../nutrition/EditMealSheet';
 import { EditSetModal } from '../workout/EditSetModal';
 import { CoachContext } from '../../context/CoachContextTypes';
 import { NutritionHistoryTimeline, type NutritionDaySummary } from './NutritionHistoryTimeline';
@@ -508,12 +508,14 @@ export const HistoryView: React.FC = () => {
       )}
 
 
-      {/* Edit Meal Modal */}
-      <EditMealModal
+      {/* Edit Meal Sheet */}
+      <EditMealSheet
         isOpen={!!editingMealLog}
         meal={editingMealLog}
         onClose={() => setEditingMealLog(null)}
         targetUserId={targetUserId}
+        nutritionLogs={nutritionLogs}
+        timeZone={effectiveTimeZone}
       />
 
       {/* Edit Set Modal */}

@@ -1556,3 +1556,132 @@ describe('StagedMealCard', () => {
     });
   });
 });
+
+describe('StagedMealCard mode="edit" vs mode="stage"', () => {
+  it('default mode="stage" is byte-identical to omitting mode', () => {
+    const meal = makeMultiItemMeal();
+    const props = {
+      stagedMeal: meal,
+      onUpdateStagedMeal: vi.fn(),
+      onApplyStagedItemChange: vi.fn(),
+      onDeleteItem: vi.fn(),
+      onSaveItemAsCustomDish: vi.fn(),
+      onLogStagedMeal: vi.fn(),
+      onSaveStagedAsCustomDish: vi.fn(),
+      onDiscardStagedMeal: vi.fn(),
+      isPending: false,
+      navHeight: 66,
+    };
+
+    const { container: c1 } = render(<StagedMealCard {...props} />);
+    const { container: c2 } = render(<StagedMealCard {...props} mode="stage" />);
+
+    expect(c1.firstElementChild?.outerHTML).toBe(c2.firstElementChild?.outerHTML);
+  });
+
+  it('renders edit mode elements: date row, whole-dish scale bar, Save changes button, Cancel button, and star', () => {
+    const meal = makeMultiItemMeal();
+    const onDateChange = vi.fn();
+    const onScale = vi.fn();
+    const onCancel = vi.fn();
+    const onSave = vi.fn();
+
+    const { rerender } = render(
+      <StagedMealCard
+        mode="edit"
+        stagedMeal={meal}
+        date="2026-09-26"
+        isDirty={false}
+        isPending={false}
+        onDateChange={onDateChange}
+        onScale={onScale}
+        onCancel={onCancel}
+        onLogStagedMeal={onSave}
+        onUpdateStagedMeal={vi.fn()}
+        onApplyStagedItemChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onSaveItemAsCustomDish={vi.fn()}
+        onSaveStagedAsCustomDish={vi.fn()}
+        onDiscardStagedMeal={vi.fn()}
+      />
+    );
+
+    // 1. Date input row under header
+    const dateInput = screen.getByTestId('edit-meal-date-input') as HTMLInputElement;
+    expect(dateInput).toBeInTheDocument();
+    expect(dateInput.value).toBe('2026-09-26');
+    fireEvent.change(dateInput, { target: { value: '2026-09-25' } });
+    expect(onDateChange).toHaveBeenCalledWith('2026-09-25');
+
+    // 2. Whole-dish scale bar above items
+    const scaleBar = screen.getByTestId('dish-scale-bar');
+    expect(scaleBar).toBeInTheDocument();
+    const scaleHalf = screen.getByTestId('dish-scale-0.5');
+    fireEvent.click(scaleHalf);
+    expect(onScale).toHaveBeenCalledWith(0.5);
+
+    // 3. Primary button reads 'Save changes' and is disabled when not dirty
+    const saveBtn = screen.getByTestId('save-edit-meal-btn');
+    expect(saveBtn).toHaveTextContent('Save changes');
+    expect(saveBtn).toBeDisabled();
+
+    // 4. Cancel button replaces discard (x)
+    expect(screen.queryByLabelText('Discard staged meal')).toBeNull();
+    const cancelBtn = screen.getByTestId('cancel-edit-meal-btn');
+    expect(cancelBtn).toHaveTextContent('Cancel');
+    fireEvent.click(cancelBtn);
+    expect(onCancel).toHaveBeenCalled();
+
+    // 5. Star button (Save as custom dish) stays
+    expect(screen.getByLabelText('Save as Custom Dish')).toBeInTheDocument();
+
+    // 6. Action row has bottom 0px (sticks to sheet bottom, not nav)
+    const actions = screen.getByTestId('staged-card-actions');
+    expect(actions.style.bottom).toBe('0px');
+
+    // 7. When isDirty = true, Save changes button is enabled
+    rerender(
+      <StagedMealCard
+        mode="edit"
+        stagedMeal={meal}
+        date="2026-09-26"
+        isDirty={true}
+        isPending={false}
+        onDateChange={onDateChange}
+        onScale={onScale}
+        onCancel={onCancel}
+        onLogStagedMeal={onSave}
+        onUpdateStagedMeal={vi.fn()}
+        onApplyStagedItemChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onSaveItemAsCustomDish={vi.fn()}
+        onSaveStagedAsCustomDish={vi.fn()}
+        onDiscardStagedMeal={vi.fn()}
+      />
+    );
+    expect(saveBtn).toBeEnabled();
+
+    // 8. When isPending = true, Save changes button reads 'Saving...' and is disabled
+    rerender(
+      <StagedMealCard
+        mode="edit"
+        stagedMeal={meal}
+        date="2026-09-26"
+        isDirty={true}
+        isPending={true}
+        onDateChange={onDateChange}
+        onScale={onScale}
+        onCancel={onCancel}
+        onLogStagedMeal={onSave}
+        onUpdateStagedMeal={vi.fn()}
+        onApplyStagedItemChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onSaveItemAsCustomDish={vi.fn()}
+        onSaveStagedAsCustomDish={vi.fn()}
+        onDiscardStagedMeal={vi.fn()}
+      />
+    );
+    expect(saveBtn).toHaveTextContent('Saving...');
+    expect(saveBtn).toBeDisabled();
+  });
+});

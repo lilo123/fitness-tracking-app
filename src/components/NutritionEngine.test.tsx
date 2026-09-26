@@ -1569,26 +1569,18 @@ Total Fiber: 1 g`;
     // Click edit button
     openMealAction('today-log-1', 'edit');
 
-    // Modal should be open with values pre-populated
-    expect(screen.getByTestId('edit-meal-modal')).toBeDefined();
-    expect(screen.getByTestId('edit-meal-name-input')).toHaveValue('Avocado Toast & Poached Egg');
-    expect(screen.getByTestId('edit-meal-type-select')).toHaveValue('Breakfast');
-    expect(screen.getByTestId('edit-meal-calories-input')).toHaveValue(380);
-    expect(screen.getByTestId('edit-meal-protein-input')).toHaveValue(16);
-    expect(screen.getByTestId('edit-meal-carbs-input')).toHaveValue(28);
-    expect(screen.getByTestId('edit-meal-fat-input')).toHaveValue(22);
-    expect(screen.getByTestId('edit-meal-fiber-input')).toHaveValue(6);
+    // Edit sheet should be open with values pre-populated
+    expect(screen.getByTestId('edit-meal-sheet')).toBeDefined();
+    expect(screen.getByTestId('dish-name-input')).toHaveValue('Avocado Toast & Poached Egg');
+    expect(screen.getByTestId('component-name')).toHaveTextContent('Avocado Toast & Poached Egg');
+    expect(screen.getByTestId('component-quantity-input')).toHaveValue(1);
 
-    // Edit fields
-    fireEvent.change(screen.getByTestId('edit-meal-name-input'), {
+    // Edit meal name
+    fireEvent.change(screen.getByTestId('dish-name-input'), {
       target: { value: 'Avocado Toast & 2 Poached Eggs' },
     });
-    fireEvent.change(screen.getByTestId('edit-meal-calories-input'), {
-      target: { value: '450' },
-    });
-    fireEvent.change(screen.getByTestId('edit-meal-protein-input'), {
-      target: { value: '23' },
-    });
+    // Scale dish by x2
+    fireEvent.click(screen.getByTestId('dish-scale-2'));
 
     // Submit
     fireEvent.click(screen.getByTestId('save-edit-meal-btn'));
@@ -1597,19 +1589,19 @@ Total Fiber: 1 g`;
       expect(mockUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           food_name: 'Avocado Toast & 2 Poached Eggs',
-          calories: 450,
-          protein: 23,
+          calories: 760,
+          protein: 32,
         })
       );
       expect(mockUpdateEq).toHaveBeenCalledWith('id', 'today-log-1');
     });
 
     await waitFor(() => {
-      expect(screen.queryByTestId('edit-meal-modal')).toBeNull();
+      expect(screen.queryByTestId('edit-meal-sheet')).toBeNull();
     });
   });
 
-  it('displays error notification in Edit Meal modal when meal update fails', async () => {
+  it('displays error notification in Edit Meal sheet when meal update fails', async () => {
     const todayStr = getLocalDateStr(new Date());
     const mockMeal = {
       id: 'today-log-2',
@@ -1650,7 +1642,12 @@ Total Fiber: 1 g`;
 
     openMealAction('today-log-2', 'edit');
 
-    expect(screen.getByTestId('edit-meal-modal')).toBeDefined();
+    expect(screen.getByTestId('edit-meal-sheet')).toBeDefined();
+
+    // Dirty the draft so save button is active
+    fireEvent.change(screen.getByTestId('dish-name-input'), {
+      target: { value: 'Protein Shake (Double)' },
+    });
 
     fireEvent.click(screen.getByTestId('save-edit-meal-btn'));
 
@@ -1695,10 +1692,10 @@ Total Fiber: 1 g`;
     });
 
     openMealAction('today-log-3', 'edit');
-    expect(screen.getByTestId('edit-meal-modal')).toBeDefined();
+    expect(screen.getByTestId('edit-meal-sheet')).toBeDefined();
 
     // Clear name and save
-    fireEvent.change(screen.getByTestId('edit-meal-name-input'), {
+    fireEvent.change(screen.getByTestId('dish-name-input'), {
       target: { value: '  ' },
     });
     fireEvent.click(screen.getByTestId('save-edit-meal-btn'));
@@ -1707,10 +1704,117 @@ Total Fiber: 1 g`;
     expect(within(screen.getByTestId('edit-meal-error')).getByText('Meal name is required')).toBeDefined();
     expect(mockUpdate).not.toHaveBeenCalled();
 
-    // Close on Escape
-    fireEvent.keyDown(document, { key: 'Escape' });
+    // Cancel closes sheet
+    fireEvent.click(screen.getByTestId('cancel-edit-meal-btn'));
     await waitFor(() => {
-      expect(screen.queryByTestId('edit-meal-modal')).toBeNull();
+      expect(screen.queryByTestId('edit-meal-sheet')).toBeNull();
+    });
+  });
+
+  it('D44 edit sheet: open from row ⋯, scale dish, save, check update and toast Undo restore', async () => {
+    const todayStr = getLocalDateStr(new Date());
+    const mockMeal = {
+      id: 'today-log-4',
+      user_id: 'test-user-id',
+      food_name: 'Chicken Rice Bowl',
+      meal_type: 'Lunch',
+      calories: 500,
+      protein: 40,
+      carbs: 60,
+      fat: 10,
+      fiber: 4,
+      serving_size: 1,
+      serving_unit: 'bowl',
+      logged_at: `${todayStr}T12:00:00Z`,
+      logged_date: todayStr,
+      has_components: true,
+      items: [
+        {
+          id: 'item-1',
+          name: 'Chicken Breast',
+          quantity: 150,
+          unit: 'g',
+          calories: 250,
+          protein: 35,
+          carbs: 0,
+          fat: 5,
+          fiber: 0,
+        },
+        {
+          id: 'item-2',
+          name: 'White Rice',
+          quantity: 200,
+          unit: 'g',
+          calories: 250,
+          protein: 5,
+          carbs: 60,
+          fat: 5,
+          fiber: 4,
+        },
+      ],
+    };
+
+    const mockUpdateEq = vi.fn().mockReturnValue({
+      select: vi.fn().mockResolvedValue({ data: [mockMeal], error: null }),
+    });
+    const mockUpdate = vi.fn().mockReturnValue({
+      eq: mockUpdateEq,
+    });
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'nutrition_logs') {
+        const b = createSupabaseBuilder('nutrition_logs', { data: [mockMeal], error: null });
+        b.update = mockUpdate;
+        return b;
+      }
+      return createSupabaseBuilder(table, { data: [], error: null });
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('meal-actions-today-log-4')).toBeDefined();
+    });
+
+    openMealAction('today-log-4', 'edit');
+
+    expect(screen.getByTestId('edit-meal-sheet')).toBeDefined();
+
+    // Scale dish by x1.5
+    fireEvent.click(screen.getByTestId('dish-scale-1.5'));
+
+    // Save
+    fireEvent.click(screen.getByTestId('save-edit-meal-btn'));
+
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          food_name: 'Chicken Rice Bowl',
+          calories: 750,
+          protein: 60,
+        })
+      );
+      expect(mockUpdateEq).toHaveBeenCalledWith('id', 'today-log-4');
+    });
+
+    // Toast should show updated variant with Undo button
+    await waitFor(() => {
+      expect(screen.getByTestId('quick-log-toast')).toBeDefined();
+      expect(screen.getByTestId('toast-undo-btn')).toBeDefined();
+    });
+
+    // Click Undo
+    mockUpdate.mockClear();
+    fireEvent.click(screen.getByTestId('toast-undo-btn'));
+
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          food_name: 'Chicken Rice Bowl',
+          calories: 500,
+          protein: 40,
+        })
+      );
     });
   });
 
@@ -3307,11 +3411,15 @@ Total Fiber: 1 g`;
     };
 
     // Exactly what Phase 5 returns when the parent no longer matches Σ(items).
-    const mockUpdateEq = vi.fn().mockResolvedValue({
-      error: {
-        message:
-          'new row for relation "nutrition_logs" violates check constraint "chk_nl_parent_equals_items_sum"',
-      },
+    const constraintError = {
+      message:
+        'new row for relation "nutrition_logs" violates check constraint "chk_nl_parent_equals_items_sum"',
+    };
+    const mockSelectResult = { data: null, error: constraintError };
+    const mockSelect = vi.fn().mockResolvedValue(mockSelectResult);
+    const mockUpdateEq = vi.fn().mockReturnValue({
+      select: mockSelect,
+      then: (resolve: any) => Promise.resolve({ error: constraintError }).then(resolve),
     });
     const mockUpdate = vi.fn().mockReturnValue({ eq: mockUpdateEq });
 
@@ -3327,22 +3435,21 @@ Total Fiber: 1 g`;
     renderComponent();
 
     await waitFor(() => {
-      expect(screen.getByTestId('meal-log-accordion-trigger')).toBeDefined();
+      expect(screen.getByTestId('meal-actions-today-log-scale')).toBeDefined();
     });
 
-    fireEvent.click(screen.getByTestId('meal-log-accordion-trigger'));
+    fireEvent.click(screen.getByTestId('meal-actions-today-log-scale'));
+    fireEvent.click(screen.getByTestId('edit-meal-today-log-scale'));
+
+    expect(await screen.findByTestId('edit-meal-sheet')).toBeDefined();
     fireEvent.click(screen.getByTestId('dish-scale-0.5'));
 
-    // Optimistic: half of 560 is on screen before the write lands.
-    expect(screen.getByText(/280 kcal/)).toBeDefined();
-    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    // Save changes
+    fireEvent.click(screen.getByTestId('save-edit-meal-btn'));
 
-    // Rejected: the row must return to the stored totals and say why in the
-    // mapped wording, not in raw Postgres.
-    const alert = await screen.findByTestId('meal-log-error');
+    // Rejected: EditMealSheet surfaces the constraint violation in mapped wording
+    const alert = await screen.findByTestId('edit-meal-error');
     expect(alert.textContent).toMatch(/no longer match its components/);
-    expect(screen.getByText(/560 kcal/)).toBeDefined();
-    expect(screen.queryByText(/280 kcal/)).toBeNull();
   });
 
   describe('interactive nutrient breakdown popup', () => {

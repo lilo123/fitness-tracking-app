@@ -472,13 +472,12 @@ Total Fiber: 8 g`;
     await deleteMealRow(page, 'High-Protein Breakfast Plate & Chia Pudding Bowl (Friday Menu Grounded)');
   });
 
-  test('allows editing a logged meal in today timeline and history view with updated macros', async ({ page }) => {
+  test('allows editing a logged meal in today timeline and history view with updated macros (D44)', async ({ page }) => {
     const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const originalMealName = `Meal-${uniqueSuffix}`;
-    const editedMealName = `Edited-${uniqueSuffix}`;
     const historyMealName = `History-${uniqueSuffix}`;
 
-    // 1. Log a meal manually first
+    // 1. Stage a 2-item meal via manual entry + add item
     const manualToggleBtn = page.locator('button:has-text("Manual Entry")');
     if (await manualToggleBtn.isVisible()) {
       await manualToggleBtn.click();
@@ -486,38 +485,50 @@ Total Fiber: 8 g`;
 
     const dishInput = page.locator('[data-testid="dish-name-input"]');
     await dishInput.fill(originalMealName);
-
-    const calInput = page.locator('[data-testid="calories-input"]');
-    await calInput.fill('350');
-
-    const proInput = page.locator('[data-testid="protein-input"]');
-    await proInput.fill('30');
-
-    const carbsInput = page.locator('[data-testid="carbs-input"]');
-    await carbsInput.fill('40');
-
-    const fatInput = page.locator('[data-testid="fat-input"]');
-    await fatInput.fill('8');
+    await page.locator('[data-testid="calories-input"]').fill('300');
+    await page.locator('[data-testid="protein-input"]').fill('25');
+    await page.locator('[data-testid="carbs-input"]').fill('35');
+    await page.locator('[data-testid="fat-input"]').fill('5');
 
     const logBtn = page.locator('button:has-text("Log Meal")').last();
     await logBtn.click();
 
-    // Commit staged meal to log (D22)
+    // Staged card is open, add second item
     const stagedCard = page.locator('[data-testid="staged-meal-card"]');
     await expect(stagedCard).toBeVisible();
-    await stagedCard.locator('button:has-text("Log Meal")').click();
+
+    const addItemBtn = stagedCard.locator('[data-testid="add-item-button"]');
+    await expect(addItemBtn).toBeVisible();
+    await addItemBtn.click();
+
+    const addItemForm = stagedCard.locator('[data-testid="add-item-form"]');
+    await expect(addItemForm).toBeVisible();
+    await addItemForm.locator('[data-testid="add-item-name-input"]').fill('Side Salad');
+    await addItemForm.locator('[data-testid="add-item-quantity-input"]').fill('100');
+    await addItemForm.locator('[data-testid="add-item-unit-input"]').fill('g');
+    await addItemForm.locator('[data-testid="add-item-calories-input"]').fill('100');
+    await addItemForm.locator('[data-testid="add-item-protein-input"]').fill('2');
+    await addItemForm.locator('[data-testid="add-item-carbs-input"]').fill('8');
+    await addItemForm.locator('[data-testid="add-item-fat-input"]').fill('5');
+    await addItemForm.locator('[data-testid="submit-add-item-button"]').click();
+    await expect(addItemForm).not.toBeVisible();
+
+    // Commit 2-item meal (300 + 100 = 400 kcal)
+    const commitBtn = stagedCard.locator('button:has-text("Log Meal (+400 kcal)")');
+    await expect(commitBtn).toBeVisible();
+    await commitBtn.click();
     await expect(stagedCard).not.toBeVisible();
 
-    // Verify meal is displayed
+    // Verify 2-item meal in today timeline
     const originalRow = page.locator('[data-testid="meal-log-item"]').filter({ hasText: originalMealName });
     await expect(originalRow).toBeVisible();
+    await expect(originalRow.locator('text=400 kcal')).toBeVisible();
 
-    // 2. Open the row's overflow menu, then pick Edit. Edit and Delete were
-    //    collapsed into one control so the row fits a 320px viewport.
+    // 2. Open row overflow menu and pick Edit meal (D44 EditMealSheet)
     const actionsBtn = originalRow.locator('button[aria-haspopup="menu"]');
     await expect(actionsBtn).toBeVisible();
 
-    // Verify touch target for the overflow trigger >= 40px
+    // Verify touch target for overflow trigger >= 40px
     const editBox = await actionsBtn.boundingBox();
     expect(editBox).not.toBeNull();
     expect(editBox!.width).toBeGreaterThanOrEqual(40);
@@ -528,51 +539,50 @@ Total Fiber: 8 g`;
     await expect(editBtn).toBeVisible();
     await editBtn.click();
 
-    // Verify Edit Meal modal appears
-    const modal = page.locator('[data-testid="edit-meal-modal"]');
-    await expect(modal).toBeVisible();
-    await expect(page.locator('text=Edit Meal')).toBeVisible();
+    // Verify EditMealSheet appears
+    const sheet = page.locator('[data-testid="edit-meal-sheet"]');
+    await expect(sheet).toBeVisible();
+    await expect(sheet.locator('text=Edit Meal')).toBeVisible();
 
-    // Edit meal name and macros
-    const editNameInput = page.locator('[data-testid="edit-meal-name-input"]');
-    await expect(editNameInput).toHaveValue(originalMealName);
-    await editNameInput.fill(editedMealName);
+    // Scale dish by x1.5 (400 * 1.5 = 600 kcal)
+    const scaleBtn = sheet.locator('[data-testid="dish-scale-1.5"]');
+    await expect(scaleBtn).toBeVisible();
+    await scaleBtn.click();
 
-    const editMealType = page.locator('[data-testid="edit-meal-type-select"]');
-    await editMealType.selectOption('Dinner');
-
-    const editCalInput = page.locator('[data-testid="edit-meal-calories-input"]');
-    await editCalInput.fill('480');
-
-    const editProInput = page.locator('[data-testid="edit-meal-protein-input"]');
-    await editProInput.fill('42');
-
-    const editCarbsInput = page.locator('[data-testid="edit-meal-carbs-input"]');
-    await editCarbsInput.fill('50');
-
-    const editFatInput = page.locator('[data-testid="edit-meal-fat-input"]');
-    await editFatInput.fill('12');
-
-    const editFiberInput = page.locator('[data-testid="edit-meal-fiber-input"]');
-    await editFiberInput.fill('7');
-
-    const editServingSize = page.locator('[data-testid="edit-meal-serving-size-input"]');
-    await editServingSize.fill('1.5');
-
-    const editServingUnit = page.locator('[data-testid="edit-meal-serving-unit-input"]');
-    await editServingUnit.fill('bowls');
+    // Change date to yesterday
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const yStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`;
+    const dateInput = sheet.locator('[data-testid="edit-meal-date-input"]');
+    await expect(dateInput).toBeVisible();
+    await dateInput.fill(yStr);
 
     // Save changes
-    const saveBtn = page.locator('[data-testid="save-edit-meal-btn"]');
+    const saveBtn = sheet.locator('[data-testid="save-edit-meal-btn"]');
+    await expect(saveBtn).toBeVisible();
     await saveBtn.click();
 
-    // Modal closes
-    await expect(modal).not.toBeVisible();
+    // Sheet closes
+    await expect(sheet).not.toBeVisible();
 
-    // Verify updated meal name and calories in timeline
-    const editedRow = page.locator('[data-testid="meal-log-item"]').filter({ hasText: editedMealName });
-    await expect(editedRow).toBeVisible();
-    await expect(editedRow.locator('text=480 kcal')).toBeVisible();
+    // Row has moved out of today timeline (since date is yesterday)
+    await expect(page.locator('[data-testid="meal-log-item"]').filter({ hasText: originalMealName })).toHaveCount(0);
+
+    // Toast shows Updated variant with Undo button
+    const toast = page.locator('[data-testid="quick-log-toast"]');
+    await expect(toast).toBeVisible();
+    await expect(toast).toContainText("Updated");
+
+    const undoBtn = page.locator('[data-testid="toast-undo-btn"]');
+    await expect(undoBtn).toBeVisible();
+    await undoBtn.click();
+
+    // Toast closes and meal is restored back to today with original 400 kcal
+    await expect(toast).not.toBeVisible();
+    const restoredRow = page.locator('[data-testid="meal-log-item"]').filter({ hasText: originalMealName });
+    await expect(restoredRow).toBeVisible();
+    await expect(restoredRow.locator('text=400 kcal')).toBeVisible();
 
     // 3. Navigate to /history, switch to Nutrition, and verify edit works there as well
     await safeGoto(page, '/history');
@@ -582,29 +592,27 @@ Total Fiber: 8 g`;
     await nutritionTab.click();
     await expect(page.locator('text=Nutrition History')).toBeVisible();
 
-    // Verify editedMealName is visible in history
-    const historyRow = page.locator('[data-testid="meal-log-item"]').filter({ hasText: editedMealName });
+    // Verify originalMealName is visible in history
+    const historyRow = page.locator('[data-testid="meal-log-item"]').filter({ hasText: originalMealName });
     await expect(historyRow).toBeVisible();
 
-    // Open the row's overflow menu, then pick Edit.
+    // Open row overflow menu, pick Edit meal
     await historyRow.locator('button[aria-haspopup="menu"]').click();
     const historyEditBtn = historyRow.locator('[role="menuitem"]', { hasText: 'Edit meal' });
     await expect(historyEditBtn).toBeVisible();
     await historyEditBtn.click();
 
-    await expect(modal).toBeVisible();
-    await expect(page.locator('[data-testid="edit-meal-name-input"]')).toHaveValue(editedMealName);
+    await expect(sheet).toBeVisible();
+    const nameInput = sheet.locator('[data-testid="dish-name-input"]');
+    await expect(nameInput).toHaveValue(originalMealName);
 
     // Change name in history
-    await page.locator('[data-testid="edit-meal-name-input"]').fill(historyMealName);
-    await page.locator('[data-testid="save-edit-meal-btn"]').click();
-
-    await expect(modal).not.toBeVisible();
+    await nameInput.fill(historyMealName);
+    await sheet.locator('[data-testid="save-edit-meal-btn"]').click();
+    await expect(sheet).not.toBeVisible();
     await expect(page.locator('text=' + historyMealName).first()).toBeVisible();
 
-    // Net-neutral: the name is unique per run, so this row would otherwise be
-    // one more permanent addition per project per run. Deleting it here also
-    // exercises delete from the history view, which nothing else covers.
+    // Net-neutral: clean up
     await deleteMealRow(page, historyMealName);
   });
 test('manual form stages meal, adds item with updated totals, and logs to timeline (D22)', async ({ page }) => {

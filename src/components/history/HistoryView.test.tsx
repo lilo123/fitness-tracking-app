@@ -326,12 +326,12 @@ describe('HistoryView', () => {
         { id: 'i2', name: 'Grilled Pork', quantity: 120, unit: 'g', calories: 260, protein: 26, carbs: 4, fat: 15, fiber: 0 },
       ],
     };
-    const rejectingEq = vi.fn().mockResolvedValue({
-      error: {
-        message:
-          'new row for relation "nutrition_logs" violates check constraint "chk_nl_parent_equals_items_sum"',
-      },
-    });
+    const constraintErr = {
+      message:
+        'new row for relation "nutrition_logs" violates check constraint "chk_nl_parent_equals_items_sum"',
+    };
+    const rejectingSelect = vi.fn().mockResolvedValue({ data: null, error: constraintErr });
+    const rejectingEq = vi.fn().mockReturnValue({ select: rejectingSelect });
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'nutrition_logs') {
         const b = createSupabaseBuilder('nutrition_logs', { data: [mealWithItems], error: null });
@@ -345,18 +345,17 @@ describe('HistoryView', () => {
     renderComponent();
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
 
-    const trigger = await screen.findByTestId('meal-log-accordion-trigger');
-    fireEvent.click(trigger);
-    fireEvent.click(screen.getByTestId('dish-scale-0.5'));
+    await screen.findByTestId('meal-actions-log-items');
+    openMealAction('log-items', 'edit');
 
-    expect(screen.getByText(/280 kcal/)).toBeDefined();
+    expect(await screen.findByTestId('edit-meal-sheet')).toBeDefined();
+    fireEvent.click(screen.getByTestId('dish-scale-0.5'));
+    fireEvent.click(screen.getByTestId('save-edit-meal-btn'));
+
     await waitFor(() => expect(rejectingEq).toHaveBeenCalledWith('id', 'log-items'));
 
-    const alert = await screen.findByTestId('meal-log-error');
+    const alert = await screen.findByTestId('edit-meal-error');
     expect(alert.textContent).toMatch(/no longer match its components/);
-    // The day-total line repeats the figure, hence the plural queries.
-    expect(screen.getAllByText(/560 kcal/).length).toBeGreaterThan(0);
-    expect(screen.queryAllByText(/280 kcal/)).toHaveLength(0);
   });
 
   it('scaling a meal from /history preserves the real macros and never writes zeros or []', async () => {
@@ -381,7 +380,8 @@ describe('HistoryView', () => {
     };
 
     let updatedPayload: any = null;
-    const captureUpdateEq = vi.fn().mockResolvedValue({ error: null });
+    const captureUpdateSelect = vi.fn().mockResolvedValue({ data: [mealWithKnownItems], error: null });
+    const captureUpdateEq = vi.fn().mockReturnValue({ select: captureUpdateSelect });
     const captureUpdate = vi.fn().mockImplementation((payload: any) => {
       updatedPayload = payload;
       return { eq: captureUpdateEq };
@@ -420,10 +420,12 @@ describe('HistoryView', () => {
     renderComponent();
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
 
-    const trigger = await screen.findByTestId('meal-log-accordion-trigger');
-    fireEvent.click(trigger);
+    await screen.findByTestId('meal-actions-log-scale-test');
+    openMealAction('log-scale-test', 'edit');
+    expect(await screen.findByTestId('edit-meal-sheet')).toBeDefined();
     const scaleBtn = await screen.findByTestId('dish-scale-0.5');
     fireEvent.click(scaleBtn);
+    fireEvent.click(screen.getByTestId('save-edit-meal-btn'));
 
     await waitFor(() => {
       expect(captureUpdate).toHaveBeenCalled();
@@ -577,7 +579,7 @@ describe('HistoryView', () => {
   });
 
 
-  it('opens Edit Meal modal pre-filled with meal values when Edit button is clicked in nutrition history', async () => {
+  it('opens Edit Meal sheet pre-filled with meal values when Edit button is clicked in nutrition history (D44)', async () => {
     renderComponent();
 
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
@@ -589,21 +591,16 @@ describe('HistoryView', () => {
     // Click edit button for log-1
     openMealAction('log-1', 'edit');
 
-    // Modal opens
-    expect(screen.getByTestId('edit-meal-modal')).toBeDefined();
+    // Sheet opens
+    expect(screen.getByTestId('edit-meal-sheet')).toBeDefined();
     expect(screen.getByText('Edit Meal')).toBeDefined();
 
     // Fields are pre-filled
-    expect(screen.getByTestId('edit-meal-name-input')).toHaveValue('Grilled Chicken & Rice');
-    expect(screen.getByTestId('edit-meal-type-select')).toHaveValue('Lunch');
-    expect(screen.getByTestId('edit-meal-calories-input')).toHaveValue(550);
-    expect(screen.getByTestId('edit-meal-protein-input')).toHaveValue(45);
-    expect(screen.getByTestId('edit-meal-carbs-input')).toHaveValue(60);
-    expect(screen.getByTestId('edit-meal-fat-input')).toHaveValue(10);
-    expect(screen.getByTestId('edit-meal-fiber-input')).toHaveValue(5);
+    expect(screen.getByTestId('dish-name-input')).toHaveValue('Grilled Chicken & Rice');
+    expect(screen.getByTestId('meal-type-select')).toHaveValue('Lunch');
   });
 
-  it('submits updated meal changes and executes update mutation on supabase', async () => {
+  it('submits updated meal changes and executes update mutation on supabase (D44)', async () => {
     renderComponent();
 
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
@@ -615,59 +612,33 @@ describe('HistoryView', () => {
     openMealAction('log-1', 'edit');
 
     // Modify values
-    fireEvent.change(screen.getByTestId('edit-meal-name-input'), {
+    fireEvent.change(screen.getByTestId('dish-name-input'), {
       target: { value: 'Grilled Lemon Herb Chicken & Rice' },
     });
-    fireEvent.change(screen.getByTestId('edit-meal-type-select'), {
+    fireEvent.change(screen.getByTestId('meal-type-select'), {
       target: { value: 'Dinner' },
-    });
-    fireEvent.change(screen.getByTestId('edit-meal-calories-input'), {
-      target: { value: '620' },
-    });
-    fireEvent.change(screen.getByTestId('edit-meal-protein-input'), {
-      target: { value: '52' },
-    });
-    fireEvent.change(screen.getByTestId('edit-meal-carbs-input'), {
-      target: { value: '65' },
-    });
-    fireEvent.change(screen.getByTestId('edit-meal-fat-input'), {
-      target: { value: '14' },
-    });
-    fireEvent.change(screen.getByTestId('edit-meal-fiber-input'), {
-      target: { value: '6' },
-    });
-    fireEvent.change(screen.getByTestId('edit-meal-serving-size-input'), {
-      target: { value: '2' },
-    });
-    fireEvent.change(screen.getByTestId('edit-meal-serving-unit-input'), {
-      target: { value: 'bowls' },
     });
 
     // Save
     fireEvent.click(screen.getByTestId('save-edit-meal-btn'));
 
     await waitFor(() => {
-      expect(mockUpdate).toHaveBeenCalledWith({
-        food_name: 'Grilled Lemon Herb Chicken & Rice',
-        meal_type: 'Dinner',
-        calories: 620,
-        protein: 52,
-        carbs: 65,
-        fat: 14,
-        fiber: 6,
-        serving_size: 2,
-        serving_unit: 'bowls',
-      });
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          food_name: 'Grilled Lemon Herb Chicken & Rice',
+          meal_type: 'Dinner',
+        })
+      );
       expect(mockUpdateEq).toHaveBeenCalledWith('id', 'log-1');
     });
 
-    // Modal closes
+    // Sheet closes
     await waitFor(() => {
-      expect(screen.queryByTestId('edit-meal-modal')).toBeNull();
+      expect(screen.queryByTestId('edit-meal-sheet')).toBeNull();
     });
   });
 
-  it('displays error notification in Edit Meal modal when meal update fails', async () => {
+  it('displays error notification in Edit Meal sheet when meal update fails (D44)', async () => {
     mockUpdateEq.mockReturnValueOnce({
       select: vi.fn().mockResolvedValue({ data: null, error: { message: 'Database update failed' } }),
     });
@@ -682,6 +653,11 @@ describe('HistoryView', () => {
 
     openMealAction('log-1', 'edit');
 
+    // Modify to dirty
+    fireEvent.change(screen.getByTestId('dish-name-input'), {
+      target: { value: 'New Name' },
+    });
+
     fireEvent.click(screen.getByTestId('save-edit-meal-btn'));
 
     await waitFor(() => {
@@ -691,8 +667,7 @@ describe('HistoryView', () => {
     });
   });
 
-
-  it('allows canceling edit modal without submitting update', async () => {
+  it('allows canceling edit sheet without submitting update (D44)', async () => {
     renderComponent();
 
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
@@ -703,18 +678,18 @@ describe('HistoryView', () => {
 
     openMealAction('log-1', 'edit');
 
-    expect(screen.getByTestId('edit-meal-modal')).toBeDefined();
+    expect(screen.getByTestId('edit-meal-sheet')).toBeDefined();
 
     fireEvent.click(screen.getByTestId('cancel-edit-meal-btn'));
 
     await waitFor(() => {
-      expect(screen.queryByTestId('edit-meal-modal')).toBeNull();
+      expect(screen.queryByTestId('edit-meal-sheet')).toBeNull();
     });
 
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
-  it('validates meal name is required before submitting update', async () => {
+  it('validates meal name is required before submitting update (D44)', async () => {
     renderComponent();
 
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
@@ -726,7 +701,7 @@ describe('HistoryView', () => {
     openMealAction('log-1', 'edit');
 
     // Clear food name
-    fireEvent.change(screen.getByTestId('edit-meal-name-input'), {
+    fireEvent.change(screen.getByTestId('dish-name-input'), {
       target: { value: '   ' },
     });
 
@@ -738,8 +713,7 @@ describe('HistoryView', () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
-
-  it('clamps negative numbers and defaults invalid serving size when updating', async () => {
+  it('allows changing date in Edit Meal sheet (D44/D29)', async () => {
     renderComponent();
 
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
@@ -750,31 +724,21 @@ describe('HistoryView', () => {
 
     openMealAction('log-1', 'edit');
 
-    // Enter negative and invalid values
-    fireEvent.change(screen.getByTestId('edit-meal-calories-input'), {
-      target: { value: '-50' },
-    });
-    fireEvent.change(screen.getByTestId('edit-meal-protein-input'), {
-      target: { value: '-10' },
-    });
-    fireEvent.change(screen.getByTestId('edit-meal-serving-size-input'), {
-      target: { value: '-2' },
-    });
+    const dateInput = screen.getByTestId('edit-meal-date-input');
+    fireEvent.change(dateInput, { target: { value: '2026-09-15' } });
 
     fireEvent.click(screen.getByTestId('save-edit-meal-btn'));
 
     await waitFor(() => {
       expect(mockUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
-          calories: 0,
-          protein: 0,
-          serving_size: 1,
+          logged_date: '2026-09-15',
         })
       );
     });
   });
 
-  it('dismisses edit modal on backdrop click and Escape key', async () => {
+  it('dismisses edit sheet on backdrop click and Escape key when clean (D44)', async () => {
     renderComponent();
 
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
@@ -785,21 +749,21 @@ describe('HistoryView', () => {
 
     // 1. Open and dismiss with Escape
     openMealAction('log-1', 'edit');
-    expect(screen.getByTestId('edit-meal-modal')).toBeDefined();
+    expect(screen.getByTestId('edit-meal-sheet')).toBeDefined();
 
     fireEvent.keyDown(document, { key: 'Escape' });
     await waitFor(() => {
-      expect(screen.queryByTestId('edit-meal-modal')).toBeNull();
+      expect(screen.queryByTestId('edit-meal-sheet')).toBeNull();
     });
 
     // 2. Open and dismiss with backdrop click
     openMealAction('log-1', 'edit');
-    const modalBackdrop = screen.getByTestId('edit-meal-modal');
-    expect(modalBackdrop).toBeDefined();
+    const overlay = screen.getByTestId('edit-meal-sheet-overlay');
+    expect(overlay).toBeDefined();
 
-    fireEvent.click(modalBackdrop);
+    fireEvent.click(overlay);
     await waitFor(() => {
-      expect(screen.queryByTestId('edit-meal-modal')).toBeNull();
+      expect(screen.queryByTestId('edit-meal-sheet')).toBeNull();
     });
   });
 
@@ -1373,11 +1337,11 @@ describe('HistoryView', () => {
       fireEvent.click(screen.getByTestId('history-tab-nutrition'));
       await screen.findByTestId('meal-actions-log-coach-1');
       openMealAction('log-coach-1', 'edit');
-      expect(await screen.findByTestId('edit-meal-modal')).toBeDefined();
+      expect(await screen.findByTestId('edit-meal-sheet')).toBeDefined();
 
-      // Toggle inspect mode back to athlete -> meal modal must be dismissed
+      // Toggle inspect mode back to athlete -> meal sheet must be dismissed
       fireEvent.click(screen.getByTestId('toggle-inspect-mode-btn'));
-      expect(screen.queryByTestId('edit-meal-modal')).toBeNull();
+      expect(screen.queryByTestId('edit-meal-sheet')).toBeNull();
     });
 
     it('buckets nutrition logs by athlete timezone rather than viewer timezone in coach inspection mode', async () => {

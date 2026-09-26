@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import type { NutritionLog } from '../../types/database';
 import { getLocalDateStr, formatLocalTimestamp } from '../../utils/date';
-import { EditMealModal } from './EditMealModal';
+import { EditMealSheet } from './EditMealSheet';
 import { roundTo1Decimal } from '../../utils/nutrition';
 import {
   itemsForPersist, sumItems, type NutritionItem,
@@ -59,7 +59,7 @@ export const NutritionEngine: React.FC = () => {
 
   const {
     customDishes, todayLogs, dailyTotals, targets, remainingFuel,
-    mutation, deleteMutation, scaleLogMutation, saveCustomDishMutation, deleteCustomDishMutation,
+    mutation, deleteMutation, saveCustomDishMutation, deleteCustomDishMutation,
     activeToast, dismissToast, triggerToast, isTimerActive,
     isNutritionLogsError, nutritionLogsError, refetchNutritionLogs,
     isCustomDishesError, customDishesError, refetchCustomDishes, fetchDishDetail,
@@ -401,7 +401,6 @@ export const NutritionEngine: React.FC = () => {
                     void deleteMutation.mutateAsync(l.id);
                   }
                 }}
-                onItemsChange={(l, items) => scaleLogMutation.mutateAsync({ log: l, items })}
               />
             ))}
           </div>
@@ -446,16 +445,18 @@ export const NutritionEngine: React.FC = () => {
         isTimerActive={isTimerActive}
       />
 
-      {/* Edit Meal Modal */}
-      <EditMealModal
+      {/* Edit Meal Sheet (D44) */}
+      <EditMealSheet
         isOpen={!!editingMealLog}
         meal={editingMealLog}
         onClose={() => setEditingMealLog(null)}
         targetUserId={targetUserId}
-        onSuccess={() => {
-          setStatus('Meal updated successfully');
-          setIsError(false);
-        }}
+        nutritionLogs={todayLogs}
+        targets={targets}
+        timeZone={profile?.timezone}
+        triggerToast={triggerToast}
+        setStatus={setStatus}
+        setIsError={setIsError}
       />
 
       {/* Nutrient Breakdown Modal */}

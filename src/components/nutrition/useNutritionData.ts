@@ -360,7 +360,7 @@ export function useNutritionData({
   // Floating Quick-Log Toast state
   const [activeToast, setActiveToast] = useState<{
     id: string;
-    variant: 'logged' | 'added';
+    variant: 'logged' | 'added' | 'updated';
     dishName: string;
     name: string;
     calories: number;
@@ -380,7 +380,7 @@ export function useNutritionData({
     (
       dish: { name: string; calories: number | null },
       options?: {
-        variant?: 'logged' | 'added';
+        variant?: 'logged' | 'added' | 'updated';
         onUndo?: () => Promise<void> | void;
         forMeal?: any;
         preMeal?: any;
@@ -391,6 +391,18 @@ export function useNutritionData({
       const isAdded = options?.variant === 'added';
       const dishName = options?.dishName || dish.name;
       const calories = roundTo1Decimal(options?.calories ?? dish.calories ?? 0);
+
+      if (options?.variant === 'updated') {
+        setActiveToast({
+          id: String(Date.now()),
+          variant: 'updated',
+          dishName,
+          name: dishName,
+          calories,
+          onUndo: options?.onUndo,
+        });
+        return;
+      }
 
       if (isAdded) {
         setActiveToast({

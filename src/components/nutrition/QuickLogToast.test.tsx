@@ -213,3 +213,41 @@ describe('QuickLogToast', () => {
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 });
+
+  it('renders "Updated" variant with check icon, 12px muted verb, 14px dish · kcal (no +), and 44px Undo button', () => {
+    const onUndo = vi.fn();
+    const onDismiss = vi.fn();
+
+    render(
+      <QuickLogToast
+        toast={{
+          variant: 'updated',
+          dishName: 'Updated Salmon Bowl',
+          calories: 620,
+          onUndo,
+        }}
+        onDismiss={onDismiss}
+        isStaged={false}
+        isTimerActive={false}
+      />
+    );
+
+    const toast = screen.getByTestId('quick-log-toast');
+    expect(toast).toBeInTheDocument();
+
+    // Line 1: 'Updated'
+    const verb = screen.getByText('Updated');
+    expect(verb).toBeInTheDocument();
+    expect(verb.className).toContain('text-xs');
+
+    // Line 2: 'Updated Salmon Bowl · 620 kcal' (no leading '+')
+    const line2 = screen.getByTestId('toast-dish-text');
+    expect(line2).toBeInTheDocument();
+    expect(line2.textContent).toBe('Updated Salmon Bowl · 620 kcal');
+    expect(line2.getAttribute('title')).toBe('Updated Salmon Bowl · 620 kcal');
+
+    // Undo button
+    const undoBtn = screen.getByTestId('toast-undo-btn');
+    expect(undoBtn).toBeInTheDocument();
+    expect(undoBtn.getAttribute('aria-label')).toBe('Undo update Updated Salmon Bowl');
+  });

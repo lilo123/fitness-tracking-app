@@ -94,8 +94,8 @@ describe('MealLogRow', () => {
     expect(screen.queryByTestId('meal-log-count-badge')).toBeNull();
   });
 
-  it('expands a multi-component log and lists its components', () => {
-    const items = [component(), component({ id: 'c2', name: 'Whey', calories: 120 })];
+  it('expands a multi-component log and lists its components read-only (D44)', () => {
+    const items = [component(), component({ id: 'c2', name: 'Whey', calories: 120, quantity: 30 })];
     render(<MealLogRow log={log(items)} onEdit={noop} onDelete={noop} />);
 
     const trigger = screen.getByTestId('meal-log-accordion-trigger');
@@ -109,12 +109,21 @@ describe('MealLogRow', () => {
     const panel = screen.getByTestId('meal-log-panel');
     expect(within(panel).getAllByTestId('component-row')).toHaveLength(2);
     expect(trigger.getAttribute('aria-controls')).toBe(panel.getAttribute('id'));
+
+    // D44: Read-only presentation, no scale bar, no quantity input, no unit chip
+    expect(screen.queryByTestId('dish-scale-bar')).toBeNull();
+    expect(screen.queryByTestId('component-quantity-input')).toBeNull();
+    expect(screen.queryByTestId('component-unit-chip')).toBeNull();
+    expect(screen.getByText('Rolled oats')).toBeDefined();
+    expect(screen.getByText('80g')).toBeDefined();
+    expect(screen.getByText('Whey')).toBeDefined();
+    expect(screen.getByText('30g')).toBeDefined();
   });
 
   it('hides every mutating affordance when read-only', () => {
     const items = [component(), component({ id: 'c2' })];
     render(
-      <MealLogRow log={log(items)} onEdit={noop} onDelete={noop} onItemsChange={noop} readOnly />
+      <MealLogRow log={log(items)} onEdit={noop} onDelete={noop} readOnly />
     );
 
     expect(screen.queryByTestId('meal-actions-log-1')).toBeNull();
@@ -123,34 +132,32 @@ describe('MealLogRow', () => {
     fireEvent.click(screen.getByTestId('meal-log-accordion-trigger'));
     expect(screen.getByTestId('meal-log-panel')).toBeDefined();
     expect(screen.queryByTestId('dish-scale-bar')).toBeNull();
-    // R-20: the per-component editor is a write too. A coach's UPDATE is
-    // rejected by RLS, so offering these would only produce failures.
     expect(screen.queryByTestId('component-quantity-input')).toBeNull();
     expect(screen.queryByTestId('component-unit-chip')).toBeNull();
   });
 
-  it('persists a single component edited to an absolute quantity', () => {
-    const items = [component(), component({ id: 'c2', name: 'Whey', calories: 120, protein: 25 })];
-    const onItemsChange = vi.fn();
-    render(
-      <MealLogRow log={log(items)} onEdit={noop} onDelete={noop} onItemsChange={onItemsChange} />
-    );
+  it('renders expanded component rows strictly read-only with no scale bar and no action menus (D44)', () => {
+    const items = [
+      component({ id: 'c1', name: 'Oatmeal', quantity: 100, unit: 'g', calories: 380, protein: 13, carbs: 68, fat: 7, fiber: 10 }),
+      component({ id: 'c2', name: 'Almond Milk', quantity: 200, unit: 'ml', calories: 60, protein: 2, carbs: 4, fat: 5, fiber: 1 }),
+    ];
+    render(<MealLogRow log={log(items)} onEdit={noop} onDelete={noop} />);
 
     fireEvent.click(screen.getByTestId('meal-log-accordion-trigger'));
 
-    // The whole-dish bar only offers four factors. Any other amount — and the
-    // user's actual complaint, that portions were multipliers rather than real
-    // quantities — needs this.
-    const quantity = screen.getAllByTestId('component-quantity-input')[0] as HTMLInputElement;
-    expect(quantity.value).toBe('80');
-    fireEvent.change(quantity, { target: { value: '40' } });
-    fireEvent.blur(quantity);
+    // No scale bar
+    expect(screen.queryByTestId('dish-scale-bar')).toBeNull();
 
-    const next = onItemsChange.mock.calls[0][1] as NutritionItem[];
-    // Only the edited component moves, and it moves linearly.
-    expect(next[0].quantity).toBe(40);
-    expect(next[0].calories).toBe(150);
-    expect(next[1].calories).toBe(120);
+    // No editing inputs or unit chips
+    expect(screen.queryAllByTestId('component-quantity-input')).toHaveLength(0);
+    expect(screen.queryAllByTestId('component-unit-chip')).toHaveLength(0);
+
+    // No component action menus (⋯)
+    expect(screen.queryAllByTestId('component-actions')).toHaveLength(0);
+
+    // Read-only quantities visible
+    expect(screen.getByText('100g')).toBeDefined();
+    expect(screen.getByText('200ml')).toBeDefined();
   });
 
   it('exposes edit and delete only after the overflow menu is opened', () => {
@@ -165,50 +172,6 @@ describe('MealLogRow', () => {
 
     expect(onDelete).toHaveBeenCalledTimes(1);
     expect(onEdit).not.toHaveBeenCalled();
-  });
-
-  it('scales every component and reports the scaled set, with x1 always reachable', () => {
-    const items = [component(), component({ id: 'c2', name: 'Whey', calories: 120, protein: 25 })];
-    const onItemsChange = vi.fn();
-    render(<MealLogRow log={log(items)} onEdit={noop} onDelete={noop} onItemsChange={onItemsChange} />);
-
-    fireEvent.click(screen.getByTestId('meal-log-accordion-trigger'));
-    fireEvent.click(screen.getByTestId('dish-scale-0.5'));
-
-    const halved = onItemsChange.mock.calls[0][1] as NutritionItem[];
-    expect(halved.map((i) => i.calories)).toEqual([150, 60]);
-    expect(halved.map((i) => i.quantity)).toEqual([40, 40]);
-
-    // The old +/-0.5 stepper had a one-way ladder from which x1 was
-    // unreachable; here it is always one tap away.
-    fireEvent.click(screen.getByTestId('dish-scale-1'));
-    const restored = onItemsChange.mock.calls[1][1] as NutritionItem[];
-    expect(restored.map((i) => i.calories)).toEqual([300, 120]);
-  });
-
-  it('keeps scale factors absolute when each scale is persisted back into the row', () => {
-    const items = [component(), component({ id: 'c2', name: 'Whey', calories: 120, protein: 25 })];
-    const onItemsChange = vi.fn();
-    const { rerender } = render(
-      <MealLogRow log={log(items)} onEdit={noop} onDelete={noop} onItemsChange={onItemsChange} />
-    );
-
-    fireEvent.click(screen.getByTestId('meal-log-accordion-trigger'));
-    fireEvent.click(screen.getByTestId('dish-scale-0.5'));
-
-    // Simulate the write landing and the query refetching: the row now arrives
-    // with the halved components as its stored state.
-    const halved = onItemsChange.mock.calls[0][1] as NutritionItem[];
-    rerender(<MealLogRow log={log(halved)} onEdit={noop} onDelete={noop} onItemsChange={onItemsChange} />);
-
-    fireEvent.click(screen.getByTestId('dish-scale-0.5'));
-    const again = onItemsChange.mock.calls[1][1] as NutritionItem[];
-    // Still half of the original, not a quarter.
-    expect(again.map((i) => i.calories)).toEqual([150, 60]);
-
-    fireEvent.click(screen.getByTestId('dish-scale-1'));
-    const back = onItemsChange.mock.calls[2][1] as NutritionItem[];
-    expect(back.map((i) => i.calories)).toEqual([300, 120]);
   });
 
   it('shows totals derived from components rather than the stored parent scalar', () => {
@@ -229,229 +192,20 @@ describe('MealLogRow', () => {
     expect(screen.getByText(/500 kcal/)).toBeDefined();
   });
 
-  it('rolls a rejected write back to the stored components and shows the reason', async () => {
+  it('updates displayed totals and components when log prop updates with new items (D44)', () => {
     const items = [component(), component({ id: 'c2', name: 'Whey', calories: 120, protein: 25 })];
-    // Exactly what Phase 5 returns when the parent no longer matches Σ(items).
-    const onItemsChange = vi
-      .fn()
-      .mockRejectedValueOnce({
-        message:
-          'new row for relation "nutrition_logs" violates check constraint "chk_nl_parent_equals_items_sum"',
-      });
-    render(<MealLogRow log={log(items)} onEdit={noop} onDelete={noop} onItemsChange={onItemsChange} />);
-
-    fireEvent.click(screen.getByTestId('meal-log-accordion-trigger'));
-    fireEvent.click(screen.getByTestId('dish-scale-0.5'));
-
-    // Optimistic: the halved total is on screen before the write lands.
-    expect(screen.getByText(/210 kcal/)).toBeDefined();
-
-    // Once the write is rejected the row must not keep showing a number the
-    // database refused.
-    const alert = await screen.findByTestId('meal-log-error');
-    expect(alert.textContent).toMatch(/no longer match its components/);
-    expect(screen.getByText(/420 kcal/)).toBeDefined();
-    expect(screen.queryByText(/210 kcal/)).toBeNull();
-    expect((screen.getAllByTestId('component-quantity-input')[0] as HTMLInputElement).value).toBe('80');
-
-    // The next attempt clears the stale message.
-    fireEvent.click(screen.getByTestId('dish-scale-1'));
-    expect(screen.queryByTestId('meal-log-error')).toBeNull();
-  });
-
-  it('maintains an idle live region that persists across optimistic rollback', async () => {
-    const items = [component(), component({ id: 'c2', name: 'Whey', calories: 120, protein: 25 })];
-    const onItemsChange = vi
-      .fn()
-      .mockRejectedValueOnce({
-        message: 'new row for relation "nutrition_logs" violates check constraint "chk_nl_parent_equals_items_sum"',
-      });
-    const { container } = render(
-      <MealLogRow log={log(items)} onEdit={noop} onDelete={noop} onItemsChange={onItemsChange} />
-    );
-
-    // Idle: role="alert" live regions exist from mount and are empty
-    const alertRegions = container.querySelectorAll('[role="alert"]');
-    expect(alertRegions.length).toBeGreaterThan(0);
-    alertRegions.forEach((r) => expect(r).toHaveTextContent(''));
-    expect(screen.queryByTestId('meal-log-error')).toBeNull();
-
-    fireEvent.click(screen.getByTestId('meal-log-accordion-trigger'));
-    fireEvent.click(screen.getByTestId('dish-scale-0.5'));
-
-    // Once rejected, an alert region contains the error message
-    await screen.findByTestId('meal-log-error');
-    const activeAlerts = Array.from(container.querySelectorAll('[role="alert"]')).filter(
-      (r) => r.textContent !== ''
-    );
-    expect(activeAlerts.length).toBe(1);
-    expect(activeAlerts[0].textContent).toMatch(/no longer match its components/);
-  });
-
-  it('rolls back to the last persisted set, not to the stored row, after a partial sequence', async () => {
-    const items = [component(), component({ id: 'c2', name: 'Whey', calories: 120, protein: 25 })];
-    const onItemsChange = vi
-      .fn()
-      .mockResolvedValueOnce(undefined)
-      .mockRejectedValueOnce({ message: 'network unreachable' });
-    render(<MealLogRow log={log(items)} onEdit={noop} onDelete={noop} onItemsChange={onItemsChange} />);
-
-    fireEvent.click(screen.getByTestId('meal-log-accordion-trigger'));
-
-    // First write succeeds: 210 kcal is now the persisted truth.
-    fireEvent.click(screen.getByTestId('dish-scale-0.5'));
-    await waitFor(() => expect(onItemsChange).toHaveBeenCalledTimes(1));
-    expect(screen.getByText(/210 kcal/)).toBeDefined();
-
-    // Second write fails: the row returns to 210, not to the row's own 420.
-    fireEvent.click(screen.getByTestId('dish-scale-2'));
-    expect(screen.getByText(/840 kcal/)).toBeDefined();
-
-    const alert = await screen.findByTestId('meal-log-error');
-    // A non-constraint error is passed through verbatim by friendlyError.
-    expect(alert.textContent).toBe('network unreachable');
-    expect(screen.getByText(/210 kcal/)).toBeDefined();
-  });
-
-  it('rolls back when the persist handler throws synchronously', () => {
-    const items = [component(), component({ id: 'c2', name: 'Whey', calories: 120, protein: 25 })];
-    const onItemsChange = vi.fn(() => {
-      throw new Error('offline');
-    });
-    render(<MealLogRow log={log(items)} onEdit={noop} onDelete={noop} onItemsChange={onItemsChange} />);
-
-    fireEvent.click(screen.getByTestId('meal-log-accordion-trigger'));
-    fireEvent.click(screen.getByTestId('dish-scale-0.5'));
-
-    expect(screen.getByTestId('meal-log-error').textContent).toBe('offline');
-    expect(screen.getByText(/420 kcal/)).toBeDefined();
-  });
-
-  it('lands on a persisted value when two overlapping writes are both rejected', async () => {
-    const items = [component(), component({ id: 'c2', name: 'Whey', calories: 120, protein: 25 })];
-    const deferred = () => {
-      let reject!: (err: unknown) => void;
-      const promise = new Promise((_res, rej) => {
-        reject = rej;
-      });
-      return { promise, reject };
-    };
-    const first = deferred();
-    const second = deferred();
-    const onItemsChange = vi
-      .fn()
-      .mockReturnValueOnce(first.promise)
-      .mockReturnValueOnce(second.promise);
-
-    render(<MealLogRow log={log(items)} onEdit={noop} onDelete={noop} onItemsChange={onItemsChange} />);
-    fireEvent.click(screen.getByTestId('meal-log-accordion-trigger'));
-
-    // Two scale factors tapped before either write resolves.
-    fireEvent.click(screen.getByTestId('dish-scale-0.5')); // 210, in flight
-    fireEvent.click(screen.getByTestId('dish-scale-2')); // 840, in flight
-
-    // The superseded write fails first. It must not move the row: 840 belongs
-    // to a later write that has not reported yet.
-    first.reject({ message: 'first rejected' });
-    await waitFor(() => expect(onItemsChange).toHaveBeenCalledTimes(2));
-    expect(screen.getByText(/840 kcal/)).toBeDefined();
-    expect(screen.queryByTestId('meal-log-error')).toBeNull();
-
-    // Now the live write fails too. The row must land on 420 — the stored row,
-    // the only value the database ever confirmed — and never on 210, which was
-    // merely the first tap's optimistic guess.
-    second.reject({ message: 'second rejected' });
-    const alert = await screen.findByTestId('meal-log-error');
-    expect(alert.textContent).toBe('second rejected');
-    expect(screen.getByText(/420 kcal/)).toBeDefined();
-    expect(screen.queryByText(/210 kcal/)).toBeNull();
-  });
-
-  it('lets a refetch carrying different components supersede the optimistic overlay', async () => {
-    const items = [component(), component({ id: 'c2', name: 'Whey', calories: 120, protein: 25 })];
-    const onItemsChange = vi.fn().mockResolvedValue(undefined);
     const { rerender } = render(
-      <MealLogRow log={log(items)} onEdit={noop} onDelete={noop} onItemsChange={onItemsChange} />
+      <MealLogRow log={log(items)} onEdit={noop} onDelete={noop} />
     );
 
-    fireEvent.click(screen.getByTestId('meal-log-accordion-trigger'));
-    fireEvent.click(screen.getByTestId('dish-scale-0.5'));
-    await waitFor(() => expect(screen.getByText(/210 kcal/)).toBeDefined());
+    expect(screen.getByText(/420 kcal/)).toBeDefined();
 
-    // The meal is then changed somewhere else — EditMealModal, another device —
-    // and the query refetches. The overlay must not keep shadowing it, or the
-    // row displays numbers the database does not hold.
+    // The meal is changed via EditMealSheet and query refetches with updated items
     const edited = [component({ calories: 999 }), component({ id: 'c2', name: 'Whey', calories: 1 })];
-    rerender(<MealLogRow log={log(edited)} onEdit={noop} onDelete={noop} onItemsChange={onItemsChange} />);
+    rerender(<MealLogRow log={log(edited)} onEdit={noop} onDelete={noop} />);
 
     expect(screen.getByText(/1000 kcal/)).toBeDefined();
-    expect(screen.queryByText(/210 kcal/)).toBeNull();
-  });
-
-  it('clears error message when fresh server state arrives', async () => {
-    const items = [component(), component({ id: 'c2', name: 'Whey', calories: 120, protein: 25 })];
-    const onItemsChange = vi.fn().mockRejectedValueOnce({ message: 'network down' });
-    const { rerender } = render(
-      <MealLogRow log={log(items)} onEdit={noop} onDelete={noop} onItemsChange={onItemsChange} />
-    );
-
-    fireEvent.click(screen.getByTestId('meal-log-accordion-trigger'));
-    fireEvent.click(screen.getByTestId('dish-scale-0.5'));
-
-    const alert = await screen.findByTestId('meal-log-error');
-    expect(alert.textContent).toBe('network down');
-
-    // Fresh server state arrives (e.g. from query refetch after another change)
-    rerender(
-      <MealLogRow
-        log={{ ...log(items), items: [component({ calories: 350 }), component({ id: 'c2', calories: 120 })] }}
-        onEdit={noop}
-        onDelete={noop}
-        onItemsChange={onItemsChange}
-      />
-    );
-
-    // Stale error must be cleared
-    expect(screen.queryByTestId('meal-log-error')).toBeNull();
-  });
-
-  it('does not allow an older out-of-order write to clobber a newer persisted state', async () => {
-    const items = [component(), component({ id: 'c2', name: 'Whey', calories: 120, protein: 25 })];
-    const deferred = () => {
-      let resolve!: (val: unknown) => void;
-      const promise = new Promise((res) => {
-        resolve = res;
-      });
-      return { promise, resolve };
-    };
-    const first = deferred();
-    const second = deferred();
-    const onItemsChange = vi
-      .fn()
-      .mockReturnValueOnce(first.promise)
-      .mockReturnValueOnce(second.promise)
-      .mockRejectedValueOnce({ message: 'third write failed' });
-
-    render(<MealLogRow log={log(items)} onEdit={noop} onDelete={noop} onItemsChange={onItemsChange} />);
-    fireEvent.click(screen.getByTestId('meal-log-accordion-trigger'));
-
-    // Write 1 (halved: 210) and Write 2 (doubled: 840)
-    fireEvent.click(screen.getByTestId('dish-scale-0.5'));
-    fireEvent.click(screen.getByTestId('dish-scale-2'));
-
-    // Write 2 resolves first!
-    second.resolve(undefined);
-    await waitFor(() => expect(screen.getByText(/840 kcal/)).toBeDefined());
-
-    // Write 1 resolves second (out of order). It must NOT overwrite persisted state.
-    first.resolve(undefined);
-
-    // Now Write 3 is triggered and fails. It must roll back to Write 2 (840 kcal), NOT Write 1 (210 kcal).
-    fireEvent.click(screen.getByTestId('dish-scale-1'));
-    const alert = await screen.findByTestId('meal-log-error');
-    expect(alert.textContent).toBe('third write failed');
-    expect(screen.getByText(/840 kcal/)).toBeDefined();
-    expect(screen.queryByText(/210 kcal/)).toBeNull();
+    expect(screen.queryByText(/420 kcal/)).toBeNull();
   });
 
   it('does not fan out queries on mount when items are omitted and fetches exactly 1 query on expand', async () => {
@@ -623,47 +377,4 @@ describe('MealLogRow', () => {
     expect(screen.queryAllByTestId('meal-log-accordion-trigger')).toHaveLength(0);
     expect(screen.queryAllByTestId('meal-log-count-badge')).toHaveLength(0);
   });
-
-  it('propagates re-anchoring to anchorItems so subsequent whole-dish scale uses new anchor', () => {
-    const items = [
-      component({ id: 'c1', name: 'Eggs', quantity: 1, unit: 'unit', calories: 600, protein: 30, carbs: 40, fat: 20, fiber: 5 }),
-      component({ id: 'c2', name: 'Toast', quantity: 50, unit: 'g', calories: 150, protein: 5, carbs: 25, fat: 2, fiber: 2 }),
-    ];
-    const onItemsChange = vi.fn();
-    render(
-      <MealLogRow log={log(items)} onEdit={noop} onDelete={noop} onItemsChange={onItemsChange} />
-    );
-
-    fireEvent.click(screen.getByTestId('meal-log-accordion-trigger'));
-
-    // Re-anchor the first item from 1 unit -> 540g
-    const unitChips = screen.getAllByTestId('component-unit-chip');
-    fireEvent.click(unitChips[0]);
-    fireEvent.click(screen.getByTestId('unit-option-g'));
-
-    const quantityInputs = screen.getAllByTestId('component-quantity-input');
-    fireEvent.change(quantityInputs[0], { target: { value: '540' } });
-    fireEvent.blur(quantityInputs[0]);
-
-    expect(onItemsChange).toHaveBeenCalledTimes(1);
-    const reanchoredList = onItemsChange.mock.calls[0][1] as NutritionItem[];
-    expect(reanchoredList[0].quantity).toBe(540);
-    expect(reanchoredList[0].unit).toBe('g');
-    expect(reanchoredList[0].calories).toBe(600);
-
-    // Now apply whole-dish scale x2
-    fireEvent.click(screen.getByRole('button', { name: /×2/ }));
-
-    expect(onItemsChange).toHaveBeenCalledTimes(2);
-    const scaledList = onItemsChange.mock.calls[1][1] as NutritionItem[];
-    // First item must scale from 540g -> 1080g (600 -> 1200 kcal), NOT from 1 unit -> 2 unit
-    expect(scaledList[0].quantity).toBe(1080);
-    expect(scaledList[0].unit).toBe('g');
-    expect(scaledList[0].calories).toBe(1200);
-    // Second item also scaled by 2 (50g -> 100g, 150 -> 300 kcal)
-    expect(scaledList[1].quantity).toBe(100);
-    expect(scaledList[1].calories).toBe(300);
-  });
 });
-
-

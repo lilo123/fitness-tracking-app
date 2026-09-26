@@ -21,6 +21,12 @@ import { MacroCell } from './MacroCell';
 import { DayTotalRow, type MacroTotalsShape } from './TodayAfterRow';
 
 export interface StagedMealCardProps {
+  mode?: 'stage' | 'edit';
+  isDirty?: boolean;
+  date?: string;
+  onDateChange?: (date: string) => void;
+  onScale?: (factor: number) => void;
+  onCancel?: () => void;
   navHeight?: number;
   stagedMeal: StagedMeal;
   dailyTotals?: Partial<MacroTotalsShape>;
@@ -36,6 +42,12 @@ export interface StagedMealCardProps {
 }
 
 export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
+  mode = 'stage',
+  isDirty = false,
+  date,
+  onDateChange,
+  onScale,
+  onCancel,
   stagedMeal,
   dailyTotals,
   targets,
@@ -51,7 +63,8 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const measuredNavHeight = useNavHeight();
-  const effectiveNavHeight = navHeightProp ?? measuredNavHeight;
+  const isEditMode = mode === 'edit';
+  const effectiveNavHeight = isEditMode ? (navHeightProp ?? 0) : (navHeightProp ?? measuredNavHeight);
 
   useEffect(() => {
     const behavior = getScrollBehavior();
@@ -204,6 +217,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
         <div className="relative w-[134px] shrink-0">
           <select
             aria-label="Meal type"
+            data-testid="meal-type-select"
             value={stagedMeal.mealType}
             onChange={(e) => onUpdateStagedMeal({ ...stagedMeal, mealType: e.target.value })}
             className="w-full appearance-none bg-zinc-950 border border-border-interactive text-zinc-300 text-base font-semibold rounded-xl pl-2 pr-7 py-2 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none min-h-[40px] h-10 cursor-pointer"
@@ -221,6 +235,26 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
           />
         </div>
       </div>
+
+      {/* Date row in edit mode */}
+      {isEditMode && (
+        <div className="flex items-center justify-between gap-2 border-b border-zinc-800 pb-1.5 pt-0.5">
+          <label
+            htmlFor="edit-meal-date-input"
+            className="text-xs font-bold uppercase tracking-wider text-zinc-400"
+          >
+            Date
+          </label>
+          <input
+            id="edit-meal-date-input"
+            type="date"
+            data-testid="edit-meal-date-input"
+            value={date}
+            onChange={(e) => onDateChange?.(e.target.value)}
+            className="bg-zinc-950 border border-border-interactive text-cyan-400 rounded-xl px-2.5 py-1 text-base tabular-nums font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none cursor-pointer shrink-0 min-h-[40px] h-10 w-[140px] sm:w-auto"
+          />
+        </div>
+      )}
 
       {/* Itemized Ingredient Breakdown */}
       <div className="space-y-0.5 pt-0.5">
@@ -243,6 +277,27 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
             </button>
           )}
         </div>
+
+        {/* Whole-dish scale bar in edit mode */}
+        {isEditMode && onScale && (
+          <fieldset
+            aria-label="Scale whole dish"
+            data-testid="dish-scale-bar"
+            className="flex w-full items-stretch gap-0.5 rounded-lg border border-zinc-800 bg-zinc-950 p-0.5 pt-1 mb-1.5 min-w-0"
+          >
+            {[0.5, 1, 1.5, 2].map((factor) => (
+              <button
+                key={factor}
+                type="button"
+                data-testid={`dish-scale-${factor}`}
+                onClick={() => onScale(factor)}
+                className="min-h-[40px] h-10 flex-1 rounded text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 touch-manipulation"
+              >
+                &times;{factor}
+              </button>
+            ))}
+          </fieldset>
+        )}
 
         <div className="divide-y divide-zinc-800/80 pt-3.5">
           {stagedMeal.items.map((item) => (
@@ -353,6 +408,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
         <button
           ref={logButtonRef}
           type="button"
+          data-testid={isEditMode ? 'save-edit-meal-btn' : undefined}
           onClick={handleLogClick}
           onFocus={() => {
             logButtonHadFocusRef.current = true;
@@ -362,14 +418,18 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
               logButtonHadFocusRef.current = false;
             }
           }}
-          disabled={isPending}
-          className="flex-1 min-w-0 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold py-2.5 px-2 min-h-[40px] rounded-xl text-xs shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 transition motion-reduce:transition-none disabled:opacity-50 flex items-center justify-center gap-1 touch-manipulation whitespace-nowrap"
+          disabled={isEditMode ? (isPending || !isDirty) : isPending}
+          className={`flex-1 min-w-0 font-bold py-2.5 px-2 min-h-[40px] rounded-xl text-xs active:scale-95 transition motion-reduce:transition-none disabled:opacity-50 flex items-center justify-center gap-1 touch-manipulation whitespace-nowrap ${
+            isEditMode
+              ? 'bg-gradient-to-r from-cyan-500 to-teal-600 hover:from-cyan-400 hover:to-teal-500 text-white shadow-[0_0_15px_rgba(6,182,212,0.3)]'
+              : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]'
+          }`}
         >
           <Check className="w-4 h-4 shrink-0" />
           <span className="whitespace-nowrap">
-            {isPending
-              ? 'Logging...'
-              : `Log Meal (+${formatCalories(stagedMeal.calories)} kcal)`}
+            {isEditMode
+              ? (isPending ? 'Saving...' : 'Save changes')
+              : (isPending ? 'Logging...' : `Log Meal (+${formatCalories(stagedMeal.calories)} kcal)`)}
           </span>
         </button>
 
@@ -384,15 +444,28 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
           <span className="hidden sm:inline">Save as Custom Dish</span>
         </button>
 
-        <button
-          type="button"
-          aria-label="Discard staged meal"
-          onClick={handleDiscardClick}
-          className="bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white p-2.5 min-h-[40px] min-w-[40px] rounded-xl transition motion-reduce:transition-none border border-border-interactive flex items-center justify-center touch-manipulation shrink-0"
-          title="Discard"
-        >
-          <X className="w-4 h-4 shrink-0" />
-        </button>
+        {isEditMode ? (
+          <button
+            type="button"
+            data-testid="cancel-edit-meal-btn"
+            aria-label="Cancel editing"
+            onClick={onCancel ?? handleDiscardClick}
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white px-3 py-2 min-h-[40px] rounded-xl text-xs font-bold transition motion-reduce:transition-none border border-border-interactive flex items-center justify-center touch-manipulation shrink-0"
+            title="Cancel"
+          >
+            Cancel
+          </button>
+        ) : (
+          <button
+            type="button"
+            aria-label="Discard staged meal"
+            onClick={handleDiscardClick}
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white p-2.5 min-h-[40px] min-w-[40px] rounded-xl transition motion-reduce:transition-none border border-border-interactive flex items-center justify-center touch-manipulation shrink-0"
+            title="Discard"
+          >
+            <X className="w-4 h-4 shrink-0" />
+          </button>
+        )}
       </div>
     </div>
   );

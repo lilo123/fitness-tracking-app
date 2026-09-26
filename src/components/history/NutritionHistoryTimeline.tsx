@@ -22,7 +22,7 @@ interface NutritionHistoryTimelineProps {
   isInspectingAthlete: boolean;
   onEditMeal: (meal: NutritionLog) => void;
   onDeleteMeal: (mealId: string) => void;
-  onScaleMeal: (log: NutritionLog, items: NutritionItem[]) => Promise<unknown>;
+  onScaleMeal?: (log: NutritionLog, items: NutritionItem[]) => Promise<unknown>;
 }
 
 export const NutritionHistoryTimeline: React.FC<NutritionHistoryTimelineProps> = ({
@@ -31,7 +31,7 @@ export const NutritionHistoryTimeline: React.FC<NutritionHistoryTimelineProps> =
   isInspectingAthlete,
   onEditMeal,
   onDeleteMeal,
-  onScaleMeal,
+  onScaleMeal: _onScaleMeal,
 }) => {
   const parentRef = React.useRef<HTMLDivElement | null>(null);
   const [scrollMargin, setScrollMargin] = React.useState(0);
@@ -215,11 +215,6 @@ export const NutritionHistoryTimeline: React.FC<NutritionHistoryTimelineProps> =
                 onEdit={onEditMeal}
                 onDelete={(m) => onDeleteMeal(m.id)}
                 readOnly={isInspectingAthlete}
-                onItemsChange={
-                  isInspectingAthlete
-                    ? undefined
-                    : (m, items) => onScaleMeal(m, items)
-                }
               />
             ))}
           </div>

@@ -3618,20 +3618,20 @@ ${JSON.stringify(nutrientModalViolations, null, 2)}`).toHaveLength(0);
         await page.keyboard.press('Escape');
         await expect(nutrientModal).not.toBeVisible();
 
-        // 3. Surface: EditMealModal
+        // 3. Surface: EditMealSheet (D44 replaces EditMealModal)
         const rowMenuBtn = page.locator('button[aria-haspopup="menu"]').first();
         await expect(rowMenuBtn).toBeVisible({ timeout: 5000 });
         await rowMenuBtn.click();
         const editMenuItem = page.locator('[role="menuitem"]', { hasText: 'Edit meal' });
         await expect(editMenuItem).toBeVisible({ timeout: 5000 });
         await editMenuItem.click();
-        const editMealModal = page.locator('[data-testid="edit-meal-modal"]');
-        await expect(editMealModal).toBeVisible({ timeout: 5000 });
-        const editModalViolations = await checkTypeScale(editMealModal);
-        expect(editModalViolations, `EditMealModal type violations at ${width}px:
+        const editMealSheet = page.locator('[data-testid="edit-meal-sheet"]');
+        await expect(editMealSheet).toBeVisible({ timeout: 5000 });
+        const editModalViolations = await checkTypeScale(editMealSheet);
+        expect(editModalViolations, `EditMealSheet type violations at ${width}px:
 ${JSON.stringify(editModalViolations, null, 2)}`).toHaveLength(0);
-        await page.locator('[data-testid="edit-meal-modal"] button:has-text("Cancel")').click();
-        await expect(editMealModal).not.toBeVisible();
+        await page.locator('[data-testid="edit-meal-sheet"] button:has-text("Cancel")').click();
+        await expect(editMealSheet).not.toBeVisible();
 
         // 4. Surface: Quick Log Toast
         const quickLogBtn = page.locator('[data-testid^="quick-log-btn-"]').first();
@@ -3696,6 +3696,167 @@ ${JSON.stringify(stagedViolations, null, 2)}`).toHaveLength(0);
           expect([600, 700], `Header "${style.text}" font weight must be 600 or 700`).toContain(style.weight);
         }
 
+      } finally {
+        await page.close();
+      }
+    });
+  }
+});
+
+
+// ---------------------------------------------------------------------------
+// D44 edit sheet density & layout (320x640 and 390x844)
+// ---------------------------------------------------------------------------
+
+test.describe('D44 edit sheet density & layout', () => {
+  const VIEWPORTS = [
+    { width: 320, height: 640 },
+    { width: 390, height: 844 },
+  ];
+
+  for (const { width, height } of VIEWPORTS) {
+    test(`edit sheet layout, tap targets and typography at ${width}x${height}`, async ({ browser }) => {
+      const page = await browser.newPage({
+        viewport: { width, height },
+      });
+
+      try {
+        let logs: any[] = [
+          {
+            id: 'meal-log-multi',
+            user_id: 'test-user',
+            food_name: 'Steak & Salad',
+            meal_type: 'Dinner',
+            calories: 650,
+            protein: 55,
+            carbs: 10,
+            fat: 35,
+            fiber: 4,
+            serving_size: 1,
+            serving_unit: 'serving',
+            logged_at: '2026-09-26T19:00:00Z',
+            logged_date: '2026-09-26',
+            has_components: true,
+            items: [
+              {
+                id: 'c1',
+                name: 'Ribeye Steak',
+                portion: '200 g',
+                quantity: 200,
+                unit: 'g',
+                calories: 500,
+                protein: 50,
+                carbs: 0,
+                fat: 30,
+                fiber: 0,
+              },
+              {
+                id: 'c2',
+                name: 'Garden Salad',
+                portion: '150 g',
+                quantity: 150,
+                unit: 'g',
+                calories: 150,
+                protein: 5,
+                carbs: 10,
+                fat: 5,
+                fiber: 4,
+              },
+            ],
+          },
+        ];
+
+        await page.route('**/rest/v1/nutrition_logs*', async (route) => {
+          const method = route.request().method();
+          if (method === 'PATCH' || method === 'PUT') {
+            const body = route.request().postDataJSON();
+            const updated = { ...logs[0], ...body };
+            logs = [updated];
+            return route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              headers: { 'access-control-allow-origin': '*' },
+              body: JSON.stringify([updated]),
+            });
+          }
+          return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            headers: { 'access-control-allow-origin': '*' },
+            body: JSON.stringify(logs),
+          });
+        });
+
+        await setupPageAndLogin(page);
+
+        // Open edit sheet via row menu
+        const rowMenuBtn = page.locator('[data-testid="meal-actions-meal-log-multi"]');
+        await expect(rowMenuBtn).toBeVisible({ timeout: 5000 });
+        await rowMenuBtn.click();
+        const editMenuItem = page.locator('[data-testid="edit-meal-meal-log-multi"]');
+        await expect(editMenuItem).toBeVisible({ timeout: 5000 });
+        await editMenuItem.click();
+
+        const sheet = page.locator('[data-testid="edit-meal-sheet"]');
+        await expect(sheet).toBeVisible({ timeout: 5000 });
+
+        // 1. Sheet fits viewport (no page-level horizontal overflow)
+        const hasPageHOverflow = await page.evaluate(() => {
+          return document.documentElement.scrollWidth > window.innerWidth;
+        });
+        expect(hasPageHOverflow, 'Page must not have horizontal overflow').toBe(false);
+
+        // 2. Action row (Save changes, Cancel, Star) is visible, reachable, not clipped
+        const actionRow = sheet.locator('[data-testid="staged-card-actions"]');
+        await expect(actionRow).toBeVisible();
+
+        const saveBtn = sheet.locator('[data-testid="save-edit-meal-btn"]');
+        const cancelBtn = sheet.locator('[data-testid="cancel-edit-meal-btn"]');
+        const starBtn = sheet.locator('button[aria-label="Save as Custom Dish"]');
+
+        await expect(saveBtn).toBeVisible();
+        await expect(cancelBtn).toBeVisible();
+        await expect(starBtn).toBeVisible();
+
+        // 3. No element clipped by overflow-hidden
+        const actionsBox = await actionRow.boundingBox();
+        expect(actionsBox).not.toBeNull();
+        if (actionsBox) {
+          expect(actionsBox.y + actionsBox.height).toBeLessThanOrEqual(height + 1);
+        }
+
+        // 4. Tap targets >= 40x40 (>= 44x44 for touch targets)
+        const interactiveElements = await sheet.evaluate((root) => {
+          const buttons = Array.from(root.querySelectorAll('button, input, select, a, [role="button"]'));
+          return buttons.map((el) => {
+            const r = el.getBoundingClientRect();
+            const cs = window.getComputedStyle(el);
+            const isVisible = r.width > 0 && r.height > 0 && cs.display !== 'none' && cs.visibility !== 'hidden';
+            return {
+              tag: el.tagName.toLowerCase(),
+              testId: el.getAttribute('data-testid') || el.getAttribute('aria-label') || el.textContent?.trim().slice(0, 15),
+              width: Math.round(r.width),
+              height: Math.round(r.height),
+              isVisible,
+            };
+          }).filter((b) => b.isVisible);
+        });
+
+        for (const target of interactiveElements) {
+          expect(
+            target.height >= 40 || target.width >= 40,
+            `Target ${target.testId || target.tag} dimensions (${target.width}x${target.height}) must have at least 40px`
+          ).toBe(true);
+        }
+
+        // 5. Fonts conform to D43 walker (12, 14, 16px only; weights 400, 600, 700 only)
+        const typeViolations = await checkTypeScale(sheet);
+        expect(typeViolations, `D44 EditMealSheet typography violations at ${width}px:
+${JSON.stringify(typeViolations, null, 2)}`).toHaveLength(0);
+
+        // Cancel closes sheet
+        await cancelBtn.click();
+        await expect(sheet).not.toBeVisible();
       } finally {
         await page.close();
       }
