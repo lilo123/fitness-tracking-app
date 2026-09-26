@@ -580,10 +580,15 @@ async function checkClipping(surface: Locator) {
       candidateCount++;
       const s = window.getComputedStyle(el);
 
-      // Inputs scroll horizontally by design; intentional ellipsis truncation is allowed if full name is available
-      const isIntentionalTruncate =
-        (s.textOverflow === 'ellipsis' || el.classList.contains('truncate')) &&
-        (el.hasAttribute('title') || Boolean(el.closest('[aria-label]')));
+      // Exemption 1 (D19, D31): Staged-card meal-name input is exempt from horizontal scroll check
+      const isStagedMealNameInput = el.getAttribute('data-testid') === 'dish-name-input';
+
+      // Exemption 2 (D26): Quick Log dish names use CSS truncate with title attribute by design
+      const isQuickLogDishName =
+        Boolean(el.id && el.id.startsWith('dish-name-')) &&
+        el.classList.contains('truncate');
+
+      const isIntentionalTruncate = isStagedMealNameInput || isQuickLogDishName;
 
       if (el.tagName !== 'INPUT' && !isIntentionalTruncate && el.scrollWidth > el.clientWidth + 1) {
         clippedElements.push({
@@ -654,9 +659,14 @@ async function waitForScrollSettled(page: Page, targetSelector: string = '[data-
 
 // Check 4 helper: Wait for instant scroll position to reach target and settle across animation frames
 async function waitForScrollPosition(page: Page, target: number | 'bottom') {
-  await page.evaluate(() => {
+  await page.evaluate((tgt) => {
+    const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    const expectedY = tgt === 'bottom' ? maxScroll : Math.min(tgt, maxScroll);
+    if (Math.abs(window.scrollY - expectedY) > 1) {
+      window.scrollTo(0, expectedY);
+    }
     delete (window as unknown as { __scrollPosState?: unknown }).__scrollPosState;
-  });
+  }, target);
 
   await page.waitForFunction(
     (tgt) => {
@@ -679,10 +689,7 @@ async function waitForScrollPosition(page: Page, target: number | 'bottom') {
       if (diffFromExpected <= 1 && diffFromLast < 0.5) {
         w.__scrollPosState.count++;
       } else {
-        if (diffFromExpected > 1) {
-          window.scrollTo(0, expectedY);
-        }
-        w.__scrollPosState.y = window.scrollY;
+        w.__scrollPosState.y = currentY;
         w.__scrollPosState.count = 0;
       }
 
@@ -1578,24 +1585,28 @@ test.describe('Surface D: staged card placement (D10)', () => {
     // Emulate reduced motion
     await page.emulateMedia({ reducedMotion: 'reduce' });
 
-    // Staged card replaces AI input again
-    await page.click('button:has-text("Analyze Meal")');
-    await expect(cardLocator).toBeVisible({ timeout: 15000 });
-    await waitForScrollSettled(page);
+    try {
+      // Staged card replaces AI input again
+      await page.click('button:has-text("Analyze Meal")');
+      await expect(cardLocator).toBeVisible({ timeout: 15000 });
+      await waitForScrollSettled(page);
 
-    const cardBox = (await cardLocator.boundingBox())!;
-    const cardTop = Math.round(cardBox.y * 10) / 10;
+      const cardBox = (await cardLocator.boundingBox())!;
+      const cardTop = Math.round(cardBox.y * 10) / 10;
 
-    const measurements = {
-      test: 'D4: D1 with reducedMotion reduce emulated',
-      surface: 'D',
-      cardTop,
-      inRange: cardTop >= 0 && cardTop <= 200,
-    };
-    console.log(JSON.stringify(measurements));
+      const measurements = {
+        test: 'D4: D1 with reducedMotion reduce emulated',
+        surface: 'D',
+        cardTop,
+        inRange: cardTop >= 0 && cardTop <= 200,
+      };
+      console.log(JSON.stringify(measurements));
 
-    expect(cardTop, `Reduced motion card top (${cardTop}px) must be >= 0`).toBeGreaterThanOrEqual(0);
-    expect(cardTop, `Reduced motion card top (${cardTop}px) must be <= 200`).toBeLessThanOrEqual(200);
+      expect(cardTop, `Reduced motion card top (${cardTop}px) must be >= 0`).toBeGreaterThanOrEqual(0);
+      expect(cardTop, `Reduced motion card top (${cardTop}px) must be <= 200`).toBeLessThanOrEqual(200);
+    } finally {
+      await page.emulateMedia({ reducedMotion: null });
+    }
   });
 
   test('D5: page end content not covered by nav', async () => {
@@ -2226,46 +2237,61 @@ test.describe('Surface F: Manual-staged card and Add-item at 390×844', () => {
   });
 
   test('F: Add-item form open (font >= 12, taps >= 40, inputs 16px)', async () => {
-    const addItemBtn = cardLocator.locator('[data-testid="add-item-button"]');
-    await expect(addItemBtn).toBeVisible();
-    await addItemBtn.click();
-
     const addItemForm = cardLocator.locator('[data-testid="add-item-form"]');
+    if (!(await addItemForm.isVisible())) {
+      const addItemBtn = cardLocator.locator('[data-testid="add-item-button"]');
+      await expect(addItemBtn).toBeVisible();
+      await addItemBtn.click();
+    }
     await expect(addItemForm).toBeVisible();
 
-    const fontResult = await checkFontSizes(addItemForm);
-    expect(fontResult.offenders, `Found fonts smaller than 12px in AddItemForm: ${JSON.stringify(fontResult.offenders)}`).toEqual([]);
+    try {
+      const fontResult = await checkFontSizes(addItemForm);
+      expect(fontResult.offenders, `Found fonts smaller than 12px in AddItemForm: ${JSON.stringify(fontResult.offenders)}`).toEqual([]);
 
-    const tapResult = await checkTapTargets(addItemForm);
-    expect(tapResult.offendersUnder40, `Found tap targets smaller than 40px in AddItemForm: ${JSON.stringify(tapResult.offendersUnder40)}`).toEqual([]);
+      const tapResult = await checkTapTargets(addItemForm);
+      expect(tapResult.offendersUnder40, `Found tap targets smaller than 40px in AddItemForm: ${JSON.stringify(tapResult.offendersUnder40)}`).toEqual([]);
 
-    // Verify all input elements in AddItemForm have fontSize >= 16px (to prevent iOS auto-zoom)
-    const inputsUnder16 = await addItemForm.evaluate((form) => {
-      const inputs = Array.from(form.querySelectorAll('input, select, textarea'));
-      const under16: Array<{ name: string; fontSize: number }> = [];
-      for (const input of inputs) {
-        const fs = parseFloat(window.getComputedStyle(input).fontSize);
-        if (fs < 16) {
-          under16.push({
-            name: input.getAttribute('name') || input.getAttribute('data-testid') || input.tagName,
-            fontSize: fs,
-          });
+      // Verify all input elements in AddItemForm have fontSize >= 16px (to prevent iOS auto-zoom)
+      const inputsUnder16 = await addItemForm.evaluate((form) => {
+        const inputs = Array.from(form.querySelectorAll('input, select, textarea'));
+        const under16: Array<{ name: string; fontSize: number }> = [];
+        for (const input of inputs) {
+          const fs = parseFloat(window.getComputedStyle(input).fontSize);
+          if (fs < 16) {
+            under16.push({
+              name: input.getAttribute('name') || input.getAttribute('data-testid') || input.tagName,
+              fontSize: fs,
+            });
+          }
         }
+        return under16;
+      });
+
+      console.log(JSON.stringify({
+        test: 'F: Add-item form inputs font size',
+        surface: 'F',
+        inputsUnder16,
+      }));
+
+      expect(inputsUnder16, `Found inputs with font-size < 16px in AddItemForm: ${JSON.stringify(inputsUnder16)}`).toEqual([]);
+    } finally {
+      const cancelBtn = cardLocator.locator('[data-testid="cancel-add-item-button"]');
+      if (await cancelBtn.isVisible()) {
+        await cancelBtn.click();
+        await expect(addItemForm).not.toBeVisible();
       }
-      return under16;
-    });
-
-    console.log(JSON.stringify({
-      test: 'F: Add-item form inputs font size',
-      surface: 'F',
-      inputsUnder16,
-    }));
-
-    expect(inputsUnder16, `Found inputs with font-size < 16px in AddItemForm: ${JSON.stringify(inputsUnder16)}`).toEqual([]);
+    }
   });
 
   test('F: 4 items after Add item (height <= 480px)', async () => {
+    // Establish precondition: ensure add-item form is open
     const addItemForm = cardLocator.locator('[data-testid="add-item-form"]');
+    if (!(await addItemForm.isVisible())) {
+      const addItemBtn = cardLocator.locator('[data-testid="add-item-button"]');
+      await expect(addItemBtn).toBeVisible();
+      await addItemBtn.click();
+    }
     await expect(addItemForm).toBeVisible();
 
     // Add item 2
