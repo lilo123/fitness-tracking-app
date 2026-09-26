@@ -193,9 +193,10 @@ const ItemNutritionForm: React.FC<ItemNutritionFormProps> = ({ item, onClose, on
               >
                 <label
                   htmlFor={field.id}
-                  className={`block text-xs font-semibold ${field.tone} uppercase tracking-wider mb-1`}
+                  className={`block text-xs font-semibold ${field.tone} uppercase tracking-wider mb-1 whitespace-nowrap`}
                 >
-                  {field.label} <span className="font-normal text-zinc-400">{field.unit}</span>
+                  {field.label}
+                  <span className="sr-only"> ({field.unit})</span>
                 </label>
                 <input
                   id={field.id}
@@ -213,6 +214,9 @@ const ItemNutritionForm: React.FC<ItemNutritionFormProps> = ({ item, onClose, on
                       : 'border-border-interactive focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50'
                   }`}
                 />
+                <p aria-hidden="true" className="text-[11px] text-zinc-400 text-center mt-1 lowercase">
+                  {field.unit}
+                </p>
                 {hasFieldError && (
                   <p
                     id={errorId}
