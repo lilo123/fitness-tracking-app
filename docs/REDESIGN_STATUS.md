@@ -495,7 +495,19 @@ None open. All six were answered on 2026-09-26 19:59Z and are recorded in §2.0:
 
 Add new questions here as phases surface them (e.g. the P8 Coach/Settings audit, the RD-15/RD-16 counts).
 
-**Pre-P1 data audit (production, read-only, run by the user in the Supabase SQL editor, 2026-09-26):** blank/whitespace exercise names = **0**. The remaining counts (RD-15 duplicate days, RD-16 warm-up/drop sets, W50a/b) are pending: one-result query in the planning conversation `scratch/p0_counts_one.sql`. The agent has no production DB credentials (anon key only).
+**Pre-P1 data audit (production, read-only; run by the user in the Supabase SQL editor on 2026-09-26 with `p0_counts_one.sql`):**
+
+| Check | Count | Consequence |
+|---|---|---|
+| RD-15 duplicate workout days (UTC date / user time zone) | 0 / 0 | W41's unique `(user_id, workout_date)` can land without any merge; no approval needed. |
+| RD-16 warm-up / drop sets | 0 / 0 | Hiding non-working sets affects no existing data. |
+| W50a sets on unlinked non-master exercises | 0 | RLS v2 hides nothing that existing sets reference. |
+| W50b template rows using another user's non-master exercise (unlinked) | 0 (0) | Same, for templates. |
+| Blank or whitespace exercise names | 0 | The `CHECK (length(trim(name)) > 0)` in M1 applies cleanly. |
+| Context: workouts / sets / users | 32 / 387 / 3 | Small data set; backfills are trivial. |
+
+All P1 pre-migration audit counts are 0. The remaining P1 prerequisite is a database backup (the Free plan has no automatic backups; use `pg_dump`).
+The agent has no production DB credentials (anon key only); re-run the query before each migration phase.
 
 ---
 
@@ -521,3 +533,4 @@ Add new questions here as phases surface them (e.g. the P8 Coach/Settings audit,
 | 2026-09-26 | OQ-1..OQ-6 answered and the K9 reading confirmed (RD-14..RD-20); §7 closed; P2/P5a/P8 scope wording aligned. No implementation started. |
 | 2026-09-26 | RD-21: D46 whole-meal Scale chip (replaces the D44 scale bar) and the edit-nutrition unit-caption STD-DAT-3 exception, both shipped on `v2-rewrite`. |
 | 2026-09-26 | P0 done (`6bc91c7`); E2E label fix for D46 (`7e7b05b`); baseline updated; two new risks (TZ-unclean full suite, D44 E2E flake); pre-P1 audit partial (blank names = 0). |
+| 2026-09-26 | P0 shipped to `v2-rewrite` at `7d907bc` (CI fixes: `test:tz` after Supabase start, Roboto for density, D23 screenshot path). Production audit recorded: every count is 0. |
