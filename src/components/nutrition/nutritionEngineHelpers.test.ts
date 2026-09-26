@@ -571,6 +571,179 @@ describe('useStagedCardFocus', () => {
     document.body.removeChild(outsideInput);
     document.body.removeChild(mockTextarea);
   });
+
+  it('does NOT restore focus if Log was triggered via touch/pen tap (Finding #5)', () => {
+    let isStaged = true;
+    const { result, rerender } = renderHook(() => useStagedCardFocus(isStaged));
+
+    const card = document.createElement('div');
+    const childBtn = document.createElement('button');
+    card.appendChild(childBtn);
+    const mockTextarea = document.createElement('textarea');
+    document.body.appendChild(card);
+    document.body.appendChild(mockTextarea);
+
+    const textareaFocusSpy = vi.spyOn(mockTextarea, 'focus');
+
+    (result.current.cardContainerRef as any).current = card;
+    (result.current.textareaRef as any).current = mockTextarea;
+
+    // Simulate touch tap: pointerdown with pointerType 'touch'
+    const pointerEvent = new Event('pointerdown', { bubbles: true }) as any;
+    pointerEvent.pointerType = 'touch';
+    window.dispatchEvent(pointerEvent);
+
+    childBtn.focus();
+    expect(document.activeElement).toBe(childBtn);
+
+    act(() => {
+      // decideFocusRestore called on touch tap
+      result.current.decideFocusRestore({ detail: 1, pointerType: 'touch' } as any);
+    });
+
+    isStaged = false;
+    rerender();
+
+    // Must NOT focus mockTextarea after touch tap
+    expect(textareaFocusSpy).not.toHaveBeenCalled();
+
+    document.body.removeChild(card);
+    document.body.removeChild(mockTextarea);
+  });
+
+  it('restores focus if Log was activated via keyboard Enter/Space (click event.detail === 0)', () => {
+    let isStaged = true;
+    const { result, rerender } = renderHook(() => useStagedCardFocus(isStaged));
+
+    const card = document.createElement('div');
+    const childBtn = document.createElement('button');
+    card.appendChild(childBtn);
+    const mockTextarea = document.createElement('textarea');
+    document.body.appendChild(card);
+    document.body.appendChild(mockTextarea);
+
+    const textareaFocusSpy = vi.spyOn(mockTextarea, 'focus');
+
+    (result.current.cardContainerRef as any).current = card;
+    (result.current.textareaRef as any).current = mockTextarea;
+
+    // Simulate keyboard navigation: keydown Enter
+    const keyEvent = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+    window.dispatchEvent(keyEvent);
+
+    childBtn.focus();
+    expect(document.activeElement).toBe(childBtn);
+
+    act(() => {
+      result.current.decideFocusRestore({ detail: 0 } as any);
+    });
+
+    isStaged = false;
+    rerender();
+
+    // Must restore focus on keyboard activation
+    expect(textareaFocusSpy).toHaveBeenCalledTimes(1);
+
+    document.body.removeChild(card);
+    document.body.removeChild(mockTextarea);
+  });
+
+  it('restores focus on coarse-pointer device when activated via keyboard (keyboard wins over coarse pointer)', () => {
+    // Mock coarse-only pointer environment
+    const origMatchMedia = window.matchMedia;
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(pointer: coarse)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+
+    try {
+      let isStaged = true;
+      const { result, rerender } = renderHook(() => useStagedCardFocus(isStaged));
+
+      const card = document.createElement('div');
+      const childBtn = document.createElement('button');
+      card.appendChild(childBtn);
+      const mockTextarea = document.createElement('textarea');
+      document.body.appendChild(card);
+      document.body.appendChild(mockTextarea);
+
+      const textareaFocusSpy = vi.spyOn(mockTextarea, 'focus');
+
+      (result.current.cardContainerRef as any).current = card;
+      (result.current.textareaRef as any).current = mockTextarea;
+
+      // Simulate prior touch event on screen, then keyboard activation
+      const pointerEvent = new Event('pointerdown', { bubbles: true }) as any;
+      pointerEvent.pointerType = 'touch';
+      window.dispatchEvent(pointerEvent);
+
+      // Now user presses Enter
+      const keyEvent = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+      window.dispatchEvent(keyEvent);
+
+      childBtn.focus();
+      act(() => {
+        result.current.decideFocusRestore({ detail: 0 } as any);
+      });
+
+      isStaged = false;
+      rerender();
+
+      expect(textareaFocusSpy).toHaveBeenCalledTimes(1);
+
+      document.body.removeChild(card);
+      document.body.removeChild(mockTextarea);
+    } finally {
+      window.matchMedia = origMatchMedia;
+    }
+  });
+
+  it('does NOT restore focus if user typed in textarea earlier but activated Log via touch tap (touch wins for this activation)', () => {
+    let isStaged = true;
+    const { result, rerender } = renderHook(() => useStagedCardFocus(isStaged));
+
+    const card = document.createElement('div');
+    const childBtn = document.createElement('button');
+    card.appendChild(childBtn);
+    const mockTextarea = document.createElement('textarea');
+    document.body.appendChild(card);
+    document.body.appendChild(mockTextarea);
+
+    const textareaFocusSpy = vi.spyOn(mockTextarea, 'focus');
+
+    (result.current.cardContainerRef as any).current = card;
+    (result.current.textareaRef as any).current = mockTextarea;
+
+    // Earlier keydown in textarea
+    const keyEvent = new KeyboardEvent('keydown', { key: 'a', bubbles: true });
+    window.dispatchEvent(keyEvent);
+
+    // Later touch tap on Log button
+    const pointerEvent = new Event('pointerdown', { bubbles: true }) as any;
+    pointerEvent.pointerType = 'touch';
+    window.dispatchEvent(pointerEvent);
+
+    childBtn.focus();
+
+    act(() => {
+      result.current.decideFocusRestore({ detail: 1, pointerType: 'touch' } as any);
+    });
+
+    isStaged = false;
+    rerender();
+
+    // Touch tap on Log must win over earlier typing
+    expect(textareaFocusSpy).not.toHaveBeenCalled();
+
+    document.body.removeChild(card);
+    document.body.removeChild(mockTextarea);
+  });
 });
 
 describe('D33: isIdenticalItem and mergeOrAppendStagedItems', () => {

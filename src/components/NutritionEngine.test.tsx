@@ -3957,6 +3957,150 @@ Total Fiber: 1 g`;
 
       const restoredInput = screen.getByPlaceholderText(/Describe what you ate/i);
       expect(document.activeElement).toBe(restoredInput);
+      document.body.removeAttribute('tabindex');
+    });
+
+    it('Finding #5: does NOT restore focus to AI input textarea after touch pointer Log', async () => {
+      let resolveInsert: (val: any) => void;
+      const insertPromise = new Promise((resolve) => {
+        resolveInsert = resolve;
+      });
+      const mockInsert = vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue(insertPromise),
+      });
+      (supabase.from as any).mockImplementation((table: string) => {
+        const b = createSupabaseBuilder(table, { data: [], error: null });
+        if (table === 'nutrition_logs') {
+          b.insert = mockInsert;
+        }
+        return b;
+      });
+
+      (supabase.functions.invoke as any).mockResolvedValue({
+        data: {
+          name: 'Protein Shake',
+          calories: 200,
+          protein: 30,
+          carbs: 5,
+          fat: 2,
+          fiber: 1,
+          items: [
+            { name: 'Whey', portion: '1 scoop', calories: 200, protein: 30, carbs: 5, fat: 2, fiber: 1, quantity: 1, unit: 'scoop' },
+          ],
+        },
+        error: null,
+      });
+
+      renderComponent();
+
+      const input = screen.getByPlaceholderText(/Describe what you ate/i);
+      await userEvent.type(input, 'whey protein shake');
+      fireEvent.click(screen.getByText('Analyze Meal'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('staged-meal-card')).toBeDefined();
+      });
+
+      // Mount autofocus runs in rAF and focuses dish-name-input
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      const dishInput = screen.getByTestId('dish-name-input');
+      expect(document.activeElement).toBe(dishInput);
+
+      const logBtn = screen.getByRole('button', { name: /Log Meal/i });
+
+      // Simulate mobile touch tap on Log button while dish-name-input has focus:
+      // pointerdown with pointerType 'touch'
+      fireEvent.pointerDown(logBtn, { pointerType: 'touch' });
+      fireEvent.click(logBtn);
+
+      await waitFor(() => {
+        expect(logBtn).toBeDisabled();
+      });
+
+      // Now mutation succeeds
+      await act(async () => {
+        resolveInsert!({ data: [], error: null });
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('staged-meal-card')).toBeNull();
+      });
+
+      const restoredInput = screen.getByPlaceholderText(/Describe what you ate/i);
+      // Active element must NOT be restored to the textarea after touch tap!
+      expect(document.activeElement).not.toBe(restoredInput);
+    });
+
+    it('Finding #5: returns focus to Log button when log mutation errors and card stays mounted', async () => {
+      let rejectInsert: (val: any) => void;
+      const insertPromise = new Promise((_, reject) => {
+        rejectInsert = reject;
+      });
+      const mockInsert = vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue(insertPromise),
+      });
+      (supabase.from as any).mockImplementation((table: string) => {
+        const b = createSupabaseBuilder(table, { data: [], error: null });
+        if (table === 'nutrition_logs') {
+          b.insert = mockInsert;
+        }
+        return b;
+      });
+
+      (supabase.functions.invoke as any).mockResolvedValue({
+        data: {
+          name: 'Protein Shake',
+          calories: 200,
+          protein: 30,
+          carbs: 5,
+          fat: 2,
+          fiber: 1,
+          items: [
+            { name: 'Whey', portion: '1 scoop', calories: 200, protein: 30, carbs: 5, fat: 2, fiber: 1, quantity: 1, unit: 'scoop' },
+          ],
+        },
+        error: null,
+      });
+
+      renderComponent();
+
+      const input = screen.getByPlaceholderText(/Describe what you ate/i);
+      await userEvent.type(input, 'whey protein shake');
+      fireEvent.click(screen.getByText('Analyze Meal'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('staged-meal-card')).toBeDefined();
+      });
+
+      const logBtn = screen.getByRole('button', { name: /Log Meal/i });
+      logBtn.focus();
+      expect(document.activeElement).toBe(logBtn);
+
+      fireEvent.click(logBtn);
+
+      await waitFor(() => {
+        expect(logBtn).toBeDisabled();
+      });
+      document.body.tabIndex = -1;
+      document.body.focus();
+      expect(document.activeElement).toBe(document.body);
+
+      // Now mutation errors
+      await act(async () => {
+        rejectInsert!(new Error('Network error'));
+      });
+
+      // Card must stay mounted
+      await waitFor(() => {
+        expect(screen.getByTestId('staged-meal-card')).toBeDefined();
+      });
+
+      // Log button is re-enabled and receives focus back
+      await waitFor(() => {
+        expect(logBtn).not.toBeDisabled();
+      });
+      expect(document.activeElement).toBe(logBtn);
+      document.body.removeAttribute('tabindex');
     });
 
     it('restores focus to AI input textarea when staged card closes on log success (F5)', async () => {

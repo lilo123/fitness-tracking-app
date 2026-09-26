@@ -428,11 +428,89 @@ export function useStagedCardFocus(isStaged: boolean) {
   const shouldRestoreFocusRef = useRef(false);
   const prevIsStagedRef = useRef(isStaged);
 
-  const decideFocusRestore = () => {
-    const activeEl = document.activeElement;
-    shouldRestoreFocusRef.current = Boolean(
-      activeEl && cardContainerRef.current?.contains(activeEl)
-    );
+  const lastPointerTypeRef = useRef<string | null>(null);
+  const lastModalityRef = useRef<'keyboard' | 'pointer' | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const onPointerDown = (e: PointerEvent) => {
+      lastPointerTypeRef.current = e.pointerType || null;
+      lastModalityRef.current = 'pointer';
+    };
+
+    const onKeyDown = () => {
+      lastPointerTypeRef.current = null;
+      lastModalityRef.current = 'keyboard';
+    };
+
+    window.addEventListener('pointerdown', onPointerDown, { capture: true });
+    window.addEventListener('keydown', onKeyDown, { capture: true });
+
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown, { capture: true });
+      window.removeEventListener('keydown', onKeyDown, { capture: true });
+    };
+  }, []);
+
+  const decideFocusRestore = (
+    triggerEvent?: React.UIEvent | UIEvent | { detail?: number; pointerType?: string } | null
+  ) => {
+    const activeEl = typeof document !== 'undefined' ? document.activeElement : null;
+    const isInsideCard = Boolean(activeEl && cardContainerRef.current?.contains(activeEl));
+    if (!isInsideCard) {
+      shouldRestoreFocusRef.current = false;
+      return;
+    }
+
+    // Explicit pointerType from event or tracked pointerdown
+    const eventPointerType =
+      (triggerEvent as any)?.pointerType ?? (triggerEvent as any)?.nativeEvent?.pointerType;
+
+    const isTouchOrPen =
+      eventPointerType === 'touch' ||
+      eventPointerType === 'pen' ||
+      lastPointerTypeRef.current === 'touch' ||
+      lastPointerTypeRef.current === 'pen';
+
+    if (isTouchOrPen) {
+      shouldRestoreFocusRef.current = false;
+      return;
+    }
+
+    // Keyboard activation:
+    // (a) click event.detail === 0 (standard browser behavior for Enter/Space on focused button)
+    // (b) last input modality was keydown
+    // Keyboard activation strictly wins over coarse pointer heuristics.
+    const isKeyboard =
+      lastModalityRef.current === 'keyboard' ||
+      (triggerEvent && typeof triggerEvent.detail === 'number' && triggerEvent.detail === 0);
+
+    // Mouse on fine pointer:
+    const hasFinePointer =
+      typeof window !== 'undefined' && window.matchMedia
+        ? window.matchMedia('(pointer: fine)').matches
+        : true;
+
+    const isMouse =
+      (eventPointerType === 'mouse' || lastPointerTypeRef.current === 'mouse') && hasFinePointer;
+
+    const isCoarseOnly =
+      typeof window !== 'undefined' &&
+      window.matchMedia &&
+      window.matchMedia('(pointer: coarse)').matches &&
+      !window.matchMedia('(pointer: fine)').matches;
+
+    if (isKeyboard || isMouse) {
+      shouldRestoreFocusRef.current = true;
+    } else if (isCoarseOnly) {
+      shouldRestoreFocusRef.current = false;
+    } else if (!triggerEvent && lastPointerTypeRef.current === null) {
+      // In tests/helpers without pointerdown on desktop / jsdom:
+      shouldRestoreFocusRef.current = true;
+    } else {
+      shouldRestoreFocusRef.current = false;
+    }
   };
 
   useEffect(() => {

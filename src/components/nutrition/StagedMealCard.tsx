@@ -29,9 +29,9 @@ export interface StagedMealCardProps {
   onApplyStagedItemChange: (id: string, next: NutritionItem) => void;
   onDeleteItem: (id: string) => void;
   onSaveItemAsCustomDish: (item: StagedItem) => void;
-  onLogStagedMeal: () => void;
+  onLogStagedMeal: (e?: React.MouseEvent<HTMLButtonElement>) => void;
   onSaveStagedAsCustomDish: () => void;
-  onDiscardStagedMeal: () => void;
+  onDiscardStagedMeal: (e?: React.MouseEvent<HTMLButtonElement>) => void;
   isPending: boolean;
 }
 
@@ -91,6 +91,38 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
 
     return () => cancelAnimationFrame(frameId);
   }, []);
+
+  const logButtonRef = useRef<HTMLButtonElement>(null);
+  const wasPendingRef = useRef(isPending);
+  const logButtonHadFocusRef = useRef(false);
+
+  useEffect(() => {
+    if (isPending) {
+      if (typeof document !== 'undefined' && document.activeElement === logButtonRef.current) {
+        logButtonHadFocusRef.current = true;
+      }
+    } else if (wasPendingRef.current && !isPending) {
+      if (logButtonHadFocusRef.current) {
+        logButtonHadFocusRef.current = false;
+        const active = typeof document !== 'undefined' ? document.activeElement : null;
+        if (!active || active === document.body || active === document.documentElement) {
+          logButtonRef.current?.focus();
+        }
+      }
+    }
+    wasPendingRef.current = isPending;
+  }, [isPending]);
+
+  const handleLogClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (typeof document !== 'undefined' && document.activeElement === logButtonRef.current) {
+      logButtonHadFocusRef.current = true;
+    }
+    onLogStagedMeal(e);
+  };
+
+  const handleDiscardClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    onDiscardStagedMeal(e);
+  };
 
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [newlyAddedItemId, setNewlyAddedItemId] = useState<string | null>(null);
@@ -319,8 +351,17 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
         className="sticky z-20 bg-zinc-900 border-t border-zinc-800/80 -mx-3 px-3 sm:-mx-4 sm:px-4 py-1.5 flex items-center gap-1.5 sm:gap-2 rounded-b-2xl sm:rounded-b-3xl"
       >
         <button
+          ref={logButtonRef}
           type="button"
-          onClick={onLogStagedMeal}
+          onClick={handleLogClick}
+          onFocus={() => {
+            logButtonHadFocusRef.current = true;
+          }}
+          onBlur={(e) => {
+            if (e.relatedTarget && e.relatedTarget !== document.body) {
+              logButtonHadFocusRef.current = false;
+            }
+          }}
           disabled={isPending}
           className="flex-1 min-w-0 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold py-2.5 px-2 min-h-[40px] rounded-xl text-xs uppercase tracking-tight shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 transition motion-reduce:transition-none disabled:opacity-50 flex items-center justify-center gap-1 touch-manipulation whitespace-nowrap"
         >
@@ -346,7 +387,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
         <button
           type="button"
           aria-label="Discard staged meal"
-          onClick={onDiscardStagedMeal}
+          onClick={handleDiscardClick}
           className="bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white p-2.5 min-h-[40px] min-w-[40px] rounded-xl transition motion-reduce:transition-none border border-border-interactive flex items-center justify-center touch-manipulation shrink-0"
           title="Discard"
         >

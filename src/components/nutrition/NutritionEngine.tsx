@@ -142,9 +142,9 @@ export const NutritionEngine: React.FC = () => {
     setStagedMeal({ ...stagedMeal, items: updatedItems, ...recomputeStagedTotals(updatedItems) });
   };
 
-  const handleLogStagedMeal = () => {
+  const handleLogStagedMeal = (e?: React.MouseEvent | React.UIEvent) => {
     if (!stagedMeal) return;
-    decideFocusRestore();
+    decideFocusRestore(e);
     const items = stagedMeal.items.map(stagedToItem);
     const totals = sumItems(items);
     const isSingle = items.length <= 1;
@@ -287,8 +287,8 @@ export const NutritionEngine: React.FC = () => {
             onSaveItemAsCustomDish={handleSaveItemAsCustomDish}
             onLogStagedMeal={handleLogStagedMeal}
             onSaveStagedAsCustomDish={handleSaveStagedAsCustomDish}
-            onDiscardStagedMeal={() => {
-              decideFocusRestore();
+            onDiscardStagedMeal={(e) => {
+              decideFocusRestore(e);
               setStagedMeal(null);
             }}
             isPending={mutation.isPending}

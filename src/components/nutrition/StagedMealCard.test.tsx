@@ -1426,5 +1426,133 @@ describe('StagedMealCard', () => {
       expect(document.activeElement).toBe(outsideInput);
       document.body.removeChild(outsideInput);
     });
+
+    it('Finding #5: returns focus to Log button when mutation errors and focus was dropped to body', async () => {
+      const meal = makeStagedMeal();
+      const onLog = vi.fn();
+      const { rerender } = render(
+        <StagedMealCard
+          stagedMeal={meal}
+          onUpdateStagedMeal={vi.fn()}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={onLog}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={false}
+        />
+      );
+
+      const logBtn = screen.getByRole('button', { name: /Log Meal/i });
+      logBtn.focus();
+      expect(document.activeElement).toBe(logBtn);
+
+      fireEvent.click(logBtn);
+      expect(onLog).toHaveBeenCalledTimes(1);
+
+      // Pending state disables button; simulate focus dropping to body
+      rerender(
+        <StagedMealCard
+          stagedMeal={meal}
+          onUpdateStagedMeal={vi.fn()}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={onLog}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={true}
+        />
+      );
+
+      document.body.tabIndex = -1;
+      document.body.focus();
+      expect(document.activeElement).toBe(document.body);
+
+      // Mutation errors, isPending becomes false while card remains mounted
+      rerender(
+        <StagedMealCard
+          stagedMeal={meal}
+          onUpdateStagedMeal={vi.fn()}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={onLog}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={false}
+        />
+      );
+
+      expect(document.activeElement).toBe(logBtn);
+      document.body.removeAttribute('tabindex');
+    });
+
+    it('Finding #5: does NOT move focus to Log button on error if user moved focus elsewhere during pending', async () => {
+      const meal = makeStagedMeal();
+      const onLog = vi.fn();
+      const outsideInput = document.createElement('input');
+      outsideInput.setAttribute('data-testid', 'outside-input');
+      document.body.appendChild(outsideInput);
+
+      const { rerender } = render(
+        <StagedMealCard
+          stagedMeal={meal}
+          onUpdateStagedMeal={vi.fn()}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={onLog}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={false}
+        />
+      );
+
+      const logBtn = screen.getByRole('button', { name: /Log Meal/i });
+      logBtn.focus();
+      expect(document.activeElement).toBe(logBtn);
+
+      fireEvent.click(logBtn);
+
+      // Pending state
+      rerender(
+        <StagedMealCard
+          stagedMeal={meal}
+          onUpdateStagedMeal={vi.fn()}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={onLog}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={true}
+        />
+      );
+
+      // User focuses outside input while pending
+      outsideInput.focus();
+      expect(document.activeElement).toBe(outsideInput);
+
+      // Mutation errors
+      rerender(
+        <StagedMealCard
+          stagedMeal={meal}
+          onUpdateStagedMeal={vi.fn()}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={onLog}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={false}
+        />
+      );
+
+      // Should not steal focus from outsideInput
+      expect(document.activeElement).toBe(outsideInput);
+      document.body.removeChild(outsideInput);
+    });
   });
 });

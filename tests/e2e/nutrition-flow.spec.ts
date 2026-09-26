@@ -255,6 +255,42 @@ test.describe('Nutrition Flow E2E', () => {
     await expect(page.locator(`[data-testid="meal-actions-${id}"]`)).toHaveCount(0);
   });
 
+  test.describe('touch tap (Finding #5)', () => {
+    test.use({ hasTouch: true });
+
+    test('touch tap on Log Meal does NOT focus AI textarea (Finding #5)', async ({ page }) => {
+      // Toggle manual form
+      const manualToggleBtn = page.locator('button:has-text("Manual Entry")');
+      if (await manualToggleBtn.isVisible()) {
+        await manualToggleBtn.click();
+      }
+
+      const dishInput = page.locator('[data-testid="dish-name-input"]');
+      await dishInput.fill('Playwright Touch Tap Meal');
+
+      const calInput = page.locator('[data-testid="calories-input"]');
+      await calInput.fill('400');
+
+      // Submit manual form (stages meal into StagedMealCard per D22)
+      const logBtn = page.locator('button:has-text("Log Meal")').last();
+      await logBtn.click();
+
+      const stagedCard = page.locator('[data-testid="staged-meal-card"]');
+      await expect(stagedCard).toBeVisible();
+
+      // Finding #5 check: tap() with touch does NOT focus AI textarea
+      const commitLogBtn = stagedCard.locator('button:has-text("Log Meal")');
+      await commitLogBtn.tap();
+      await expect(stagedCard).not.toBeVisible();
+
+      const aiTextarea = page.locator('textarea[placeholder*="Describe what you ate"]');
+      await expect(aiTextarea).not.toBeFocused();
+
+      // Clean up logged meal
+      await deleteMealRow(page, 'Playwright Touch Tap Meal');
+    });
+  });
+
   test('submits conversational meal prompt, interacts with staged card and quick log', async ({ page }) => {
     // Fill conversational prompt
     const nlTextarea = page.locator('textarea[placeholder*="Describe what you ate"]');
