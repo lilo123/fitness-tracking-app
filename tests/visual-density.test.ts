@@ -312,6 +312,111 @@ async function checkSelectChevronGeometry(card: Locator) {
   });
 }
 
+// Check helper: Breakdown header row height and Add item button geometry (D28)
+async function checkBreakdownHeaderGeometry(card: Locator) {
+  return await card.evaluate((cardEl) => {
+    const addItemBtn = cardEl.querySelector<HTMLElement>('[data-testid="add-item-button"]');
+    if (!addItemBtn) throw new Error('add-item-button not found');
+
+    const headerRow = addItemBtn.parentElement;
+    if (!headerRow) throw new Error('header row (add-item-button parent) not found');
+
+    const headerRowRect = headerRow.getBoundingClientRect();
+    const btnRect = addItemBtn.getBoundingClientRect();
+
+    const headerLabel = headerRow.querySelector('span:not(.sr-only)');
+    const labelRect = headerLabel ? headerLabel.getBoundingClientRect() : null;
+
+    const firstRow = cardEl.querySelector('[data-testid="component-row"]');
+    if (!firstRow) throw new Error('first component-row not found');
+    const firstRowRect = firstRow.getBoundingClientRect();
+
+    // Check intersection with header label
+    let labelIntersectionArea = 0;
+    if (labelRect) {
+      const hOverlap = Math.max(0, Math.min(btnRect.right, labelRect.right) - Math.max(btnRect.left, labelRect.left));
+      const vOverlap = Math.max(0, Math.min(btnRect.bottom, labelRect.bottom) - Math.max(btnRect.top, labelRect.top));
+      labelIntersectionArea = hOverlap * vOverlap;
+    }
+
+    // Check intersection with first item row
+    const hOverlapFirst = Math.max(0, Math.min(btnRect.right, firstRowRect.right) - Math.max(btnRect.left, firstRowRect.left));
+    const vOverlapFirst = Math.max(0, Math.min(btnRect.bottom, firstRowRect.bottom) - Math.max(btnRect.top, firstRowRect.top));
+    const firstRowIntersectionArea = hOverlapFirst * vOverlapFirst;
+
+    const select = cardEl.querySelector<HTMLSelectElement>('select[aria-label="Meal type"]');
+    const selectRect = select ? select.getBoundingClientRect() : null;
+
+    // Check intersection with meal type select above
+    let selectIntersectionArea = 0;
+    if (selectRect) {
+      const hOverlapSelect = Math.max(0, Math.min(btnRect.right, selectRect.right) - Math.max(btnRect.left, selectRect.left));
+      const vOverlapSelect = Math.max(0, Math.min(btnRect.bottom, selectRect.bottom) - Math.max(btnRect.top, selectRect.top));
+      selectIntersectionArea = hOverlapSelect * vOverlapSelect;
+    }
+
+    // Hit-testing at key points of the button to verify no occlusion or tap-stealing
+    const pts = {
+      top: { x: btnRect.left + btnRect.width / 2, y: btnRect.top },
+      center: { x: btnRect.left + btnRect.width / 2, y: btnRect.top + btnRect.height / 2 },
+      bottom: { x: btnRect.left + btnRect.width / 2, y: btnRect.bottom - 1 },
+      topLeft: { x: btnRect.left + 2, y: btnRect.top + 2 },
+      topRight: { x: btnRect.right - 2, y: btnRect.top + 2 },
+      bottomLeft: { x: btnRect.left + 2, y: btnRect.bottom - 2 },
+    };
+    const hitResults: Record<string, { tag: string; isBtnOrDescendant: boolean }> = {};
+    for (const [k, pt] of Object.entries(pts)) {
+      const el = document.elementFromPoint(pt.x, pt.y);
+      hitResults[k] = {
+        tag: el?.tagName || '',
+        isBtnOrDescendant: el === addItemBtn || (addItemBtn.contains(el)),
+      };
+    }
+
+    // Hit-testing at center of select to verify button does not occlude select
+    let selectCenterHit: { tag: string; isAddBtn: boolean } | null = null;
+    if (selectRect) {
+      const cx = selectRect.left + selectRect.width / 2;
+      const cy = selectRect.top + selectRect.height / 2;
+      const el = document.elementFromPoint(cx, cy);
+      selectCenterHit = {
+        tag: el?.tagName || '',
+        isAddBtn: el === addItemBtn || (addItemBtn.contains(el)),
+      };
+    }
+
+    // Button text vertical center vs header label vertical center alignment
+    let btnTextRect: DOMRect | null = null;
+    const walker = document.createTreeWalker(addItemBtn, NodeFilter.SHOW_TEXT);
+    const textNode = walker.nextNode();
+    if (textNode) {
+      const range = document.createRange();
+      range.selectNodeContents(textNode);
+      btnTextRect = range.getBoundingClientRect();
+    }
+    const labelCenterY = labelRect ? labelRect.top + labelRect.height / 2 : null;
+    const btnTextCenterY = btnTextRect ? btnTextRect.top + btnTextRect.height / 2 : null;
+    const textLabelDeltaY = (btnTextCenterY != null && labelCenterY != null)
+      ? Math.round((btnTextCenterY - labelCenterY) * 10) / 10
+      : null;
+
+    return {
+      headerRowHeight: Math.round(headerRowRect.height * 10) / 10,
+      buttonWidth: Math.round(btnRect.width * 10) / 10,
+      buttonHeight: Math.round(btnRect.height * 10) / 10,
+      labelIntersectionArea: Math.round(labelIntersectionArea * 10) / 10,
+      firstRowIntersectionArea: Math.round(firstRowIntersectionArea * 10) / 10,
+      selectIntersectionArea: Math.round(selectIntersectionArea * 10) / 10,
+      hitResults,
+      selectCenterHit,
+      textLabelDeltaY,
+      btnBox: { x: btnRect.x, y: btnRect.y, width: btnRect.width, height: btnRect.height },
+      labelBox: labelRect ? { x: labelRect.x, y: labelRect.y, width: labelRect.width, height: labelRect.height } : null,
+      firstRowBox: { x: firstRowRect.x, y: firstRowRect.y, width: firstRowRect.width, height: firstRowRect.height },
+    };
+  });
+}
+
 // Check 1 helper: Font sizes
 async function checkFontSizes(surface: Locator) {
   const result = await surface.evaluate((root) => {
@@ -601,7 +706,7 @@ test.describe('Surface A: Staged card with 4 items', () => {
     await page.close();
   });
 
-  test('A: card height <= 500px', async () => {
+  test('A: card height <= 480px', async () => {
     await waitForScrollSettled(page);
     const { cardBox, firstRowBox, actionRowBox } = await cardLocator.evaluate((card) => {
       const cardRect = card.getBoundingClientRect();
@@ -620,7 +725,7 @@ test.describe('Surface A: Staged card with 4 items', () => {
     });
 
     const measurements = {
-      test: 'A: card height <= 500px',
+      test: 'A: card height <= 480px',
       surface: 'A',
       cardSelector: '[data-testid="staged-meal-card"]',
       card: {
@@ -636,7 +741,7 @@ test.describe('Surface A: Staged card with 4 items', () => {
       },
       cardContainsFirstRowTop: cardBox.y <= firstRowBox.y + 0.5,
       cardContainsActionRowBottom: cardBox.y + cardBox.height >= actionRowBox.y + actionRowBox.height - 0.5,
-      heightPass: cardBox.height <= 500,
+      heightPass: cardBox.height <= 480,
     };
     console.log(JSON.stringify(measurements));
 
@@ -644,8 +749,8 @@ test.describe('Surface A: Staged card with 4 items', () => {
     expect(cardBox.y).toBeLessThanOrEqual(firstRowBox.y + 0.5);
     expect(cardBox.y + cardBox.height).toBeGreaterThanOrEqual(actionRowBox.y + actionRowBox.height - 0.5);
 
-    // Height cap assert: <= 500px
-    expect(cardBox.height).toBeLessThanOrEqual(500);
+    // Height cap assert: <= 480px (tightened from 500px per D28)
+    expect(cardBox.height).toBeLessThanOrEqual(480);
   });
 
   test('A: font >= 12px', async () => {
@@ -829,6 +934,44 @@ test.describe('Surface A: Staged card with 4 items', () => {
       await page.setViewportSize({ width: 390, height: 844 });
       await waitForScrollSettled(page);
     }
+  });
+
+  test('A: breakdown header row height <= 16px, Add item tap >= 40px, no overlap with label or first row at 390px', async () => {
+    expect(page.viewportSize()?.width).toBe(390);
+    await waitForScrollSettled(page);
+
+    const result = await checkBreakdownHeaderGeometry(cardLocator);
+    console.log(JSON.stringify({ test: 'A: breakdown header geometry at 390px', surface: 'A', ...result }));
+
+    // Header row height <= pre-D22 value (16px) with +0.5px tolerance max
+    expect(result.headerRowHeight, `Header row height (${result.headerRowHeight}px) exceeds pre-D22 value 16px (+0.5px tolerance)`).toBeLessThanOrEqual(16.5);
+
+    // Add item tap box >= 40 tall and >= 40 wide
+    expect(result.buttonHeight, `Add item tap height (${result.buttonHeight}px) < 40px`).toBeGreaterThanOrEqual(40);
+    expect(result.buttonWidth, `Add item tap width (${result.buttonWidth}px) < 40px`).toBeGreaterThanOrEqual(40);
+
+    // Add item box does not overlap the header label (rect intersection = 0)
+    expect(result.labelIntersectionArea, `Add item button intersects header label with area ${result.labelIntersectionArea}px²`).toBe(0);
+
+    // Add item box does not overlap the first item row (rect intersection = 0)
+    expect(result.firstRowIntersectionArea, `Add item button intersects first item row with area ${result.firstRowIntersectionArea}px²`).toBe(0);
+
+    // Add item box does not overlap the meal-type select above (rect intersection = 0)
+    expect(result.selectIntersectionArea, `Add item button intersects meal type select with area ${result.selectIntersectionArea}px²`).toBe(0);
+
+    // Hit-testing points on button hit the button (no tap stealing by adjacent elements)
+    expect(result.hitResults.top.isBtnOrDescendant, 'Top edge of Add item button must hit button').toBe(true);
+    expect(result.hitResults.center.isBtnOrDescendant, 'Center of Add item button must hit button').toBe(true);
+    expect(result.hitResults.bottom.isBtnOrDescendant, 'Bottom edge of Add item button must hit button').toBe(true);
+
+    // Select center must hit select, not add-item button
+    if (result.selectCenterHit) {
+      expect(result.selectCenterHit.isAddBtn, 'Center of meal type select must not be occluded by Add item button').toBe(false);
+    }
+
+    // Button text vertical center aligns with header label vertical center (within +-1px)
+    expect(result.textLabelDeltaY).not.toBeNull();
+    expect(Math.abs(result.textLabelDeltaY!), `Add item text center-Y deviates from label center-Y by ${result.textLabelDeltaY}px`).toBeLessThanOrEqual(1.0);
   });
 });
 
@@ -1595,6 +1738,44 @@ test.describe('Surface E: Staged card at 320px width (D24)', () => {
     expect(result320.isClipped, 'Select label must not be clipped at 320px').toBe(false);
     expect(result320.paddingLeft + result320.maxTextWidth, `No overlap between longest label (${result320.longestOption}) and chevron at 320px`).toBeLessThanOrEqual(result320.chevronOffsetLeft - 2);
   });
+
+  test('E: breakdown header row height <= 16px, Add item tap >= 40px, no overlap with label or first row at 320px', async () => {
+    expect(page.viewportSize()?.width).toBe(320);
+    await waitForScrollSettled(page);
+
+    const result = await checkBreakdownHeaderGeometry(cardLocator);
+    console.log(JSON.stringify({ test: 'E: breakdown header geometry at 320px', surface: 'E', ...result }));
+
+    // Header row height <= pre-D22 value (16px) with +0.5px tolerance max
+    expect(result.headerRowHeight, `Header row height (${result.headerRowHeight}px) exceeds pre-D22 value 16px (+0.5px tolerance)`).toBeLessThanOrEqual(16.5);
+
+    // Add item tap box >= 40 tall and >= 40 wide
+    expect(result.buttonHeight, `Add item tap height (${result.buttonHeight}px) < 40px`).toBeGreaterThanOrEqual(40);
+    expect(result.buttonWidth, `Add item tap width (${result.buttonWidth}px) < 40px`).toBeGreaterThanOrEqual(40);
+
+    // Add item box does not overlap the header label (rect intersection = 0)
+    expect(result.labelIntersectionArea, `Add item button intersects header label with area ${result.labelIntersectionArea}px²`).toBe(0);
+
+    // Add item box does not overlap the first item row (rect intersection = 0)
+    expect(result.firstRowIntersectionArea, `Add item button intersects first item row with area ${result.firstRowIntersectionArea}px²`).toBe(0);
+
+    // Add item box does not overlap the meal-type select above (rect intersection = 0)
+    expect(result.selectIntersectionArea, `Add item button intersects meal type select with area ${result.selectIntersectionArea}px²`).toBe(0);
+
+    // Hit-testing points on button hit the button (no tap stealing by adjacent elements)
+    expect(result.hitResults.top.isBtnOrDescendant, 'Top edge of Add item button must hit button').toBe(true);
+    expect(result.hitResults.center.isBtnOrDescendant, 'Center of Add item button must hit button').toBe(true);
+    expect(result.hitResults.bottom.isBtnOrDescendant, 'Bottom edge of Add item button must hit button').toBe(true);
+
+    // Select center must hit select, not add-item button
+    if (result.selectCenterHit) {
+      expect(result.selectCenterHit.isAddBtn, 'Center of meal type select must not be occluded by Add item button').toBe(false);
+    }
+
+    // Button text vertical center aligns with header label vertical center (within +-1px)
+    expect(result.textLabelDeltaY).not.toBeNull();
+    expect(Math.abs(result.textLabelDeltaY!), `Add item text center-Y deviates from label center-Y by ${result.textLabelDeltaY}px`).toBeLessThanOrEqual(1.0);
+  });
 });
 
 
@@ -1755,7 +1936,7 @@ test.describe('Surface F: Manual-staged card and Add-item at 390×844', () => {
     expect(inputsUnder16, `Found inputs with font-size < 16px in AddItemForm: ${JSON.stringify(inputsUnder16)}`).toEqual([]);
   });
 
-  test('F: 4 items after Add item (height <= 500px)', async () => {
+  test('F: 4 items after Add item (height <= 480px)', async () => {
     const addItemForm = cardLocator.locator('[data-testid="add-item-form"]');
     await expect(addItemForm).toBeVisible();
 
@@ -1807,11 +1988,11 @@ test.describe('Surface F: Manual-staged card and Add-item at 390×844', () => {
     await waitForScrollSettled(page);
     const cardBox = (await cardLocator.boundingBox())!;
     console.log(JSON.stringify({
-      test: 'F: 4 items after Add item (height <= 500px)',
+      test: 'F: 4 items after Add item (height <= 480px)',
       surface: 'F',
       cardHeight: Math.round(cardBox.height * 10) / 10,
     }));
-    expect(cardBox.height).toBeLessThanOrEqual(500);
+    expect(cardBox.height).toBeLessThanOrEqual(480);
   });
 });
 

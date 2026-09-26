@@ -110,10 +110,10 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
     <div
       ref={cardRef}
       data-testid="staged-meal-card"
-      className="bg-zinc-900/90 border border-cyan-500/50 rounded-2xl sm:rounded-3xl px-3 pt-2 pb-0 sm:pt-4 sm:px-4 sm:pb-0 shadow-[0_0_30px_rgba(6,182,212,0.15)] space-y-1.5 sm:space-y-2 animate-in fade-in motion-reduce:animate-none scroll-mt-16 sm:scroll-mt-20"
+      className="bg-zinc-900/90 border border-cyan-500/50 rounded-2xl sm:rounded-3xl px-3 pt-0.5 pb-0 sm:pt-4 sm:px-4 sm:pb-0 shadow-[0_0_30px_rgba(6,182,212,0.15)] space-y-1.5 sm:space-y-2 animate-in fade-in motion-reduce:animate-none scroll-mt-16 sm:scroll-mt-20"
     >
       {/* Header row: Dish Name & Meal Type (1 row on mobile & desktop) */}
-      <div className="flex items-center gap-2 border-b border-zinc-800 pb-1.5">
+      <div className="flex items-center gap-2 border-b border-zinc-800 pb-1">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {stagedMeal.photoUrl ? (
             <div className="w-8 h-8 rounded-lg overflow-hidden border border-cyan-500/40 shrink-0 bg-zinc-950 shadow-md">
@@ -162,7 +162,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
       </div>
 
       {/* Itemized Ingredient Breakdown */}
-      <div className="space-y-0.5">
+      <div className="space-y-0.5 pt-0.5">
         <div className="flex items-center justify-between text-xs font-bold uppercase text-zinc-400 tracking-wider">
           {isMultiItem ? (
             <span>Itemized Breakdown ({stagedMeal.items.length})</span>
@@ -175,14 +175,14 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
               type="button"
               data-testid="add-item-button"
               onClick={() => setIsAddingItem(true)}
-              className="text-cyan-400 hover:text-cyan-300 font-bold text-xs uppercase tracking-wider min-h-[40px] px-2.5 py-1 flex items-center justify-center -my-1 rounded-lg transition motion-reduce:transition-none touch-manipulation"
+              className="ml-auto text-cyan-400 hover:text-cyan-300 font-bold text-xs uppercase tracking-wider min-h-[40px] h-10 px-2.5 flex items-center justify-center -my-3 rounded-lg transition motion-reduce:transition-none touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
             >
               + Add item
             </button>
           )}
         </div>
 
-        <div className="divide-y divide-zinc-800/80">
+        <div className="divide-y divide-zinc-800/80 pt-2.5">
           {stagedMeal.items.map((item) => (
             <div key={item.id} data-item-id={item.id}>
               <ComponentRow
@@ -232,13 +232,13 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
         {isMultiItem && (
           <div
             data-testid="staged-meal-totals"
-            className="pt-1.5 border-t border-zinc-700/80 text-xs tabular-nums leading-tight"
+            className="pt-1 border-t border-zinc-700/80 text-xs tabular-nums leading-tight"
             aria-label="Totals are the sum of items"
             title="Totals are the sum of items · edit an item via ⋯"
           >
             <div
               data-testid="this-meal-label"
-              className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-0.5 leading-none"
+              className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-0 leading-none"
             >
               This meal
             </div>
