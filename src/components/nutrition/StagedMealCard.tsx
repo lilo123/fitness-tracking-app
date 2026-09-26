@@ -367,6 +367,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
         {isComposerOpen && (
           <AddItemsComposer
             customDishes={customDishes}
+            scrollMarginBottom={effectiveNavHeight + 70}
             onParsed={handleAddParsed}
             onEnterManually={() => {
               setIsComposerOpen(false);

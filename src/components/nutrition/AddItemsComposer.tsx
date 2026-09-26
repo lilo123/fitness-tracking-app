@@ -10,12 +10,13 @@ import { CameraSource } from '@capacitor/camera';
 import type { CustomDish } from '../../types/database';
 import { formatFileSize } from '../../utils/imageCompression';
 import { StatusBanner } from '../common/StatusBanner';
-import type { StagedItem } from './nutritionEngineHelpers';
+import { getScrollBehavior, type StagedItem } from './nutritionEngineHelpers';
 import { parseNutrition } from './parseNutrition';
 import { useNutritionPhotoPicker } from './useNutritionPhotoPicker';
 
 export interface AddItemsComposerProps {
   customDishes?: CustomDish[];
+  scrollMarginBottom?: number;
   onParsed: (items: StagedItem[]) => void;
   onEnterManually: () => void;
   onCancel: () => void;
@@ -23,6 +24,7 @@ export interface AddItemsComposerProps {
 
 export const AddItemsComposer: React.FC<AddItemsComposerProps> = memo(({
   customDishes = [],
+  scrollMarginBottom,
   onParsed,
   onEnterManually,
   onCancel,
@@ -31,7 +33,9 @@ export const AddItemsComposer: React.FC<AddItemsComposerProps> = memo(({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
   const isCancelledRef = useRef(false);
+  const isAnalyzingRef = useRef(false);
 
   const {
     selectedPhoto,
@@ -49,7 +53,14 @@ export const AddItemsComposer: React.FC<AddItemsComposerProps> = memo(({
   });
 
   useEffect(() => {
-    textareaRef.current?.focus();
+    const behavior = getScrollBehavior();
+    const frameId = requestAnimationFrame(() => {
+      if (typeof composerRef.current?.scrollIntoView === 'function') {
+        composerRef.current.scrollIntoView({ block: 'nearest', behavior });
+      }
+    });
+    textareaRef.current?.focus({ preventScroll: true });
+    return () => cancelAnimationFrame(frameId);
   }, []);
 
   const handleCancel = useCallback(() => {
@@ -58,7 +69,8 @@ export const AddItemsComposer: React.FC<AddItemsComposerProps> = memo(({
   }, [onCancel]);
 
   const handleAnalyze = async () => {
-    if (!text.trim() && !selectedPhoto) return;
+    if (isAnalyzingRef.current || isAnalyzing || (!text.trim() && !selectedPhoto)) return;
+    isAnalyzingRef.current = true;
     isCancelledRef.current = false;
     setIsAnalyzing(true);
     setError(null);
@@ -88,6 +100,7 @@ export const AddItemsComposer: React.FC<AddItemsComposerProps> = memo(({
         );
       }
     } finally {
+      isAnalyzingRef.current = false;
       if (!isCancelledRef.current) {
         setIsAnalyzing(false);
       }
@@ -96,7 +109,9 @@ export const AddItemsComposer: React.FC<AddItemsComposerProps> = memo(({
 
   return (
     <div
+      ref={composerRef}
       data-testid="add-items-composer"
+      style={{ scrollMarginBottom: `${scrollMarginBottom ?? 64}px` }}
       className="bg-zinc-950 border border-border-interactive rounded-2xl p-3 focus-within:border-cyan-500 focus-within:ring-2 focus-within:ring-cyan-500/50 transition space-y-2.5 my-2"
     >
       {selectedPhoto && (
@@ -146,6 +161,7 @@ export const AddItemsComposer: React.FC<AddItemsComposerProps> = memo(({
       <textarea
         ref={textareaRef}
         data-testid="composer-textarea"
+        aria-label="Add items"
         value={text}
         onChange={(e) => {
           setText(e.target.value);
@@ -240,15 +256,13 @@ export const AddItemsComposer: React.FC<AddItemsComposerProps> = memo(({
         </div>
       )}
 
-      {error && (
-        <StatusBanner
-          message={error}
-          tone="error"
-          testId="composer-error"
-          className="text-xs"
-          icon={<AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />}
-        />
-      )}
+      <StatusBanner
+        message={error}
+        tone="error"
+        testId="composer-error"
+        className="text-xs"
+        icon={<AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />}
+      />
     </div>
   );
 });

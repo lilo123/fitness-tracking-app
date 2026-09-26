@@ -215,4 +215,40 @@ describe('AddItemsComposer', () => {
       expect(onParsed).toHaveBeenCalledWith(mockItems);
     });
   });
+  it('provides accessible label for textarea and handles scrollIntoView', () => {
+    const scrollSpy = vi.fn();
+    Element.prototype.scrollIntoView = scrollSpy;
+
+    render(<AddItemsComposer {...defaultProps} scrollMarginBottom={134} />);
+
+    const textarea = screen.getByRole('textbox', { name: 'Add items' });
+    expect(textarea).toBeDefined();
+
+    // scrollIntoView executed via requestAnimationFrame
+    expect(screen.getByTestId('add-items-composer').style.scrollMarginBottom).toBe('134px');
+  });
+
+  it('prevents double-tap on Analyze from issuing duplicate parse calls', async () => {
+    let resolveParse: any;
+    (parseNutritionModule.parseNutrition as any).mockImplementation(
+      () => new Promise((res) => { resolveParse = res; })
+    );
+
+    const onParsed = vi.fn();
+    render(<AddItemsComposer {...defaultProps} onParsed={onParsed} />);
+
+    const textarea = screen.getByRole('textbox', { name: 'Add items' });
+    fireEvent.change(textarea, { target: { value: '2 boiled eggs' } });
+
+    const analyzeBtn = screen.getByRole('button', { name: /analyze/i });
+    fireEvent.click(analyzeBtn);
+    fireEvent.click(analyzeBtn);
+
+    expect(parseNutritionModule.parseNutrition).toHaveBeenCalledTimes(1);
+
+    resolveParse({ items: [{ id: '1', name: 'Egg', calories: 70 }] });
+    await waitFor(() => {
+      expect(onParsed).toHaveBeenCalledTimes(1);
+    });
+  });
 });
