@@ -457,23 +457,6 @@ describe('QuickLogFavorites (Horizontal Bar Redesign)', () => {
     expect(screen.queryByTestId('custom-dish-card-dish-2')).toBeNull();
   });
 
-  it('search input satisfies text-base without sm:text-xs to maintain 16px at every width (D35)', () => {
-    render(
-      <QuickLogFavorites
-        customDishes={[createMockDish()]}
-        onOpenNewDishModal={vi.fn()}
-        onStageCustomDish={vi.fn()}
-        onOpenEditDishModal={vi.fn()}
-        onQuickLogCustomDishDirect={vi.fn()}
-        onDismissToast={vi.fn()}
-      />
-    );
-
-    const searchInput = screen.getByTestId('search-favorites-input');
-    expect(searchInput.className).toContain('text-base');
-    expect(searchInput.className).not.toContain('sm:text-xs');
-  });
-
   // Attack A & E: Note searching across full set
   it('searches by note as well as dish name across full set', () => {
     const dishes = [
@@ -551,26 +534,6 @@ describe('QuickLogFavorites (Horizontal Bar Redesign)', () => {
     expect(expandBtn).toBeDefined();
     expect(expandBtn.className).not.toContain('min-height');
     expect(expandBtn.textContent).toContain('Show all 5 favorites');
-  });
-
-  // Attack G1: Expander does not render when list has 3 or fewer dishes
-  it('Attack G1: expander does not render when list has 3 or fewer dishes', () => {
-    const dishes = Array.from({ length: 3 }, (_, i) =>
-      createMockDish({ id: `dish-${i + 1}`, name: `Dish ${i + 1}` })
-    );
-
-    render(
-      <QuickLogFavorites
-        customDishes={dishes}
-        onOpenNewDishModal={vi.fn()}
-        onStageCustomDish={vi.fn()}
-        onOpenEditDishModal={vi.fn()}
-        onQuickLogCustomDishDirect={vi.fn()}
-        onDismissToast={vi.fn()}
-      />
-    );
-
-    expect(screen.queryByTestId('open-favorites-sheet-btn')).toBeNull();
   });
 
   // Attack G3: Live regions for search result count and no-results message

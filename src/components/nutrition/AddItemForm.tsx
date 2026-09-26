@@ -1,6 +1,7 @@
 import React, { memo, useEffect, useId, useState } from 'react';
 import type { CanonicalUnit } from '../../utils/unitConverter';
 import { roundTo1Decimal } from '../../utils/nutrition';
+import { MacroInputsGrid } from './MacroInputsGrid';
 
 export interface AddItemFormData {
   name: string;
@@ -245,194 +246,27 @@ export const AddItemForm: React.FC<AddItemFormProps> = memo(({
         </div>
       </div>
 
-      <div className="grid grid-cols-6 sm:grid-cols-5 gap-2">
-        <div className="col-span-2 sm:col-span-1">
-          <label
-            htmlFor={caloriesId}
-            className="block text-xs font-bold text-amber-400 uppercase tracking-wider mb-1"
-          >
-            Calories <span className="text-amber-400 font-bold">*</span>
-          </label>
-          <input
-            id={caloriesId}
-            type="number"
-            step="any"
-            min="0"
-            inputMode="decimal"
-            enterKeyHint="next"
-            data-testid="add-item-calories-input"
-            value={calories}
-            onChange={(e) => setCalories(e.target.value === '' ? '' : Number(e.target.value))}
-            placeholder="0"
-            aria-invalid={Boolean(errors.calories)}
-            aria-errormessage={errors.calories ? `${caloriesId}-error` : undefined}
-            className={`w-full bg-zinc-900 border text-white rounded-xl p-2 text-base tabular-nums font-bold outline-none text-center transition min-h-[40px] ${
-              errors.calories
-                ? 'border-rose-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/50'
-                : 'border-border-interactive focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50'
-            }`}
-            required
-          />
-          {errors.calories && (
-            <p
-              id={`${caloriesId}-error`}
-              role="alert"
-              data-testid="add-item-calories-error"
-              className="text-xs text-rose-400 mt-1"
-            >
-              {errors.calories}
-            </p>
-          )}
-        </div>
-        <div className="col-span-2 sm:col-span-1">
-          <label
-            htmlFor={proteinId}
-            className="block text-xs font-bold text-cyan-400 uppercase tracking-wider mb-1"
-          >
-            Protein (g)
-          </label>
-          <input
-            id={proteinId}
-            type="number"
-            step="any"
-            min="0"
-            inputMode="decimal"
-            enterKeyHint="next"
-            data-testid="add-item-protein-input"
-            value={protein}
-            onChange={(e) => setProtein(e.target.value === '' ? '' : Number(e.target.value))}
-            placeholder="0"
-            aria-invalid={Boolean(errors.protein)}
-            aria-errormessage={errors.protein ? `${proteinId}-error` : undefined}
-            className={`w-full bg-zinc-900 border text-white rounded-xl p-2 text-base tabular-nums font-bold outline-none text-center transition min-h-[40px] ${
-              errors.protein
-                ? 'border-rose-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/50'
-                : 'border-border-interactive focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50'
-            }`}
-          />
-          {errors.protein && (
-            <p
-              id={`${proteinId}-error`}
-              role="alert"
-              data-testid="add-item-protein-error"
-              className="text-xs text-rose-400 mt-1"
-            >
-              {errors.protein}
-            </p>
-          )}
-        </div>
-        <div className="col-span-2 sm:col-span-1">
-          <label
-            htmlFor={carbsId}
-            className="block text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1"
-          >
-            Carbs (g)
-          </label>
-          <input
-            id={carbsId}
-            type="number"
-            step="any"
-            min="0"
-            inputMode="decimal"
-            enterKeyHint="next"
-            data-testid="add-item-carbs-input"
-            value={carbs}
-            onChange={(e) => setCarbs(e.target.value === '' ? '' : Number(e.target.value))}
-            placeholder="0"
-            aria-invalid={Boolean(errors.carbs)}
-            aria-errormessage={errors.carbs ? `${carbsId}-error` : undefined}
-            className={`w-full bg-zinc-900 border text-white rounded-xl p-2 text-base tabular-nums font-bold outline-none text-center transition min-h-[40px] ${
-              errors.carbs
-                ? 'border-rose-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/50'
-                : 'border-border-interactive focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50'
-            }`}
-          />
-          {errors.carbs && (
-            <p
-              id={`${carbsId}-error`}
-              role="alert"
-              data-testid="add-item-carbs-error"
-              className="text-xs text-rose-400 mt-1"
-            >
-              {errors.carbs}
-            </p>
-          )}
-        </div>
-        <div className="col-span-3 sm:col-span-1">
-          <label
-            htmlFor={fatId}
-            className="block text-xs font-bold text-violet-400 uppercase tracking-wider mb-1"
-          >
-            Fat (g)
-          </label>
-          <input
-            id={fatId}
-            type="number"
-            step="any"
-            min="0"
-            inputMode="decimal"
-            enterKeyHint="next"
-            data-testid="add-item-fat-input"
-            value={fat}
-            onChange={(e) => setFat(e.target.value === '' ? '' : Number(e.target.value))}
-            placeholder="0"
-            aria-invalid={Boolean(errors.fat)}
-            aria-errormessage={errors.fat ? `${fatId}-error` : undefined}
-            className={`w-full bg-zinc-900 border text-white rounded-xl p-2 text-base tabular-nums font-bold outline-none text-center transition min-h-[40px] ${
-              errors.fat
-                ? 'border-rose-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/50'
-                : 'border-border-interactive focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50'
-            }`}
-          />
-          {errors.fat && (
-            <p
-              id={`${fatId}-error`}
-              role="alert"
-              data-testid="add-item-fat-error"
-              className="text-xs text-rose-400 mt-1"
-            >
-              {errors.fat}
-            </p>
-          )}
-        </div>
-        <div className="col-span-3 sm:col-span-1">
-          <label
-            htmlFor={fiberId}
-            className="block text-xs font-bold text-teal-400 uppercase tracking-wider mb-1"
-          >
-            Fiber (g)
-          </label>
-          <input
-            id={fiberId}
-            type="number"
-            step="any"
-            min="0"
-            inputMode="decimal"
-            enterKeyHint="done"
-            data-testid="add-item-fiber-input"
-            value={fiber}
-            onChange={(e) => setFiber(e.target.value === '' ? '' : Number(e.target.value))}
-            placeholder="0"
-            aria-invalid={Boolean(errors.fiber)}
-            aria-errormessage={errors.fiber ? `${fiberId}-error` : undefined}
-            className={`w-full bg-zinc-900 border text-white rounded-xl p-2 text-base tabular-nums font-bold outline-none text-center transition min-h-[40px] ${
-              errors.fiber
-                ? 'border-rose-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/50'
-                : 'border-border-interactive focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50'
-            }`}
-          />
-          {errors.fiber && (
-            <p
-              id={`${fiberId}-error`}
-              role="alert"
-              data-testid="add-item-fiber-error"
-              className="text-xs text-rose-400 mt-1"
-            >
-              {errors.fiber}
-            </p>
-          )}
-        </div>
-      </div>
+      <MacroInputsGrid
+        values={{ calories, protein, carbs, fat, fiber }}
+        onChange={{
+          onCaloriesChange: setCalories,
+          onProteinChange: setProtein,
+          onCarbsChange: setCarbs,
+          onFatChange: setFat,
+          onFiberChange: setFiber,
+        }}
+        errors={errors}
+        ids={{
+          caloriesId,
+          proteinId,
+          carbsId,
+          fatId,
+          fiberId,
+        }}
+        testIdPrefix="add-item-"
+        inputClassName="w-full bg-zinc-900 border text-white rounded-xl p-2 text-base tabular-nums font-bold outline-none text-center transition min-h-[40px]"
+        fiberEnterKeyHint="done"
+      />
 
       <div className="flex items-center justify-end gap-2 pt-1 border-t border-zinc-850">
         <button

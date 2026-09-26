@@ -1,6 +1,6 @@
 import React, { memo, useRef, useEffect, useState } from 'react';
 import { Utensils, Check, Star, X, ChevronDown } from 'lucide-react';
-import { roundTo1Decimal, formatCalories, formatMacro } from '../../utils/nutrition';
+import { formatCalories } from '../../utils/nutrition';
 import type { NutritionItem } from '../../utils/itemModel';
 import { ComponentRow } from './ComponentRow';
 import {
@@ -16,7 +16,8 @@ import {
   type StagedMeal,
 } from './nutritionEngineHelpers';
 import { AddItemForm, type AddItemFormData } from './AddItemForm';
-import { computeVisibleMacroColumns, MACRO_COLUMNS_CONFIG, getMacroGridTemplateColumns } from './macroColumns';
+import { computeVisibleMacroColumns, getMacroGridTemplateColumns } from './macroColumns';
+import { MacroCell } from './MacroCell';
 import { DayTotalRow, type MacroTotalsShape } from './TodayAfterRow';
 
 export interface StagedMealCardProps {
@@ -277,28 +278,14 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
               style={{ gridTemplateColumns: getMacroGridTemplateColumns(macroColumns) }}
             >
               <span className="sr-only">Totals are the sum of items</span>
-              {macroColumns.map((colKey) => {
-                const config = MACRO_COLUMNS_CONFIG[colKey];
-                const rawVal = stagedMeal[colKey];
-                const num = roundTo1Decimal(rawVal);
-                const isZero = colKey === 'calories' ? Math.abs(num) < 0.5 : Math.abs(num) < 0.05;
-                const formatted = isZero ? '0' : (colKey === 'calories' ? formatCalories(rawVal) : formatMacro(rawVal));
-
-                return (
-                  <div
-                    key={colKey}
-                    data-testid={`staged-total-${colKey}`}
-                    className={`text-right text-xs tabular-nums whitespace-nowrap ${isZero ? 'text-zinc-600 font-normal' : config.colorClass}`}
-                  >
-                    <span data-testid={`macro-val-${colKey}`} className={`text-sm tabular-nums ${isZero ? 'font-normal' : 'font-semibold'}`}>
-                      {formatted}
-                    </span>{' '}
-                    <span className="text-xs opacity-70 font-normal">
-                      {config.label}
-                    </span>
-                  </div>
-                );
-              })}
+              {macroColumns.map((colKey) => (
+                <MacroCell
+                  key={colKey}
+                  colKey={colKey}
+                  value={stagedMeal[colKey]}
+                  variant="staged-total"
+                />
+              ))}
             </div>
           </div>
         )}

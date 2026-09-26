@@ -1,8 +1,8 @@
 import React from 'react';
-import { roundTo1Decimal, formatCalories, formatMacro } from '../../utils/nutrition';
+import { roundTo1Decimal } from '../../utils/nutrition';
+import { MacroCell } from './MacroCell';
 import {
   type MacroColumnKey,
-  MACRO_COLUMNS_CONFIG,
   getMacroGridTemplateColumns,
 } from './macroColumns';
 
@@ -44,47 +44,19 @@ export const DayTotalRow: React.FC<DayTotalRowProps> = ({
         style={{ gridTemplateColumns: getMacroGridTemplateColumns(macroColumns) }}
       >
         {macroColumns.map((colKey) => {
-          const config = MACRO_COLUMNS_CONFIG[colKey];
           const consumed = Number(dailyTotals?.[colKey]) || 0;
           const meal = Number(mealTotals[colKey]) || 0;
           const newVal = roundTo1Decimal(consumed + meal);
           const target = Number(targets?.[colKey]) || 0;
-          const isOver = target > 0 && newVal > target;
-
-          const isZero = colKey === 'calories' ? Math.abs(newVal) < 0.5 : Math.abs(newVal) < 0.05;
-          const formatted = isZero ? '0' : (colKey === 'calories' ? formatCalories(newVal) : formatMacro(newVal));
-
-          const colorClass = isOver
-            ? 'text-rose-400'
-            : isZero
-            ? 'text-zinc-600 font-normal'
-            : config.colorClass;
-
-          const overAmount = isOver ? roundTo1Decimal(newVal - target) : 0;
-          const formattedOver = colKey === 'calories' ? formatCalories(overAmount) : formatMacro(overAmount);
-          const overDescription = isOver ? `over target by ${formattedOver} ${config.label}` : undefined;
 
           return (
-            <div
+            <MacroCell
               key={colKey}
-              data-testid={`day-total-${colKey}`}
-              className={`text-right text-xs tabular-nums whitespace-nowrap ${colorClass}`}
-            >
-              <span
-                data-testid={`day-total-val-${colKey}`}
-                className={`tabular-nums ${isZero && !isOver ? 'font-normal' : 'font-semibold'}`}
-              >
-                {formatted}
-              </span>{' '}
-              <span className="opacity-70 font-normal">
-                {config.label}
-              </span>
-              {isOver && (
-                <span data-testid={`day-total-over-${colKey}`} className="sr-only">
-                  {overDescription}
-                </span>
-              )}
-            </div>
+              colKey={colKey}
+              value={newVal}
+              target={target}
+              variant="day-total"
+            />
           );
         })}
       </div>
