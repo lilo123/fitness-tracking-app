@@ -8,13 +8,13 @@
 > - `HISTORY_AUDIT_REPORT.md` (conv `c66e93e7`; H1–H53)
 > - Nutrition decisions D1–D45 (conv `27f07f48`)
 >
-> **Baseline:** `origin/v2-rewrite` = `da67a71` (2026-09-26): vitest 90 files / 1259, density 65, E2E trio 36/0/6, oxlint 0e/33w.
+> **Baseline:** after P0 (2026-09-26, on top of `d2ddeb7`): vitest 98 files / 1349, `test:tz` 141 + 141, density 67, E2E trio 36/0/6, oxlint 0e/33w.
 > **Owner of this file:** whoever runs the current phase. Update the phase table, the item table and the decision log in the same commit as the work.
 
 ## 1. Status summary
 | Phase | Title | Status | Progress notes |
 |---|---|---|---|
-| P0 | Foundations and test guardrails | not started | |
+| P0 | Foundations and test guardrails | **done** 2026-09-26 | `6bc91c7` (+ `7e7b05b` E2E label fix for D46). Gates: tsc 0, oxlint 0e/33w, vitest 98/1349, test:tz LA 141 + Tokyo 141, check:mocks/payload, build, perf, density 67/67 ×2, E2E trio 36/0/6. No DOM change. |
 | P1 | Safety hotfixes + exercises RLS v2 | not started | |
 | P2 | Workout data layer and cross-tab data contracts | not started | |
 | P3a | Shared primitives, exercise card, set rows, EditSetSheet | not started | |
@@ -495,6 +495,8 @@ None open. All six were answered on 2026-09-26 19:59Z and are recorded in §2.0:
 
 Add new questions here as phases surface them (e.g. the P8 Coach/Settings audit, the RD-15/RD-16 counts).
 
+**Pre-P1 data audit (production, read-only, run by the user in the Supabase SQL editor, 2026-09-26):** blank/whitespace exercise names = **0**. The remaining counts (RD-15 duplicate days, RD-16 warm-up/drop sets, W50a/b) are pending: one-result query in the planning conversation `scratch/p0_counts_one.sql`. The agent has no production DB credentials (anon key only).
+
 ---
 
 ## 8. Risks
@@ -509,6 +511,8 @@ Add new questions here as phases surface them (e.g. the P8 Coach/Settings audit,
 | Catalog seed (M8) collides with users' custom names | Duplicate-name trigger fails | M7 collision report precedes M8; the seed skips names that collide. |
 | LOC budget (600) on HistoryView/ExercisesView/CoachCockpit (543/543/587 today) | perf gate fails | Split files as part of each phase (listed under Owns). |
 | Coach/Settings unaudited | Hidden defects reach P8 late | The P8 audit runs first; it may split P8. |
+| Full vitest suite is not time-zone clean (found in P0): under `TZ=America/Los_Angeles` 1 test fails, under `Asia/Tokyo` 6 fail (NutritionEngine.test, HistoryView.test, useCustomDishActions.test). `test:tz` covers the 7 date suites, which pass. | Hidden day-boundary bugs, or tests that assume UTC | Triage in P2 (date contract): fix the test or the product per case, then widen `test:tz` to the full suite. |
+| D44 edit-meal E2E flaked once in the History half (Save stayed disabled after a name change; 6/6 passes on repeat, on both base and P0) | CI noise | Watch; if it recurs, check the edit sheet's async draft reload overwriting typed input. |
 
 ## 9. Change log of this file
 | Date | Change |
@@ -516,3 +520,4 @@ Add new questions here as phases surface them (e.g. the P8 Coach/Settings audit,
 | 2026-09-26 | Created: standards, decisions RD-1..13 and RP-1..6, phases P0–P8, full item assignment (151), open questions, risks. No implementation started. |
 | 2026-09-26 | OQ-1..OQ-6 answered and the K9 reading confirmed (RD-14..RD-20); §7 closed; P2/P5a/P8 scope wording aligned. No implementation started. |
 | 2026-09-26 | RD-21: D46 whole-meal Scale chip (replaces the D44 scale bar) and the edit-nutrition unit-caption STD-DAT-3 exception, both shipped on `v2-rewrite`. |
+| 2026-09-26 | P0 done (`6bc91c7`); E2E label fix for D46 (`7e7b05b`); baseline updated; two new risks (TZ-unclean full suite, D44 E2E flake); pre-P1 audit partial (blank names = 0). |
