@@ -1002,7 +1002,7 @@ test.describe('Surface B: Staged card with 1 item', () => {
     await page.close();
   });
 
-  test('B: card height <= 320px', async () => {
+  test('B: card height <= 260px', async () => {
     await waitForScrollSettled(page);
     const { cardBox, firstRowBox, actionRowBox } = await cardLocator.evaluate((card) => {
       const cardRect = card.getBoundingClientRect();
@@ -1021,7 +1021,7 @@ test.describe('Surface B: Staged card with 1 item', () => {
     });
 
     const measurements = {
-      test: 'B: card height <= 320px',
+      test: 'B: card height <= 260px',
       surface: 'B',
       cardSelector: '[data-testid="staged-meal-card"]',
       card: {
@@ -1037,7 +1037,7 @@ test.describe('Surface B: Staged card with 1 item', () => {
       },
       cardContainsFirstRowTop: cardBox.y <= firstRowBox.y + 0.5,
       cardContainsActionRowBottom: cardBox.y + cardBox.height >= actionRowBox.y + actionRowBox.height - 0.5,
-      heightPass: cardBox.height <= 320,
+      heightPass: cardBox.height <= 260,
     };
     console.log(JSON.stringify(measurements));
 
@@ -1045,8 +1045,8 @@ test.describe('Surface B: Staged card with 1 item', () => {
     expect(cardBox.y).toBeLessThanOrEqual(firstRowBox.y + 0.5);
     expect(cardBox.y + cardBox.height).toBeGreaterThanOrEqual(actionRowBox.y + actionRowBox.height - 0.5);
 
-    // Height cap assert: <= 320px
-    expect(cardBox.height).toBeLessThanOrEqual(320);
+    // Height cap assert: <= 260px
+    expect(cardBox.height).toBeLessThanOrEqual(260);
   });
 
   test('B: font >= 12px', async () => {
@@ -1829,15 +1829,15 @@ test.describe('Surface F: Manual-staged card and Add-item at 390×844', () => {
     await page.close();
   });
 
-  test('F: 1-item card height <= 320px', async () => {
+  test('F: 1-item card height <= 260px', async () => {
     await waitForScrollSettled(page);
     const cardBox = (await cardLocator.boundingBox())!;
     console.log(JSON.stringify({
-      test: 'F: 1-item card height <= 320px',
+      test: 'F: 1-item card height <= 260px',
       surface: 'F',
       cardHeight: Math.round(cardBox.height * 10) / 10,
     }));
-    expect(cardBox.height).toBeLessThanOrEqual(320);
+    expect(cardBox.height).toBeLessThanOrEqual(260);
   });
 
   test('F: font >= 12px', async () => {

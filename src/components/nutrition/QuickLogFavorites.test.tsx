@@ -209,9 +209,19 @@ describe('QuickLogFavorites (Horizontal Bar Redesign)', () => {
 
     // Order should be: Dish B (10), Dish D (5, newer), Dish C (5, older), Dish A (3), Dish E (2), Dish F (1)
     // In collapsed state per D26, top 3 (B, D, C) are rendered; A, E, F are beyond top 3
-    expect(screen.getByTestId('custom-dish-card-dish-b')).toBeDefined();
-    expect(screen.getByTestId('custom-dish-card-dish-d')).toBeDefined();
-    expect(screen.getByTestId('custom-dish-card-dish-c')).toBeDefined();
+    const renderedCards = screen.getAllByTestId(/custom-dish-card-/);
+    expect(renderedCards.map((card) => card.getAttribute('data-testid'))).toEqual([
+      'custom-dish-card-dish-b',
+      'custom-dish-card-dish-d',
+      'custom-dish-card-dish-c',
+    ]);
+
+    const cardB = screen.getByTestId('custom-dish-card-dish-b');
+    const cardD = screen.getByTestId('custom-dish-card-dish-d');
+    const cardC = screen.getByTestId('custom-dish-card-dish-c');
+    expect(cardB.compareDocumentPosition(cardD) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(cardD.compareDocumentPosition(cardC) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
     expect(screen.queryByTestId('custom-dish-card-dish-a')).toBeNull();
     expect(screen.queryByTestId('custom-dish-card-dish-e')).toBeNull();
     expect(screen.queryByTestId('custom-dish-card-dish-f')).toBeNull();
