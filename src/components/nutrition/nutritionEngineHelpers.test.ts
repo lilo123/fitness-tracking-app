@@ -614,13 +614,13 @@ describe('D33: isIdenticalItem and mergeOrAppendStagedItems', () => {
     });
     expect(isIdenticalItem(item1, itemDiffUnit)).toBe(false);
 
-    // Per-unit macro differs by > epsilon (0.1) -> not identical
+    // Per-unit macro differs by > relative epsilon (1%) -> not identical
     const itemDiffMacro = buildStagedItem({
       name: 'Rolled Oats',
       portion: '1 serving',
       quantity: 1,
       unit: 'unit',
-      calories: 151,
+      calories: 160,
       protein: 5,
       carbs: 27,
       fat: 3,
@@ -933,5 +933,142 @@ describe('D33: isIdenticalItem and mergeOrAppendStagedItems', () => {
 
     expect(JSON.stringify(existing)).toBe(existingBefore);
     expect(JSON.stringify(incoming)).toBe(incomingBefore);
+  });
+
+  describe('Audit Fix #2: isIdenticalItem relative tolerance & D7 edits', () => {
+    it('per-gram protein 0.027 vs 0.07 -> NOT identical', () => {
+      const itemA = buildStagedItem({
+        name: 'Greek Yogurt',
+        portion: '100g',
+        quantity: 100,
+        unit: 'g',
+        calories: 100,
+        protein: 2.7, // 0.027 g/g
+        carbs: 5,
+        fat: 0,
+        fiber: 0,
+      });
+      const itemB = buildStagedItem({
+        name: 'Greek Yogurt',
+        portion: '100g',
+        quantity: 100,
+        unit: 'g',
+        calories: 100,
+        protein: 7.0, // 0.070 g/g
+        carbs: 5,
+        fat: 0,
+        fiber: 0,
+      });
+      expect(isIdenticalItem(itemA, itemB)).toBe(false);
+    });
+
+    it('1.30 vs 1.305 kcal/g -> identical', () => {
+      const itemA = buildStagedItem({
+        name: 'Energy Bar',
+        portion: '100g',
+        quantity: 100,
+        unit: 'g',
+        calories: 130, // 1.30 kcal/g
+        protein: 10,
+        carbs: 20,
+        fat: 2,
+        fiber: 1,
+      });
+      const itemB = buildStagedItem({
+        name: 'Energy Bar',
+        portion: '100g',
+        quantity: 100,
+        unit: 'g',
+        calories: 130.5, // 1.305 kcal/g (diff is 0.005 <= 0.01 * 1.305 = 0.01305)
+        protein: 10,
+        carbs: 20,
+        fat: 2,
+        fiber: 1,
+      });
+      expect(isIdenticalItem(itemA, itemB)).toBe(true);
+    });
+
+    it('D7-edited item vs original -> not identical', () => {
+      // Original 150g favorite: 4g protein, 0.5g fat, 195 kcal
+      const original = buildStagedItem({
+        name: 'Rice & Beans',
+        portion: '150g',
+        quantity: 150,
+        unit: 'g',
+        calories: 195,
+        protein: 4,
+        carbs: 35,
+        fat: 0.5,
+        fiber: 3,
+      });
+      // D7 user edit: 15g protein, 7g fat, 215 kcal
+      const d7Edited = buildStagedItem({
+        name: 'Rice & Beans',
+        portion: '150g',
+        quantity: 150,
+        unit: 'g',
+        calories: 215,
+        protein: 15,
+        carbs: 35,
+        fat: 7,
+        fiber: 3,
+      });
+      expect(isIdenticalItem(d7Edited, original)).toBe(false);
+    });
+
+    it('handles undefined fiber vs 0 gracefully without NaN', () => {
+      const itemA = buildStagedItem({
+        name: 'Rice',
+        portion: '100g',
+        quantity: 100,
+        unit: 'g',
+        calories: 130,
+        protein: 2.7,
+        carbs: 28,
+        fat: 0.3,
+        fiber: 0,
+      });
+      const itemB = {
+        ...itemA,
+        fiber: undefined as unknown as number,
+      };
+      expect(isIdenticalItem(itemA, itemB)).toBe(true);
+    });
+  });
+
+  describe('Audit Fix #7: mergeOrAppendStagedItems portion rescaling', () => {
+    it('merging into an item rescales its portion text', () => {
+      const existing = [
+        buildStagedItem({
+          name: 'Chicken Rice',
+          portion: '150 g',
+          quantity: 150,
+          unit: 'g',
+          calories: 200,
+          protein: 20,
+          carbs: 25,
+          fat: 2,
+          fiber: 1,
+        }),
+      ];
+      const incoming = [
+        buildStagedItem({
+          name: 'Chicken Rice',
+          portion: '150 g',
+          quantity: 150,
+          unit: 'g',
+          calories: 200,
+          protein: 20,
+          carbs: 25,
+          fat: 2,
+          fiber: 1,
+        }),
+      ];
+
+      const merged = mergeOrAppendStagedItems(existing, incoming);
+      expect(merged).toHaveLength(1);
+      expect(merged[0].quantity).toBe(300);
+      expect(merged[0].portion).toBe('300 g');
+    });
   });
 });

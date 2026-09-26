@@ -302,27 +302,29 @@ export function isIdenticalItem(existing: StagedItem, incoming: StagedItem): boo
   const inQty = incoming.quantity > 0 ? incoming.quantity : 1;
 
   const exPerUnit = {
-    calories: existing.calories / exQty,
-    protein: existing.protein / exQty,
-    carbs: existing.carbs / exQty,
-    fat: existing.fat / exQty,
-    fiber: existing.fiber / exQty,
+    calories: (existing.calories ?? 0) / exQty,
+    protein: (existing.protein ?? 0) / exQty,
+    carbs: (existing.carbs ?? 0) / exQty,
+    fat: (existing.fat ?? 0) / exQty,
+    fiber: (existing.fiber ?? 0) / exQty,
   };
   const inPerUnit = {
-    calories: incoming.calories / inQty,
-    protein: incoming.protein / inQty,
-    carbs: incoming.carbs / inQty,
-    fat: incoming.fat / inQty,
-    fiber: incoming.fiber / inQty,
+    calories: (incoming.calories ?? 0) / inQty,
+    protein: (incoming.protein ?? 0) / inQty,
+    carbs: (incoming.carbs ?? 0) / inQty,
+    fat: (incoming.fat ?? 0) / inQty,
+    fiber: (incoming.fiber ?? 0) / inQty,
   };
 
-  const eps = 0.1;
+  const isMacroClose = (a: number, b: number): boolean =>
+    Math.abs(a - b) <= Math.max(1e-6, 0.01 * Math.max(Math.abs(a), Math.abs(b)));
+
   return (
-    Math.abs(roundTo1Decimal(exPerUnit.calories) - roundTo1Decimal(inPerUnit.calories)) <= eps &&
-    Math.abs(roundTo1Decimal(exPerUnit.protein) - roundTo1Decimal(inPerUnit.protein)) <= eps &&
-    Math.abs(roundTo1Decimal(exPerUnit.carbs) - roundTo1Decimal(inPerUnit.carbs)) <= eps &&
-    Math.abs(roundTo1Decimal(exPerUnit.fat) - roundTo1Decimal(inPerUnit.fat)) <= eps &&
-    Math.abs(roundTo1Decimal(exPerUnit.fiber) - roundTo1Decimal(inPerUnit.fiber)) <= eps
+    isMacroClose(exPerUnit.calories, inPerUnit.calories) &&
+    isMacroClose(exPerUnit.protein, inPerUnit.protein) &&
+    isMacroClose(exPerUnit.carbs, inPerUnit.carbs) &&
+    isMacroClose(exPerUnit.fat, inPerUnit.fat) &&
+    isMacroClose(exPerUnit.fiber, inPerUnit.fiber)
   );
 }
 
@@ -342,6 +344,7 @@ export function mergeOrAppendStagedItems(
       const scaled = scaleItemToQuantity(stagedReference(existing), newQuantity);
       currentItems[existingIdx] = {
         ...existing,
+        portion: `${roundTo1Decimal(scaled.quantity)} ${existing.unit}`,
         quantity: roundTo1Decimal(scaled.quantity),
         calories: roundTo1Decimal(scaled.calories),
         protein: roundTo1Decimal(scaled.protein),

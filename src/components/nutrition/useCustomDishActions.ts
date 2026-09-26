@@ -22,6 +22,13 @@ export interface AddedFavoriteBanner {
   onUndo: () => void;
 }
 
+interface BannerState {
+  forMeal: StagedMeal;
+  preMeal: StagedMeal;
+  message: string;
+  onUndo: () => void;
+}
+
 export interface UseCustomDishActionsOptions {
   targetUserId: string;
   selectedDate: string;
@@ -29,7 +36,7 @@ export interface UseCustomDishActionsOptions {
   setStagedMeal: (meal: StagedMeal | null) => void;
   setDishFetchError?: (error: { message: string; retry: () => void } | null) => void;
   fetchDishDetail?: (dishId: string) => Promise<CustomDishDetail | null>;
-  mutation: { mutate: (payload: any) => void };
+  mutation: { mutate: (payload: any) => void; isPending?: boolean };
   triggerToast?: (dish: CustomDish) => void;
 }
 
@@ -78,10 +85,15 @@ export function useCustomDishActions({
   triggerToast,
 }: UseCustomDishActionsOptions) {
   const queryClient = useQueryClient();
-  const [addedFavoriteBanner, setAddedFavoriteBanner] = useState<AddedFavoriteBanner | null>(null);
+  const [bannerState, setBannerState] = useState<BannerState | null>(null);
   const previousStagedMealRef = useRef<StagedMeal | null>(null);
   const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestStagedMealRef = useRef<StagedMeal | null>(stagedMeal ?? null);
+  const mutationRef = useRef(mutation);
+
+  useEffect(() => {
+    mutationRef.current = mutation;
+  });
 
   useEffect(() => {
     return () => {
@@ -93,14 +105,19 @@ export function useCustomDishActions({
 
   useEffect(() => {
     latestStagedMealRef.current = stagedMeal ?? null;
-    if (!stagedMeal) {
+    if (
+      !stagedMeal ||
+      (bannerState &&
+        stagedMeal !== bannerState.forMeal &&
+        stagedMeal !== bannerState.preMeal)
+    ) {
       if (bannerTimerRef.current) {
         clearTimeout(bannerTimerRef.current);
         bannerTimerRef.current = null;
       }
       previousStagedMealRef.current = null;
     }
-  }, [stagedMeal]);
+  }, [stagedMeal, bannerState]);
 
   const incrementDishUseCount = useCallback(
     (dish: CustomDish) => {
@@ -117,12 +134,14 @@ export function useCustomDishActions({
 
   const handleStageCustomDish = useCallback(
     async function stageDish(dish: CustomDish) {
+      if (mutationRef.current?.isPending) return;
       setDishFetchError?.(null);
       let detail: CustomDishDetail | null = null;
       const fetcher = fetchDishDetail || defaultFetchDishDetail;
       try {
         detail = await fetcher(dish.id);
       } catch (err: any) {
+        if (mutationRef.current?.isPending) return;
         const msg = err?.message || 'Failed to load dish details';
         setDishFetchError?.({
           message: msg,
@@ -132,6 +151,15 @@ export function useCustomDishActions({
         });
         return;
       }
+
+      if (mutationRef.current?.isPending) return;
+
+      if (bannerTimerRef.current) {
+        clearTimeout(bannerTimerRef.current);
+        bannerTimerRef.current = null;
+      }
+      setBannerState(null);
+      previousStagedMealRef.current = null;
 
       const items = buildItemsFromDish(dish, detail);
       const { explanation, ...tot } = recomputeStagedTotals(items);
@@ -155,6 +183,7 @@ export function useCustomDishActions({
 
   const handleAddCustomDishToStaged = useCallback(
     async function addDishToStaged(dish: CustomDish) {
+      if (mutationRef.current?.isPending) return;
       if (!latestStagedMealRef.current) return;
       setDishFetchError?.(null);
       let detail: CustomDishDetail | null = null;
@@ -162,7 +191,7 @@ export function useCustomDishActions({
       try {
         detail = await fetcher(dish.id);
       } catch (err: any) {
-        if (!latestStagedMealRef.current) return;
+        if (mutationRef.current?.isPending || !latestStagedMealRef.current) return;
         const msg = err?.message || 'Failed to load dish details';
         setDishFetchError?.({
           message: msg,
@@ -173,6 +202,7 @@ export function useCustomDishActions({
         return;
       }
 
+      if (mutationRef.current?.isPending) return;
       const currentStagedMeal = latestStagedMealRef.current;
       if (!currentStagedMeal) {
         return;
@@ -191,6 +221,12 @@ export function useCustomDishActions({
         ...tot,
         explanation:
           mergedItems.length > 1 ? explanation : `${formatCalories(tot.calories)} kcal (${currentStagedMeal.name})`,
+        ...(mergedItems.length === 1
+          ? {
+              servingSize: mergedItems[0].quantity,
+              servingUnit: mergedItems[0].unit,
+            }
+          : {}),
       };
 
       latestStagedMealRef.current = nextStagedMeal;
@@ -208,21 +244,27 @@ export function useCustomDishActions({
           clearTimeout(bannerTimerRef.current);
           bannerTimerRef.current = null;
         }
-        if (previousStagedMealRef.current) {
+        if (
+          previousStagedMealRef.current &&
+          (latestStagedMealRef.current === nextStagedMeal ||
+            latestStagedMealRef.current === snapshot)
+        ) {
           latestStagedMealRef.current = previousStagedMealRef.current;
           setStagedMeal(previousStagedMealRef.current);
           previousStagedMealRef.current = null;
         }
-        setAddedFavoriteBanner(null);
+        setBannerState(null);
       };
 
-      setAddedFavoriteBanner({
+      setBannerState({
+        forMeal: nextStagedMeal,
+        preMeal: snapshot,
         message: `Added ${dish.name} to staged meal`,
         onUndo,
       });
 
       bannerTimerRef.current = setTimeout(() => {
-        setAddedFavoriteBanner(null);
+        setBannerState(null);
         bannerTimerRef.current = null;
       }, 5000);
     },
@@ -232,6 +274,7 @@ export function useCustomDishActions({
   const handleQuickLogCustomDishDirect = useCallback(
     (dish: CustomDish, e?: React.MouseEvent) => {
       e?.stopPropagation();
+      if (mutationRef.current?.isPending) return;
       const payload = {
         food_name: dish.name,
         calories: roundTo1Decimal(dish.calories),
@@ -253,19 +296,21 @@ export function useCustomDishActions({
     [incrementDishUseCount, mutation, selectedDate, triggerToast]
   );
 
-  const dismissAddedFavoriteBanner = useCallback(() => {
-    if (bannerTimerRef.current) {
-      clearTimeout(bannerTimerRef.current);
-      bannerTimerRef.current = null;
-    }
-    setAddedFavoriteBanner(null);
-  }, []);
+  const isBannerActive =
+    bannerState !== null &&
+    stagedMeal !== null &&
+    stagedMeal !== undefined &&
+    (stagedMeal === bannerState.forMeal || stagedMeal === bannerState.preMeal);
 
   return {
     handleStageCustomDish,
     handleQuickLogCustomDishDirect,
     handleAddCustomDishToStaged,
-    addedFavoriteBanner: stagedMeal ? addedFavoriteBanner : null,
-    dismissAddedFavoriteBanner,
+    addedFavoriteBanner: isBannerActive
+      ? {
+          message: bannerState.message,
+          onUndo: bannerState.onUndo,
+        }
+      : null,
   };
 }
