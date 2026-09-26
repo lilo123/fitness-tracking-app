@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import type { NutritionLog, CustomDish, CustomDishDetail } from '../../types/database';
+import type { NutritionLog } from '../../types/database';
 import { getLocalDateStr, formatLocalTimestamp } from '../../utils/date';
 import { EditMealModal } from './EditMealModal';
-import { formatCalories, roundTo1Decimal } from '../../utils/nutrition';
+import { roundTo1Decimal } from '../../utils/nutrition';
 import {
-  itemsForPersist, itemsFromLegacyIngredients, normalizeItems, sumItems, type NutritionItem,
+  itemsForPersist, sumItems, type NutritionItem,
 } from '../../utils/itemModel';
 import { MealLogRow } from './MealLogRow';
 import { NutrientBreakdownModal, type BreakdownNutrient } from './NutrientBreakdownModal';
 import {
-  stagedToItem, buildStagedItem, recomputeStagedTotals, buildStagedMealFromManualData,
-  useStagedCardFocus, type StagedItem, type StagedMeal,
+  stagedToItem, recomputeStagedTotals, buildStagedMealFromManualData,
+  useStagedCardFocus, type StagedMeal,
 } from './nutritionEngineHelpers';
 import { useNutritionData } from './useNutritionData';
 import { useNutritionAi } from './useNutritionAi';
@@ -23,6 +23,7 @@ import { StagedMealCard } from './StagedMealCard';
 import { ManualMealForm } from './ManualMealForm';
 import { useManualMealForm, type ManualMealStagedData } from './useManualMealForm';
 import { useCustomDishSaving } from './useCustomDishSaving';
+import { useCustomDishActions } from './useCustomDishActions';
 import { CustomDishesModal } from './CustomDishesModal';
 import { Utensils, CheckCircle2, AlertCircle, RotateCcw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -174,102 +175,16 @@ export const NutritionEngine: React.FC = () => {
     setIsError,
   });
 
-  const handleStageCustomDish = async (dish: CustomDish) => {
-    setDishFetchError(null);
-    let detail: CustomDishDetail | null = null;
-    try {
-      detail = await fetchDishDetail(dish.id);
-    } catch (err: any) {
-      const msg = err?.message || 'Failed to load dish details';
-      setDishFetchError({
-        message: msg,
-        retry: () => {
-          void handleStageCustomDish(dish);
-        },
-      });
-      return;
-    }
-
-    const stored =
-      normalizeItems(detail?.items) ?? itemsFromLegacyIngredients(dish.id, dish.name, detail?.ingredients);
-
-    let items: StagedItem[] = (stored ?? []).map((it) =>
-      buildStagedItem({
-        name: it.name,
-        portion: it.displayPortion,
-        quantity: it.quantity,
-        unit: it.unit,
-        calories: it.calories,
-        protein: it.protein,
-        carbs: it.carbs,
-        fat: it.fat,
-        fiber: it.fiber,
-      })
-    );
-
-    if (items.length === 0) {
-      items = [
-        buildStagedItem({
-          name: dish.name,
-          portion: '1 serving',
-          calories: dish.calories,
-          protein: dish.protein,
-          carbs: dish.carbs,
-          fat: dish.fat,
-          fiber: dish.fiber,
-        }),
-      ];
-    }
-
-    const { explanation, ...tot } = recomputeStagedTotals(items);
-
-    setStagedMeal({
-      name: dish.name,
-      mealType: 'Breakfast',
-      explanation:
-        items.length > 1 ? explanation : `${formatCalories(tot.calories)} kcal (${dish.name})`,
-      items,
-      ...tot,
-      servingSize: 1,
-      servingUnit: 'serving',
-      notes: dish.notes ?? null,
-    });
-
-    void supabase
-      .from('custom_dishes')
-      .update({ use_count: (dish.use_count ?? 0) + 1 })
-      .eq('id', dish.id)
-      .then(() => {
-        queryClient.invalidateQueries({ queryKey: ['custom_dishes', targetUserId] });
-      });
-  };
-
-  const handleQuickLogCustomDishDirect = (dish: CustomDish, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const payload = {
-      food_name: dish.name,
-      calories: roundTo1Decimal(dish.calories),
-      protein: roundTo1Decimal(dish.protein),
-      carbs: roundTo1Decimal(dish.carbs),
-      fat: roundTo1Decimal(dish.fat),
-      fiber: roundTo1Decimal(dish.fiber),
-      meal_type: 'Breakfast',
-      serving_size: 1,
-      serving_unit: 'serving',
-      logged_at: formatLocalTimestamp(selectedDate),
-      logged_date: selectedDate,
-      notes: dish.notes ?? null,
-    };
-    mutation.mutate(payload);
-    void supabase
-      .from('custom_dishes')
-      .update({ use_count: (dish.use_count ?? 0) + 1 })
-      .eq('id', dish.id)
-      .then(() => {
-        queryClient.invalidateQueries({ queryKey: ['custom_dishes', targetUserId] });
-      });
-    triggerToast(dish);
-  };
+  const { handleStageCustomDish, handleQuickLogCustomDishDirect } = useCustomDishActions({
+    targetUserId,
+    selectedDate,
+    stagedMeal,
+    setStagedMeal,
+    setDishFetchError,
+    fetchDishDetail,
+    mutation,
+    triggerToast,
+  });
 
   // Saved-dish failures surface here, beside Quick Log Favorites, rather than in the nutrition
   // logs banner. They are independent queries; folding them together reported a custom_dishes
