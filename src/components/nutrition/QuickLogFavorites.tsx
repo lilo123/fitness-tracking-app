@@ -10,6 +10,8 @@ export interface QuickLogFavoritesProps {
   onOpenEditDishModal: (dish: CustomDish) => void;
   onQuickLogCustomDishDirect: (dish: CustomDish, e: React.MouseEvent) => void;
   onDismissToast: () => void;
+  isStaged?: boolean;
+  onAddCustomDishToStaged?: (dish: CustomDish) => void;
 }
 
 export const QuickLogFavorites: React.FC<QuickLogFavoritesProps> = ({
@@ -19,6 +21,8 @@ export const QuickLogFavorites: React.FC<QuickLogFavoritesProps> = ({
   onOpenEditDishModal,
   onQuickLogCustomDishDirect,
   onDismissToast,
+  isStaged = false,
+  onAddCustomDishToStaged,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
@@ -76,7 +80,7 @@ export const QuickLogFavorites: React.FC<QuickLogFavoritesProps> = ({
         <div className="flex items-center gap-2">
           <Star className="w-4 h-4 text-amber-400 fill-amber-400/20" />
           <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-            Quick Log Favorites
+            {isStaged ? 'Add to staged meal' : 'Quick Log Favorites'}
           </h3>
           <output
             aria-live="polite"
@@ -159,6 +163,8 @@ export const QuickLogFavorites: React.FC<QuickLogFavoritesProps> = ({
                       onOpenEditDishModal={onOpenEditDishModal}
                       onQuickLogCustomDishDirect={onQuickLogCustomDishDirect}
                       onDismissToast={onDismissToast}
+                      isStaged={isStaged}
+                      onAddCustomDishToStaged={onAddCustomDishToStaged}
                     />
                   </div>
                 );

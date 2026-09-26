@@ -30,7 +30,6 @@ import { supabase } from '../../lib/supabase';
 import { useQueryClient } from '@tanstack/react-query';
 import { StatusBanner } from '../common/StatusBanner';
 
-
 export const NutritionEngine: React.FC = () => {
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
@@ -175,16 +174,10 @@ export const NutritionEngine: React.FC = () => {
     setIsError,
   });
 
-  const { handleStageCustomDish, handleQuickLogCustomDishDirect } = useCustomDishActions({
-    targetUserId,
-    selectedDate,
-    stagedMeal,
-    setStagedMeal,
-    setDishFetchError,
-    fetchDishDetail,
-    mutation,
-    triggerToast,
-  });
+  const { handleStageCustomDish, handleQuickLogCustomDishDirect, handleAddCustomDishToStaged, addedFavoriteBanner } =
+    useCustomDishActions({
+      targetUserId, selectedDate, stagedMeal, setStagedMeal, setDishFetchError, fetchDishDetail, mutation, triggerToast,
+    });
 
   // Saved-dish failures surface here, beside Quick Log Favorites, rather than in the nutrition
   // logs banner. They are independent queries; folding them together reported a custom_dishes
@@ -215,6 +208,8 @@ export const NutritionEngine: React.FC = () => {
         onOpenEditDishModal={dishModal.handleOpenEditDishModal}
         onQuickLogCustomDishDirect={handleQuickLogCustomDishDirect}
         onDismissToast={dismissToast}
+        isStaged={Boolean(stagedMeal)}
+        onAddCustomDishToStaged={handleAddCustomDishToStaged}
       />
 
       <StatusBanner
@@ -259,6 +254,26 @@ export const NutritionEngine: React.FC = () => {
           }
         />
       ) : null}
+
+      <StatusBanner
+        message={stagedMeal ? addedFavoriteBanner?.message : null}
+        tone="success"
+        testId="add-favorite-status-banner"
+        className="shadow-lg"
+        icon={<CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" aria-hidden="true" />}
+        action={
+          addedFavoriteBanner && (
+            <button
+              type="button"
+              data-testid="undo-add-favorite-btn"
+              onClick={addedFavoriteBanner.onUndo}
+              className="shrink-0 rounded border border-emerald-400/40 bg-emerald-500/20 min-h-[40px] h-10 min-w-[48px] px-3 text-xs font-bold text-emerald-200 hover:bg-emerald-500/30 touch-manipulation cursor-pointer flex items-center justify-center"
+            >
+              Undo
+            </button>
+          )
+        }
+      />
 
       {stagedMeal ? (
         <div {...cardFocusProps}>

@@ -362,4 +362,1106 @@ describe('useCustomDishActions', () => {
     expect(fetchDishDetail).toHaveBeenCalledTimes(2);
     expect(setStagedMeal).toHaveBeenCalledTimes(1);
   });
+
+  describe('D33: handleAddCustomDishToStaged', () => {
+    it('appends favorite items to staged meal without replacing it', async () => {
+      const initialStagedMeal = {
+        name: 'Breakfast Bowl',
+        mealType: 'Breakfast',
+        explanation: '300 kcal (Eggs)',
+        items: [
+          {
+            id: 'item-eggs',
+            name: 'Scrambled Eggs',
+            portion: '2 eggs',
+            quantity: 2,
+            unit: 'unit' as const,
+            baseQuantity: 2,
+            baseCalories: 140,
+            baseProtein: 12,
+            baseCarbs: 2,
+            baseFat: 10,
+            baseFiber: 0,
+            calories: 140,
+            protein: 12,
+            carbs: 2,
+            fat: 10,
+            fiber: 0,
+            portionMultiplier: 1,
+          },
+        ],
+        calories: 140,
+        protein: 12,
+        carbs: 2,
+        fat: 10,
+        fiber: 0,
+        servingSize: 1,
+        servingUnit: 'serving',
+        notes: null,
+      };
+
+      const setStagedMeal = vi.fn();
+      const dish: CustomDish = {
+        id: 'dish-toast-1',
+        user_id: 'user-123',
+        name: 'Avocado Toast',
+        calories: 250,
+        protein: 6,
+        carbs: 28,
+        fat: 13,
+        fiber: 5,
+        kind: 'recipe',
+        use_count: 2,
+      };
+
+      const dishDetail: CustomDishDetail = {
+        ...dish,
+        items: [
+          {
+            id: 'item-toast-comp',
+            name: 'Sourdough Toast',
+            quantity: 1,
+            unit: 'unit',
+            displayPortion: '1 slice',
+            calories: 250,
+            protein: 6,
+            carbs: 28,
+            fat: 13,
+            fiber: 5,
+          },
+        ],
+      };
+
+      const fetchDishDetail = vi.fn().mockResolvedValue(dishDetail);
+
+      const { result } = renderHook(
+        () =>
+          useCustomDishActions({
+            targetUserId: 'user-123',
+            selectedDate: '2026-09-26',
+            stagedMeal: initialStagedMeal,
+            setStagedMeal,
+            fetchDishDetail,
+            mutation: { mutate: vi.fn() },
+          }),
+        { wrapper }
+      );
+
+      await act(async () => {
+        await result.current.handleAddCustomDishToStaged(dish);
+      });
+
+      expect(setStagedMeal).toHaveBeenCalledTimes(1);
+      const updated = setStagedMeal.mock.calls[0][0];
+      // Meal name and meal type are preserved
+      expect(updated.name).toBe('Breakfast Bowl');
+      expect(updated.mealType).toBe('Breakfast');
+      // Has both items: original eggs and appended toast
+      expect(updated.items).toHaveLength(2);
+      expect(updated.items[0].name).toBe('Scrambled Eggs');
+      expect(updated.items[1].name).toBe('Sourdough Toast');
+      // Totals recomputed as sum of items
+      expect(updated.calories).toBe(390);
+      expect(updated.protein).toBe(18);
+      expect(updated.carbs).toBe(30);
+      expect(updated.fat).toBe(23);
+      expect(updated.fiber).toBe(5);
+
+      // Banner is set
+      expect(result.current.addedFavoriteBanner).not.toBeNull();
+      expect(result.current.addedFavoriteBanner?.message).toBe('Added Avocado Toast to staged meal');
+    });
+
+    it('adds all components of a multi-component favorite to staged meal', async () => {
+      const initialStagedMeal = {
+        name: 'Lunch',
+        mealType: 'Lunch',
+        explanation: '100 kcal (Salad)',
+        items: [
+          {
+            id: 'item-salad',
+            name: 'Garden Salad',
+            portion: '1 bowl',
+            quantity: 1,
+            unit: 'unit' as const,
+            baseQuantity: 1,
+            baseCalories: 100,
+            baseProtein: 2,
+            baseCarbs: 10,
+            baseFat: 5,
+            baseFiber: 4,
+            calories: 100,
+            protein: 2,
+            carbs: 10,
+            fat: 5,
+            fiber: 4,
+            portionMultiplier: 1,
+          },
+        ],
+        calories: 100,
+        protein: 2,
+        carbs: 10,
+        fat: 5,
+        fiber: 4,
+        servingSize: 1,
+        servingUnit: 'serving',
+        notes: null,
+      };
+
+      const setStagedMeal = vi.fn();
+      const dish: CustomDish = {
+        id: 'dish-combo-1',
+        user_id: 'user-123',
+        name: 'Protein Combo',
+        calories: 400,
+        protein: 40,
+        carbs: 20,
+        fat: 10,
+        fiber: 2,
+        kind: 'recipe',
+        use_count: 5,
+      };
+
+      const dishDetail: CustomDishDetail = {
+        ...dish,
+        items: [
+          {
+            id: 'c1',
+            name: 'Grilled Chicken',
+            quantity: 150,
+            unit: 'g',
+            displayPortion: '150g',
+            calories: 250,
+            protein: 35,
+            carbs: 0,
+            fat: 5,
+            fiber: 0,
+          },
+          {
+            id: 'c2',
+            name: 'Quinoa',
+            quantity: 100,
+            unit: 'g',
+            displayPortion: '100g',
+            calories: 150,
+            protein: 5,
+            carbs: 20,
+            fat: 5,
+            fiber: 2,
+          },
+        ],
+      };
+
+      const fetchDishDetail = vi.fn().mockResolvedValue(dishDetail);
+
+      const { result } = renderHook(
+        () =>
+          useCustomDishActions({
+            targetUserId: 'user-123',
+            selectedDate: '2026-09-26',
+            stagedMeal: initialStagedMeal,
+            setStagedMeal,
+            fetchDishDetail,
+            mutation: { mutate: vi.fn() },
+          }),
+        { wrapper }
+      );
+
+      await act(async () => {
+        await result.current.handleAddCustomDishToStaged(dish);
+      });
+
+      expect(setStagedMeal).toHaveBeenCalledTimes(1);
+      const updated = setStagedMeal.mock.calls[0][0];
+      // All 3 items present: original salad + 2 combo components
+      expect(updated.items).toHaveLength(3);
+      expect(updated.items[0].name).toBe('Garden Salad');
+      expect(updated.items[1].name).toBe('Grilled Chicken');
+      expect(updated.items[2].name).toBe('Quinoa');
+      expect(updated.calories).toBe(500);
+      expect(updated.protein).toBe(42);
+      expect(updated.carbs).toBe(30);
+      expect(updated.fat).toBe(15);
+      expect(updated.fiber).toBe(6);
+    });
+
+    it('merges identical items by incrementing quantity (1 serving -> 2) and appends non-identical items', async () => {
+      const initialStagedMeal = {
+        name: 'Oatmeal Meal',
+        mealType: 'Breakfast',
+        explanation: '150 kcal (Oatmeal)',
+        items: [
+          {
+            id: 'item-oatmeal',
+            name: 'Rolled Oats',
+            portion: '1 serving',
+            quantity: 1,
+            unit: 'unit' as const,
+            baseQuantity: 1,
+            baseCalories: 150,
+            baseProtein: 5,
+            baseCarbs: 27,
+            baseFat: 3,
+            baseFiber: 4,
+            calories: 150,
+            protein: 5,
+            carbs: 27,
+            fat: 3,
+            fiber: 4,
+            portionMultiplier: 1,
+          },
+        ],
+        calories: 150,
+        protein: 5,
+        carbs: 27,
+        fat: 3,
+        fiber: 4,
+        servingSize: 1,
+        servingUnit: 'serving',
+        notes: null,
+      };
+
+      const setStagedMeal = vi.fn();
+      // dish has identical Rolled Oats (1 serving) + non-identical Banana
+      const dish: CustomDish = {
+        id: 'dish-oats-banana',
+        user_id: 'user-123',
+        name: 'Oats & Banana',
+        calories: 255,
+        protein: 6.3,
+        carbs: 54,
+        fat: 3.4,
+        fiber: 7.1,
+        kind: 'recipe',
+        use_count: 1,
+      };
+
+      const dishDetail: CustomDishDetail = {
+        ...dish,
+        items: [
+          {
+            id: 'comp-oats',
+            name: '  rolled oats  ', // case-insensitive trimmed
+            quantity: 1,
+            unit: 'unit',
+            displayPortion: '1 serving',
+            calories: 150,
+            protein: 5,
+            carbs: 27,
+            fat: 3,
+            fiber: 4,
+          },
+          {
+            id: 'comp-banana',
+            name: 'Banana',
+            quantity: 1,
+            unit: 'unit',
+            displayPortion: '1 medium',
+            calories: 105,
+            protein: 1.3,
+            carbs: 27,
+            fat: 0.4,
+            fiber: 3.1,
+          },
+        ],
+      };
+
+      const fetchDishDetail = vi.fn().mockResolvedValue(dishDetail);
+
+      const { result } = renderHook(
+        () =>
+          useCustomDishActions({
+            targetUserId: 'user-123',
+            selectedDate: '2026-09-26',
+            stagedMeal: initialStagedMeal,
+            setStagedMeal,
+            fetchDishDetail,
+            mutation: { mutate: vi.fn() },
+          }),
+        { wrapper }
+      );
+
+      await act(async () => {
+        await result.current.handleAddCustomDishToStaged(dish);
+      });
+
+      expect(setStagedMeal).toHaveBeenCalledTimes(1);
+      const updated = setStagedMeal.mock.calls[0][0];
+      // Rolled Oats merged: length is 2 (Oats + Banana), not 3!
+      expect(updated.items).toHaveLength(2);
+      // Oats quantity is merged from 1 to 2
+      expect(updated.items[0].name).toBe('Rolled Oats');
+      expect(updated.items[0].quantity).toBe(2);
+      expect(updated.items[0].calories).toBe(300);
+      expect(updated.items[0].protein).toBe(10);
+      expect(updated.items[0].carbs).toBe(54);
+      expect(updated.items[0].fat).toBe(6);
+      expect(updated.items[0].fiber).toBe(8);
+
+      // Banana is appended
+      expect(updated.items[1].name).toBe('Banana');
+      expect(updated.items[1].quantity).toBe(1);
+
+      // Meal totals are the sum
+      expect(updated.calories).toBe(405);
+      expect(updated.protein).toBe(11.3);
+      expect(updated.carbs).toBe(81);
+      expect(updated.fat).toBe(6.4);
+      expect(updated.fiber).toBe(11.1);
+    });
+
+    it('Undo restores the exact previous staged meal and hides the banner', async () => {
+      const initialStagedMeal = {
+        name: 'My Special Meal',
+        mealType: 'Dinner',
+        explanation: '200 kcal (Salmon)',
+        items: [
+          {
+            id: 'item-salmon',
+            name: 'Salmon Fillet',
+            portion: '150g',
+            quantity: 150,
+            unit: 'g' as const,
+            baseQuantity: 150,
+            baseCalories: 200,
+            baseProtein: 30,
+            baseCarbs: 0,
+            baseFat: 8,
+            baseFiber: 0,
+            calories: 200,
+            protein: 30,
+            carbs: 0,
+            fat: 8,
+            fiber: 0,
+            portionMultiplier: 1,
+            userOverridden: true,
+          },
+        ],
+        calories: 200,
+        protein: 30,
+        carbs: 0,
+        fat: 8,
+        fiber: 0,
+        servingSize: 1,
+        servingUnit: 'serving',
+        notes: 'Wild caught',
+      };
+
+      const setStagedMeal = vi.fn();
+      const dish: CustomDish = {
+        id: 'dish-rice',
+        user_id: 'user-123',
+        name: 'Rice',
+        calories: 150,
+        protein: 3,
+        carbs: 32,
+        fat: 0.5,
+        fiber: 1,
+        kind: 'food',
+        use_count: 4,
+      };
+
+      const fetchDishDetail = vi.fn().mockResolvedValue(null);
+
+      const { result } = renderHook(
+        () =>
+          useCustomDishActions({
+            targetUserId: 'user-123',
+            selectedDate: '2026-09-26',
+            stagedMeal: initialStagedMeal,
+            setStagedMeal,
+            fetchDishDetail,
+            mutation: { mutate: vi.fn() },
+          }),
+        { wrapper }
+      );
+
+      await act(async () => {
+        await result.current.handleAddCustomDishToStaged(dish);
+      });
+
+      expect(result.current.addedFavoriteBanner).not.toBeNull();
+      expect(result.current.addedFavoriteBanner?.message).toBe('Added Rice to staged meal');
+
+      // Now trigger Undo
+      act(() => {
+        result.current.addedFavoriteBanner?.onUndo();
+      });
+
+      // Banner is hidden
+      expect(result.current.addedFavoriteBanner).toBeNull();
+      // setStagedMeal called with the EXACT previous staged meal object
+      expect(setStagedMeal).toHaveBeenLastCalledWith(initialStagedMeal);
+      const restored = setStagedMeal.mock.calls[1][0];
+      expect(restored.name).toBe('My Special Meal');
+      expect(restored.notes).toBe('Wild caught');
+      expect(restored.items[0].userOverridden).toBe(true);
+      expect(restored.items).toHaveLength(1);
+    });
+
+    it('displays banner text and Undo button and auto-hides after 5s (fake timers)', async () => {
+      vi.useFakeTimers();
+      try {
+        const initialStagedMeal = {
+          name: 'Meal',
+          mealType: 'Breakfast',
+          explanation: '100 kcal',
+          items: [],
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+          fiber: 0,
+          servingSize: 1,
+          servingUnit: 'serving',
+          notes: null,
+        };
+
+        const setStagedMeal = vi.fn();
+        const dish: CustomDish = {
+          id: 'dish-snack',
+          user_id: 'user-123',
+          name: 'Almonds',
+          calories: 160,
+          protein: 6,
+          carbs: 6,
+          fat: 14,
+          fiber: 3,
+          kind: 'food',
+          use_count: 1,
+        };
+
+        const fetchDishDetail = vi.fn().mockResolvedValue(null);
+
+        const { result } = renderHook(
+          () =>
+            useCustomDishActions({
+              targetUserId: 'user-123',
+              selectedDate: '2026-09-26',
+              stagedMeal: initialStagedMeal,
+              setStagedMeal,
+              fetchDishDetail,
+              mutation: { mutate: vi.fn() },
+            }),
+          { wrapper }
+        );
+
+        await act(async () => {
+          await result.current.handleAddCustomDishToStaged(dish);
+        });
+
+        expect(result.current.addedFavoriteBanner).not.toBeNull();
+        expect(result.current.addedFavoriteBanner?.message).toBe('Added Almonds to staged meal');
+
+        // Advance 4900ms: still visible (>= 5s required)
+        act(() => {
+          vi.advanceTimersByTime(4900);
+        });
+        expect(result.current.addedFavoriteBanner).not.toBeNull();
+
+        // Advance past 5000ms: hides
+        act(() => {
+          vi.advanceTimersByTime(150);
+        });
+        expect(result.current.addedFavoriteBanner).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('increments use_count on add but does NOT decrement use_count on Undo', async () => {
+      const initialStagedMeal = {
+        name: 'Meal',
+        mealType: 'Breakfast',
+        explanation: '100 kcal',
+        items: [],
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+        fiber: 0,
+        servingSize: 1,
+        servingUnit: 'serving',
+        notes: null,
+      };
+
+      const setStagedMeal = vi.fn();
+      const dish: CustomDish = {
+        id: 'dish-count-1',
+        user_id: 'user-123',
+        name: 'Protein Shake',
+        calories: 180,
+        protein: 25,
+        carbs: 5,
+        fat: 2,
+        fiber: 1,
+        kind: 'food',
+        use_count: 5,
+      };
+
+      const fetchDishDetail = vi.fn().mockResolvedValue(null);
+
+      const { result } = renderHook(
+        () =>
+          useCustomDishActions({
+            targetUserId: 'user-123',
+            selectedDate: '2026-09-26',
+            stagedMeal: initialStagedMeal,
+            setStagedMeal,
+            fetchDishDetail,
+            mutation: { mutate: vi.fn() },
+          }),
+        { wrapper }
+      );
+
+      await act(async () => {
+        await result.current.handleAddCustomDishToStaged(dish);
+      });
+
+      // Incremented once: 5 -> 6
+      expect(supabase.from).toHaveBeenCalledWith('custom_dishes');
+      expect(mockUpdate).toHaveBeenCalledWith({ use_count: 6 });
+      expect(mockUpdateEq).toHaveBeenCalledWith('id', 'dish-count-1');
+
+      // Clear calls
+      mockUpdate.mockClear();
+      mockUpdateEq.mockClear();
+
+      // Undo
+      act(() => {
+        result.current.addedFavoriteBanner?.onUndo();
+      });
+
+      // Undo does NOT decrement
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it('replaces banner on subsequent add and Undo reverts only the latest add', async () => {
+      const meal0 = {
+        name: 'Meal 0',
+        mealType: 'Breakfast',
+        explanation: '0 kcal',
+        items: [],
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+        fiber: 0,
+        servingSize: 1,
+        servingUnit: 'serving',
+        notes: null,
+      };
+
+      let currentStaged = meal0;
+      const setStagedMeal = vi.fn((m) => {
+        currentStaged = m;
+      });
+
+      const dishA: CustomDish = {
+        id: 'dish-a',
+        user_id: 'user-123',
+        name: 'Dish A',
+        calories: 100,
+        protein: 10,
+        carbs: 10,
+        fat: 2,
+        fiber: 1,
+        kind: 'food',
+        use_count: 0,
+      };
+
+      const dishB: CustomDish = {
+        id: 'dish-b',
+        user_id: 'user-123',
+        name: 'Dish B',
+        calories: 200,
+        protein: 20,
+        carbs: 20,
+        fat: 4,
+        fiber: 2,
+        kind: 'food',
+        use_count: 0,
+      };
+
+      const fetchDishDetail = vi.fn().mockResolvedValue(null);
+
+      const { result, rerender } = renderHook(
+        () =>
+          useCustomDishActions({
+            targetUserId: 'user-123',
+            selectedDate: '2026-09-26',
+            stagedMeal: currentStaged,
+            setStagedMeal,
+            fetchDishDetail,
+            mutation: { mutate: vi.fn() },
+          }),
+        { wrapper }
+      );
+
+      // Add Dish A
+      await act(async () => {
+        await result.current.handleAddCustomDishToStaged(dishA);
+      });
+
+      expect(result.current.addedFavoriteBanner?.message).toBe('Added Dish A to staged meal');
+      rerender();
+
+      // Add Dish B while banner is visible
+      await act(async () => {
+        await result.current.handleAddCustomDishToStaged(dishB);
+      });
+
+      expect(result.current.addedFavoriteBanner?.message).toBe('Added Dish B to staged meal');
+
+      // Undo reverts only Dish B, restoring the state after Dish A was added
+      act(() => {
+        result.current.addedFavoriteBanner?.onUndo();
+      });
+
+      expect(setStagedMeal).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          items: expect.arrayContaining([expect.objectContaining({ name: 'Dish A' })]),
+        })
+      );
+      const reverted = setStagedMeal.mock.calls[setStagedMeal.mock.calls.length - 1][0];
+      expect(reverted.items).toHaveLength(1);
+      expect(reverted.items[0].name).toBe('Dish A');
+    });
+
+    it('log or discard during fetch does not resurrect the meal', async () => {
+      let resolveFetch!: (val: CustomDishDetail | null) => void;
+      const fetchPromise = new Promise<CustomDishDetail | null>((resolve) => {
+        resolveFetch = resolve;
+      });
+      const fetchDishDetail = vi.fn().mockImplementation(() => fetchPromise);
+      const setStagedMeal = vi.fn();
+
+      const initialStagedMeal = {
+        name: 'Initial Meal',
+        mealType: 'Breakfast',
+        explanation: '200 kcal',
+        items: [
+          {
+            id: 'item-init',
+            name: 'Initial Item',
+            portion: '1 serving',
+            quantity: 1,
+            unit: 'unit' as const,
+            baseQuantity: 1,
+            baseCalories: 200,
+            baseProtein: 10,
+            baseCarbs: 20,
+            baseFat: 5,
+            baseFiber: 2,
+            calories: 200,
+            protein: 10,
+            carbs: 20,
+            fat: 5,
+            fiber: 2,
+            portionMultiplier: 1,
+          },
+        ],
+        calories: 200,
+        protein: 10,
+        carbs: 20,
+        fat: 5,
+        fiber: 2,
+        servingSize: 1,
+        servingUnit: 'serving',
+        notes: null,
+      };
+
+      const dish: CustomDish = {
+        id: 'dish-async-1',
+        user_id: 'user-123',
+        name: 'Async Dish',
+        calories: 150,
+        protein: 5,
+        carbs: 20,
+        fat: 5,
+        fiber: 1,
+        kind: 'food',
+        use_count: 1,
+      };
+
+      const { result, rerender } = renderHook(
+        ({ stagedMeal }) =>
+          useCustomDishActions({
+            targetUserId: 'user-123',
+            selectedDate: '2026-09-26',
+            stagedMeal,
+            setStagedMeal,
+            fetchDishDetail,
+            mutation: { mutate: vi.fn() },
+          }),
+        {
+          wrapper,
+          initialProps: { stagedMeal: initialStagedMeal as any },
+        }
+      );
+
+      // Start adding favorite (fetch is now in flight)
+      const addPromise = result.current.handleAddCustomDishToStaged(dish);
+
+      // While fetch is pending, user logs or discards the meal
+      rerender({ stagedMeal: null });
+
+      // Resolve the fetch detail now
+      await act(async () => {
+        resolveFetch({
+          ...dish,
+          items: [
+            {
+              id: 'it-1',
+              name: 'Async Dish',
+              displayPortion: '1 serving',
+              quantity: 1,
+              unit: 'unit',
+              calories: 150,
+              protein: 5,
+              carbs: 20,
+              fat: 5,
+              fiber: 1,
+            },
+          ],
+        });
+        await addPromise;
+      });
+
+      // Must NOT resurrect the meal or update staged meal
+      expect(setStagedMeal).not.toHaveBeenCalled();
+      // Must NOT set the added favorite banner
+      expect(result.current.addedFavoriteBanner).toBeNull();
+      // Must NOT increment use_count
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it('two rapid adds with deferred fetch promises resolved in order B then A keep both favorites and Undo reverts only the last applied one', async () => {
+      let resolveA!: (val: CustomDishDetail | null) => void;
+      let resolveB!: (val: CustomDishDetail | null) => void;
+      const promiseA = new Promise<CustomDishDetail | null>((resolve) => {
+        resolveA = resolve;
+      });
+      const promiseB = new Promise<CustomDishDetail | null>((resolve) => {
+        resolveB = resolve;
+      });
+
+      const dishA: CustomDish = {
+        id: 'dish-A',
+        user_id: 'user-123',
+        name: 'Dish A',
+        calories: 100,
+        protein: 10,
+        carbs: 10,
+        fat: 2,
+        fiber: 1,
+        kind: 'food',
+        use_count: 1,
+      };
+      const dishB: CustomDish = {
+        id: 'dish-B',
+        user_id: 'user-123',
+        name: 'Dish B',
+        calories: 200,
+        protein: 20,
+        carbs: 20,
+        fat: 4,
+        fiber: 2,
+        kind: 'food',
+        use_count: 1,
+      };
+
+      const fetchDishDetail = vi.fn((id: string) => {
+        if (id === 'dish-A') return promiseA;
+        return promiseB;
+      });
+
+      const initialStagedMeal = {
+        name: 'Base Meal',
+        mealType: 'Dinner',
+        explanation: '300 kcal',
+        items: [
+          {
+            id: 'item-base',
+            name: 'Base Rice',
+            portion: '1 cup',
+            quantity: 1,
+            unit: 'unit' as const,
+            baseQuantity: 1,
+            baseCalories: 300,
+            baseProtein: 5,
+            baseCarbs: 60,
+            baseFat: 1,
+            baseFiber: 2,
+            calories: 300,
+            protein: 5,
+            carbs: 60,
+            fat: 1,
+            fiber: 2,
+            portionMultiplier: 1,
+          },
+        ],
+        calories: 300,
+        protein: 5,
+        carbs: 60,
+        fat: 1,
+        fiber: 2,
+        servingSize: 1,
+        servingUnit: 'serving',
+        notes: null,
+      };
+
+      const { result } = renderHook(
+        () => {
+          const [stagedMeal, setStagedMeal] = React.useState<any>(initialStagedMeal);
+          const actions = useCustomDishActions({
+            targetUserId: 'user-123',
+            selectedDate: '2026-09-26',
+            stagedMeal,
+            setStagedMeal,
+            fetchDishDetail,
+            mutation: { mutate: vi.fn() },
+          });
+          return { ...actions, stagedMeal };
+        },
+        { wrapper }
+      );
+
+      // Rapidly tap Dish A, then Dish B
+      const actionPromiseA = result.current.handleAddCustomDishToStaged(dishA);
+      const actionPromiseB = result.current.handleAddCustomDishToStaged(dishB);
+
+      // Resolve B first
+      await act(async () => {
+        resolveB({
+          ...dishB,
+          items: [
+            {
+              id: 'it-b',
+              name: 'Dish B',
+              displayPortion: '1 serving',
+              quantity: 1,
+              unit: 'unit',
+              calories: 200,
+              protein: 20,
+              carbs: 20,
+              fat: 4,
+              fiber: 2,
+            },
+          ],
+        });
+        await actionPromiseB;
+      });
+
+      // Resolve A second
+      await act(async () => {
+        resolveA({
+          ...dishA,
+          items: [
+            {
+              id: 'it-a',
+              name: 'Dish A',
+              displayPortion: '1 serving',
+              quantity: 1,
+              unit: 'unit',
+              calories: 100,
+              protein: 10,
+              carbs: 10,
+              fat: 2,
+              fiber: 1,
+            },
+          ],
+        });
+        await actionPromiseA;
+      });
+
+      // Both items MUST be present in staged meal (Base Rice + Dish B + Dish A)
+      expect(result.current.stagedMeal.items).toHaveLength(3);
+      const itemNames = result.current.stagedMeal.items.map((it: any) => it.name);
+      expect(itemNames).toContain('Base Rice');
+      expect(itemNames).toContain('Dish B');
+      expect(itemNames).toContain('Dish A');
+      expect(result.current.stagedMeal.calories).toBe(600); // 300 + 200 + 100
+
+      // Banner should announce Dish A (the last applied one)
+      expect(result.current.addedFavoriteBanner?.message).toBe('Added Dish A to staged meal');
+
+      // Undo reverts ONLY the last applied one (Dish A)
+      await act(async () => {
+        result.current.addedFavoriteBanner?.onUndo();
+      });
+
+      // Staged meal should now contain Base Rice + Dish B (Dish A removed)
+      expect(result.current.stagedMeal.items).toHaveLength(2);
+      const revertedNames = result.current.stagedMeal.items.map((it: any) => it.name);
+      expect(revertedNames).toContain('Base Rice');
+      expect(revertedNames).toContain('Dish B');
+      expect(revertedNames).not.toContain('Dish A');
+      expect(result.current.stagedMeal.calories).toBe(500); // 300 + 200
+    });
+
+    it('two rapid adds with deferred fetch promises resolved in order A then B keep both favorites and Undo reverts only the last applied one', async () => {
+      let resolveA!: (val: CustomDishDetail | null) => void;
+      let resolveB!: (val: CustomDishDetail | null) => void;
+      const promiseA = new Promise<CustomDishDetail | null>((resolve) => {
+        resolveA = resolve;
+      });
+      const promiseB = new Promise<CustomDishDetail | null>((resolve) => {
+        resolveB = resolve;
+      });
+
+      const dishA: CustomDish = {
+        id: 'dish-A2',
+        user_id: 'user-123',
+        name: 'Dish A2',
+        calories: 100,
+        protein: 10,
+        carbs: 10,
+        fat: 2,
+        fiber: 1,
+        kind: 'food',
+        use_count: 1,
+      };
+      const dishB: CustomDish = {
+        id: 'dish-B2',
+        user_id: 'user-123',
+        name: 'Dish B2',
+        calories: 200,
+        protein: 20,
+        carbs: 20,
+        fat: 4,
+        fiber: 2,
+        kind: 'food',
+        use_count: 1,
+      };
+
+      const fetchDishDetail = vi.fn((id: string) => {
+        if (id === 'dish-A2') return promiseA;
+        return promiseB;
+      });
+
+      const initialStagedMeal = {
+        name: 'Base Meal 2',
+        mealType: 'Dinner',
+        explanation: '300 kcal',
+        items: [
+          {
+            id: 'item-base-2',
+            name: 'Base Rice 2',
+            portion: '1 cup',
+            quantity: 1,
+            unit: 'unit' as const,
+            baseQuantity: 1,
+            baseCalories: 300,
+            baseProtein: 5,
+            baseCarbs: 60,
+            baseFat: 1,
+            baseFiber: 2,
+            calories: 300,
+            protein: 5,
+            carbs: 60,
+            fat: 1,
+            fiber: 2,
+            portionMultiplier: 1,
+          },
+        ],
+        calories: 300,
+        protein: 5,
+        carbs: 60,
+        fat: 1,
+        fiber: 2,
+        servingSize: 1,
+        servingUnit: 'serving',
+        notes: null,
+      };
+
+      const { result } = renderHook(
+        () => {
+          const [stagedMeal, setStagedMeal] = React.useState<any>(initialStagedMeal);
+          const actions = useCustomDishActions({
+            targetUserId: 'user-123',
+            selectedDate: '2026-09-26',
+            stagedMeal,
+            setStagedMeal,
+            fetchDishDetail,
+            mutation: { mutate: vi.fn() },
+          });
+          return { ...actions, stagedMeal };
+        },
+        { wrapper }
+      );
+
+      // Rapidly tap Dish A2, then Dish B2
+      const actionPromiseA = result.current.handleAddCustomDishToStaged(dishA);
+      const actionPromiseB = result.current.handleAddCustomDishToStaged(dishB);
+
+      // Resolve A first
+      await act(async () => {
+        resolveA({
+          ...dishA,
+          items: [
+            {
+              id: 'it-a2',
+              name: 'Dish A2',
+              displayPortion: '1 serving',
+              quantity: 1,
+              unit: 'unit',
+              calories: 100,
+              protein: 10,
+              carbs: 10,
+              fat: 2,
+              fiber: 1,
+            },
+          ],
+        });
+        await actionPromiseA;
+      });
+
+      // Resolve B second
+      await act(async () => {
+        resolveB({
+          ...dishB,
+          items: [
+            {
+              id: 'it-b2',
+              name: 'Dish B2',
+              displayPortion: '1 serving',
+              quantity: 1,
+              unit: 'unit',
+              calories: 200,
+              protein: 20,
+              carbs: 20,
+              fat: 4,
+              fiber: 2,
+            },
+          ],
+        });
+        await actionPromiseB;
+      });
+
+      // Both items MUST be present in staged meal (Base Rice 2 + Dish A2 + Dish B2)
+      expect(result.current.stagedMeal.items).toHaveLength(3);
+      const itemNames = result.current.stagedMeal.items.map((it: any) => it.name);
+      expect(itemNames).toContain('Base Rice 2');
+      expect(itemNames).toContain('Dish A2');
+      expect(itemNames).toContain('Dish B2');
+      expect(result.current.stagedMeal.calories).toBe(600); // 300 + 100 + 200
+
+      // Banner should announce Dish B2 (the last applied one)
+      expect(result.current.addedFavoriteBanner?.message).toBe('Added Dish B2 to staged meal');
+
+      // Undo reverts ONLY the last applied one (Dish B2)
+      await act(async () => {
+        result.current.addedFavoriteBanner?.onUndo();
+      });
+
+      // Staged meal should now contain Base Rice 2 + Dish A2 (Dish B2 removed)
+      expect(result.current.stagedMeal.items).toHaveLength(2);
+      const revertedNames = result.current.stagedMeal.items.map((it: any) => it.name);
+      expect(revertedNames).toContain('Base Rice 2');
+      expect(revertedNames).toContain('Dish A2');
+      expect(revertedNames).not.toContain('Dish B2');
+      expect(result.current.stagedMeal.calories).toBe(400); // 300 + 100
+    });
+  });
 });

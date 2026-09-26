@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState, useRef, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import type { CustomDish, CustomDishDetail } from '../../types/database';
@@ -12,9 +12,15 @@ import { fetchDishDetail as defaultFetchDishDetail } from './useNutritionData';
 import {
   buildStagedItem,
   recomputeStagedTotals,
+  mergeOrAppendStagedItems,
   type StagedItem,
   type StagedMeal,
 } from './nutritionEngineHelpers';
+
+export interface AddedFavoriteBanner {
+  message: string;
+  onUndo: () => void;
+}
 
 export interface UseCustomDishActionsOptions {
   targetUserId: string;
@@ -27,9 +33,44 @@ export interface UseCustomDishActionsOptions {
   triggerToast?: (dish: CustomDish) => void;
 }
 
+export function buildItemsFromDish(dish: CustomDish, detail: CustomDishDetail | null): StagedItem[] {
+  const stored =
+    normalizeItems(detail?.items) ?? itemsFromLegacyIngredients(dish.id, dish.name, detail?.ingredients);
+
+  let items: StagedItem[] = (stored ?? []).map((it) =>
+    buildStagedItem({
+      name: it.name,
+      portion: it.displayPortion,
+      quantity: it.quantity,
+      unit: it.unit,
+      calories: it.calories,
+      protein: it.protein,
+      carbs: it.carbs,
+      fat: it.fat,
+      fiber: it.fiber,
+    })
+  );
+
+  if (items.length === 0) {
+    items = [
+      buildStagedItem({
+        name: dish.name,
+        portion: '1 serving',
+        calories: dish.calories,
+        protein: dish.protein,
+        carbs: dish.carbs,
+        fat: dish.fat,
+        fiber: dish.fiber,
+      }),
+    ];
+  }
+  return items;
+}
+
 export function useCustomDishActions({
   targetUserId,
   selectedDate,
+  stagedMeal,
   setStagedMeal,
   setDishFetchError,
   fetchDishDetail,
@@ -37,6 +78,29 @@ export function useCustomDishActions({
   triggerToast,
 }: UseCustomDishActionsOptions) {
   const queryClient = useQueryClient();
+  const [addedFavoriteBanner, setAddedFavoriteBanner] = useState<AddedFavoriteBanner | null>(null);
+  const previousStagedMealRef = useRef<StagedMeal | null>(null);
+  const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestStagedMealRef = useRef<StagedMeal | null>(stagedMeal ?? null);
+
+  useEffect(() => {
+    return () => {
+      if (bannerTimerRef.current) {
+        clearTimeout(bannerTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    latestStagedMealRef.current = stagedMeal ?? null;
+    if (!stagedMeal) {
+      if (bannerTimerRef.current) {
+        clearTimeout(bannerTimerRef.current);
+        bannerTimerRef.current = null;
+      }
+      previousStagedMealRef.current = null;
+    }
+  }, [stagedMeal]);
 
   const incrementDishUseCount = useCallback(
     (dish: CustomDish) => {
@@ -69,37 +133,7 @@ export function useCustomDishActions({
         return;
       }
 
-      const stored =
-        normalizeItems(detail?.items) ?? itemsFromLegacyIngredients(dish.id, dish.name, detail?.ingredients);
-
-      let items: StagedItem[] = (stored ?? []).map((it) =>
-        buildStagedItem({
-          name: it.name,
-          portion: it.displayPortion,
-          quantity: it.quantity,
-          unit: it.unit,
-          calories: it.calories,
-          protein: it.protein,
-          carbs: it.carbs,
-          fat: it.fat,
-          fiber: it.fiber,
-        })
-      );
-
-      if (items.length === 0) {
-        items = [
-          buildStagedItem({
-            name: dish.name,
-            portion: '1 serving',
-            calories: dish.calories,
-            protein: dish.protein,
-            carbs: dish.carbs,
-            fat: dish.fat,
-            fiber: dish.fiber,
-          }),
-        ];
-      }
-
+      const items = buildItemsFromDish(dish, detail);
       const { explanation, ...tot } = recomputeStagedTotals(items);
 
       setStagedMeal({
@@ -115,6 +149,82 @@ export function useCustomDishActions({
       });
 
       incrementDishUseCount(dish);
+    },
+    [fetchDishDetail, incrementDishUseCount, setDishFetchError, setStagedMeal]
+  );
+
+  const handleAddCustomDishToStaged = useCallback(
+    async function addDishToStaged(dish: CustomDish) {
+      if (!latestStagedMealRef.current) return;
+      setDishFetchError?.(null);
+      let detail: CustomDishDetail | null = null;
+      const fetcher = fetchDishDetail || defaultFetchDishDetail;
+      try {
+        detail = await fetcher(dish.id);
+      } catch (err: any) {
+        if (!latestStagedMealRef.current) return;
+        const msg = err?.message || 'Failed to load dish details';
+        setDishFetchError?.({
+          message: msg,
+          retry: () => {
+            void addDishToStaged(dish);
+          },
+        });
+        return;
+      }
+
+      const currentStagedMeal = latestStagedMealRef.current;
+      if (!currentStagedMeal) {
+        return;
+      }
+
+      const incomingItems = buildItemsFromDish(dish, detail);
+      const snapshot = currentStagedMeal;
+      previousStagedMealRef.current = snapshot;
+
+      const mergedItems = mergeOrAppendStagedItems(currentStagedMeal.items, incomingItems);
+      const { explanation, ...tot } = recomputeStagedTotals(mergedItems);
+
+      const nextStagedMeal: StagedMeal = {
+        ...currentStagedMeal,
+        items: mergedItems,
+        ...tot,
+        explanation:
+          mergedItems.length > 1 ? explanation : `${formatCalories(tot.calories)} kcal (${currentStagedMeal.name})`,
+      };
+
+      latestStagedMealRef.current = nextStagedMeal;
+      setStagedMeal(nextStagedMeal);
+
+      incrementDishUseCount(dish);
+
+      if (bannerTimerRef.current) {
+        clearTimeout(bannerTimerRef.current);
+        bannerTimerRef.current = null;
+      }
+
+      const onUndo = () => {
+        if (bannerTimerRef.current) {
+          clearTimeout(bannerTimerRef.current);
+          bannerTimerRef.current = null;
+        }
+        if (previousStagedMealRef.current) {
+          latestStagedMealRef.current = previousStagedMealRef.current;
+          setStagedMeal(previousStagedMealRef.current);
+          previousStagedMealRef.current = null;
+        }
+        setAddedFavoriteBanner(null);
+      };
+
+      setAddedFavoriteBanner({
+        message: `Added ${dish.name} to staged meal`,
+        onUndo,
+      });
+
+      bannerTimerRef.current = setTimeout(() => {
+        setAddedFavoriteBanner(null);
+        bannerTimerRef.current = null;
+      }, 5000);
     },
     [fetchDishDetail, incrementDishUseCount, setDishFetchError, setStagedMeal]
   );
@@ -143,8 +253,19 @@ export function useCustomDishActions({
     [incrementDishUseCount, mutation, selectedDate, triggerToast]
   );
 
+  const dismissAddedFavoriteBanner = useCallback(() => {
+    if (bannerTimerRef.current) {
+      clearTimeout(bannerTimerRef.current);
+      bannerTimerRef.current = null;
+    }
+    setAddedFavoriteBanner(null);
+  }, []);
+
   return {
     handleStageCustomDish,
     handleQuickLogCustomDishDirect,
+    handleAddCustomDishToStaged,
+    addedFavoriteBanner: stagedMeal ? addedFavoriteBanner : null,
+    dismissAddedFavoriteBanner,
   };
 }

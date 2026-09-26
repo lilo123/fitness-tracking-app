@@ -4082,6 +4082,91 @@ Total Fiber: 1 g`;
       expect(document.activeElement).toBe(dateInput);
     });
 
+    it('D33: while meal is staged, Quick Log favorite appends items, updates Day total/This meal, shows banner with Undo, and "+" does not call log mutation', async () => {
+      const mockInsert = vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) });
+      const customDishes = [
+        { id: 'dish-1', user_id: 'test-user', name: 'Almonds', calories: 160, protein: 6, carbs: 6, fat: 14, fiber: 3, kind: 'food', use_count: 5 },
+      ];
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'custom_dishes') {
+          return createSupabaseBuilder('custom_dishes', {
+            resolver: (builder: any) => {
+              if (builder.projection === 'id, items, ingredients, kind, notes') {
+                return {
+                  id: 'dish-1',
+                  items: null,
+                  ingredients: null,
+                  kind: 'food',
+                  notes: null,
+                };
+              }
+              return customDishes;
+            },
+          });
+        }
+        const b = createSupabaseBuilder(table, { data: [], error: null });
+        if (table === 'nutrition_logs') {
+          b.insert = mockInsert;
+        }
+        return b;
+      });
+
+      renderComponent();
+
+      // Initially no meal staged: title is Quick Log Favorites
+      await waitFor(() => {
+        expect(screen.getByText('Almonds')).toBeDefined();
+      });
+      expect(screen.getByRole('heading', { level: 3, name: /Quick Log Favorites/i })).toBeDefined();
+
+      // Stage a meal via Manual Entry
+      fireEvent.click(screen.getByText('Manual Entry'));
+      await userEvent.type(screen.getByTestId('dish-name-input'), 'Greek Yogurt');
+      await userEvent.type(screen.getByTestId('calories-input'), '150');
+      await userEvent.type(screen.getByTestId('protein-input'), '15');
+      await userEvent.type(screen.getByTestId('carbs-input'), '10');
+      await userEvent.type(screen.getByTestId('fat-input'), '2');
+      fireEvent.click(screen.getByText('Log Meal'));
+
+      // Now meal is staged
+      await waitFor(() => {
+        expect(screen.getByTestId('staged-meal-card')).toBeInTheDocument();
+      });
+
+      // Section title switched to "Add to staged meal"
+      expect(screen.getByRole('heading', { level: 3, name: /Add to staged meal/i })).toBeDefined();
+
+      // "+" button aria-label is "Add Almonds to staged meal"
+      const plusBtn = screen.getByLabelText('Add Almonds to staged meal');
+      expect(plusBtn).toBeDefined();
+
+      // Click "+" button
+      fireEvent.click(plusBtn);
+
+      // Does NOT call log mutation
+      expect(mockInsert).not.toHaveBeenCalled();
+
+      // Banner with Undo is present
+      await waitFor(() => {
+        expect(screen.getByTestId('add-favorite-status-banner')).toHaveTextContent(/Added Almonds to staged meal/i);
+      });
+      const undoBtn = screen.getByTestId('undo-add-favorite-btn');
+      expect(undoBtn).toBeInTheDocument();
+
+      // This meal and totals recomputed: 150 + 160 = 310 kcal
+      expect(screen.getByText(/Log Meal \(\+310 kcal\)/i)).toBeInTheDocument();
+
+      // Click Undo
+      fireEvent.click(undoBtn);
+
+      // Reverts to original staged meal (150 kcal)
+      await waitFor(() => {
+        expect(screen.getByText(/Log Meal \(\+150 kcal\)/i)).toBeInTheDocument();
+      });
+      // Banner is hidden
+      expect(screen.queryByTestId('add-favorite-status-banner')).toBeNull();
+    });
+
   });
 
 });

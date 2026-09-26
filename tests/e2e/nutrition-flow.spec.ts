@@ -632,4 +632,136 @@ test('manual form stages meal, adds item with updated totals, and logs to timeli
     // 10. Delete row to remain net-neutral
     await deleteMealRow(page, manualMealName);
   });
+
+  test('while meal is staged, Quick Log favorite appends items to staged meal and commits (D33)', async ({ page }) => {
+    const favoriteDish = {
+      id: 'dish-almonds-fav',
+      user_id: 'test-user',
+      name: 'Roasted Almonds',
+      calories: 160,
+      protein: 6,
+      carbs: 6,
+      fat: 14,
+      fiber: 3,
+      created_at: new Date().toISOString(),
+      kind: 'food',
+      use_count: 5,
+      notes: null,
+      items: [
+        {
+          id: 'item-almond-1',
+          name: 'Roasted Almonds',
+          displayPortion: '1 oz',
+          quantity: 1,
+          unit: 'oz',
+          calories: 160,
+          protein: 6,
+          carbs: 6,
+          fat: 14,
+          fiber: 3,
+        },
+      ],
+    };
+
+    await page.route('**/rest/v1/custom_dishes*', async (route) => {
+      if (route.request().method() === 'OPTIONS') {
+        await route.fulfill({
+          status: 200,
+          headers: {
+            'access-control-allow-origin': '*',
+            'access-control-allow-headers': 'authorization, x-client-info, apikey, content-type',
+            'access-control-allow-methods': 'GET, POST, OPTIONS',
+          },
+        });
+        return;
+      }
+      const url = route.request().url();
+      if (url.includes('id=eq.')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          headers: { 'access-control-allow-origin': '*' },
+          body: JSON.stringify([favoriteDish]),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: {
+          'access-control-allow-origin': '*',
+          'content-range': '0-0/1',
+        },
+        body: JSON.stringify([favoriteDish]),
+      });
+    });
+
+    await page.route('**/rest/v1/rpc/increment_dish_use_count*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: { 'access-control-allow-origin': '*' },
+        body: JSON.stringify({}),
+      });
+    });
+
+    await safeGoto(page, '/nutrition');
+    await page.waitForSelector("text=Today's Nutrition");
+
+    // Initially heading is "Quick Log Favorites"
+    await expect(page.locator('section').filter({ hasText: 'Quick Log Favorites' })).toBeVisible();
+    await expect(page.locator('[data-testid="custom-dish-card-dish-almonds-fav"]')).toBeVisible();
+
+    // Stage a meal via Manual Entry
+    const manualMealName = `D33 Greek Yogurt ${Date.now()}`;
+    const manualToggleBtn = page.locator('button:has-text("Manual Entry")');
+    if (await manualToggleBtn.isVisible()) {
+      await manualToggleBtn.click();
+    }
+    await page.locator('[data-testid="dish-name-input"]').fill(manualMealName);
+    await page.locator('[data-testid="calories-input"]').fill('150');
+    await page.locator('[data-testid="protein-input"]').fill('15');
+    await page.locator('[data-testid="carbs-input"]').fill('10');
+    await page.locator('[data-testid="fat-input"]').fill('2');
+    const fiberInput = page.locator('[data-testid="fiber-input"]');
+    if (await fiberInput.isVisible()) {
+      await fiberInput.fill('0');
+    }
+    await page.locator('button:has-text("Log Meal")').last().click();
+
+    // Staged card is visible
+    const stagedCard = page.locator('[data-testid="staged-meal-card"]');
+    await expect(stagedCard).toBeVisible();
+
+    // Heading switches to "Add to staged meal"
+    await expect(page.locator('section').filter({ hasText: 'Add to staged meal' })).toBeVisible();
+
+    // Plus button aria-label includes "Add Roasted Almonds to staged meal"
+    const plusBtn = page.locator('[data-testid="quick-log-btn-dish-almonds-fav"]');
+    await expect(plusBtn).toHaveAttribute('aria-label', /Add Roasted Almonds to staged meal/i);
+
+    // Click plus button to append Roasted Almonds
+    await plusBtn.click();
+
+    // Banner with Undo is visible
+    const banner = page.locator('[data-testid="add-favorite-status-banner"]');
+    await expect(banner).toBeVisible();
+    await expect(banner).toContainText('Added Roasted Almonds to staged meal');
+
+    // Totals updated: 150 + 160 = 310 kcal
+    const commitBtn = stagedCard.locator('button:has-text("Log Meal (+310 kcal)")');
+    await expect(commitBtn).toBeVisible();
+
+    // Commit staged meal
+    await commitBtn.click();
+    await expect(stagedCard).not.toBeVisible();
+
+    // Verify logged meal row in timeline with combined totals (310 kcal)
+    const loggedRow = page.locator('[data-testid="meal-log-item"]').filter({ hasText: manualMealName }).first();
+    await expect(loggedRow).toBeVisible();
+    await expect(loggedRow.locator('text=310 kcal')).toBeVisible();
+
+    // Net-neutral: remove the row
+    await deleteMealRow(page, manualMealName);
+  });
 });

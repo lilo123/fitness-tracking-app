@@ -789,4 +789,151 @@ describe('QuickLogFavorites (Horizontal Bar Redesign)', () => {
     const cardBtn = screen.getByTestId('custom-dish-card-dish-long-name');
     expect(cardBtn.getAttribute('aria-label')).toContain(longName);
   });
+
+  describe('D33: Quick Log Favorites staged mode', () => {
+    it('switches section title to "Add to staged meal" when isStaged is true, and keeps "Quick Log Favorites" when false', () => {
+      const dish = createMockDish({ id: 'dish-1', name: 'Greek Yogurt' });
+
+      // Unstaged (default)
+      const { unmount } = render(
+        <QuickLogFavorites
+          customDishes={[dish]}
+          onOpenNewDishModal={vi.fn()}
+          onStageCustomDish={vi.fn()}
+          onOpenEditDishModal={vi.fn()}
+          onQuickLogCustomDishDirect={vi.fn()}
+          onDismissToast={vi.fn()}
+          isStaged={false}
+        />
+      );
+      expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Quick Log Favorites');
+      unmount();
+
+      // Staged
+      render(
+        <QuickLogFavorites
+          customDishes={[dish]}
+          onOpenNewDishModal={vi.fn()}
+          onStageCustomDish={vi.fn()}
+          onOpenEditDishModal={vi.fn()}
+          onQuickLogCustomDishDirect={vi.fn()}
+          onDismissToast={vi.fn()}
+          isStaged={true}
+        />
+      );
+      expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Add to staged meal');
+    });
+
+    it('"+" button aria-label is "Add <dish name> to staged meal" when isStaged is true, and "Quick log 1 serving of <dish name>" when false', () => {
+      const dish = createMockDish({ id: 'dish-1', name: 'Almonds' });
+
+      // Unstaged
+      const { unmount } = render(
+        <QuickLogFavorites
+          customDishes={[dish]}
+          onOpenNewDishModal={vi.fn()}
+          onStageCustomDish={vi.fn()}
+          onOpenEditDishModal={vi.fn()}
+          onQuickLogCustomDishDirect={vi.fn()}
+          onDismissToast={vi.fn()}
+          isStaged={false}
+        />
+      );
+      const plusBtnUnstaged = screen.getByTestId('quick-log-btn-dish-1');
+      expect(plusBtnUnstaged.getAttribute('aria-label')).toBe('Quick log 1 serving of Almonds');
+      unmount();
+
+      // Staged
+      render(
+        <QuickLogFavorites
+          customDishes={[dish]}
+          onOpenNewDishModal={vi.fn()}
+          onStageCustomDish={vi.fn()}
+          onOpenEditDishModal={vi.fn()}
+          onQuickLogCustomDishDirect={vi.fn()}
+          onDismissToast={vi.fn()}
+          isStaged={true}
+        />
+      );
+      const plusBtnStaged = screen.getByTestId('quick-log-btn-dish-1');
+      expect(plusBtnStaged.getAttribute('aria-label')).toBe('Add Almonds to staged meal');
+    });
+
+    it('"+" button while staged calls onAddCustomDishToStaged and does NOT call onQuickLogCustomDishDirect', () => {
+      const dish = createMockDish({ id: 'dish-1', name: 'Almonds' });
+      const onAddCustomDishToStaged = vi.fn();
+      const onQuickLogCustomDishDirect = vi.fn();
+
+      render(
+        <QuickLogFavorites
+          customDishes={[dish]}
+          onOpenNewDishModal={vi.fn()}
+          onStageCustomDish={vi.fn()}
+          onOpenEditDishModal={vi.fn()}
+          onQuickLogCustomDishDirect={onQuickLogCustomDishDirect}
+          onDismissToast={vi.fn()}
+          isStaged={true}
+          onAddCustomDishToStaged={onAddCustomDishToStaged}
+        />
+      );
+
+      const plusBtn = screen.getByTestId('quick-log-btn-dish-1');
+      fireEvent.click(plusBtn);
+
+      expect(onAddCustomDishToStaged).toHaveBeenCalledTimes(1);
+      expect(onAddCustomDishToStaged).toHaveBeenCalledWith(dish);
+      expect(onQuickLogCustomDishDirect).not.toHaveBeenCalled();
+    });
+
+    it('"+" button with no staged meal still logs directly', () => {
+      const dish = createMockDish({ id: 'dish-1', name: 'Almonds' });
+      const onAddCustomDishToStaged = vi.fn();
+      const onQuickLogCustomDishDirect = vi.fn();
+
+      render(
+        <QuickLogFavorites
+          customDishes={[dish]}
+          onOpenNewDishModal={vi.fn()}
+          onStageCustomDish={vi.fn()}
+          onOpenEditDishModal={vi.fn()}
+          onQuickLogCustomDishDirect={onQuickLogCustomDishDirect}
+          onDismissToast={vi.fn()}
+          isStaged={false}
+          onAddCustomDishToStaged={onAddCustomDishToStaged}
+        />
+      );
+
+      const plusBtn = screen.getByTestId('quick-log-btn-dish-1');
+      fireEvent.click(plusBtn);
+
+      expect(onQuickLogCustomDishDirect).toHaveBeenCalledTimes(1);
+      expect(onAddCustomDishToStaged).not.toHaveBeenCalled();
+    });
+
+    it('row tap while staged calls onAddCustomDishToStaged instead of onStageCustomDish', () => {
+      const dish = createMockDish({ id: 'dish-1', name: 'Almonds' });
+      const onAddCustomDishToStaged = vi.fn();
+      const onStageCustomDish = vi.fn();
+
+      render(
+        <QuickLogFavorites
+          customDishes={[dish]}
+          onOpenNewDishModal={vi.fn()}
+          onStageCustomDish={onStageCustomDish}
+          onOpenEditDishModal={vi.fn()}
+          onQuickLogCustomDishDirect={vi.fn()}
+          onDismissToast={vi.fn()}
+          isStaged={true}
+          onAddCustomDishToStaged={onAddCustomDishToStaged}
+        />
+      );
+
+      const rowBtn = screen.getByTestId('custom-dish-card-dish-1');
+      fireEvent.click(rowBtn);
+
+      expect(onAddCustomDishToStaged).toHaveBeenCalledTimes(1);
+      expect(onAddCustomDishToStaged).toHaveBeenCalledWith(dish);
+      expect(onStageCustomDish).not.toHaveBeenCalled();
+    });
+  });
 });
