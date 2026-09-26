@@ -24,6 +24,7 @@ import { ManualMealForm } from './ManualMealForm';
 import { useManualMealForm, type ManualMealStagedData } from './useManualMealForm';
 import { useCustomDishSaving } from './useCustomDishSaving';
 import { useCustomDishActions } from './useCustomDishActions';
+import { useStagedMealAddAi } from './useStagedMealAddAi';
 import { CustomDishesModal } from './CustomDishesModal';
 import { Utensils, CheckCircle2, AlertCircle, RotateCcw } from 'lucide-react';
 import { StatusBanner } from '../common/StatusBanner';
@@ -177,6 +178,12 @@ export const NutritionEngine: React.FC = () => {
       targetUserId, selectedDate, stagedMeal, setStagedMeal, setDishFetchError, fetchDishDetail, mutation, triggerToast,
     });
 
+  const { handleAddParsedItems } = useStagedMealAddAi({
+    stagedMeal,
+    setStagedMeal,
+    triggerToast,
+  });
+
   useEffect(() => {
     if (
       activeToast?.variant === 'added' &&
@@ -282,6 +289,8 @@ export const NutritionEngine: React.FC = () => {
               setStagedMeal(null);
             }}
             isPending={mutation.isPending}
+            customDishes={customDishes}
+            onAddParsedItems={handleAddParsedItems}
           />
         </div>
       ) : (
@@ -457,6 +466,7 @@ export const NutritionEngine: React.FC = () => {
         triggerToast={triggerToast}
         setStatus={setStatus}
         setIsError={setIsError}
+        customDishes={customDishes}
       />
 
       {/* Nutrient Breakdown Modal */}

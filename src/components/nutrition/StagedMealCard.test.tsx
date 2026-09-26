@@ -1061,8 +1061,8 @@ describe('StagedMealCard', () => {
         />
       );
       expect(screen.getByTestId('add-item-button')).toBeDefined();
-      expect(screen.getByText('+ Manual')).toBeDefined();
-      expect(screen.getByRole('button', { name: 'Add manual item' })).toBeDefined();
+      expect(screen.getByText('+ Add')).toBeDefined();
+      expect(screen.getByRole('button', { name: 'Add item' })).toBeDefined();
       unmount();
 
       const multiMeal = makeMultiItemMeal();
@@ -1082,7 +1082,7 @@ describe('StagedMealCard', () => {
       expect(screen.getByTestId('add-item-button')).toBeDefined();
     });
 
-    it('D34: renders "+ Manual" button with aria-label on single, multi-component, AI and manual staged cards and opens add-item form', () => {
+    it('D34/D45: renders "+ Add" button with aria-label on single, multi-component, AI and manual staged cards and opens composer', () => {
       const cardTypes: Array<{ type: string; meal: StagedMeal }> = [
         {
           type: 'single-item',
@@ -1155,20 +1155,54 @@ describe('StagedMealCard', () => {
 
         const btn = screen.getByTestId('add-item-button');
         expect(btn).toBeDefined();
-        expect(btn.textContent?.trim()).toBe('+ Manual');
-        expect(btn.getAttribute('aria-label')).toBe('Add manual item');
-        expect(screen.getByRole('button', { name: 'Add manual item' })).toBeDefined();
+        expect(btn.textContent?.trim()).toBe('+ Add');
+        expect(btn.getAttribute('aria-label')).toBe('Add item');
+        expect(screen.getByRole('button', { name: 'Add item' })).toBeDefined();
 
-        // Clicking + Manual opens the inline AddItemForm
-        expect(screen.queryByTestId('add-item-form')).toBeNull();
+        // Clicking + Add opens the inline composer
+        expect(screen.queryByTestId('add-items-composer')).toBeNull();
         fireEvent.click(btn);
+        expect(screen.getByTestId('add-items-composer')).toBeDefined();
+
+        // Clicking Enter manually inside composer opens AddItemForm
+        fireEvent.click(screen.getByRole('button', { name: /enter manually/i }));
         expect(screen.getByTestId('add-item-form')).toBeDefined();
 
         unmount();
       }
     });
 
-    it('clicking + Add item opens the inline form, and Cancel closes it without changes', () => {
+    it('D45: focus returns to "+ Add" button when composer is closed via Cancel', () => {
+      const meal = makeStagedMeal();
+      render(
+        <StagedMealCard
+          stagedMeal={meal}
+          onUpdateStagedMeal={vi.fn()}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={vi.fn()}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={false}
+        />
+      );
+
+      const addBtn = screen.getByTestId('add-item-button');
+      fireEvent.click(addBtn);
+
+      const composer = screen.getByTestId('add-items-composer');
+      expect(composer).toBeDefined();
+
+      const cancelBtn = screen.getByTestId('cancel-composer-button');
+      fireEvent.click(cancelBtn);
+
+      expect(screen.queryByTestId('add-items-composer')).toBeNull();
+      expect(document.activeElement).toBe(screen.getByTestId('add-item-button'));
+    });
+
+
+    it('clicking + Add item opens the composer, Enter manually opens the inline form, and Cancel closes it without changes', () => {
       const meal = makeStagedMeal();
       const onUpdateStagedMeal = vi.fn();
       render(
@@ -1188,8 +1222,10 @@ describe('StagedMealCard', () => {
       // Initially inline form is not open
       expect(screen.queryByTestId('add-item-form')).toBeNull();
 
-      // Click + Add item
+      // Click + Add item, then Enter manually
       fireEvent.click(screen.getByTestId('add-item-button'));
+      expect(screen.getByTestId('add-items-composer')).toBeDefined();
+      fireEvent.click(screen.getByRole('button', { name: /enter manually/i }));
       expect(screen.getByTestId('add-item-form')).toBeDefined();
       expect(screen.queryByTestId('add-item-button')).toBeNull(); // button hidden while form open
 
@@ -1222,6 +1258,7 @@ describe('StagedMealCard', () => {
       );
 
       fireEvent.click(screen.getByTestId('add-item-button'));
+      fireEvent.click(screen.getByRole('button', { name: /enter manually/i }));
 
       // Fill in new item (White Rice, 200g, 260 kcal, 5 P, 56 C, 1 F, 2 Fib)
       fireEvent.change(screen.getByTestId('add-item-name-input'), { target: { value: 'White Rice' } });
@@ -1318,6 +1355,7 @@ describe('StagedMealCard', () => {
       );
 
       fireEvent.click(screen.getByTestId('add-item-button'));
+      fireEvent.click(screen.getByRole('button', { name: /enter manually/i }));
       fireEvent.change(screen.getByTestId('add-item-name-input'), { target: { value: 'Side Salad' } });
       fireEvent.change(screen.getByTestId('add-item-calories-input'), { target: { value: '50' } });
       fireEvent.click(screen.getByTestId('submit-add-item-button'));

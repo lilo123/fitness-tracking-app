@@ -3,6 +3,8 @@ import { Utensils, X } from 'lucide-react';
 import type { NutritionLog } from '../../types/database';
 import { AccessibleModal } from '../common/AccessibleModal';
 import { StatusBanner } from '../common/StatusBanner';
+import type { CustomDish } from '../../types/database';
+import { mergeOrAppendStagedItems, recomputeStagedTotals, type StagedItem, type StagedMeal } from './nutritionEngineHelpers';
 import { StagedMealCard } from './StagedMealCard';
 import { useMealEditor } from './useMealEditor';
 import { useCustomDishSaving } from './useCustomDishSaving';
@@ -35,6 +37,7 @@ export interface EditMealSheetProps {
   ) => void;
   setStatus?: (s: string) => void;
   setIsError?: (e: boolean) => void;
+  customDishes?: CustomDish[];
 }
 
 export const EditMealSheet: React.FC<EditMealSheetProps> = ({
@@ -49,6 +52,7 @@ export const EditMealSheet: React.FC<EditMealSheetProps> = ({
   triggerToast,
   setStatus,
   setIsError,
+  customDishes = [],
 }) => {
   const headingRef = useRef<HTMLHeadingElement>(null);
 
@@ -79,6 +83,7 @@ export const EditMealSheet: React.FC<EditMealSheetProps> = ({
       triggerToast={triggerToast}
       setStatus={setStatus}
       setIsError={setIsError}
+      customDishes={customDishes}
     />
   );
 };
@@ -108,6 +113,7 @@ interface EditMealSheetContentProps {
   ) => void;
   setStatus?: (s: string) => void;
   setIsError?: (e: boolean) => void;
+  customDishes?: CustomDish[];
 }
 
 const EditMealSheetContent: React.FC<EditMealSheetContentProps> = ({
@@ -121,6 +127,7 @@ const EditMealSheetContent: React.FC<EditMealSheetContentProps> = ({
   triggerToast,
   setStatus,
   setIsError,
+  customDishes = [],
 }) => {
   const {
     draft,
@@ -176,6 +183,24 @@ const EditMealSheetContent: React.FC<EditMealSheetContentProps> = ({
   const handleCancel = useCallback(() => {
     onClose();
   }, [onClose]);
+
+  const handleAddParsedItems = useCallback(
+    (items: StagedItem[], mealAtStart?: StagedMeal) => {
+      setDraft((currentDraft) => {
+        if (!currentDraft) return null;
+        if (mealAtStart && currentDraft !== mealAtStart) return currentDraft;
+        const merged = mergeOrAppendStagedItems(currentDraft.items, items);
+        const tot = recomputeStagedTotals(merged);
+        return {
+          ...currentDraft,
+          items: merged,
+          ...tot,
+          explanation: currentDraft.explanation,
+        };
+      });
+    },
+    [setDraft]
+  );
 
   return (
     <AccessibleModal
@@ -235,6 +260,8 @@ const EditMealSheetContent: React.FC<EditMealSheetContentProps> = ({
           onScale={applyScale}
           isPending={isSaving}
           navHeight={0}
+          customDishes={customDishes}
+          onAddParsedItems={handleAddParsedItems}
         />
       )}
     </AccessibleModal>

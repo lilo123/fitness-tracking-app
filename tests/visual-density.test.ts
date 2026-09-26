@@ -1061,8 +1061,8 @@ test.describe('Surface A: Staged card with 4 items', () => {
     expect(result.headerRowHeight, `Header row height (${result.headerRowHeight}px) exceeds pre-D22 value 16px (+0.5px tolerance)`).toBeLessThanOrEqual(16.5);
 
     // D34: label text '+ Manual', aria-label 'Add manual item', no clip
-    expect(result.buttonText, 'Breakdown header button label must be "+ Manual"').toBe('+ Manual');
-    expect(result.ariaLabel, 'Breakdown header button aria-label must be "Add manual item"').toBe('Add manual item');
+    expect(result.buttonText, 'Breakdown header button label must be "+ Add"').toBe('+ Add');
+    expect(result.ariaLabel, 'Breakdown header button aria-label must be "Add item"').toBe('Add item');
     expect(result.isClipped, 'Breakdown header button must fit with no clipping').toBe(false);
 
     // Add item tap box >= 40 tall and >= 40 wide
@@ -1282,7 +1282,7 @@ test.describe('Surface B: Staged card with 1 item', () => {
     ).toEqual([]);
   });
 
-  test('B: breakdown header row height <= 16px, + Manual button geometry at 390px (D34)', async () => {
+  test('B: breakdown header row height <= 16px, + Add button geometry at 390px (D34/D45)', async () => {
     expect(page.viewportSize()?.width).toBe(390);
     await waitForScrollSettled(page);
 
@@ -1290,8 +1290,8 @@ test.describe('Surface B: Staged card with 1 item', () => {
     console.log(JSON.stringify({ test: 'B: breakdown header geometry at 390px', surface: 'B', ...result }));
 
     expect(result.headerRowHeight, `Header row height (${result.headerRowHeight}px) exceeds 16px (+0.5px tolerance)`).toBeLessThanOrEqual(16.5);
-    expect(result.buttonText, 'Breakdown header button label must be "+ Manual"').toBe('+ Manual');
-    expect(result.ariaLabel, 'Breakdown header button aria-label must be "Add manual item"').toBe('Add manual item');
+    expect(result.buttonText, 'Breakdown header button label must be "+ Add"').toBe('+ Add');
+    expect(result.ariaLabel, 'Breakdown header button aria-label must be "Add item"').toBe('Add item');
     expect(result.isClipped, 'Breakdown header button must fit with no clipping').toBe(false);
     expect(result.buttonHeight, `+ Manual button tap height (${result.buttonHeight}px) < 40px`).toBeGreaterThanOrEqual(40);
     expect(result.buttonWidth, `+ Manual button tap width (${result.buttonWidth}px) < 40px`).toBeGreaterThanOrEqual(40);
@@ -1961,8 +1961,8 @@ test.describe('Surface E: Staged card at 320px width (D24)', () => {
     console.log(JSON.stringify({ test: 'E: breakdown header geometry at 320px', surface: 'E', ...result }));
 
     // D34: label text '+ Manual', aria-label 'Add manual item', no clip
-    expect(result.buttonText, 'Breakdown header button label must be "+ Manual"').toBe('+ Manual');
-    expect(result.ariaLabel, 'Breakdown header button aria-label must be "Add manual item"').toBe('Add manual item');
+    expect(result.buttonText, 'Breakdown header button label must be "+ Add"').toBe('+ Add');
+    expect(result.ariaLabel, 'Breakdown header button aria-label must be "Add item"').toBe('Add item');
     expect(result.isClipped, 'Breakdown header button must fit with no clipping').toBe(false);
 
     // Header row height <= pre-D22 value (16px) with +0.5px tolerance max
@@ -2077,8 +2077,8 @@ test.describe('Surface E: Staged card at 320px width (D24)', () => {
     console.log(JSON.stringify({ test: 'E: single-item breakdown header geometry at 320px', surface: 'E', ...singleResult }));
 
     expect(singleResult.headerRowHeight, `Header row height (${singleResult.headerRowHeight}px) exceeds 16px (+0.5px tolerance)`).toBeLessThanOrEqual(16.5);
-    expect(singleResult.buttonText, 'Breakdown header button label must be "+ Manual"').toBe('+ Manual');
-    expect(singleResult.ariaLabel, 'Breakdown header button aria-label must be "Add manual item"').toBe('Add manual item');
+    expect(singleResult.buttonText, 'Breakdown header button label must be "+ Add"').toBe('+ Add');
+    expect(singleResult.ariaLabel, 'Breakdown header button aria-label must be "Add item"').toBe('Add item');
     expect(singleResult.isClipped, 'Breakdown header button must fit with no clipping').toBe(false);
     expect(singleResult.buttonHeight, `+ Manual button tap height (${singleResult.buttonHeight}px) < 40px`).toBeGreaterThanOrEqual(40);
     expect(singleResult.buttonWidth, `+ Manual button tap width (${singleResult.buttonWidth}px) < 40px`).toBeGreaterThanOrEqual(40);
@@ -2106,8 +2106,8 @@ test.describe('Surface E: Staged card at 320px width (D24)', () => {
     console.log(JSON.stringify({ test: 'E: manual card breakdown header geometry at 320px', surface: 'E', ...manualResult }));
 
     expect(manualResult.headerRowHeight, `Header row height (${manualResult.headerRowHeight}px) exceeds 16px (+0.5px tolerance)`).toBeLessThanOrEqual(16.5);
-    expect(manualResult.buttonText, 'Breakdown header button label must be "+ Manual"').toBe('+ Manual');
-    expect(manualResult.ariaLabel, 'Breakdown header button aria-label must be "Add manual item"').toBe('Add manual item');
+    expect(manualResult.buttonText, 'Breakdown header button label must be "+ Add"').toBe('+ Add');
+    expect(manualResult.ariaLabel, 'Breakdown header button aria-label must be "Add item"').toBe('Add item');
     expect(manualResult.isClipped, 'Breakdown header button must fit with no clipping').toBe(false);
     expect(manualResult.buttonHeight, `+ Manual button tap height (${manualResult.buttonHeight}px) < 40px`).toBeGreaterThanOrEqual(40);
     expect(manualResult.buttonWidth, `+ Manual button tap width (${manualResult.buttonWidth}px) < 40px`).toBeGreaterThanOrEqual(40);
@@ -2182,15 +2182,15 @@ test.describe('Surface F: Manual-staged card and Add-item at 390×844', () => {
     expect(cardBox.height).toBeLessThanOrEqual(260);
   });
 
-  test('F: breakdown header row height <= 16px, + Manual button geometry on manual-staged card at 390px (D34)', async () => {
+  test('F: breakdown header row height <= 16px, + Add button geometry on manual-staged card at 390px (D34/D45)', async () => {
     await waitForScrollSettled(page);
 
     const result = await checkBreakdownHeaderGeometry(cardLocator);
     console.log(JSON.stringify({ test: 'F: breakdown header geometry at 390px', surface: 'F', ...result }));
 
     expect(result.headerRowHeight, `Header row height (${result.headerRowHeight}px) exceeds 16px (+0.5px tolerance)`).toBeLessThanOrEqual(16.5);
-    expect(result.buttonText, 'Breakdown header button label must be "+ Manual"').toBe('+ Manual');
-    expect(result.ariaLabel, 'Breakdown header button aria-label must be "Add manual item"').toBe('Add manual item');
+    expect(result.buttonText, 'Breakdown header button label must be "+ Add"').toBe('+ Add');
+    expect(result.ariaLabel, 'Breakdown header button aria-label must be "Add item"').toBe('Add item');
     expect(result.isClipped, 'Breakdown header button must fit with no clipping').toBe(false);
     expect(result.buttonHeight, `+ Manual button tap height (${result.buttonHeight}px) < 40px`).toBeGreaterThanOrEqual(40);
     expect(result.buttonWidth, `+ Manual button tap width (${result.buttonWidth}px) < 40px`).toBeGreaterThanOrEqual(40);
@@ -2265,6 +2265,7 @@ test.describe('Surface F: Manual-staged card and Add-item at 390×844', () => {
       const addItemBtn = cardLocator.locator('[data-testid="add-item-button"]');
       await expect(addItemBtn).toBeVisible();
       await addItemBtn.click();
+      await cardLocator.locator('[data-testid="enter-manually-button"]').click();
     }
     await expect(addItemForm).toBeVisible();
 
@@ -2314,6 +2315,7 @@ test.describe('Surface F: Manual-staged card and Add-item at 390×844', () => {
       const addItemBtn = cardLocator.locator('[data-testid="add-item-button"]');
       await expect(addItemBtn).toBeVisible();
       await addItemBtn.click();
+      await cardLocator.locator('[data-testid="enter-manually-button"]').click();
     }
     await expect(addItemForm).toBeVisible();
 
@@ -2332,6 +2334,7 @@ test.describe('Surface F: Manual-staged card and Add-item at 390×844', () => {
     // Add item 3
     const addItemBtn = cardLocator.locator('[data-testid="add-item-button"]');
     await addItemBtn.click();
+    await cardLocator.locator('[data-testid="enter-manually-button"]').click();
     await expect(addItemForm).toBeVisible();
     await addItemForm.locator('[data-testid="add-item-name-input"]').fill('Steamed Broccoli');
     await addItemForm.locator('[data-testid="add-item-quantity-input"]').fill('100');
@@ -2346,6 +2349,7 @@ test.describe('Surface F: Manual-staged card and Add-item at 390×844', () => {
 
     // Add item 4
     await addItemBtn.click();
+    await cardLocator.locator('[data-testid="enter-manually-button"]').click();
     await expect(addItemForm).toBeVisible();
     await addItemForm.locator('[data-testid="add-item-name-input"]').fill('Olive Oil Drizzle');
     await addItemForm.locator('[data-testid="add-item-quantity-input"]').fill('10');
@@ -3143,6 +3147,7 @@ test.describe('D23 kcal-vs-macros hint', () => {
 
       const addItemBtn = stagedCard.locator('[data-testid="add-item-button"]');
       await addItemBtn.click();
+      await stagedCard.locator('[data-testid="enter-manually-button"]').click();
 
       const addItemForm = stagedCard.locator('[data-testid="add-item-form"]');
       await expect(addItemForm).toBeVisible();
@@ -3222,6 +3227,7 @@ test.describe('D23 kcal-vs-macros hint', () => {
 
       const addItemBtn = stagedCard.locator('[data-testid="add-item-button"]');
       await addItemBtn.click();
+      await stagedCard.locator('[data-testid="enter-manually-button"]').click();
 
       const addItemForm = stagedCard.locator('[data-testid="add-item-form"]');
       await expect(addItemForm).toBeVisible();
@@ -3658,6 +3664,17 @@ ${JSON.stringify(toastViolations, null, 2)}`).toHaveLength(0);
         expect(stagedViolations, `StagedMealCard type violations at ${width}px:
 ${JSON.stringify(stagedViolations, null, 2)}`).toHaveLength(0);
 
+        // D45: AddItemsComposer typography in D43 walker
+        const addBtn = cardLocator.locator('[data-testid="add-item-button"]');
+        await addBtn.click();
+        const composerLocator = cardLocator.locator('[data-testid="add-items-composer"]');
+        await expect(composerLocator).toBeVisible();
+        const composerViolations = await checkTypeScale(composerLocator);
+        expect(composerViolations, `AddItemsComposer type violations at ${width}px:
+${JSON.stringify(composerViolations, null, 2)}`).toHaveLength(0);
+        await composerLocator.locator('[data-testid="cancel-composer-button"]').click();
+        await expect(composerLocator).not.toBeVisible();
+
         // Explicit Peer Checks on Staged Card
         // Peer Check A: This meal value size == Day total value size
         const thisMealVal = page.locator('[data-testid="staged-total-calories"] [data-testid="macro-val-calories"]').first();
@@ -3857,6 +3874,119 @@ ${JSON.stringify(typeViolations, null, 2)}`).toHaveLength(0);
         // Cancel closes sheet
         await cancelBtn.click();
         await expect(sheet).not.toBeVisible();
+      } finally {
+        await page.close();
+      }
+    });
+  }
+});
+
+
+// ---------------------------------------------------------------------------
+// D45 add composer density & layout (320x640 and 390x844)
+// ---------------------------------------------------------------------------
+
+test.describe('D45 add composer', () => {
+  const VIEWPORTS = [
+    { width: 320, height: 640 },
+    { width: 390, height: 844 },
+  ];
+
+  for (const { width, height } of VIEWPORTS) {
+    test(`add composer layout, tap targets, font scale, sticky actions at ${width}x${height}`, async ({ browser }) => {
+      const page = await browser.newPage({
+        viewport: { width, height },
+        deviceScaleFactor: 1,
+      });
+
+      try {
+        await setupPageAndLogin(page);
+
+        // Stage a meal via Manual Entry
+        const manualBtn = page.locator('button:has-text("Manual Entry")');
+        await manualBtn.click();
+        await page.fill('[data-testid="dish-name-input"]', 'Greek Yogurt Bowl');
+        await page.fill('[data-testid="calories-input"]', '250');
+        await page.fill('[data-testid="protein-input"]', '20');
+        await page.fill('[data-testid="carbs-input"]', '15');
+        await page.fill('[data-testid="fat-input"]', '5');
+        const logBtn = page.locator('button:has-text("Log Meal")').last();
+        await logBtn.click();
+
+        const cardLocator = page.locator('[data-testid="staged-meal-card"]');
+        await expect(cardLocator).toBeVisible({ timeout: 15000 });
+        await waitForScrollSettled(page);
+
+        // 1. Breakdown header fits on one line with "+ Add" (no wrap)
+        const headerResult = await checkBreakdownHeaderGeometry(cardLocator);
+        expect(headerResult.headerRowHeight, `Header row height (${headerResult.headerRowHeight}px) exceeds 16.5px`).toBeLessThanOrEqual(16.5);
+        expect(headerResult.buttonText, 'Breakdown header button label must be "+ Add"').toBe('+ Add');
+        expect(headerResult.ariaLabel, 'Breakdown header button aria-label must be "Add item"').toBe('Add item');
+        expect(headerResult.isClipped, 'Breakdown header button must not be clipped').toBe(false);
+
+        // 2. Open composer by clicking "+ Add"
+        const addBtn = cardLocator.locator('[data-testid="add-item-button"]');
+        await addBtn.click();
+
+        const composer = cardLocator.locator('[data-testid="add-items-composer"]');
+        await expect(composer).toBeVisible();
+
+        // Focus management: textarea is focused
+        const textarea = composer.locator('[data-testid="composer-textarea"]');
+        await expect(textarea).toBeFocused();
+
+        // 3. Textarea and buttons fit without horizontal page overflow
+        const hasPageHOverflow = await page.evaluate(() => {
+          return document.documentElement.scrollWidth > window.innerWidth;
+        });
+        expect(hasPageHOverflow, 'Page must not have horizontal overflow with composer open').toBe(false);
+
+        // 4. Tap targets >= 40px in composer
+        const interactiveElements = await composer.evaluate((root) => {
+          const els = Array.from(root.querySelectorAll('button, input, select, textarea, [role="button"]'));
+          return els.map((el) => {
+            const r = el.getBoundingClientRect();
+            const cs = window.getComputedStyle(el);
+            const isVisible = r.width > 0 && r.height > 0 && cs.display !== 'none' && cs.visibility !== 'hidden';
+            return {
+              tag: el.tagName.toLowerCase(),
+              testId: el.getAttribute('data-testid') || el.getAttribute('aria-label') || el.textContent?.trim().slice(0, 15),
+              width: Math.round(r.width),
+              height: Math.round(r.height),
+              isVisible,
+            };
+          }).filter((b) => b.isVisible);
+        });
+
+        for (const target of interactiveElements) {
+          expect(
+            target.height >= 40 || target.width >= 40,
+            `Target ${target.testId || target.tag} dimensions (${target.width}x${target.height}) must have at least 40px`
+          ).toBe(true);
+        }
+
+        // 5. Typography conforms to D43 type scale
+        const typeViolations = await checkTypeScale(composer);
+        expect(typeViolations, `D45 composer typography violations at ${width}px:
+${JSON.stringify(typeViolations, null, 2)}`).toHaveLength(0);
+
+        // 6. Sticky action row not covered
+        const actionRow = cardLocator.locator('[data-testid="staged-card-actions"]');
+        await expect(actionRow).toBeVisible();
+        const actionBox = await actionRow.boundingBox();
+        const composerBox = await composer.boundingBox();
+        expect(actionBox).not.toBeNull();
+        expect(composerBox).not.toBeNull();
+        if (actionBox && composerBox) {
+          // Composer must be above sticky action row
+          expect(composerBox.y + composerBox.height).toBeLessThanOrEqual(actionBox.y + 1);
+        }
+
+        // 7. Cancel closes composer and restores focus to "+ Add"
+        const cancelBtn = composer.locator('[data-testid="cancel-composer-button"]');
+        await cancelBtn.click();
+        await expect(composer).not.toBeVisible();
+        await expect(addBtn).toBeFocused();
       } finally {
         await page.close();
       }

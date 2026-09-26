@@ -629,6 +629,7 @@ describe('NutritionEngine', () => {
 
     // 3. Add item: Honey (60 kcal, 17 C)
     fireEvent.click(screen.getByTestId('add-item-button'));
+    fireEvent.click(screen.getByTestId('enter-manually-button'));
     fireEvent.change(screen.getByTestId('add-item-name-input'), { target: { value: 'Honey' } });
     fireEvent.change(screen.getByTestId('add-item-quantity-input'), { target: { value: '20' } });
     fireEvent.change(screen.getByTestId('add-item-unit-input'), { target: { value: 'g' } });
@@ -696,6 +697,7 @@ describe('NutritionEngine', () => {
 
     // Add item: Avocado (80 kcal, 1 P, 4 C, 7 F, 3 Fib)
     fireEvent.click(screen.getByTestId('add-item-button'));
+    fireEvent.click(screen.getByTestId('enter-manually-button'));
     fireEvent.change(screen.getByTestId('add-item-name-input'), { target: { value: 'Avocado' } });
     fireEvent.change(screen.getByTestId('add-item-quantity-input'), { target: { value: '50' } });
     fireEvent.change(screen.getByTestId('add-item-unit-input'), { target: { value: 'g' } });
@@ -772,6 +774,7 @@ describe('NutritionEngine', () => {
 
     // Add item: Chia Seeds (50 kcal, 2 P, 4 C, 3 F, 3 Fib)
     fireEvent.click(screen.getByTestId('add-item-button'));
+    fireEvent.click(screen.getByTestId('enter-manually-button'));
     fireEvent.change(screen.getByTestId('add-item-name-input'), { target: { value: 'Chia Seeds' } });
     fireEvent.change(screen.getByTestId('add-item-quantity-input'), { target: { value: '10' } });
     fireEvent.change(screen.getByTestId('add-item-unit-input'), { target: { value: 'g' } });

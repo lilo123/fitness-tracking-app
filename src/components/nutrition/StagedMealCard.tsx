@@ -10,12 +10,15 @@ import {
   recomputeStagedTotals,
   updateStagedItemNutrition,
   buildStagedItem,
+  mergeOrAppendStagedItems,
   getScrollBehavior,
   useNavHeight,
   type StagedItem,
   type StagedMeal,
 } from './nutritionEngineHelpers';
+import type { CustomDish } from '../../types/database';
 import { AddItemForm, type AddItemFormData } from './AddItemForm';
+import { AddItemsComposer } from './AddItemsComposer';
 import { computeVisibleMacroColumns, getMacroGridTemplateColumns } from './macroColumns';
 import { MacroCell } from './MacroCell';
 import { DayTotalRow, type MacroTotalsShape } from './TodayAfterRow';
@@ -39,6 +42,8 @@ export interface StagedMealCardProps {
   onSaveStagedAsCustomDish: () => void;
   onDiscardStagedMeal: (e?: React.MouseEvent<HTMLButtonElement>) => void;
   isPending: boolean;
+  customDishes?: CustomDish[];
+  onAddParsedItems?: (items: StagedItem[], mealAtStart?: StagedMeal) => void;
 }
 
 export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
@@ -59,6 +64,8 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
   onSaveStagedAsCustomDish,
   onDiscardStagedMeal,
   isPending,
+  customDishes = [],
+  onAddParsedItems,
   navHeight: navHeightProp,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
@@ -138,8 +145,10 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
   };
 
   const [isAddingItem, setIsAddingItem] = useState(false);
+  const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [newlyAddedItemId, setNewlyAddedItemId] = useState<string | null>(null);
   const wasAddingItemRef = useRef(false);
+  const wasComposerOpenRef = useRef(false);
   const addItemBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -148,11 +157,30 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
       const qtyInput = row?.querySelector<HTMLInputElement>('[data-testid="component-quantity-input"]');
       qtyInput?.focus();
       setNewlyAddedItemId(null);
-    } else if (wasAddingItemRef.current && !isAddingItem) {
+    } else if (
+      (wasAddingItemRef.current && !isAddingItem && !isComposerOpen) ||
+      (wasComposerOpenRef.current && !isComposerOpen && !isAddingItem)
+    ) {
       addItemBtnRef.current?.focus();
     }
     wasAddingItemRef.current = isAddingItem;
-  }, [newlyAddedItemId, isAddingItem]);
+    wasComposerOpenRef.current = isComposerOpen;
+  }, [newlyAddedItemId, isAddingItem, isComposerOpen]);
+
+  const handleAddParsed = (items: StagedItem[]) => {
+    if (onAddParsedItems) {
+      onAddParsedItems(items, stagedMeal);
+    } else {
+      const merged = mergeOrAppendStagedItems(stagedMeal.items, items);
+      const totals = recomputeStagedTotals(merged);
+      onUpdateStagedMeal({
+        ...stagedMeal,
+        items: merged,
+        ...totals,
+      });
+    }
+    setIsComposerOpen(false);
+  };
 
   const handleAddItem = (data: AddItemFormData) => {
     const newItem = buildStagedItem({
@@ -264,16 +292,16 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
           ) : (
             <span className="sr-only">Items</span>
           )}
-          {!isAddingItem && (
+          {!isAddingItem && !isComposerOpen && (
             <button
               ref={addItemBtnRef}
               type="button"
               data-testid="add-item-button"
-              aria-label="Add manual item"
-              onClick={() => setIsAddingItem(true)}
+              aria-label="Add item"
+              onClick={() => setIsComposerOpen(true)}
               className="ml-auto text-cyan-400 hover:text-cyan-300 font-bold text-xs min-h-[40px] h-10 px-2.5 flex items-center justify-center -my-3 rounded-lg transition motion-reduce:transition-none touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
             >
-              + Manual
+              + Add
             </button>
           )}
         </div>
@@ -335,6 +363,20 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
             </div>
           ))}
         </div>
+
+        {isComposerOpen && (
+          <AddItemsComposer
+            customDishes={customDishes}
+            onParsed={handleAddParsed}
+            onEnterManually={() => {
+              setIsComposerOpen(false);
+              setIsAddingItem(true);
+            }}
+            onCancel={() => {
+              setIsComposerOpen(false);
+            }}
+          />
+        )}
 
         {isAddingItem && (
           <div className="pt-1">

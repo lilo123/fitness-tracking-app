@@ -69,6 +69,20 @@ test.describe('Nutrition Flow E2E', () => {
       const postData = route.request().postDataJSON() || {};
       const promptText = (postData.input || postData.prompt || '').toLowerCase();
 
+      if (promptText.includes('banana')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          headers: { 'access-control-allow-origin': '*' },
+          body: JSON.stringify({
+            items: [
+              { name: 'Banana', portion: '1 medium', quantity: 1, unit: 'unit', calories: 105, protein: 1.3, carbs: 27, fat: 0.3, fiber: 3.1 },
+            ],
+          }),
+        });
+        return;
+      }
+
       if (promptText.includes('com tam') || promptText.includes('cơm tấm')) {
         await route.fulfill({
           status: 200,
@@ -500,6 +514,7 @@ Total Fiber: 8 g`;
     const addItemBtn = stagedCard.locator('[data-testid="add-item-button"]');
     await expect(addItemBtn).toBeVisible();
     await addItemBtn.click();
+    await stagedCard.locator('[data-testid="enter-manually-button"]').click();
 
     const addItemForm = stagedCard.locator('[data-testid="add-item-form"]');
     await expect(addItemForm).toBeVisible();
@@ -652,6 +667,7 @@ test('manual form stages meal, adds item with updated totals, and logs to timeli
     const addItemBtn = stagedCard.locator('[data-testid="add-item-button"]');
     await expect(addItemBtn).toBeVisible();
     await addItemBtn.click();
+    await stagedCard.locator('[data-testid="enter-manually-button"]').click();
 
     // 6. Fill AddItemForm
     const addItemForm = stagedCard.locator('[data-testid="add-item-form"]');
@@ -897,5 +913,109 @@ test('manual form stages meal, adds item with updated totals, and logs to timeli
 
     // Entry removed from timeline (D42)
     await expect(loggedRow).not.toBeVisible();
+  });
+  test('D45: Stage meal -> "+ Add" -> "Enter manually" -> adds item manually and updates totals', async ({ page }) => {
+    // 1. Stage a meal via conversational input
+    const nlTextarea = page.locator('textarea[placeholder*="Describe what you ate"]');
+    await nlTextarea.fill('3 eggs and toast');
+    await page.click('button:has-text("Analyze Meal")');
+
+    const stagedCard = page.locator('[data-testid="staged-meal-card"]');
+    await expect(stagedCard).toBeVisible({ timeout: 15000 });
+
+    // Initial calories: 470 kcal
+    const initialTotals = page.locator('[data-testid="staged-meal-totals-grid"]');
+    await expect(initialTotals).toBeVisible();
+    await expect(initialTotals).toContainText('470');
+
+    // 2. Click "+ Add" to open inline composer
+    const addBtn = stagedCard.locator('[data-testid="add-item-button"]');
+    await expect(addBtn).toHaveText('+ Add');
+    await addBtn.click();
+
+    const composer = stagedCard.locator('[data-testid="add-items-composer"]');
+    await expect(composer).toBeVisible();
+
+    // 3. Click "Enter manually" in composer
+    const enterManuallyBtn = composer.locator('[data-testid="enter-manually-button"]');
+    await enterManuallyBtn.click();
+
+    // Composer closed, AddItemForm opened
+    await expect(composer).not.toBeVisible();
+    const addItemForm = stagedCard.locator('[data-testid="add-item-form"]');
+    await expect(addItemForm).toBeVisible();
+
+    // 4. Fill manual item details
+    await addItemForm.locator('[data-testid="add-item-name-input"]').fill('Honey Crisp Apple');
+    await addItemForm.locator('[data-testid="add-item-quantity-input"]').fill('1');
+    await addItemForm.locator('[data-testid="add-item-unit-input"]').fill('medium');
+    await addItemForm.locator('[data-testid="add-item-calories-input"]').fill('95');
+    await addItemForm.locator('[data-testid="add-item-protein-input"]').fill('0.5');
+    await addItemForm.locator('[data-testid="add-item-carbs-input"]').fill('25');
+    await addItemForm.locator('[data-testid="add-item-fat-input"]').fill('0.3');
+    await addItemForm.locator('[data-testid="add-item-fiber-input"]').fill('4.4');
+
+    await addItemForm.locator('[data-testid="submit-add-item-button"]').click();
+
+    // 5. AddItemForm closes, Honey Crisp Apple appended to meal, totals updated (470 + 95 = 565)
+    await expect(addItemForm).not.toBeVisible();
+    await expect(stagedCard).toContainText('Honey Crisp Apple');
+    await expect(initialTotals).toContainText('565');
+
+    // Clean up: discard staged meal
+    await stagedCard.locator('button[aria-label="Discard staged meal"]').click();
+    await expect(stagedCard).not.toBeVisible();
+  });
+
+  test('D45: Stage meal -> "+ Add" -> AI analyze appends items, triggers toast with Undo', async ({ page }) => {
+    // 1. Stage a meal
+    const nlTextarea = page.locator('textarea[placeholder*="Describe what you ate"]');
+    await nlTextarea.fill('3 eggs and toast');
+    await page.click('button:has-text("Analyze Meal")');
+
+    const stagedCard = page.locator('[data-testid="staged-meal-card"]');
+    await expect(stagedCard).toBeVisible({ timeout: 15000 });
+
+    const totalsGrid = page.locator('[data-testid="staged-meal-totals-grid"]');
+    await expect(totalsGrid).toContainText('470');
+
+    // 2. Open inline composer
+    const addBtn = stagedCard.locator('[data-testid="add-item-button"]');
+    await addBtn.click();
+
+    const composer = stagedCard.locator('[data-testid="add-items-composer"]');
+    await expect(composer).toBeVisible();
+
+    // 3. Type into composer and click Analyze
+    const composerTextarea = composer.locator('[data-testid="composer-textarea"]');
+    await composerTextarea.fill('1 banana');
+
+    const analyzeBtn = composer.locator('[data-testid="analyze-items-button"]');
+    await analyzeBtn.click();
+
+    // 4. Composer closes, Banana appended, totals updated (470 + 105 = 575)
+    await expect(composer).not.toBeVisible();
+    await expect(stagedCard).toContainText('Banana');
+    await expect(totalsGrid).toContainText('575');
+
+    // 5. Toast appears: "Added to meal", "Banana · +105 kcal", and Undo button
+    const toast = page.locator('[data-testid="quick-log-toast"]');
+    await expect(toast).toBeVisible();
+    await expect(toast).toContainText('Added to meal');
+    await expect(toast).toContainText('Banana · +105 kcal');
+
+    // 6. Click Undo on toast -> restores pre-add meal
+    const undoBtn = toast.locator('[data-testid="toast-undo-btn"]');
+    await expect(undoBtn).toBeVisible();
+    await undoBtn.click();
+
+    // Toast dismissed, Banana removed, totals restored to 470
+    await expect(toast).not.toBeVisible();
+    await expect(stagedCard).not.toContainText('Banana');
+    await expect(totalsGrid).toContainText('470');
+
+    // Clean up
+    await stagedCard.locator('button[aria-label="Discard staged meal"]').click();
+    await expect(stagedCard).not.toBeVisible();
   });
 });
