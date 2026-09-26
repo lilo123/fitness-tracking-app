@@ -58,7 +58,7 @@ export const NutritionEngine: React.FC = () => {
     useStagedCardFocus(Boolean(stagedMeal));
 
   const {
-    customDishes, todayLogs, dailyTotals, targets, remainingFuel,
+    customDishes, nutritionLogs, todayLogs, dailyTotals, targets, remainingFuel,
     mutation, deleteMutation, saveCustomDishMutation, deleteCustomDishMutation,
     activeToast, dismissToast, triggerToast, isTimerActive,
     isNutritionLogsError, nutritionLogsError, refetchNutritionLogs,
@@ -451,7 +451,7 @@ export const NutritionEngine: React.FC = () => {
         meal={editingMealLog}
         onClose={() => setEditingMealLog(null)}
         targetUserId={targetUserId}
-        nutritionLogs={todayLogs}
+        nutritionLogs={nutritionLogs}
         targets={targets}
         timeZone={profile?.timezone}
         triggerToast={triggerToast}

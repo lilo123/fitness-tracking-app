@@ -395,12 +395,23 @@ export function useMealEditor({
       }
 
       // Snapshot for Undo
+      let prevItems = meal.items;
+      if (prevItems === undefined && logItemsMemoryCache.has(meal.id)) {
+        prevItems = logItemsMemoryCache.get(meal.id);
+      }
+      if (prevItems === undefined && initialAnchorItems && initialAnchorItems.length > 1) {
+        prevItems = itemsForPersist(initialAnchorItems.map(stagedToItem));
+      }
+      const parsedPrevItems = prevItems
+        ? (typeof prevItems === 'string' ? JSON.parse(prevItems) : prevItems)
+        : null;
+
       const previousSnapshot = {
         food_name: meal.food_name,
         meal_type: meal.meal_type,
         logged_date: meal.logged_date,
         logged_at: meal.logged_at,
-        items: meal.items ? (typeof meal.items === 'string' ? JSON.parse(meal.items) : meal.items) : null,
+        items: parsedPrevItems,
         calories: meal.calories,
         protein: meal.protein,
         carbs: meal.carbs,
@@ -460,6 +471,7 @@ export function useMealEditor({
     meal,
     draftDate,
     initialDate,
+    initialAnchorItems,
     tz,
     targetUserId,
     onClose,

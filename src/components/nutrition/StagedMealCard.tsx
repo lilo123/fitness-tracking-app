@@ -217,7 +217,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
         <div className="relative w-[134px] shrink-0">
           <select
             aria-label="Meal type"
-            data-testid="meal-type-select"
+            {...(isEditMode ? { 'data-testid': 'meal-type-select' } : {})}
             value={stagedMeal.mealType}
             onChange={(e) => onUpdateStagedMeal({ ...stagedMeal, mealType: e.target.value })}
             className="w-full appearance-none bg-zinc-950 border border-border-interactive text-zinc-300 text-base font-semibold rounded-xl pl-2 pr-7 py-2 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none min-h-[40px] h-10 cursor-pointer"
@@ -408,7 +408,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
         <button
           ref={logButtonRef}
           type="button"
-          data-testid={isEditMode ? 'save-edit-meal-btn' : undefined}
+          {...(isEditMode ? { 'data-testid': 'save-edit-meal-btn' } : {})}
           onClick={handleLogClick}
           onFocus={() => {
             logButtonHadFocusRef.current = true;
@@ -419,11 +419,10 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
             }
           }}
           disabled={isEditMode ? (isPending || !isDirty) : isPending}
-          className={`flex-1 min-w-0 font-bold py-2.5 px-2 min-h-[40px] rounded-xl text-xs active:scale-95 transition motion-reduce:transition-none disabled:opacity-50 flex items-center justify-center gap-1 touch-manipulation whitespace-nowrap ${
-            isEditMode
-              ? 'bg-gradient-to-r from-cyan-500 to-teal-600 hover:from-cyan-400 hover:to-teal-500 text-white shadow-[0_0_15px_rgba(6,182,212,0.3)]'
-              : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]'
-          }`}
+          className={isEditMode
+            ? 'flex-1 min-w-0 bg-gradient-to-r from-cyan-500 to-teal-600 hover:from-cyan-400 hover:to-teal-500 text-white font-bold py-2.5 px-2 min-h-[40px] rounded-xl text-xs shadow-[0_0_15px_rgba(6,182,212,0.3)] active:scale-95 transition motion-reduce:transition-none disabled:opacity-50 flex items-center justify-center gap-1 touch-manipulation whitespace-nowrap'
+            : 'flex-1 min-w-0 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold py-2.5 px-2 min-h-[40px] rounded-xl text-xs shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 transition motion-reduce:transition-none disabled:opacity-50 flex items-center justify-center gap-1 touch-manipulation whitespace-nowrap'
+          }
         >
           <Check className="w-4 h-4 shrink-0" />
           <span className="whitespace-nowrap">

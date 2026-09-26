@@ -544,10 +544,12 @@ Total Fiber: 8 g`;
     await expect(sheet).toBeVisible();
     await expect(sheet.locator('text=Edit Meal')).toBeVisible();
 
-    // Scale dish by x1.5 (400 * 1.5 = 600 kcal)
-    const scaleBtn = sheet.locator('[data-testid="dish-scale-1.5"]');
-    await expect(scaleBtn).toBeVisible();
-    await scaleBtn.click();
+    // Edit component quantity: change Side Salad from 100g to 200g (300 + 200 = 500 kcal)
+    const qtyInputs = sheet.locator('[data-testid="component-quantity-input"]');
+    await expect(qtyInputs.nth(1)).toBeVisible();
+    await qtyInputs.nth(1).fill('200');
+    await qtyInputs.nth(1).press('Enter');
+    await expect(qtyInputs.nth(1)).toHaveValue('200');
 
     // Change date to yesterday
     const today = new Date();
@@ -573,6 +575,7 @@ Total Fiber: 8 g`;
     const toast = page.locator('[data-testid="quick-log-toast"]');
     await expect(toast).toBeVisible();
     await expect(toast).toContainText("Updated");
+    await expect(toast).toContainText("500 kcal");
 
     const undoBtn = page.locator('[data-testid="toast-undo-btn"]');
     await expect(undoBtn).toBeVisible();
