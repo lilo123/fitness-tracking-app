@@ -53,13 +53,10 @@ export const MacroCell: React.FC<MacroCellProps> = memo(({
     variant === 'component'
       ? 'tabular-nums font-normal'
       : variant === 'staged-total'
-      ? `text-sm tabular-nums ${isZero ? 'font-normal' : 'font-semibold'}`
+      ? `tabular-nums ${isZero ? 'font-normal' : 'font-semibold'}`
       : `tabular-nums ${isZero && !isOver ? 'font-normal' : 'font-semibold'}`;
 
-  const labelClass =
-    variant === 'staged-total'
-      ? 'text-xs opacity-70 font-normal'
-      : 'opacity-70 font-normal';
+  const labelClass = 'opacity-70 font-normal';
 
   return (
     <div

@@ -61,13 +61,13 @@ export const NutritionAiInput: React.FC<NutritionAiInputProps> = memo(({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-neon-cyan">
-            <Sparkles className="w-4 h-4 text-zinc-950 font-black" />
+            <Sparkles className="w-4 h-4 text-zinc-950" />
           </div>
           <div>
-            <h3 ref={headingRef} tabIndex={-1} className="text-sm font-black text-white uppercase tracking-wider outline-none">
+            <h3 ref={headingRef} tabIndex={-1} className="text-xs font-bold text-white uppercase tracking-wider outline-none">
               Log Food
             </h3>
-            <p className="text-[11px] text-zinc-400">
+            <p className="text-xs text-zinc-400">
               Describe what you ate in natural language
             </p>
           </div>
@@ -75,7 +75,7 @@ export const NutritionAiInput: React.FC<NutritionAiInputProps> = memo(({
         <button
           type="button"
           onClick={onToggleManualForm}
-          className="text-[11px] font-bold text-zinc-400 hover:text-white flex items-center justify-center gap-1 bg-zinc-800 hover:bg-zinc-700 px-3 py-2 min-h-[44px] min-w-[44px] rounded-xl transition border border-border-interactive touch-manipulation"
+          className="text-xs font-bold text-zinc-400 hover:text-white flex items-center justify-center gap-1 bg-zinc-800 hover:bg-zinc-700 px-3 py-2 min-h-[44px] min-w-[44px] rounded-xl transition border border-border-interactive touch-manipulation"
         >
           <span>{showManualForm ? 'Hide Manual' : 'Manual Entry'}</span>
           {showManualForm ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
@@ -118,16 +118,16 @@ export const NutritionAiInput: React.FC<NutritionAiInputProps> = memo(({
                 <div className="flex items-center gap-1.5">
                   <span
                     data-testid="photo-size-badge"
-                    className="px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-400 font-mono text-[10px] font-bold border border-cyan-500/30"
+                    className="px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-400 tabular-nums text-xs font-bold border border-cyan-500/30"
                   >
                     {formatFileSize(selectedPhoto.sizeBytes)}
                   </span>
-                  <span className="text-[10px] text-zinc-500 font-mono">
+                  <span className="text-xs text-zinc-500 tabular-nums">
                     {selectedPhoto.width}×{selectedPhoto.height}
                   </span>
                 </div>
-                <p className="text-[11px] font-bold text-zinc-300">Meal Photo Attached</p>
-                <p className="text-[10px] text-zinc-500">Ready for multimodal analysis</p>
+                <p className="text-xs font-bold text-zinc-300">Meal Photo Attached</p>
+                <p className="text-xs text-zinc-500">Ready for multimodal analysis</p>
               </div>
             </div>
 
@@ -199,7 +199,7 @@ export const NutritionAiInput: React.FC<NutritionAiInputProps> = memo(({
             onClick={onAnalyze}
             disabled={isAnalyzing || (!nlInput.trim() && !selectedPhoto)}
             aria-busy={isAnalyzing ? 'true' : undefined}
-            className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black text-xs px-4 py-2.5 min-h-[44px] min-w-[44px] rounded-xl shadow-neon-cyan active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-1.5 touch-manipulation"
+            className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs px-4 py-2.5 min-h-[44px] min-w-[44px] rounded-xl shadow-neon-cyan active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-1.5 touch-manipulation"
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>{isAnalyzing ? 'Analyzing...' : 'Analyze Meal'}</span>
@@ -225,7 +225,7 @@ export const NutritionAiInput: React.FC<NutritionAiInputProps> = memo(({
                   type="button"
                   data-testid="switch-to-manual-btn"
                   onClick={onSwitchToManual}
-                  className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-black text-xs px-3.5 py-2.5 min-h-[44px] min-w-[44px] rounded-xl transition active:scale-95 flex items-center justify-center gap-1.5 shadow-sm touch-manipulation shrink-0"
+                  className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs px-3.5 py-2.5 min-h-[44px] min-w-[44px] rounded-xl transition active:scale-95 flex items-center justify-center gap-1.5 shadow-sm touch-manipulation shrink-0"
                 >
                   <Utensils className="w-3.5 h-3.5" aria-hidden="true" />
                   <span>Switch to Manual Entry</span>

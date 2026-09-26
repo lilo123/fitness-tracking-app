@@ -181,7 +181,7 @@ export const QuickLogToast: React.FC<QuickLogToastProps> = ({
               <CheckCircle2 className="w-4 h-4 text-emerald-400" aria-hidden="true" />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-xs text-zinc-400 font-medium leading-none">
+              <div className="text-xs text-zinc-400 font-normal leading-none">
                 {verb}
               </div>
               <div

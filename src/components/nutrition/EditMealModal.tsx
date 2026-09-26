@@ -155,7 +155,7 @@ const EditMealForm: React.FC<EditMealFormProps> = ({
       className="bg-zinc-900 border border-zinc-800 rounded-t-3xl sm:rounded-3xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom,1.25rem))] max-w-md w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto"
     >
         <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-          <h3 id="edit-meal-modal-title" className="text-base font-bold text-white flex items-center gap-2">
+          <h3 id="edit-meal-modal-title" className="text-sm font-bold text-white flex items-center gap-2">
             <Utensils className="w-4 h-4 text-cyan-400" />
             <span>Edit Meal</span>
           </h3>

@@ -313,7 +313,7 @@ export const MealLogRow: React.FC<MealLogRowProps> = ({
       <span
         data-testid="meal-log-name"
         title={log.food_name}
-        className="min-w-0 flex-1 truncate text-left text-xs font-extrabold text-white"
+        className="min-w-0 flex-1 truncate text-left text-sm font-semibold text-white"
       >
         {log.food_name}
       </span>
@@ -343,7 +343,7 @@ export const MealLogRow: React.FC<MealLogRowProps> = ({
           {identity}
           <span
             data-testid="meal-log-count-badge"
-            className="shrink-0 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-1.5 py-0.5 text-[10px] font-black text-cyan-300"
+            className="shrink-0 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-1.5 py-0.5 text-xs font-bold tabular-nums text-cyan-300"
           >
             {effectiveBaseItems ? effectiveBaseItems.length : '...'}
           </span>
@@ -354,11 +354,11 @@ export const MealLogRow: React.FC<MealLogRowProps> = ({
 
       {/* Row 2 — macro cluster plus a single overflow control. */}
       <div className="mt-1 flex items-center gap-1.5">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 font-mono text-[11px] text-zinc-400">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-xs tabular-nums text-zinc-400">
           {log.meal_type && (
             <span
               data-testid="meal-log-type-chip"
-              className="whitespace-nowrap rounded-lg border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-zinc-400"
+              className="whitespace-nowrap rounded-lg border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 text-xs font-bold uppercase tracking-wider text-zinc-400"
             >
               {log.meal_type}
             </span>
@@ -409,7 +409,7 @@ export const MealLogRow: React.FC<MealLogRowProps> = ({
                   }
                 }).catch(() => {});
               }}
-              className="shrink-0 rounded border border-rose-400/40 bg-rose-500/20 px-1.5 py-0.5 text-[10px] font-bold text-rose-200 hover:bg-rose-500/30"
+              className="shrink-0 rounded border border-rose-400/40 bg-rose-500/20 px-1.5 py-0.5 text-xs font-bold text-rose-200 hover:bg-rose-500/30"
             >
               Retry
             </button>
@@ -437,7 +437,7 @@ export const MealLogRow: React.FC<MealLogRowProps> = ({
                   type="button"
                   data-testid={`dish-scale-${factor}`}
                   onClick={() => applyScale(factor)}
-                  className="min-h-[44px] flex-1 rounded text-[11px] font-black text-zinc-300 transition hover:bg-zinc-800 touch-manipulation"
+                  className="min-h-[44px] flex-1 rounded text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 touch-manipulation"
                 >
                   &times;{factor}
                 </button>

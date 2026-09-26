@@ -3423,3 +3423,282 @@ test.describe('D41 floating toast', () => {
     });
   }
 });
+
+// ---------------------------------------------------------------------------
+// D43: Nutrition Type Scale Density Guard
+// ---------------------------------------------------------------------------
+
+async function checkTypeScale(surface: Locator) {
+  return await surface.evaluate((root) => {
+    const ALLOWED_SIZES = new Set([12, 14]);
+    const ALLOWED_WEIGHTS = new Set([400, 600, 700]);
+    const violations: Array<{ selector: string; text: string; issue: string }> = [];
+
+    function isVisible(el: Element): boolean {
+      if (!(el instanceof HTMLElement || el instanceof SVGElement)) return false;
+      const s = window.getComputedStyle(el);
+      if (s.display === 'none' || s.visibility === 'hidden' || s.opacity === '0') return false;
+      if (s.clip === 'rect(0px, 0px, 0px, 0px)' || s.clipPath === 'inset(50%)') return false;
+      if (el.classList.contains('sr-only')) return false;
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    }
+
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+    let node: Node | null = walker.currentNode;
+
+    while (node) {
+      const el = node as HTMLElement;
+      node = walker.nextNode();
+
+      if (!isVisible(el)) continue;
+      const hasDirectText = Array.from(el.childNodes).some(
+        (c) => c.nodeType === Node.TEXT_NODE && c.textContent && c.textContent.trim().length > 0
+      );
+      if (!hasDirectText) continue;
+
+      if (el.closest('nav') || el.closest('header')) continue;
+
+      const cs = window.getComputedStyle(el);
+      const size = Math.round(parseFloat(cs.fontSize));
+      const weight = parseInt(cs.fontWeight, 10);
+      const family = cs.fontFamily.toLowerCase();
+      const fvn = cs.fontVariantNumeric;
+      const text = (el.innerText || el.textContent || '').trim().slice(0, 30);
+      const isInput = Boolean(el.closest('input, select, textarea'));
+
+      const sel = el.getAttribute('data-testid')
+        ? `[data-testid="${el.getAttribute('data-testid')}"]`
+        : el.tagName.toLowerCase();
+
+      // Check 1: Size
+      if (!ALLOWED_SIZES.has(size)) {
+        if (size === 16 && isInput) {
+          // Allowed: inputs are 16px to prevent iOS auto-zoom (D18/D26)
+        } else {
+          violations.push({ selector: sel, text, issue: `Font size ${size}px not in {12, 14} (16 only on inputs)` });
+        }
+      }
+
+      // Check 2: Weight
+      if (!ALLOWED_WEIGHTS.has(weight)) {
+        violations.push({ selector: sel, text, issue: `Font weight ${weight} not in {400, 600, 700}` });
+      }
+
+      // Check 3: Family
+      if (family.includes('mono')) {
+        violations.push({ selector: sel, text, issue: `Font family "${family}" is monospace (prohibited)` });
+      }
+
+      // Check 4: Numbers in macro/total cells must have tabular-nums
+      if (el.closest('[data-testid*="totals-grid"], [data-testid*="day-total-grid"], [data-testid*="-val-"], [data-testid*="staged-total-"], [data-testid*="day-total-"], [data-testid*="component-macro-"]') && /\d/.test(text)) {
+        if (!fvn.includes('tabular-nums') && !cs.fontFeatureSettings.includes('tnum')) {
+          violations.push({ selector: sel, text, issue: `Number cell missing tabular-nums: "${text}"` });
+        }
+      }
+    }
+
+    return violations;
+  });
+}
+
+test.describe('D43 nutrition type scale', () => {
+  for (const width of [390, 320] as const) {
+    test(`type scale compliance on nutrition tab surfaces at ${width}px`, async ({ browser }) => {
+      const page = await browser.newPage({
+        viewport: { width, height: 844 },
+        deviceScaleFactor: 1,
+      });
+      try {
+        const todayStr = new Date().toISOString().split('T')[0];
+        let logs: any[] = [
+          {
+            id: 'log-timeline-1',
+            user_id: 'test-user',
+            food_name: 'Grilled Salmon with Rice',
+            meal_type: 'Dinner',
+            calories: 550,
+            protein: 45,
+            carbs: 50,
+            fat: 18,
+            fiber: 4,
+            serving_size: 1,
+            serving_unit: 'serving',
+            logged_at: new Date().toISOString(),
+            logged_date: todayStr,
+            created_at: new Date().toISOString(),
+            has_components: false,
+          },
+        ];
+
+        await page.route('**/rest/v1/nutrition_logs*', async (route) => {
+          const req = route.request();
+          const method = req.method();
+          if (method === 'OPTIONS') {
+            return route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' } });
+          }
+          if (method === 'POST') {
+            const body = req.postDataJSON();
+            const newLog = Array.isArray(body) ? body[0] : body;
+            const created = {
+              id: 'log-' + Date.now(),
+              user_id: 'test-user',
+              logged_at: new Date().toISOString(),
+              logged_date: todayStr,
+              created_at: new Date().toISOString(),
+              has_components: false,
+              ...newLog,
+            };
+            logs = [created, ...logs];
+            return route.fulfill({
+              status: 201,
+              contentType: 'application/json',
+              headers: { 'access-control-allow-origin': '*' },
+              body: JSON.stringify(Array.isArray(body) ? [created] : created),
+            });
+          }
+          if (method === 'DELETE') {
+            return route.fulfill({
+              status: 204,
+              headers: { 'access-control-allow-origin': '*' },
+            });
+          }
+          return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            headers: { 'access-control-allow-origin': '*' },
+            body: JSON.stringify(logs),
+          });
+        });
+
+        await setupPageAndLogin(page);
+
+        // 1. Surface: Unstaged Main Page (AI input, Quick Log favorites, Timeline rows)
+        const mainLocator = page.locator('main');
+        const unstagedViolations = await checkTypeScale(mainLocator);
+        expect(unstagedViolations, `Unstaged main tab type violations at ${width}px:
+${JSON.stringify(unstagedViolations, null, 2)}`).toHaveLength(0);
+
+        // Verify Unstaged AI Input Typography
+        const aiHeader = page.locator('h3:has-text("Log Food")');
+        await expect(aiHeader).toBeVisible();
+        const aiHeaderStyle = await aiHeader.evaluate((el) => {
+          const cs = window.getComputedStyle(el);
+          return {
+            size: Math.round(parseFloat(cs.fontSize)),
+            weight: parseInt(cs.fontWeight, 10),
+            transform: cs.textTransform,
+          };
+        });
+        expect(aiHeaderStyle.size, 'Log Food header size must be 12px').toBe(12);
+        expect(aiHeaderStyle.weight, 'Log Food header weight must be 700').toBe(700);
+        expect(aiHeaderStyle.transform, 'Log Food header must be uppercase').toBe('uppercase');
+
+        const analyzeBtn = page.locator('[data-testid="analyze-meal-button"]');
+        const analyzeBtnStyle = await analyzeBtn.evaluate((el) => {
+          const cs = window.getComputedStyle(el);
+          return {
+            size: Math.round(parseFloat(cs.fontSize)),
+            weight: parseInt(cs.fontWeight, 10),
+            transform: cs.textTransform,
+          };
+        });
+        expect(analyzeBtnStyle.size, 'Analyze button size must be 12px').toBe(12);
+        expect(analyzeBtnStyle.weight, 'Analyze button weight must be 700').toBe(700);
+        expect(analyzeBtnStyle.transform, 'Analyze button transform must be none').toBe('none');
+
+        // 2. Surface: NutrientBreakdownModal
+        const calRing = page.locator('[data-testid="macro-ring-calories"]');
+        await calRing.click();
+        const nutrientModal = page.locator('[data-testid="nutrient-breakdown-modal"]');
+        await expect(nutrientModal).toBeVisible({ timeout: 5000 });
+        const nutrientModalViolations = await checkTypeScale(nutrientModal);
+        expect(nutrientModalViolations, `NutrientBreakdownModal type violations at ${width}px:
+${JSON.stringify(nutrientModalViolations, null, 2)}`).toHaveLength(0);
+        await page.keyboard.press('Escape');
+        await expect(nutrientModal).not.toBeVisible();
+
+        // 3. Surface: EditMealModal
+        const rowMenuBtn = page.locator('button[aria-haspopup="menu"]').first();
+        await expect(rowMenuBtn).toBeVisible({ timeout: 5000 });
+        await rowMenuBtn.click();
+        const editMenuItem = page.locator('[role="menuitem"]', { hasText: 'Edit meal' });
+        await expect(editMenuItem).toBeVisible({ timeout: 5000 });
+        await editMenuItem.click();
+        const editMealModal = page.locator('[data-testid="edit-meal-modal"]');
+        await expect(editMealModal).toBeVisible({ timeout: 5000 });
+        const editModalViolations = await checkTypeScale(editMealModal);
+        expect(editModalViolations, `EditMealModal type violations at ${width}px:
+${JSON.stringify(editModalViolations, null, 2)}`).toHaveLength(0);
+        await page.locator('[data-testid="edit-meal-modal"] button:has-text("Cancel")').click();
+        await expect(editMealModal).not.toBeVisible();
+
+        // 4. Surface: Quick Log Toast
+        const quickLogBtn = page.locator('[data-testid^="quick-log-btn-"]').first();
+        await expect(quickLogBtn).toBeVisible({ timeout: 5000 });
+        await quickLogBtn.click();
+        const toast = page.locator('[data-testid="quick-log-toast"]');
+        await expect(toast).toBeVisible({ timeout: 5000 });
+        const toastViolations = await checkTypeScale(toast);
+        expect(toastViolations, `Toast type violations at ${width}px:
+${JSON.stringify(toastViolations, null, 2)}`).toHaveLength(0);
+        // Undo and dismiss toast
+        const undoBtn = page.locator('[data-testid="toast-undo-btn"]');
+        await undoBtn.click();
+        await expect(toast).not.toBeVisible();
+
+        // 5. Surface: Staged Meal Card (incl. item rows, totals + action row)
+        await page.fill('textarea[placeholder*="Describe what you ate"]', '4-item salmon dinner');
+        await page.click('button:has-text("Analyze Meal")');
+        const cardLocator = page.locator('[data-testid="staged-meal-card"]');
+        await expect(cardLocator).toBeVisible({ timeout: 15000 });
+        await waitForScrollSettled(page);
+
+        const stagedViolations = await checkTypeScale(cardLocator);
+        expect(stagedViolations, `StagedMealCard type violations at ${width}px:
+${JSON.stringify(stagedViolations, null, 2)}`).toHaveLength(0);
+
+        // Explicit Peer Checks on Staged Card
+        // Peer Check A: This meal value size == Day total value size
+        const thisMealVal = page.locator('[data-testid="staged-total-calories"] [data-testid="macro-val-calories"]').first();
+        const dayTotalVal = page.locator('[data-testid="day-total-calories"] [data-testid="day-total-val-calories"]').first();
+        await expect(thisMealVal).toBeVisible();
+        await expect(dayTotalVal).toBeVisible();
+
+        const thisMealSize = await thisMealVal.evaluate((el) => Math.round(parseFloat(window.getComputedStyle(el).fontSize)));
+        const dayTotalSize = await dayTotalVal.evaluate((el) => Math.round(parseFloat(window.getComputedStyle(el).fontSize)));
+        expect(thisMealSize, `This meal value (${thisMealSize}px) must equal Day total value (${dayTotalSize}px)`).toBe(dayTotalSize);
+
+        // Peer Check B: Log Meal label transform == Save as Custom Dish transform
+        const logMealBtn = page.getByRole('button', { name: /Log Meal/i }).first();
+        const saveDishBtn = page.getByRole('button', { name: /Save as Custom Dish/i }).first();
+        const logMealTransform = await logMealBtn.evaluate((el) => window.getComputedStyle(el).textTransform);
+        const saveDishTransform = await saveDishBtn.evaluate((el) => window.getComputedStyle(el).textTransform);
+        expect(logMealTransform, `Log Meal transform (${logMealTransform}) must match Save as Custom Dish (${saveDishTransform})`).toBe(saveDishTransform);
+
+        // Peer Check C: All section headers same size and weight (12px / 700)
+        const sectionHeaders = page.locator(
+          'h3:has-text("Today\'s Nutrition"), h3:has-text("Log Food"), h3:has-text("Today\'s Meals"), [data-testid="this-meal-label"], [data-testid="day-total-label"]'
+        );
+        const headerCount = await sectionHeaders.count();
+        expect(headerCount).toBeGreaterThanOrEqual(3);
+        for (let i = 0; i < headerCount; i++) {
+          const header = sectionHeaders.nth(i);
+          const style = await header.evaluate((el) => {
+            const cs = window.getComputedStyle(el);
+            return {
+              text: el.textContent?.trim().slice(0, 20),
+              size: Math.round(parseFloat(cs.fontSize)),
+              weight: parseInt(cs.fontWeight, 10),
+            };
+          });
+          expect(style.size, `Header "${style.text}" font size must be 12px`).toBe(12);
+          expect([600, 700], `Header "${style.text}" font weight must be 600 or 700`).toContain(style.weight);
+        }
+
+      } finally {
+        await page.close();
+      }
+    });
+  }
+});

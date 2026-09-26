@@ -187,24 +187,24 @@ const MealBreakdownRow: React.FC<MealBreakdownRowProps> = ({
             </div>
             <span
               data-testid={`breakdown-meal-name-${log.id}`}
-              className="text-xs font-extrabold text-white truncate min-w-0 flex-1"
+              className="text-sm font-semibold text-white truncate min-w-0 flex-1"
               title={log.food_name || 'Unnamed Meal'}
             >
               {log.food_name || 'Unnamed Meal'}
             </span>
             <span
               data-testid={`breakdown-count-badge-${log.id}`}
-              className="shrink-0 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-1.5 py-0.5 text-[10px] font-black text-cyan-300"
+              className="shrink-0 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-1.5 py-0.5 text-xs font-bold tabular-nums text-cyan-300"
             >
               {items.length}
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0 font-mono text-xs">
+          <div className="flex items-center gap-1.5 shrink-0 tabular-nums text-xs">
             <span className={`font-bold ${config.textColor}`}>{formattedMealVal}</span>
             <span
               data-testid={`breakdown-meal-pct-${log.id}`}
-              className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-zinc-800 text-zinc-300 border border-zinc-700/60 shrink-0"
+              className="tabular-nums text-xs font-bold px-1.5 py-0.5 rounded-md bg-zinc-800 text-zinc-300 border border-zinc-700/60 shrink-0"
             >
               {mealPct}
             </span>
@@ -242,7 +242,7 @@ const MealBreakdownRow: React.FC<MealBreakdownRowProps> = ({
                   <div className="flex items-center gap-1.5 min-w-0 flex-1">
                     <span
                       data-testid="breakdown-child-name"
-                      className="truncate text-xs font-medium text-zinc-300 min-w-0 flex-1"
+                      className="truncate text-xs font-normal text-zinc-300 min-w-0 flex-1"
                       title={child.name || 'Item'}
                     >
                       {child.name || 'Item'}
@@ -251,20 +251,20 @@ const MealBreakdownRow: React.FC<MealBreakdownRowProps> = ({
                       <span
                         data-testid="breakdown-child-portion"
                         title={child.displayPortion}
-                        className="text-[10px] font-mono text-zinc-500 truncate max-w-[90px] shrink-0"
+                        className="text-xs tabular-nums text-zinc-500 truncate max-w-[90px] shrink-0"
                       >
                         ({child.displayPortion})
                       </span>
                     )}
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0 font-mono text-xs">
+                  <div className="flex items-center gap-1.5 shrink-0 tabular-nums text-xs">
                     <span className={`${config.textColor} font-semibold`}>
                       {formattedChildVal}
                     </span>
                     <span
                       data-testid="breakdown-child-pct"
-                      className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-zinc-800/80 text-zinc-400 border border-zinc-700/40 shrink-0"
+                      className="text-xs font-bold tabular-nums px-1.5 py-0.5 rounded bg-zinc-800/80 text-zinc-400 border border-zinc-700/40 shrink-0"
                     >
                       {childPctOfMeal}
                     </span>
@@ -290,7 +290,7 @@ const MealBreakdownRow: React.FC<MealBreakdownRowProps> = ({
         </div>
         <span
           data-testid={`breakdown-meal-name-${log.id}`}
-          className="text-xs font-extrabold text-white truncate min-w-0 flex-1"
+          className="text-sm font-semibold text-white truncate min-w-0 flex-1"
           title={log.food_name || 'Unnamed Meal'}
         >
           {log.food_name || 'Unnamed Meal'}
@@ -299,18 +299,18 @@ const MealBreakdownRow: React.FC<MealBreakdownRowProps> = ({
           <span
             data-testid={`breakdown-leaf-serving-${log.id}`}
             title={`${log.serving_size} ${log.serving_unit}`}
-            className="text-[10px] font-mono text-zinc-500 truncate max-w-[90px] shrink-0"
+            className="text-xs tabular-nums text-zinc-500 truncate max-w-[90px] shrink-0"
           >
             ({log.serving_size} {log.serving_unit})
           </span>
         ) : null}
       </div>
 
-      <div className="flex items-center gap-1.5 shrink-0 font-mono text-xs">
+      <div className="flex items-center gap-1.5 shrink-0 tabular-nums text-xs">
         <span className={`font-bold ${config.textColor}`}>{formattedMealVal}</span>
         <span
           data-testid={`breakdown-meal-pct-${log.id}`}
-          className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-zinc-800 text-zinc-300 border border-zinc-700/60 shrink-0"
+          className="tabular-nums text-xs font-bold px-1.5 py-0.5 rounded-md bg-zinc-800 text-zinc-300 border border-zinc-700/60 shrink-0"
         >
           {mealPct}
         </span>
@@ -408,7 +408,7 @@ export const NutrientBreakdownModal: React.FC<NutrientBreakdownModalProps> = ({
           <div className="flex items-center justify-between pb-1 border-b border-zinc-800/80">
             <h2
               id="nutrient-breakdown-title"
-              className="text-sm sm:text-base font-black text-white flex items-center gap-2 truncate min-w-0"
+              className="text-sm font-bold text-white flex items-center gap-2 truncate min-w-0"
             >
               <PieChart className="w-4 h-4 text-cyan-400 shrink-0" aria-hidden="true" />
               <span className="truncate">Nutrient Breakdown</span>
@@ -442,7 +442,7 @@ export const NutrientBreakdownModal: React.FC<NutrientBreakdownModalProps> = ({
                   aria-controls="nutrient-breakdown-tabpanel"
                   data-testid={`nutrient-pill-${key}`}
                   onClick={() => onSelectNutrient(key)}
-                  className={`min-h-[44px] min-w-0 flex items-center justify-center rounded-lg text-[10px] sm:text-xs font-bold transition-all touch-manipulation px-0.5 truncate cursor-pointer border ${
+                  className={`min-h-[44px] min-w-0 flex items-center justify-center rounded-lg text-xs font-bold transition-all touch-manipulation px-0.5 truncate cursor-pointer border ${
                     isSelected
                       ? cfg.activePillClass
                       : 'border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
@@ -456,14 +456,14 @@ export const NutrientBreakdownModal: React.FC<NutrientBreakdownModalProps> = ({
         </div>
 
         {/* Selected Nutrient Daily Summary */}
-        <div className="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-2.5 sm:p-3 flex items-center justify-between font-mono text-xs shrink-0">
+        <div className="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-2.5 sm:p-3 flex items-center justify-between tabular-nums text-xs shrink-0">
           <div className="flex items-center gap-1.5 min-w-0">
-            <span className="text-zinc-400 font-bold uppercase text-[10px] tracking-wider truncate">
+            <span className="text-zinc-400 font-bold uppercase text-xs tracking-wider truncate">
               Today's {config.label}
             </span>
           </div>
           <div className="flex items-center gap-1.5 font-bold shrink-0">
-            <span className={`${config.textColor} text-sm font-black`}>
+            <span className={`${config.textColor} text-sm font-bold`}>
               {formattedDailyTotal}
             </span>
             {formattedTargetVal && (
@@ -482,7 +482,7 @@ export const NutrientBreakdownModal: React.FC<NutrientBreakdownModalProps> = ({
           {contributingLogs.length === 0 ? (
             <div
               data-testid="breakdown-empty-state"
-              className="py-8 text-center text-zinc-500 text-xs font-medium"
+              className="py-8 text-center text-zinc-500 text-xs font-normal"
             >
               {logs.length === 0
                 ? 'No meals logged for this date.'

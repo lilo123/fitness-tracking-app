@@ -345,7 +345,7 @@ export const NutritionEngine: React.FC = () => {
         <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
           <div className="flex items-center gap-2">
             <Utensils className="w-4 h-4 text-cyan-400" />
-            <h3 className="text-sm font-black text-white uppercase tracking-wider">
+            <h3 className="text-xs font-bold text-white uppercase tracking-wider">
               Today's Meals ({todayLogs.length})
             </h3>
           </div>

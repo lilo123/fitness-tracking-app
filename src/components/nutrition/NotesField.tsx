@@ -114,7 +114,7 @@ export const NotesField: React.FC<NotesFieldProps> = ({
         <label
           id={labelId}
           htmlFor={inputId}
-          className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-zinc-400"
+          className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-zinc-400"
         >
           <StickyNote className="w-3 h-3 text-cyan-400" aria-hidden="true" />
           <span>Notes</span>
@@ -151,7 +151,7 @@ export const NotesField: React.FC<NotesFieldProps> = ({
         />
       </div>
 
-      <div className="flex items-center justify-between text-[10px]">
+      <div className="flex items-center justify-between text-xs">
         {/* Static accessibility hint read once on focus */}
         <span id={hintId} className="text-zinc-500 sr-only">
           Maximum 500 characters.
@@ -170,7 +170,7 @@ export const NotesField: React.FC<NotesFieldProps> = ({
         {/* Visual counter for sighted users */}
         <span
           aria-hidden="true"
-          className={`ml-auto font-mono tracking-tight ${
+          className={`ml-auto tabular-nums ${
             isNearLimit ? 'text-amber-400 font-bold' : 'text-zinc-600'
           }`}
         >

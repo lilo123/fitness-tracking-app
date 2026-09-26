@@ -237,7 +237,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
               data-testid="add-item-button"
               aria-label="Add manual item"
               onClick={() => setIsAddingItem(true)}
-              className="ml-auto text-cyan-400 hover:text-cyan-300 font-bold text-xs uppercase tracking-wider min-h-[40px] h-10 px-2.5 flex items-center justify-center -my-3 rounded-lg transition motion-reduce:transition-none touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+              className="ml-auto text-cyan-400 hover:text-cyan-300 font-bold text-xs min-h-[40px] h-10 px-2.5 flex items-center justify-center -my-3 rounded-lg transition motion-reduce:transition-none touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
             >
               + Manual
             </button>
@@ -363,7 +363,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
             }
           }}
           disabled={isPending}
-          className="flex-1 min-w-0 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold py-2.5 px-2 min-h-[40px] rounded-xl text-xs uppercase tracking-tight shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 transition motion-reduce:transition-none disabled:opacity-50 flex items-center justify-center gap-1 touch-manipulation whitespace-nowrap"
+          className="flex-1 min-w-0 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold py-2.5 px-2 min-h-[40px] rounded-xl text-xs shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 transition motion-reduce:transition-none disabled:opacity-50 flex items-center justify-center gap-1 touch-manipulation whitespace-nowrap"
         >
           <Check className="w-4 h-4 shrink-0" />
           <span className="whitespace-nowrap">
