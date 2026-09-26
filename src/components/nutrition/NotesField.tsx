@@ -147,7 +147,7 @@ export const NotesField: React.FC<NotesFieldProps> = ({
           aria-labelledby={labelId}
           aria-describedby={`${hintId} ${statusId}`}
           data-testid="dish-notes-textarea"
-          className="w-full bg-zinc-950 border border-border-interactive focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 rounded-xl p-2.5 text-base sm:text-xs text-white placeholder-zinc-600 outline-none transition resize-none min-h-[60px] max-h-[140px] leading-relaxed"
+          className="w-full bg-zinc-950 border border-border-interactive focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 rounded-xl p-2.5 text-base text-white placeholder-zinc-600 outline-none transition resize-none min-h-[60px] max-h-[140px] leading-relaxed"
         />
       </div>
 

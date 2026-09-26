@@ -2491,3 +2491,190 @@ test.describe('Surface G: Quick Log surface at 320×568 (D26)', () => {
     expect(result.clippedElements).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// D35: Type and input consistency (D18, D26, D31, D35)
+// ---------------------------------------------------------------------------
+
+test.describe('D35 type/input consistency', () => {
+  test('D35: Quick Log row height <= 60px at 320px and 390px', async ({ browser }) => {
+    for (const width of [320, 390]) {
+      const page = await browser.newPage({
+        viewport: { width, height: width === 320 ? 568 : 844 },
+        deviceScaleFactor: 1,
+      });
+      try {
+        await setupPageAndLogin(page);
+        const section = page.locator('section').filter({ hasText: 'Quick Log Favorites' });
+        await expect(section).toBeVisible();
+        const rowHeights = await section.evaluate((root) => {
+          const rows = Array.from(root.querySelectorAll('[data-testid^="favorite-row-"]'));
+          return rows.map((r) => Math.round(r.getBoundingClientRect().height * 10) / 10);
+        });
+        expect(rowHeights.length).toBeGreaterThan(0);
+        for (const h of rowHeights) {
+          expect(h).toBeLessThanOrEqual(60);
+        }
+      } finally {
+        await page.close();
+      }
+    }
+  });
+
+  test('D35: Quick Log dish name is 14px semibold (600) and all fonts in Quick Log >= 12px', async ({ browser }) => {
+    for (const width of [320, 390, 700]) {
+      const page = await browser.newPage({
+        viewport: { width, height: 844 },
+        deviceScaleFactor: 1,
+      });
+      try {
+        await setupPageAndLogin(page);
+        const section = page.locator('section').filter({ hasText: 'Quick Log Favorites' });
+        await expect(section).toBeVisible();
+        const dishNames = await section.evaluate((root) => {
+          const names = Array.from(root.querySelectorAll('[id^="dish-name-"]'));
+          return names.map((el) => {
+            const style = window.getComputedStyle(el);
+            return {
+              text: el.textContent?.trim(),
+              fontSize: style.fontSize,
+              fontWeight: style.fontWeight,
+            };
+          });
+        });
+        expect(dishNames.length).toBeGreaterThan(0);
+        for (const dn of dishNames) {
+          expect(dn.fontSize).toBe('14px');
+          expect(dn.fontWeight).toBe('600');
+        }
+
+        const fontCheck = await checkFontSizes(section);
+        expect(fontCheck.offenders).toEqual([]);
+      } finally {
+        await page.close();
+      }
+    }
+  });
+
+  test('D35: computed font-size of every input/select/textarea in the nutrition tab == 16px at 390px and 700px', async ({ browser }) => {
+    for (const width of [390, 700]) {
+      const page = await browser.newPage({
+        viewport: { width, height: 844 },
+        deviceScaleFactor: 1,
+      });
+      try {
+        await setupPageAndLogin(page);
+
+        // 1. Search input in Quick Log
+        const searchInput = page.locator('[data-testid="search-favorites-input"]');
+        await expect(searchInput).toBeVisible();
+        const searchFontSize = await searchInput.evaluate((el) => window.getComputedStyle(el).fontSize);
+        expect(searchFontSize, `search input at ${width}px`).toBe('16px');
+
+        // 2. AI input textarea (visible before staging)
+        const aiTextarea = page.locator('textarea[placeholder*="Describe what you ate"]');
+        await expect(aiTextarea).toBeVisible();
+        const aiFontSize = await aiTextarea.evaluate((el) => window.getComputedStyle(el).fontSize);
+        expect(aiFontSize, `AI textarea at ${width}px`).toBe('16px');
+
+        // 3. Stage a meal via AI input to check staged card controls
+        await aiTextarea.fill('single 1-item salmon');
+        await page.click('button:has-text("Analyze Meal")');
+        const card = page.locator('[data-testid="staged-meal-card"]');
+        await expect(card).toBeVisible({ timeout: 15000 });
+
+        const select = card.locator('select[aria-label="Meal type"]');
+        const selectFontSize = await select.evaluate((el) => window.getComputedStyle(el).fontSize);
+        expect(selectFontSize, `meal-type select at ${width}px`).toBe('16px');
+
+        const mealNameInput = card.locator('[data-testid="dish-name-input"]');
+        const nameFontSize = await mealNameInput.evaluate((el) => window.getComputedStyle(el).fontSize);
+        expect(nameFontSize, `dish-name-input at ${width}px`).toBe('16px');
+
+        const qtyInput = card.locator('[data-testid="component-quantity-input"]').first();
+        if (await qtyInput.isVisible()) {
+          const qtyFontSize = await qtyInput.evaluate((el) => window.getComputedStyle(el).fontSize);
+          expect(qtyFontSize, `qty input at ${width}px`).toBe('16px');
+        }
+
+        // Discard staged card
+        const discardBtn = card.locator('button[aria-label="Discard staged meal"]');
+        await discardBtn.click();
+        await expect(card).not.toBeVisible();
+
+        // 4. Manual entry form fields
+        const manualBtn = page.locator('button:has-text("Manual Entry")');
+        await manualBtn.click();
+        const manualForm = page.locator('form').filter({ hasText: 'Manual Macro Logging' });
+        await expect(manualForm).toBeVisible();
+
+        const formControls = await manualForm.evaluate((form) => {
+          const controls = Array.from(form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('input, select, textarea'));
+          return controls
+            .filter((c) => c.type !== 'hidden' && c.type !== 'submit' && c.type !== 'button')
+            .map((c) => ({
+              id: c.id,
+              name: c.getAttribute('data-testid') || c.getAttribute('aria-label') || c.id || c.tagName,
+              fontSize: window.getComputedStyle(c).fontSize,
+            }));
+        });
+        expect(formControls.length).toBeGreaterThan(0);
+        for (const ctrl of formControls) {
+          expect(ctrl.fontSize, `manual form control ${ctrl.name} at ${width}px`).toBe('16px');
+        }
+
+        // Close manual form
+        const cancelBtn = manualForm.locator('button:has-text("Cancel")').first();
+        await cancelBtn.click();
+      } finally {
+        await page.close();
+      }
+    }
+  });
+
+  test('D35: select label not clipped at 700px (D31)', async ({ browser }) => {
+    const page = await browser.newPage({
+      viewport: { width: 700, height: 844 },
+      deviceScaleFactor: 1,
+    });
+    try {
+      await setupPageAndLogin(page);
+
+      // Stage a meal to get the staged card
+      await page.fill('textarea[placeholder*="Describe what you ate"]', 'single 1-item salmon');
+      await page.click('button:has-text("Analyze Meal")');
+      const card = page.locator('[data-testid="staged-meal-card"]');
+      await expect(card).toBeVisible({ timeout: 15000 });
+
+      // Check chevron geometry and clearance at 700px
+      const geo = await checkSelectChevronGeometry(card);
+      console.log(JSON.stringify({
+        test: 'D35: select label not clipped at 700px',
+        width: 700,
+        geo,
+      }));
+
+      // Assert custom chevron is visible and within bounds
+      expect(geo.hasCustomChevron).toBe(true);
+      expect(geo.isChevronVisible).toBe(true);
+      expect(geo.isInside).toBe(true);
+      expect(geo.verticalDelta).toBeLessThanOrEqual(2);
+
+      // Assert longest option 'Post-Workout' does not overlap chevron
+      expect(geo.noOverlapLongest).toBe(true);
+      expect(geo.clearanceLongest).toBeGreaterThanOrEqual(0);
+
+      // Select 'Post-Workout' and assert no horizontal scroll clipping
+      const select = card.locator('select[aria-label="Meal type"]');
+      await select.selectOption('Post-Workout');
+      const selectClip = await select.evaluate((el) => ({
+        scrollWidth: el.scrollWidth,
+        clientWidth: el.clientWidth,
+        isClipped: el.scrollWidth > el.clientWidth,
+      }));
+      expect(selectClip.isClipped).toBe(false);
+    } finally {
+      await page.close();
+    }
+  });
+});

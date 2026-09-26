@@ -68,7 +68,7 @@ export const QuickLogDishCard: React.FC<QuickLogDishCardProps> = memo(({
             <span
               id={`dish-name-${dish.id}`}
               title={dish.name}
-              className="text-xs font-bold text-white group-hover:text-cyan-300 transition truncate block"
+              className="text-sm font-semibold text-white group-hover:text-cyan-300 transition truncate block"
             >
               {dish.name}
             </span>

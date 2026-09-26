@@ -457,7 +457,7 @@ describe('QuickLogFavorites (Horizontal Bar Redesign)', () => {
     expect(screen.queryByTestId('custom-dish-card-dish-2')).toBeNull();
   });
 
-  it('search input satisfies text-base sm:text-xs class contract to prevent iOS auto-zoom', () => {
+  it('search input satisfies text-base without sm:text-xs to maintain 16px at every width (D35)', () => {
     render(
       <QuickLogFavorites
         customDishes={[createMockDish()]}
@@ -470,7 +470,8 @@ describe('QuickLogFavorites (Horizontal Bar Redesign)', () => {
     );
 
     const searchInput = screen.getByTestId('search-favorites-input');
-    expect(searchInput.className).toContain('text-base sm:text-xs');
+    expect(searchInput.className).toContain('text-base');
+    expect(searchInput.className).not.toContain('sm:text-xs');
   });
 
   // Attack A & E: Note searching across full set
@@ -934,6 +935,68 @@ describe('QuickLogFavorites (Horizontal Bar Redesign)', () => {
       expect(onAddCustomDishToStaged).toHaveBeenCalledTimes(1);
       expect(onAddCustomDishToStaged).toHaveBeenCalledWith(dish);
       expect(onStageCustomDish).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('D35 type and input consistency', () => {
+    it('clear search button moves focus to the search input (D35)', () => {
+      render(
+        <QuickLogFavorites
+          customDishes={[createMockDish()]}
+          onOpenNewDishModal={vi.fn()}
+          onStageCustomDish={vi.fn()}
+          onOpenEditDishModal={vi.fn()}
+          onQuickLogCustomDishDirect={vi.fn()}
+          onDismissToast={vi.fn()}
+        />
+      );
+
+      const searchInput = screen.getByTestId('search-favorites-input');
+      fireEvent.change(searchInput, { target: { value: 'test' } });
+      const clearBtn = screen.getByLabelText('Clear search');
+      clearBtn.focus();
+      expect(document.activeElement).toBe(clearBtn);
+
+      fireEvent.click(clearBtn);
+
+      expect(document.activeElement).toBe(searchInput);
+    });
+
+    it('dish name uses 14px semibold text-sm font-semibold (D35/D18)', () => {
+      render(
+        <QuickLogFavorites
+          customDishes={[createMockDish({ id: 'dish-1', name: 'Whey Protein' })]}
+          onOpenNewDishModal={vi.fn()}
+          onStageCustomDish={vi.fn()}
+          onOpenEditDishModal={vi.fn()}
+          onQuickLogCustomDishDirect={vi.fn()}
+          onDismissToast={vi.fn()}
+        />
+      );
+
+      const dishName = screen.getByText('Whey Protein');
+      expect(dishName.className).toContain('text-sm');
+      expect(dishName.className).toContain('font-semibold');
+      expect(dishName.className).not.toContain('text-xs');
+      expect(dishName.className).not.toContain('font-bold');
+    });
+
+    it('search input maintains 16px text-base without sm:text-xs responsive shrink (D35)', () => {
+      render(
+        <QuickLogFavorites
+          customDishes={[createMockDish()]}
+          onOpenNewDishModal={vi.fn()}
+          onStageCustomDish={vi.fn()}
+          onOpenEditDishModal={vi.fn()}
+          onQuickLogCustomDishDirect={vi.fn()}
+          onDismissToast={vi.fn()}
+        />
+      );
+
+      const searchInput = screen.getByTestId('search-favorites-input');
+      expect(searchInput.className).toContain('text-base');
+      expect(searchInput.className).not.toContain('sm:text-xs');
+      expect(searchInput.className).not.toContain('sm:text-sm');
     });
   });
 });

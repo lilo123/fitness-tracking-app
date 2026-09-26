@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import type { CustomDish } from '../../types/database';
 import { QuickLogDishCard } from './QuickLogDishCard';
 import { Star, Plus, Search, X, ChevronDown, ChevronUp } from 'lucide-react';
@@ -26,6 +26,7 @@ export const QuickLogFavorites: React.FC<QuickLogFavoritesProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Sort dishes: use_count desc, created_at desc
   const sortedDishes = useMemo(() => {
@@ -115,18 +116,22 @@ export const QuickLogFavorites: React.FC<QuickLogFavoritesProps> = ({
           <div className="relative shrink-0">
             <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
+              ref={searchInputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search favorites (e.g. oats, shake, bowl)..."
               aria-label="Search favorite dishes"
               data-testid="search-favorites-input"
-              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl pl-10 pr-12 py-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none transition min-h-[44px]"
+              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl pl-10 pr-12 py-2.5 text-base font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none transition min-h-[44px]"
             />
             {searchQuery.length > 0 && (
               <button
                 type="button"
-                onClick={() => setSearchQuery('')}
+                onClick={() => {
+                  setSearchQuery('');
+                  searchInputRef.current?.focus();
+                }}
                 aria-label="Clear search"
                 className="absolute right-1 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-500 hover:text-zinc-300 touch-manipulation"
               >

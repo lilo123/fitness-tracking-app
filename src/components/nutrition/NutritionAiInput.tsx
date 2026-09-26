@@ -154,7 +154,7 @@ export const NutritionAiInput: React.FC<NutritionAiInputProps> = memo(({
                 : "Add notes or context (optional, e.g. 'dressing on the side', 'ate 2/3 of it')"
               : "Describe what you ate (e.g., 3 eggs, 2 slices sourdough, 1 tbsp butter)"
           }
-          className="w-full bg-transparent text-white text-base sm:text-xs placeholder:text-zinc-600 outline-none resize-none"
+          className="w-full bg-transparent text-white text-base placeholder:text-zinc-600 outline-none resize-none"
           rows={3}
         />
         <div className="flex justify-between items-center pt-2 border-t border-zinc-850">

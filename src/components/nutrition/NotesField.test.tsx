@@ -56,11 +56,11 @@ describe('NotesField', () => {
     expect(screen.getByTestId('add-note-btn')).toBeDefined();
   });
 
-  it('applies text-base sm:text-xs to prevent iOS auto-zoom on focus', () => {
+  it('applies text-base without responsive shrink to maintain 16px font at every width (D35)', () => {
     render(<ControlledNotesField initialValue="Zoom test" />);
     const textarea = screen.getByTestId('dish-notes-textarea');
     expect(textarea.className).toContain('text-base');
-    expect(textarea.className).toContain('sm:text-xs');
+    expect(textarea.className).not.toContain('sm:text-xs');
   });
 
   it('enforces maximum character limit of 500', () => {

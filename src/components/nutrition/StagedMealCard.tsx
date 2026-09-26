@@ -173,7 +173,7 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
             aria-label="Meal type"
             value={stagedMeal.mealType}
             onChange={(e) => onUpdateStagedMeal({ ...stagedMeal, mealType: e.target.value })}
-            className="w-full appearance-none bg-zinc-950 border border-border-interactive text-zinc-300 text-base sm:text-xs font-semibold rounded-xl pl-2 pr-7 py-2 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none min-h-[40px] h-10 cursor-pointer"
+            className="w-full appearance-none bg-zinc-950 border border-border-interactive text-zinc-300 text-base font-semibold rounded-xl pl-2 pr-7 py-2 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none min-h-[40px] h-10 cursor-pointer"
           >
             <option value="Breakfast">Breakfast</option>
             <option value="Lunch">Lunch</option>
