@@ -3129,7 +3129,7 @@ test.describe("D37 ring clearance", () => {
 // ---------------------------------------------------------------------------
 
 test.describe('D23 kcal-vs-macros hint', () => {
-  test('D23: manual form at 320px height hidden == base (592px), visible <= base + 20 (612px), font 12px, not clipped, single line', async ({ browser }) => {
+  test('D23: manual form at 320px height hidden == base (592px), visible <= base + 20 (612px), font 12px, not clipped, single line', async ({ browser }, testInfo) => {
     const page = await browser.newPage({ viewport: { width: 320, height: 844 }, deviceScaleFactor: 1 });
     try {
       await setupPageAndLogin(page);
@@ -3164,7 +3164,7 @@ test.describe('D23 kcal-vs-macros hint', () => {
 
       // Screenshot manual form with hint visible at 320px
       await formLocator.screenshot({
-        path: '/usr/local/google/home/duynguyenn/.gemini/jetski/brain/200a9e40-21fa-4449-a8bf-d4509c01bcd4/scratch/d23_hint_320.png',
+        path: testInfo.outputPath('d23_hint_320.png'),
       });
 
       // 4. Verify hint font size == 12px
