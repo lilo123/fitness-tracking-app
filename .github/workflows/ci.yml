@@ -50,9 +50,6 @@ jobs:
       - name: TypeScript typecheck
         run: npx tsc -b --force
 
-      - name: Run date-sensitive timezone tests (H19)
-        run: npm run test:tz
-
       - name: Build application
         run: npm run build
 
@@ -109,6 +106,10 @@ jobs:
 
       - name: Seed performance benchmark data
         run: npm run seed:stress
+
+      # After Supabase is up: ghostSets.test.ts includes a DB-backed fidelity check (127.0.0.1:58822).
+      - name: Run date-sensitive timezone tests (H19)
+        run: npm run test:tz
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium webkit
