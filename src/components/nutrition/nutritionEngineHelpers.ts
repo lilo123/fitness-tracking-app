@@ -43,7 +43,7 @@ export const useNavHeight = (): number => {
 
 import { convertPortion, type CanonicalUnit } from '../../utils/unitConverter';
 import { roundTo1Decimal, formatCalories } from '../../utils/nutrition';
-import { sumItems, type NutritionItem } from '../../utils/itemModel';
+import { sumItems, scaleItemToQuantity, type NutritionItem } from '../../utils/itemModel';
 import type { ManualMealStagedData } from './useManualMealForm';
 
 export interface StagedItem {
@@ -284,6 +284,77 @@ export function buildStagedItem(raw: {
     baseFiber: base.fiber,
     ...current,
   };
+}
+
+/**
+ * D33: Identical item check.
+ * Identical item = same name (case-insensitive trimmed), same unit, same per-unit
+ * macros (kcal/P/C/F/fiber per unit, compared with epsilon 0.1 or rounded to 1 decimal).
+ */
+export function isIdenticalItem(existing: StagedItem, incoming: StagedItem): boolean {
+  if (existing.name.trim().toLowerCase() !== incoming.name.trim().toLowerCase()) {
+    return false;
+  }
+  if (existing.unit !== incoming.unit) {
+    return false;
+  }
+  const exQty = existing.quantity > 0 ? existing.quantity : 1;
+  const inQty = incoming.quantity > 0 ? incoming.quantity : 1;
+
+  const exPerUnit = {
+    calories: existing.calories / exQty,
+    protein: existing.protein / exQty,
+    carbs: existing.carbs / exQty,
+    fat: existing.fat / exQty,
+    fiber: existing.fiber / exQty,
+  };
+  const inPerUnit = {
+    calories: incoming.calories / inQty,
+    protein: incoming.protein / inQty,
+    carbs: incoming.carbs / inQty,
+    fat: incoming.fat / inQty,
+    fiber: incoming.fiber / inQty,
+  };
+
+  const eps = 0.1;
+  return (
+    Math.abs(roundTo1Decimal(exPerUnit.calories) - roundTo1Decimal(inPerUnit.calories)) <= eps &&
+    Math.abs(roundTo1Decimal(exPerUnit.protein) - roundTo1Decimal(inPerUnit.protein)) <= eps &&
+    Math.abs(roundTo1Decimal(exPerUnit.carbs) - roundTo1Decimal(inPerUnit.carbs)) <= eps &&
+    Math.abs(roundTo1Decimal(exPerUnit.fat) - roundTo1Decimal(inPerUnit.fat)) <= eps &&
+    Math.abs(roundTo1Decimal(exPerUnit.fiber) - roundTo1Decimal(inPerUnit.fiber)) <= eps
+  );
+}
+
+/**
+ * D33: Merge identical items by adding quantity, or append non-identical items in order.
+ */
+export function mergeOrAppendStagedItems(
+  existingItems: StagedItem[],
+  incomingItems: StagedItem[]
+): StagedItem[] {
+  const currentItems = [...existingItems];
+  for (const incoming of incomingItems) {
+    const existingIdx = currentItems.findIndex((ex) => isIdenticalItem(ex, incoming));
+    if (existingIdx >= 0) {
+      const existing = currentItems[existingIdx];
+      const newQuantity = roundTo1Decimal(existing.quantity + incoming.quantity);
+      const scaled = scaleItemToQuantity(stagedReference(existing), newQuantity);
+      currentItems[existingIdx] = {
+        ...existing,
+        quantity: roundTo1Decimal(scaled.quantity),
+        calories: roundTo1Decimal(scaled.calories),
+        protein: roundTo1Decimal(scaled.protein),
+        carbs: roundTo1Decimal(scaled.carbs),
+        fat: roundTo1Decimal(scaled.fat),
+        fiber: roundTo1Decimal(scaled.fiber),
+        portionMultiplier: existing.baseQuantity > 0 ? scaled.quantity / existing.baseQuantity : 1,
+      };
+    } else {
+      currentItems.push(incoming);
+    }
+  }
+  return currentItems;
 }
 
 /**

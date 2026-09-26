@@ -7,6 +7,8 @@ import {
   updateStagedItemNutrition,
   buildStagedMealFromManualData,
   useStagedCardFocus,
+  isIdenticalItem,
+  mergeOrAppendStagedItems,
   type StagedItem,
 } from './nutritionEngineHelpers';
 import { scaleItemToQuantity } from '../../utils/itemModel';
@@ -489,5 +491,368 @@ describe('useStagedCardFocus', () => {
     document.body.removeChild(card);
     document.body.removeChild(outsideInput);
     document.body.removeChild(mockTextarea);
+  });
+});
+
+describe('D33: isIdenticalItem and mergeOrAppendStagedItems', () => {
+  it('isIdenticalItem returns true for identical items and false for differing unit or macros', () => {
+    const item1 = buildStagedItem({
+      name: 'Rolled Oats',
+      portion: '1 serving',
+      quantity: 1,
+      unit: 'unit',
+      calories: 150,
+      protein: 5,
+      carbs: 27,
+      fat: 3,
+      fiber: 4,
+    });
+    const item2 = buildStagedItem({
+      name: '  rolled oats  ',
+      portion: '1 serving',
+      quantity: 1,
+      unit: 'unit',
+      calories: 150,
+      protein: 5,
+      carbs: 27,
+      fat: 3,
+      fiber: 4,
+    });
+    // Name is case- and whitespace-insensitive
+    expect(isIdenticalItem(item1, item2)).toBe(true);
+
+    // Different unit -> not identical
+    const itemDiffUnit = buildStagedItem({
+      name: 'Rolled Oats',
+      portion: '40g',
+      quantity: 40,
+      unit: 'g',
+      calories: 150,
+      protein: 5,
+      carbs: 27,
+      fat: 3,
+      fiber: 4,
+    });
+    expect(isIdenticalItem(item1, itemDiffUnit)).toBe(false);
+
+    // Per-unit macro differs by > epsilon (0.1) -> not identical
+    const itemDiffMacro = buildStagedItem({
+      name: 'Rolled Oats',
+      portion: '1 serving',
+      quantity: 1,
+      unit: 'unit',
+      calories: 151,
+      protein: 5,
+      carbs: 27,
+      fat: 3,
+      fiber: 4,
+    });
+    expect(isIdenticalItem(item1, itemDiffMacro)).toBe(false);
+
+    // Per-unit macro differs by <= epsilon (0.05) -> identical
+    const itemCloseMacro = buildStagedItem({
+      name: 'Rolled Oats',
+      portion: '1 serving',
+      quantity: 1,
+      unit: 'unit',
+      calories: 150.05,
+      protein: 5,
+      carbs: 27,
+      fat: 3,
+      fiber: 4,
+    });
+    expect(isIdenticalItem(item1, itemCloseMacro)).toBe(true);
+  });
+
+  it('identical items merge: qty summed and macros scaled exactly', () => {
+    const existing = [
+      buildStagedItem({
+        name: 'Rolled Oats',
+        portion: '1 serving',
+        quantity: 1,
+        unit: 'unit',
+        calories: 150,
+        protein: 5,
+        carbs: 27,
+        fat: 3,
+        fiber: 4,
+      }),
+    ];
+    const incoming = [
+      buildStagedItem({
+        name: 'Rolled Oats',
+        portion: '1 serving',
+        quantity: 1,
+        unit: 'unit',
+        calories: 150,
+        protein: 5,
+        carbs: 27,
+        fat: 3,
+        fiber: 4,
+      }),
+    ];
+
+    const result = mergeOrAppendStagedItems(existing, incoming);
+    expect(result).toHaveLength(1);
+    expect(result[0].quantity).toBe(2);
+    expect(result[0].calories).toBe(300);
+    expect(result[0].protein).toBe(10);
+    expect(result[0].carbs).toBe(54);
+    expect(result[0].fat).toBe(6);
+    expect(result[0].fiber).toBe(8);
+  });
+
+  it('name matching is case-insensitive and trims whitespace', () => {
+    const existing = [
+      buildStagedItem({
+        name: '  Almonds  ',
+        portion: '1 oz',
+        quantity: 1,
+        unit: 'unit',
+        calories: 160,
+        protein: 6,
+        carbs: 6,
+        fat: 14,
+        fiber: 3,
+      }),
+    ];
+    const incoming = [
+      buildStagedItem({
+        name: 'almonds',
+        portion: '1 oz',
+        quantity: 1,
+        unit: 'unit',
+        calories: 160,
+        protein: 6,
+        carbs: 6,
+        fat: 14,
+        fiber: 3,
+      }),
+    ];
+
+    const result = mergeOrAppendStagedItems(existing, incoming);
+    expect(result).toHaveLength(1);
+    expect(result[0].quantity).toBe(2);
+    expect(result[0].calories).toBe(320);
+  });
+
+  it('different unit -> appended rather than merged', () => {
+    const existing = [
+      buildStagedItem({
+        name: 'Milk',
+        portion: '100 ml',
+        quantity: 100,
+        unit: 'ml',
+        calories: 50,
+        protein: 3,
+        carbs: 5,
+        fat: 2,
+        fiber: 0,
+      }),
+    ];
+    const incoming = [
+      buildStagedItem({
+        name: 'Milk',
+        portion: '1 cup',
+        quantity: 1,
+        unit: 'unit',
+        calories: 50,
+        protein: 3,
+        carbs: 5,
+        fat: 2,
+        fiber: 0,
+      }),
+    ];
+
+    const result = mergeOrAppendStagedItems(existing, incoming);
+    expect(result).toHaveLength(2);
+    expect(result[0].unit).toBe('ml');
+    expect(result[0].quantity).toBe(100);
+    expect(result[1].unit).toBe('unit');
+    expect(result[1].quantity).toBe(1);
+  });
+
+  it('per-unit macro differs by > epsilon -> appended rather than merged', () => {
+    const existing = [
+      buildStagedItem({
+        name: 'Apple',
+        portion: '1 medium',
+        quantity: 1,
+        unit: 'unit',
+        calories: 95,
+        protein: 0.5,
+        carbs: 25,
+        fat: 0.3,
+        fiber: 4.4,
+      }),
+    ];
+    const incoming = [
+      buildStagedItem({
+        name: 'Apple',
+        portion: '1 medium',
+        quantity: 1,
+        unit: 'unit',
+        calories: 98,
+        protein: 0.5,
+        carbs: 25,
+        fat: 0.3,
+        fiber: 4.4,
+      }),
+    ];
+
+    const result = mergeOrAppendStagedItems(existing, incoming);
+    expect(result).toHaveLength(2);
+    expect(result[0].calories).toBe(95);
+    expect(result[1].calories).toBe(98);
+  });
+
+  it('an item whose nutrition was edited via D7 is compared by its CURRENT per-unit values', () => {
+    const originalItem = buildStagedItem({
+      name: 'Chicken Breast',
+      portion: '100g',
+      quantity: 100,
+      unit: 'g',
+      calories: 165,
+      protein: 31,
+      carbs: 0,
+      fat: 3.6,
+      fiber: 0,
+    });
+
+    // D7: user edits nutrition
+    const editedItem = updateStagedItemNutrition(originalItem, {
+      calories: 200,
+      protein: 40,
+      carbs: 0,
+      fat: 5,
+      fiber: 0,
+    });
+
+    const existing = [editedItem];
+
+    // Incoming with matching edited per-unit macros (2 kcal/g, 0.4 protein/g)
+    const matchingIncoming = buildStagedItem({
+      name: 'Chicken Breast',
+      portion: '100g',
+      quantity: 100,
+      unit: 'g',
+      calories: 200,
+      protein: 40,
+      carbs: 0,
+      fat: 5,
+      fiber: 0,
+    });
+
+    expect(isIdenticalItem(editedItem, matchingIncoming)).toBe(true);
+
+    const merged = mergeOrAppendStagedItems(existing, [matchingIncoming]);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].quantity).toBe(200);
+    expect(merged[0].calories).toBe(400);
+    expect(merged[0].protein).toBe(80);
+
+    // Incoming with pre-edit macros (165 kcal, 1.65 kcal/g != 2.0 kcal/g) -> not identical, appended
+    const uneditedIncoming = buildStagedItem({
+      name: 'Chicken Breast',
+      portion: '100g',
+      quantity: 100,
+      unit: 'g',
+      calories: 165,
+      protein: 31,
+      carbs: 0,
+      fat: 3.6,
+      fiber: 0,
+    });
+
+    expect(isIdenticalItem(editedItem, uneditedIncoming)).toBe(false);
+    const appended = mergeOrAppendStagedItems(existing, [uneditedIncoming]);
+    expect(appended).toHaveLength(2);
+    expect(appended[0].calories).toBe(200);
+    expect(appended[1].calories).toBe(165);
+  });
+
+  it('multiple incoming items incl. two identical to each other merge properly', () => {
+    const existing = [
+      buildStagedItem({
+        name: 'Eggs',
+        portion: '2 eggs',
+        quantity: 2,
+        unit: 'unit',
+        calories: 140,
+        protein: 12,
+        carbs: 2,
+        fat: 10,
+        fiber: 0,
+      }),
+    ];
+
+    const toast1 = buildStagedItem({
+      name: 'Toast',
+      portion: '1 slice',
+      quantity: 1,
+      unit: 'unit',
+      calories: 80,
+      protein: 3,
+      carbs: 15,
+      fat: 1,
+      fiber: 1,
+    });
+    const butter = buildStagedItem({
+      name: 'Butter',
+      portion: '1 pat',
+      quantity: 1,
+      unit: 'unit',
+      calories: 35,
+      protein: 0,
+      carbs: 0,
+      fat: 4,
+      fiber: 0,
+    });
+    const toast2 = buildStagedItem({
+      name: 'Toast',
+      portion: '1 slice',
+      quantity: 1,
+      unit: 'unit',
+      calories: 80,
+      protein: 3,
+      carbs: 15,
+      fat: 1,
+      fiber: 1,
+    });
+
+    const result = mergeOrAppendStagedItems(existing, [toast1, butter, toast2]);
+    expect(result).toHaveLength(3);
+    expect(result[0].name).toBe('Eggs');
+    expect(result[0].quantity).toBe(2);
+    expect(result[1].name).toBe('Toast');
+    expect(result[1].quantity).toBe(2);
+    expect(result[1].calories).toBe(160);
+    expect(result[2].name).toBe('Butter');
+    expect(result[2].quantity).toBe(1);
+  });
+
+  it('order of existing items and appended incoming items is preserved', () => {
+    const itemA = buildStagedItem({ name: 'Alpha', quantity: 1, unit: 'unit', calories: 10 });
+    const itemB = buildStagedItem({ name: 'Beta', quantity: 1, unit: 'unit', calories: 20 });
+    const itemC = buildStagedItem({ name: 'Gamma', quantity: 1, unit: 'unit', calories: 30 });
+    const itemD = buildStagedItem({ name: 'Delta', quantity: 1, unit: 'unit', calories: 40 });
+
+    const result = mergeOrAppendStagedItems([itemA, itemB], [itemC, itemD]);
+    expect(result.map((it) => it.name)).toEqual(['Alpha', 'Beta', 'Gamma', 'Delta']);
+  });
+
+  it('input arrays and objects are not mutated', () => {
+    const itemA = buildStagedItem({ name: 'Alpha', quantity: 1, unit: 'unit', calories: 10 });
+    const itemB = buildStagedItem({ name: 'Beta', quantity: 1, unit: 'unit', calories: 20 });
+    const existing = [itemA];
+    const incoming = [itemB];
+
+    const existingBefore = JSON.stringify(existing);
+    const incomingBefore = JSON.stringify(incoming);
+
+    mergeOrAppendStagedItems(existing, incoming);
+
+    expect(JSON.stringify(existing)).toBe(existingBefore);
+    expect(JSON.stringify(incoming)).toBe(incomingBefore);
   });
 });
