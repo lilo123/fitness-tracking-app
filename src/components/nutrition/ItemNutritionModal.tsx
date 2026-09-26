@@ -214,7 +214,7 @@ const ItemNutritionForm: React.FC<ItemNutritionFormProps> = ({ item, onClose, on
                       : 'border-border-interactive focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50'
                   }`}
                 />
-                <p aria-hidden="true" className="text-[11px] text-zinc-400 text-center mt-1 lowercase">
+                <p aria-hidden="true" className="text-xs text-zinc-400 text-left mt-1 lowercase">
                   {field.unit}
                 </p>
                 {hasFieldError && (
