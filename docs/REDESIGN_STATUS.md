@@ -27,12 +27,23 @@
 | P7b | Library template builder, coach builder, catalog content | not started | |
 | P8 | Shell, Coach, Settings + Nutrition standards sweep | not started | |
 
-Planning status: **plan drafted 2026-09-26, waiting for your review; no implementation started.**
+Planning status: **plan drafted 2026-09-26; all open questions answered (RD-14..RD-20); no implementation started.**
 
 ---
 
 ## 2. Decision log
 Newest first. Decisions dated 2026-09-26 in the audit reports are final and are not re-decided here. They are recorded so this file stands alone.
+
+### 2.0 Open-question answers (user, 2026-09-26 19:59Z)
+| ID | Decision | Reasoning |
+|---|---|---|
+| RD-14 (OQ-1) | **The test time zone is set in npm scripts only** (e.g. `TZ=America/Los_Angeles vitest run …`). `vitest.config.ts` and `playwright.config.ts` stay untouched. | Keeps the standing "no config edits" rule; same coverage; trivially reversible. |
+| RD-15 (OQ-2) | **Duplicate workouts on one day: stop and report first.** Before W41's unique `(user_id, workout_date)` lands, P2 runs a read-only audit and reports the count of duplicate days (with examples) to the user. Merging (sets moved to the oldest row) happens **only after explicit user approval**; the migration does not auto-merge. | Merging rewrites real history; the count is likely 0, so asking is cheap. |
+| RD-16 (OQ-3) | **Existing warm-up/drop sets stay hidden** (not converted to working). P2 reports how many exist per user. | Converting could inflate PRs and volume with sets never meant to count; hiding is reversible and deletes nothing. |
+| RD-17 (OQ-4) | **Keep-alive (D5) applies to History only.** Other tabs are evaluated in the P8 audit. | History is the long scroll where losing your place hurts; limits stale-data risk elsewhere (e.g. an active workout). |
+| RD-18 (OQ-5) | **BottomNav labels: measure first.** If five 12px sentence-case labels fit at 320px, use them. If not, **icon-only below 360px** (labels stay as `aria-label`), labels at 12px everywhere else. No 11px exemption. | Keeps the 12px floor with no exceptions; icon-only on very small phones is a common pattern. |
+| RD-19 (OQ-6) | **No admin screen for default exercises.** Defaults change only through database migrations (like M8). | Defaults rarely change; an admin surface is a separate feature to build and secure. Can be revisited later. |
+| RD-20 (K9 confirm) | **User confirmed the RD-9 reading:** warm-up and drop sets are hidden on every screen, excluded from PR, Last, set counts and volume; the set-type picker is removed from the set editor; no rows are deleted. | Confirmed 2026-09-26 19:59Z. |
 
 ### 2.1 Redesign plan decisions (user, 2026-09-26 19:44Z)
 | ID | Decision | Reasoning |
@@ -48,7 +59,7 @@ Newest first. Decisions dated 2026-09-26 in the audit reports are final and are 
 | RD-9 (K9) | **Warm-up and drop sets are hidden on every tab** and excluded from PR, Last, completion counts and volume. You said: "I don't even have a way to register Warm-up & Dropset now in Workout tab, just hide them all together". EditSetSheet has no set-type picker. Existing non-working rows are kept in the DB, not deleted. | There's no way to log them; hiding everywhere keeps the numbers consistent. |
 | RD-10 (6b.4-3) | **Coaches cannot edit an athlete's custom exercises** (read-only). RLS v2 omits the `is_coach_of` UPDATE branch. | Matches Library Q3 (L24). |
 | RD-11 (6b.4-4) | **Routines get a sibling `get_routine_catalog`** (same scope, hidden and cursor conventions), created in P4 and first used by the Workout routine picker (L33). | Ranking, ownership and assignment differ from exercises. |
-| RD-12 (S1–S3) | **Standards where Nutrition and the audits disagreed:** hit area ≥44px everywhere (visual 32–40px allowed with invisible expansion); **12px text floor** wins over the audits' `text-3xs/2xs` 10/11px tokens (BottomNav labels go to 12px sentence case if 5 labels fit at 320px, otherwise a documented exemption); **AA contrast** (`zinc-400`+) app-wide; Nutrition is brought into line in P8. | STD-INT-9, STD-TYP-1, STD-COL-2. |
+| RD-12 (S1–S3) | **Standards where Nutrition and the audits disagreed:** hit area ≥44px everywhere (visual 32–40px allowed with invisible expansion); **12px text floor** wins over the audits' `text-3xs/2xs` 10/11px tokens (BottomNav labels go to 12px sentence case if 5 labels fit at 320px, otherwise icon-only below 360px per RD-18); **AA contrast** (`zinc-400`+) app-wide; Nutrition is brought into line in P8. | STD-INT-9, STD-TYP-1, STD-COL-2. |
 | RD-13 (Q-seq) | **Library P0/P1 data-safety fixes L1, L2, L3, L12 go into P1** with exercises RLS v2. Also included, by the conductor because they're the same files and S effort: **L5, L6, L7**. | One-tap global data loss; they share the RLS migration (X3). |
 
 ### 2.2 Decisions made while planning (conductor, 2026-09-26; low risk, reversible)
@@ -183,7 +194,7 @@ Newest first. Decisions dated 2026-09-26 in the audit reports are final and are 
 - **Owns:**
   - migration **M2 `workouts_civil_date`** (RD-5):
     - `workout_date date not null`, backfill, trigger for legacy writers
-    - unique `(user_id, workout_date)` (W41), after a duplicate-day audit and merge plan
+    - unique `(user_id, workout_date)` (W41), after a read-only duplicate-day audit; counts reported to the user and any merge only with explicit approval (RD-15)
     - `get_ghost_sets` / `get_history_sessions` return `workout_date` (additive)
   - migration **M3 `exercise_pr_benchmarks`** (RD-4):
     - internal PR function (working sets only, RD-9)
@@ -283,7 +294,7 @@ Newest first. Decisions dated 2026-09-26 in the audit reports are final and are 
   - Library and History views unchanged (DOM diff of the list at 390).
 
 ### P5a: History data, shell and session list
-- **Scope:** H3, H5, H6, H7, H8 (data: `get_exercise_history` RPC in M5), H9, H12, H13, H14, H18, H20, H21 (sessions), H22, H26, H30, H31, H32 (adopt), H33, H34, H35 (session/shell), H38, H44 (D5 keep-alive), H45 (RD-8), H46 (part), H50.
+- **Scope:** H3, H5, H6, H7, H8 (data: `get_exercise_history` RPC in M5), H9, H12, H13, H14, H18, H20, H21 (sessions), H22, H26, H30, H31, H32 (adopt), H33, H34, H35 (session/shell), H38, H44 (D5 keep-alive, History only per RD-17), H45 (RD-8), H46 (part), H50.
 - **Tabs touched:** History; the App shell (keep-alive).
 - **Owns:**
   - migration **M5 `history_rpcs_v2`**:
@@ -370,7 +381,7 @@ Newest first. Decisions dated 2026-09-26 in the audit reports are final and are 
 ### P8: Shell, Coach, Settings + Nutrition standards sweep
 - **Scope:**
   - L41 (coach nav entry), H25, H39, W44 (final no-`window.confirm` gate across `src/`)
-  - RD-12 application: BottomNav 12px labels (or a documented exemption), Header mono tag, remaining `text-zinc-500`/sub-12px/mono/black in `src/` to zero
+  - RD-12 application: BottomNav 12px labels (measure at 320px first; if they don't fit, icon-only below 360px, RD-18), Header mono tag, remaining `text-zinc-500`/sub-12px/mono/black in `src/` to zero
   - RD-7 application: Nutrition `window.confirm` deletes (`NutritionEngine.tsx:409`, `CustomDishesModal.tsx:328,412`) → UndoToast; CoachCockpit/MyCoachCard confirms → ConfirmDialog
   - STD-CMP-10 skeletons in Nutrition; Nutrition 40px hit areas → 44 (STD-INT-9)
   - **first:** a read-only Coach + Settings audit; its findings are added to this file as C#/S# items before any change
@@ -466,14 +477,20 @@ Coverage: 50 W + 48 L + 53 H = **151 items**. Each is assigned to a phase, defer
 ---
 
 ## 7. Open questions
-| # | Question | Needed by | Default if unanswered |
-|---|---|---|---|
-| OQ-1 | Earlier runs banned edits to `vitest.config.ts` / `playwright.config.ts`. P0 needs a pinned TZ (H19): OK to set it via npm scripts only, or may P0 edit the configs? | P0 | npm scripts only (no config edits). |
-| OQ-2 | W41 unique `(user_id, workout_date)`: if the audit finds duplicate workout rows for a day, merge them (move sets to the oldest row) or block the migration for manual review? | P2 | Stop and report counts; merge only with approval. |
-| OQ-3 | RD-9: existing non-working sets (if any) are hidden. Convert them to `working` instead, so they count? | P2 | Keep them hidden and report the count. |
-| OQ-4 | Keep-alive (D5) for **all** tabs, or History only (T9)? | P5a | History only; evaluate others in P8. |
-| OQ-5 | BottomNav: if 12px sentence-case labels don't fit 5 tabs at 320px, which exemption: icon-only below 360px, or 11px nav labels as the single documented exception? | P8 | Measure first; propose in P8. |
-| OQ-6 | Is a platform admin surface for editing default exercises needed (Library L1 fix removes in-app editing of defaults entirely)? | P7b | No; defaults change via migrations (M8). |
+None open. All six were answered on 2026-09-26 19:59Z and are recorded in §2.0:
+
+| # | Question | Answer |
+|---|---|---|
+| OQ-1 | Pin the test time zone via npm scripts or config edits? | npm scripts only (RD-14). |
+| OQ-2 | Duplicate workouts on one day: auto-merge or stop? | Stop, report counts, merge only after approval (RD-15). |
+| OQ-3 | Existing warm-up/drop sets: hide or convert to working? | Keep hidden, report counts (RD-16). |
+| OQ-4 | Keep-alive for all tabs or History only? | History only; others evaluated in P8 (RD-17). |
+| OQ-5 | BottomNav if 12px labels don't fit at 320px? | Measure first; icon-only below 360px if needed (RD-18). |
+| OQ-6 | Admin screen for default exercises? | No; migrations only (RD-19). |
+
+Add new questions here as phases surface them (e.g. the P8 Coach/Settings audit, the RD-15/RD-16 counts).
+
+---
 
 ## 8. Risks
 | Risk | Impact | Mitigation |
@@ -492,3 +509,4 @@ Coverage: 50 W + 48 L + 53 H = **151 items**. Each is assigned to a phase, defer
 | Date | Change |
 |---|---|
 | 2026-09-26 | Created: standards, decisions RD-1..13 and RP-1..6, phases P0–P8, full item assignment (151), open questions, risks. No implementation started. |
+| 2026-09-26 | OQ-1..OQ-6 answered and the K9 reading confirmed (RD-14..RD-20); §7 closed; P2/P5a/P8 scope wording aligned. No implementation started. |
