@@ -58,9 +58,37 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
       if (typeof cardRef.current.scrollIntoView === 'function') {
         cardRef.current.scrollIntoView({ behavior, block: 'start' });
       }
-      const dishNameInput = cardRef.current.querySelector<HTMLInputElement>('[data-testid="dish-name-input"]');
-      dishNameInput?.focus({ preventScroll: true });
     }
+
+    const triggerEl = typeof document !== 'undefined' ? document.activeElement : null;
+    const frameId = requestAnimationFrame(() => {
+      if (!cardRef.current) return;
+      const activeEl = typeof document !== 'undefined' ? document.activeElement : null;
+      if (!activeEl || activeEl === document.body || activeEl === document.documentElement) {
+        const dishNameInput = cardRef.current.querySelector<HTMLInputElement>('[data-testid="dish-name-input"]');
+        dishNameInput?.focus({ preventScroll: true });
+        return;
+      }
+
+      if (cardRef.current.contains(activeEl)) {
+        return;
+      }
+
+      // Only autofocus if focus is still on the element that triggered staging
+      // and not moved elsewhere (e.g. date picker or outside input)
+      const isTrigger =
+        triggerEl &&
+        activeEl === triggerEl &&
+        activeEl.tagName !== 'INPUT' &&
+        activeEl.tagName !== 'TEXTAREA';
+
+      if (isTrigger) {
+        const dishNameInput = cardRef.current.querySelector<HTMLInputElement>('[data-testid="dish-name-input"]');
+        dishNameInput?.focus({ preventScroll: true });
+      }
+    });
+
+    return () => cancelAnimationFrame(frameId);
   }, []);
 
   const [isAddingItem, setIsAddingItem] = useState(false);

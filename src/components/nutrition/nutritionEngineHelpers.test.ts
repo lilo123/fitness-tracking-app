@@ -492,6 +492,85 @@ describe('useStagedCardFocus', () => {
     document.body.removeChild(outsideInput);
     document.body.removeChild(mockTextarea);
   });
+
+  it('restores focus when focus was inside at decision time even if focus dropped to body before unmount (A1)', () => {
+    let isStaged = true;
+    const { result, rerender } = renderHook(() => useStagedCardFocus(isStaged));
+
+    const card = document.createElement('div');
+    const childBtn = document.createElement('button');
+    card.appendChild(childBtn);
+    const mockTextarea = document.createElement('textarea');
+    document.body.appendChild(card);
+    document.body.appendChild(mockTextarea);
+
+    const textareaFocusSpy = vi.spyOn(mockTextarea, 'focus');
+
+    (result.current.cardContainerRef as any).current = card;
+    (result.current.textareaRef as any).current = mockTextarea;
+
+    // Focus child button inside card and decide focus restore
+    childBtn.focus();
+    expect(document.activeElement).toBe(childBtn);
+
+    act(() => {
+      result.current.decideFocusRestore();
+    });
+
+    // Button disabled during pending mutation drops focus to body
+    document.body.tabIndex = -1;
+    document.body.focus();
+    expect(document.activeElement).toBe(document.body);
+
+    // Card unmounts after mutation success
+    isStaged = false;
+    rerender();
+
+    expect(textareaFocusSpy).toHaveBeenCalledTimes(1);
+
+    document.body.removeChild(card);
+    document.body.removeChild(mockTextarea);
+  });
+
+  it('does not restore focus if focus moved to an outside input after decision before unmount (A1)', () => {
+    let isStaged = true;
+    const { result, rerender } = renderHook(() => useStagedCardFocus(isStaged));
+
+    const card = document.createElement('div');
+    const childBtn = document.createElement('button');
+    const outsideInput = document.createElement('input');
+    card.appendChild(childBtn);
+    const mockTextarea = document.createElement('textarea');
+    document.body.appendChild(card);
+    document.body.appendChild(outsideInput);
+    document.body.appendChild(mockTextarea);
+
+    const textareaFocusSpy = vi.spyOn(mockTextarea, 'focus');
+
+    (result.current.cardContainerRef as any).current = card;
+    (result.current.textareaRef as any).current = mockTextarea;
+
+    // Focus inside card and decide restore
+    childBtn.focus();
+    act(() => {
+      result.current.decideFocusRestore();
+    });
+
+    // While pending, user deliberately focuses an outside input (e.g. date picker)
+    outsideInput.focus();
+    expect(document.activeElement).toBe(outsideInput);
+
+    // Card unmounts
+    isStaged = false;
+    rerender();
+
+    // Should NOT steal focus from outsideInput
+    expect(textareaFocusSpy).not.toHaveBeenCalled();
+
+    document.body.removeChild(card);
+    document.body.removeChild(outsideInput);
+    document.body.removeChild(mockTextarea);
+  });
 });
 
 describe('D33: isIdenticalItem and mergeOrAppendStagedItems', () => {

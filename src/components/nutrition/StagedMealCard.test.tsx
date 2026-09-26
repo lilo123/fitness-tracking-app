@@ -1395,5 +1395,36 @@ describe('StagedMealCard', () => {
       const card = screen.getByTestId('staged-meal-card');
       expect(card).toHaveClass('motion-reduce:animate-none');
     });
+
+    it('A2: does not steal focus when user moves focus to another input before autofocus callback runs', async () => {
+      const outsideInput = document.createElement('input');
+      outsideInput.setAttribute('data-testid', 'outside-input');
+      document.body.appendChild(outsideInput);
+
+      // Simulate user already focused another input (e.g. date picker or quick log)
+      outsideInput.focus();
+      expect(document.activeElement).toBe(outsideInput);
+
+      const meal = makeStagedMeal();
+      render(
+        <StagedMealCard
+          stagedMeal={meal}
+          onUpdateStagedMeal={vi.fn()}
+          onApplyStagedItemChange={vi.fn()}
+          onDeleteItem={vi.fn()}
+          onSaveItemAsCustomDish={vi.fn()}
+          onLogStagedMeal={vi.fn()}
+          onSaveStagedAsCustomDish={vi.fn()}
+          onDiscardStagedMeal={vi.fn()}
+          isPending={false}
+        />
+      );
+
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+
+      // On old code, dishNameInput unconditionally stole focus
+      expect(document.activeElement).toBe(outsideInput);
+      document.body.removeChild(outsideInput);
+    });
   });
 });

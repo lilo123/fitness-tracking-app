@@ -200,11 +200,17 @@ test.describe('Nutrition Flow E2E', () => {
     const logBtn = page.locator('button:has-text("Log Meal")').last();
     await logBtn.click();
 
-    // Commit staged meal to log
+    // Commit staged meal to log (A1: keyboard activate Log button, verify focus restore)
     const stagedCard = page.locator('[data-testid="staged-meal-card"]');
     await expect(stagedCard).toBeVisible();
-    await stagedCard.locator('button:has-text("Log Meal")').click();
+    const commitLogBtn = stagedCard.locator('button:has-text("Log Meal")');
+    await commitLogBtn.focus();
+    await page.keyboard.press('Enter');
     await expect(stagedCard).not.toBeVisible();
+
+    // A1 check: after logging, focus is restored to the AI input textarea
+    const aiTextarea = page.locator('textarea[placeholder*="Describe what you ate"]');
+    await expect(aiTextarea).toBeFocused();
 
     // Verify meal is displayed in today's meals timeline
     await expect(page.locator('text=Playwright Test Chicken & Rice').first()).toBeVisible();

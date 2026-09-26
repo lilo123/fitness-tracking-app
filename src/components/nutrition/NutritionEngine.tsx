@@ -70,7 +70,6 @@ export const NutritionEngine: React.FC = () => {
     selectedDate,
     profile,
     onMutationSuccessReset: () => {
-      decideFocusRestore();
       setStagedMeal(null);
       ai.setSelectedPhoto(null);
       setShowManualForm(false);
@@ -145,6 +144,7 @@ export const NutritionEngine: React.FC = () => {
 
   const handleLogStagedMeal = () => {
     if (!stagedMeal) return;
+    decideFocusRestore();
     const items = stagedMeal.items.map(stagedToItem);
     const totals = sumItems(items);
     const isSingle = items.length <= 1;

@@ -436,10 +436,19 @@ export function useStagedCardFocus(isStaged: boolean) {
     if (prevIsStagedRef.current && !isStaged) {
       if (shouldRestoreFocusRef.current) {
         shouldRestoreFocusRef.current = false;
-        if (textareaRef.current) {
-          textareaRef.current.focus();
-        } else if (headingRef.current) {
-          headingRef.current.focus();
+        const active = document.activeElement;
+        const focusMovedElsewhere =
+          active &&
+          active !== document.body &&
+          active !== document.documentElement &&
+          !cardContainerRef.current?.contains(active);
+
+        if (!focusMovedElsewhere) {
+          if (textareaRef.current) {
+            textareaRef.current.focus();
+          } else if (headingRef.current) {
+            headingRef.current.focus();
+          }
         }
       }
     }

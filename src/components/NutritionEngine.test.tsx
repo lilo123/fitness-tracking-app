@@ -3889,6 +3889,76 @@ Total Fiber: 1 g`;
       expect(document.activeElement).toBe(restoredInput);
     });
 
+    it('A1: restores focus to AI input textarea after pending mutation disables Log button and drops focus to body', async () => {
+      let resolveInsert: (val: any) => void;
+      const insertPromise = new Promise((resolve) => {
+        resolveInsert = resolve;
+      });
+      const mockInsert = vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue(insertPromise),
+      });
+      (supabase.from as any).mockImplementation((table: string) => {
+        const b = createSupabaseBuilder(table, { data: [], error: null });
+        if (table === 'nutrition_logs') {
+          b.insert = mockInsert;
+        }
+        return b;
+      });
+
+      (supabase.functions.invoke as any).mockResolvedValue({
+        data: {
+          name: 'Protein Shake',
+          calories: 200,
+          protein: 30,
+          carbs: 5,
+          fat: 2,
+          fiber: 1,
+          items: [
+            { name: 'Whey', portion: '1 scoop', calories: 200, protein: 30, carbs: 5, fat: 2, fiber: 1, quantity: 1, unit: 'scoop' },
+          ],
+        },
+        error: null,
+      });
+
+      renderComponent();
+
+      const input = screen.getByPlaceholderText(/Describe what you ate/i);
+      await userEvent.type(input, 'whey protein shake');
+      fireEvent.click(screen.getByText('Analyze Meal'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('staged-meal-card')).toBeDefined();
+      });
+
+      const logBtn = screen.getByRole('button', { name: /Log Meal/i });
+      logBtn.focus();
+      expect(document.activeElement).toBe(logBtn);
+
+      fireEvent.click(logBtn);
+
+      // Pending state disables the button; in real browsers disabling a focused button drops focus to body.
+      await waitFor(() => {
+        expect(logBtn).toBeDisabled();
+      });
+      // In real browsers, disabling the focused button blurs it to <body>.
+      // jsdom does not auto-blur on disabled (jsdom issue #3121); simulate focus dropping to body:
+      document.body.tabIndex = -1;
+      document.body.focus();
+      expect(document.activeElement).toBe(document.body);
+
+      // Now mutation succeeds
+      await act(async () => {
+        resolveInsert!({ data: [], error: null });
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('staged-meal-card')).toBeNull();
+      });
+
+      const restoredInput = screen.getByPlaceholderText(/Describe what you ate/i);
+      expect(document.activeElement).toBe(restoredInput);
+    });
+
     it('restores focus to AI input textarea when staged card closes on log success (F5)', async () => {
       const mockInsert = vi.fn().mockReturnValue({
         select: vi.fn().mockResolvedValue({ data: [], error: null }),
