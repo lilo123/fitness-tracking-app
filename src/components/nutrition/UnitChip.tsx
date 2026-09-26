@@ -70,16 +70,24 @@ export const UnitChip: React.FC<UnitChipProps> = ({
         aria-label={ariaLabel || `Unit: ${value}. Change unit`}
         aria-haspopup="dialog"
         aria-expanded={open}
-        onClick={() => setOpen(true)}
-        className={`shrink-0 min-h-[40px] h-10 flex items-center text-xs transition touch-manipulation disabled:opacity-50 ${
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setOpen(true);
+        }}
+        className={`group shrink-0 ${
           embedded
-            ? 'w-[52px] min-w-[52px] max-w-[52px] border-0 border-l border-zinc-700/80 bg-zinc-700/60 hover:bg-zinc-700/80 hover:text-zinc-200 text-zinc-300 font-normal justify-between pl-1.5 pr-1'
-            : 'min-w-[40px] max-w-[64px] rounded-lg border border-border-interactive bg-zinc-950 hover:border-cyan-500 font-bold text-cyan-300 justify-center px-1'
-        }`}
+            ? 'h-11 min-h-[44px] -my-1.5 w-[52px] min-w-[52px] max-w-[52px] bg-transparent border-0 p-0 flex items-center justify-center'
+            : 'min-h-[40px] h-10 min-w-[40px] max-w-[64px] rounded-lg border border-border-interactive bg-zinc-950 hover:border-cyan-500 font-bold text-cyan-300 justify-center px-1'
+        } flex items-center text-xs transition touch-manipulation disabled:opacity-50`}
       >
-        <span className="truncate text-left min-w-0">{shortUnitLabel(value)}</span>
-        {embedded && (
-          <ChevronDown className="w-3 h-3 shrink-0 text-zinc-300" aria-hidden="true" />
+        {embedded ? (
+          <span className="w-full h-8 border-l border-zinc-700/80 bg-zinc-700/60 group-hover:bg-zinc-700/80 group-hover:text-zinc-200 text-zinc-300 font-normal flex items-center justify-between pl-1.5 pr-1 rounded-r-[7px]">
+            <span className="truncate text-left min-w-0">{shortUnitLabel(value)}</span>
+            <ChevronDown className="w-3 h-3 shrink-0 text-zinc-300" aria-hidden="true" />
+          </span>
+        ) : (
+          <span className="truncate text-left min-w-0">{shortUnitLabel(value)}</span>
         )}
       </button>
 

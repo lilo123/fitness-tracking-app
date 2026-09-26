@@ -508,11 +508,15 @@ async function checkTapTargets(surface: Locator) {
     for (const el of tapCandidates) {
       if (!isVis(el)) continue;
       candidateCount++;
-      const r = el.getBoundingClientRect();
+      // Controls enclosed in a dedicated touch-target wrapper (e.g. D32 qty/unit box) measure the enclosing hit area
+      const hitArea = el.matches('[data-testid="component-quantity-input"]')
+        ? el.closest<HTMLElement>('[data-testid="component-quantity-field"]')
+        : null;
+      const r = hitArea ? hitArea.getBoundingClientRect() : el.getBoundingClientRect();
       const width = Math.round(r.width * 10) / 10;
       const height = Math.round(r.height * 10) / 10;
       const text = ((el as HTMLElement).innerText || el.getAttribute('aria-label') || el.getAttribute('placeholder') || '').trim().slice(0, 25);
-      const selector = getSel(el);
+      const selector = getSel(hitArea || el);
 
       if (width < 48 || height < 48) {
         tapsUnder48.push({ selector, text, width, height });
@@ -681,6 +685,77 @@ async function waitForScrollPosition(page: Page, target: number | 'bottom') {
 }
 
 // ---------------------------------------------------------------------------
+
+// Check helper: Staged card item row qty/unit box geometry (D32)
+async function checkQtyUnitBoxGeometry(card: Locator) {
+  return await card.evaluate((cardEl) => {
+    const itemRows = Array.from(cardEl.querySelectorAll<HTMLElement>('[data-testid="component-row"]'));
+    return itemRows.map((row, idx) => {
+      const rowRect = row.getBoundingClientRect();
+      const hitArea = row.querySelector<HTMLElement>('[data-testid="component-quantity-field"]');
+      const visibleBox = row.querySelector<HTMLElement>('[data-testid="component-quantity-box"]');
+      const qtyInput = row.querySelector<HTMLInputElement>('[data-testid="component-quantity-input"]');
+      const chipBtn = row.querySelector<HTMLElement>('[data-testid="unit-chip"]') || row.querySelector<HTMLElement>('button[aria-haspopup="dialog"]');
+      const menuBtn = row.querySelector<HTMLElement>('[data-testid="component-actions"]');
+      const macroRow = row.querySelector<HTMLElement>('[data-testid="component-macros"]');
+
+      if (!hitArea || !visibleBox || !qtyInput || !macroRow || !menuBtn || !chipBtn) {
+        throw new Error(`Missing elements on component row ${idx}: hitArea=${!!hitArea}, visibleBox=${!!visibleBox}, qtyInput=${!!qtyInput}, chipBtn=${!!chipBtn}, macroRow=${!!macroRow}, menuBtn=${!!menuBtn}`);
+      }
+
+      const hitRect = hitArea.getBoundingClientRect();
+      const boxRect = visibleBox.getBoundingClientRect();
+      const macroRect = macroRow.getBoundingClientRect();
+      const menuRect = menuBtn.getBoundingClientRect();
+      const inputRect = qtyInput.getBoundingClientRect();
+      const chipRect = chipBtn.getBoundingClientRect();
+
+      const gap = Math.round((macroRect.top - boxRect.bottom) * 10) / 10;
+
+      // Check horizontal & vertical overlap between hitArea and menuBtn
+      const hOverlap = Math.max(0, Math.min(hitRect.right, menuRect.right) - Math.max(hitRect.left, menuRect.left));
+      const vOverlap = Math.max(0, Math.min(hitRect.bottom, menuRect.bottom) - Math.max(hitRect.top, menuRect.top));
+      const hasMenuOverlap = hOverlap > 0 && vOverlap > 0;
+
+      // Check overlap between chip hit box and menuBtn
+      const chipHOverlap = Math.max(0, Math.min(chipRect.right, menuRect.right) - Math.max(chipRect.left, menuRect.left));
+      const chipVOverlap = Math.max(0, Math.min(chipRect.bottom, menuRect.bottom) - Math.max(chipRect.top, menuRect.top));
+      const hasChipMenuOverlap = chipHOverlap > 0 && chipVOverlap > 0;
+
+      // elementFromPoint at top/bottom edges of 44px hit box over qty-number x-centre
+      const qtyX = inputRect.left + inputRect.width / 2;
+      const topQtyEl = document.elementFromPoint(qtyX, hitRect.top + 1);
+      const bottomQtyEl = document.elementFromPoint(qtyX, hitRect.bottom - 1);
+
+      const isTopResolved = topQtyEl === hitArea || topQtyEl === visibleBox || topQtyEl === qtyInput || (hitArea.contains(topQtyEl) && !chipBtn.contains(topQtyEl));
+      const isBottomResolved = bottomQtyEl === hitArea || bottomQtyEl === visibleBox || bottomQtyEl === qtyInput || (hitArea.contains(bottomQtyEl) && !chipBtn.contains(bottomQtyEl));
+
+      // elementFromPoint at top/bottom edges over chip's x-centre
+      const chipX = chipRect.left + chipRect.width / 2;
+      const topChipEl = document.elementFromPoint(chipX, hitRect.top + 1);
+      const bottomChipEl = document.elementFromPoint(chipX, hitRect.bottom - 1);
+
+      const isChipTopResolved = topChipEl === chipBtn || chipBtn.contains(topChipEl);
+      const isChipBottomResolved = bottomChipEl === chipBtn || chipBtn.contains(bottomChipEl);
+
+      return {
+        idx,
+        rowHeight: Math.round(rowRect.height * 10) / 10,
+        visibleBoxHeight: Math.round(boxRect.height * 10) / 10,
+        hitAreaHeight: Math.round(hitRect.height * 10) / 10,
+        chipHeight: Math.round(chipRect.height * 10) / 10,
+        gap,
+        hasMenuOverlap,
+        hasChipMenuOverlap,
+        isTopResolved,
+        isBottomResolved,
+        isChipTopResolved,
+        isChipBottomResolved,
+      };
+    });
+  });
+}
+
 // Surface A: Staged card with 4 items
 // ---------------------------------------------------------------------------
 
@@ -972,6 +1047,71 @@ test.describe('Surface A: Staged card with 4 items', () => {
     // Button text vertical center aligns with header label vertical center (within +-1px)
     expect(result.textLabelDeltaY).not.toBeNull();
     expect(Math.abs(result.textLabelDeltaY!), `Add item text center-Y deviates from label center-Y by ${result.textLabelDeltaY}px`).toBeLessThanOrEqual(1.0);
+  });
+
+  test('A: staged item row qty/unit box geometry and hit testing at 390px (D32)', async () => {
+    await waitForScrollSettled(page);
+
+    const rows = cardLocator.locator('[data-testid="component-row"]');
+    const rowCount = await rows.count();
+    expect(rowCount).toBe(4);
+
+    const measurements = await checkQtyUnitBoxGeometry(cardLocator);
+    console.log(JSON.stringify({ test: 'A: qty/unit box D32 measurements at 390px', surface: 'A', measurements }));
+
+    for (const m of measurements) {
+      // visible border height 32 (+-1)
+      expect(m.visibleBoxHeight, `Row ${m.idx} visible box height must be 32 +- 1`).toBeGreaterThanOrEqual(31);
+      expect(m.visibleBoxHeight, `Row ${m.idx} visible box height must be 32 +- 1`).toBeLessThanOrEqual(33);
+
+      // gap >= 4
+      expect(m.gap, `Row ${m.idx} gap between visible box bottom and macro row must be >= 4px`).toBeGreaterThanOrEqual(4);
+
+      // hit box >= 44 tall
+      expect(m.hitAreaHeight, `Row ${m.idx} hit box height must be >= 44px`).toBeGreaterThanOrEqual(44);
+      expect(m.chipHeight, `Row ${m.idx} chip hit box height must be >= 44px`).toBeGreaterThanOrEqual(44);
+
+      // elementFromPoint at hit-box edges resolves into the qty control over qty-number x-centre
+      expect(m.isTopResolved, `Row ${m.idx} top hit-box edge over qty resolves into qty control`).toBe(true);
+      expect(m.isBottomResolved, `Row ${m.idx} bottom hit-box edge over qty resolves into qty control`).toBe(true);
+
+      // elementFromPoint at y+1 and y+43 over chip's x-centre resolves to chip button
+      expect(m.isChipTopResolved, `Row ${m.idx} elementFromPoint at y+1 over chip resolves to chip button`).toBe(true);
+      expect(m.isChipBottomResolved, `Row ${m.idx} elementFromPoint at y+43 over chip resolves to chip button`).toBe(true);
+
+      // no overlap with the ... hit box
+      expect(m.hasMenuOverlap, `Row ${m.idx} hit area must not overlap ... menu`).toBe(false);
+      expect(m.hasChipMenuOverlap, `Row ${m.idx} chip hit box must not overlap ... menu`).toBe(false);
+
+      // item row height <= old value (62px)
+      expect(m.rowHeight, `Row ${m.idx} height must be <= old value of 62px`).toBeLessThanOrEqual(62);
+    }
+
+    // Verify tapping over the chip's x-centre at y+1 and y+43 opens unit dialog
+    const firstField = rows.first().locator('[data-testid="component-quantity-field"]');
+    await firstField.click({ position: { x: 74, y: 1 } });
+    const unitSheet = page.locator('[data-testid="unit-sheet"]');
+    await expect(unitSheet).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(unitSheet).not.toBeVisible();
+
+    await firstField.click({ position: { x: 74, y: 43 } });
+    await expect(unitSheet).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(unitSheet).not.toBeVisible();
+
+    // Verify tapping over qty-number x-centre (position { x: 20, y: 43 }) focuses the input
+    for (let i = 0; i < rowCount; i++) {
+      const row = rows.nth(i);
+      const input = row.locator('[data-testid="component-quantity-input"]');
+      const field = row.locator('[data-testid="component-quantity-field"]');
+
+      await field.click({ position: { x: 20, y: 43 } });
+      const focusedBottom = await input.evaluate((el) => document.activeElement === el);
+      expect(focusedBottom, `Row ${i} click at y+43 over qty must focus the input`).toBe(true);
+
+      await input.evaluate((el) => el.blur());
+    }
   });
 });
 
@@ -1662,6 +1802,8 @@ test.describe('Surface E: Staged card at 320px width (D24)', () => {
 
       return {
         cardWidth: Math.round(cardRect.width * 10) / 10,
+        cardHeight: Math.round(cardRect.height * 10) / 10,
+        rowHeights: items.map((r) => Math.round(r.getBoundingClientRect().height * 10) / 10),
         contentBoxRight: Math.round(contentBoxRight * 10) / 10,
         cellOverflows,
         rowScrollOverflows,
@@ -1678,6 +1820,8 @@ test.describe('Surface E: Staged card at 320px width (D24)', () => {
         test: 'E: macro cells inside card content box, no row scroll overflow, columns aligned',
         surface: 'E',
         cardWidth: result.cardWidth,
+        cardHeight: result.cardHeight,
+        rowHeights: result.rowHeights,
         contentBoxRight: result.contentBoxRight,
         cellOverflowCount: result.cellOverflows.length,
         cellOverflows: result.cellOverflows,
@@ -1775,6 +1919,72 @@ test.describe('Surface E: Staged card at 320px width (D24)', () => {
     // Button text vertical center aligns with header label vertical center (within +-1px)
     expect(result.textLabelDeltaY).not.toBeNull();
     expect(Math.abs(result.textLabelDeltaY!), `Add item text center-Y deviates from label center-Y by ${result.textLabelDeltaY}px`).toBeLessThanOrEqual(1.0);
+  });
+
+  test('E: staged item row qty/unit box geometry and hit testing at 320px (D32)', async () => {
+    expect(page.viewportSize()?.width).toBe(320);
+    await waitForScrollSettled(page);
+
+    const rows = cardLocator.locator('[data-testid="component-row"]');
+    const rowCount = await rows.count();
+    expect(rowCount).toBe(4);
+
+    const measurements = await checkQtyUnitBoxGeometry(cardLocator);
+    console.log(JSON.stringify({ test: 'E: qty/unit box D32 measurements at 320px', surface: 'E', measurements }));
+
+    for (const m of measurements) {
+      // visible border height 32 (+-1)
+      expect(m.visibleBoxHeight, `Row ${m.idx} visible box height must be 32 +- 1`).toBeGreaterThanOrEqual(31);
+      expect(m.visibleBoxHeight, `Row ${m.idx} visible box height must be 32 +- 1`).toBeLessThanOrEqual(33);
+
+      // gap >= 4
+      expect(m.gap, `Row ${m.idx} gap between visible box bottom and macro row must be >= 4px`).toBeGreaterThanOrEqual(4);
+
+      // hit box >= 44 tall
+      expect(m.hitAreaHeight, `Row ${m.idx} hit box height must be >= 44px`).toBeGreaterThanOrEqual(44);
+      expect(m.chipHeight, `Row ${m.idx} chip hit box height must be >= 44px`).toBeGreaterThanOrEqual(44);
+
+      // elementFromPoint at hit-box edges resolves into the qty control over qty-number x-centre
+      expect(m.isTopResolved, `Row ${m.idx} top hit-box edge over qty resolves into qty control`).toBe(true);
+      expect(m.isBottomResolved, `Row ${m.idx} bottom hit-box edge over qty resolves into qty control`).toBe(true);
+
+      // elementFromPoint at y+1 and y+43 over chip's x-centre resolves to chip button
+      expect(m.isChipTopResolved, `Row ${m.idx} elementFromPoint at y+1 over chip resolves to chip button`).toBe(true);
+      expect(m.isChipBottomResolved, `Row ${m.idx} elementFromPoint at y+43 over chip resolves to chip button`).toBe(true);
+
+      // no overlap with the ... hit box
+      expect(m.hasMenuOverlap, `Row ${m.idx} hit area must not overlap ... menu`).toBe(false);
+      expect(m.hasChipMenuOverlap, `Row ${m.idx} chip hit box must not overlap ... menu`).toBe(false);
+
+      // item row height <= old value (62px)
+      expect(m.rowHeight, `Row ${m.idx} height must be <= old value of 62px`).toBeLessThanOrEqual(62);
+    }
+
+    // Verify tapping over the chip's x-centre at y+1 and y+43 opens unit dialog
+    const firstField = rows.first().locator('[data-testid="component-quantity-field"]');
+    await firstField.click({ position: { x: 74, y: 1 } });
+    const unitSheet = page.locator('[data-testid="unit-sheet"]');
+    await expect(unitSheet).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(unitSheet).not.toBeVisible();
+
+    await firstField.click({ position: { x: 74, y: 43 } });
+    await expect(unitSheet).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(unitSheet).not.toBeVisible();
+
+    // Verify tapping over qty-number x-centre (position { x: 20, y: 43 }) focuses the input
+    for (let i = 0; i < rowCount; i++) {
+      const row = rows.nth(i);
+      const input = row.locator('[data-testid="component-quantity-input"]');
+      const field = row.locator('[data-testid="component-quantity-field"]');
+
+      await field.click({ position: { x: 20, y: 43 } });
+      const focusedBottom = await input.evaluate((el) => document.activeElement === el);
+      expect(focusedBottom, `Row ${i} click at y+43 over qty must focus the input`).toBe(true);
+
+      await input.evaluate((el) => el.blur());
+    }
   });
 });
 

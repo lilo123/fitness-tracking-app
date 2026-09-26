@@ -264,14 +264,16 @@ test.describe('Nutrition Flow E2E', () => {
     await expect(page.locator('text=Itemized Breakdown')).toBeVisible();
     await expect(page.locator('text=Eggs').first()).toBeVisible();
 
-    // D17 replaced the -/+ stepper with a typed [qty][unit] box.
-    // The input meets the >= 40px touch target, and typing quantity + Enter saves.
+    // D17/D32: typed [qty][unit] box with 44px hit area wrapper and 32px visible box.
+    // The hit area meets the >= 40px touch target, and typing quantity + Enter saves.
+    const quantityField = page.locator('[data-testid="component-quantity-field"]').first();
+    await expect(quantityField).toBeVisible();
+    const fieldBox = await quantityField.boundingBox();
+    expect(fieldBox).not.toBeNull();
+    expect(fieldBox!.width).toBeGreaterThanOrEqual(40);
+    expect(fieldBox!.height).toBeGreaterThanOrEqual(40);
     const quantityInput = page.locator('[data-testid="component-quantity-input"]').first();
     await expect(quantityInput).toBeVisible();
-    const inputBox = await quantityInput.boundingBox();
-    expect(inputBox).not.toBeNull();
-    expect(inputBox!.width).toBeGreaterThanOrEqual(40);
-    expect(inputBox!.height).toBeGreaterThanOrEqual(40);
     await quantityInput.fill('4');
     await quantityInput.press('Enter');
     await expect(quantityInput).toHaveValue('4');

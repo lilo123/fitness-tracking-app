@@ -160,7 +160,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
   return (
     <div
       data-testid="component-row"
-      className="py-0.5 border-b border-zinc-800/80 last:border-b-0 min-h-[44px] flex flex-col justify-center gap-0.5"
+      className="py-0.5 border-b border-zinc-800/80 last:border-b-0 min-h-[44px] flex flex-col justify-center gap-1"
     >
       {/* LINE 1: Name (left, flex-1, may wrap) + [qty][unit] field and ⋯ (right) */}
       <div className="flex items-center justify-between gap-1.5 sm:gap-2">
@@ -175,39 +175,46 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
         {/* RIGHT (shrink-0): [field: input + UnitChip] + ⋯ OverflowMenu */}
         <div data-testid="component-right-cluster" className="shrink-0 flex items-center gap-1">
           {editable ? (
-            <div
+            <label
+              htmlFor={`component-quantity-input-${item.id}`}
               data-testid="component-quantity-field"
-              className="w-[100px] min-h-[44px] h-11 -my-0.5 shrink-0 rounded-lg border border-border-interactive bg-zinc-950 flex items-center overflow-hidden transition hover:border-cyan-500/70 focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-400 [&_button]:!min-h-[44px] [&_button]:!h-11"
+              className="relative w-[100px] min-h-[44px] h-11 -my-1.5 shrink-0 flex items-center cursor-text touch-manipulation"
             >
-              <input
-                type="number"
-                step="any"
-                min="0"
-                inputMode="decimal"
-                enterKeyHint="done"
-                data-testid="component-quantity-input"
-                aria-label={`Quantity of ${item.name}`}
-                value={shown}
-                placeholder={pendingUnit ? `amount in ${pendingUnit} for this ${formatCalories(item.calories)} kcal` : undefined}
-                onFocus={(e) => e.target.select()}
-                onChange={(e) => setDraft(e.target.value)}
-                onBlur={(e) => commit(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    commit((e.target as HTMLInputElement).value);
-                  }
-                }}
-                className="min-h-[44px] h-11 w-[46px] shrink-0 bg-transparent text-right pr-1 pl-1 text-base font-semibold tabular-nums text-white outline-none border-0 m-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              />
-              <UnitChip
-                value={activeUnit}
-                onChange={handleUnitChange}
-                testId="component-unit-chip"
-                ariaLabel={`Change unit for ${item.name}, currently ${shortUnitLabel(activeUnit)}`}
-                embedded
-              />
-            </div>
+              <div
+                data-testid="component-quantity-box"
+                className="w-full h-8 rounded-lg border border-border-interactive bg-zinc-950 flex items-center transition hover:border-cyan-500/70 focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-400"
+              >
+                <input
+                  id={`component-quantity-input-${item.id}`}
+                  type="number"
+                  step="any"
+                  min="0"
+                  inputMode="decimal"
+                  enterKeyHint="done"
+                  data-testid="component-quantity-input"
+                  aria-label={`Quantity of ${item.name}`}
+                  value={shown}
+                  placeholder={pendingUnit ? `amount in ${pendingUnit} for this ${formatCalories(item.calories)} kcal` : undefined}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onBlur={(e) => commit(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      commit((e.target as HTMLInputElement).value);
+                    }
+                  }}
+                  className="h-8 w-[46px] shrink-0 bg-transparent text-right pr-1 pl-1 text-base font-semibold tabular-nums text-white outline-none border-0 m-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <UnitChip
+                  value={activeUnit}
+                  onChange={handleUnitChange}
+                  testId="component-unit-chip"
+                  ariaLabel={`Change unit for ${item.name}, currently ${shortUnitLabel(activeUnit)}`}
+                  embedded
+                />
+              </div>
+            </label>
           ) : (
             <span className="text-xs tabular-nums font-normal text-zinc-400 px-1">
               {roundTo1Decimal(item.quantity)}{shortUnitLabel(item.unit)}
@@ -215,7 +222,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
           )}
 
           {!readOnly && menuItems.length > 0 && (
-            <div className="-my-0.5 [&>div>button]:!min-h-[44px] [&>div>button]:!h-11 [&>div>button]:!min-w-[44px] [&>div>button]:!w-11 [&>div>button]:!p-0 flex items-center justify-center">
+            <div className="-my-1.5 [&>div>button]:!min-h-[44px] [&>div>button]:!h-11 [&>div>button]:!min-w-[44px] [&>div>button]:!w-11 [&>div>button]:!p-0 flex items-center justify-center">
               <OverflowMenu
                 ariaLabel={`Actions for ${item.name}`}
                 items={menuItems}
