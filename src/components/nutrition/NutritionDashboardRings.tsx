@@ -57,11 +57,11 @@ export const NutritionDashboardRings: React.FC<NutritionDashboardRingsProps> = m
   const fibStatus = formatStatus('Fiber', remainingFuel.fiber);
 
   return (
-    <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-5 shadow-2xl">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Flame className="w-5 h-5 text-amber-400" />
-          <h2 className="text-xs font-bold uppercase tracking-wider text-white">
+    <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-4 sm:p-5 shadow-2xl">
+      <div className="flex items-center justify-between mb-4 gap-1.5 sm:gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+          <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 shrink-0" />
+          <h2 className="text-xs font-bold uppercase tracking-wider text-white truncate" title="Today's Nutrition">
             Today's Nutrition
           </h2>
         </div>
@@ -70,7 +70,7 @@ export const NutritionDashboardRings: React.FC<NutritionDashboardRingsProps> = m
           data-testid="nutrition-date-input"
           value={selectedDate}
           onChange={(e) => onDateChange(e.target.value)}
-          className="bg-zinc-950 border border-border-interactive text-cyan-400 rounded-xl px-2.5 py-1.5 text-base tabular-nums font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none cursor-pointer"
+          className="bg-zinc-950 border border-border-interactive text-cyan-400 rounded-xl px-2 sm:px-2.5 py-1.5 text-base tabular-nums font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none cursor-pointer shrink-0"
         />
       </div>
 

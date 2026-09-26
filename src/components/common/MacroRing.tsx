@@ -34,7 +34,8 @@ export const MacroRing: React.FC<MacroRingProps> = ({
   const displayPercentage = Math.round((current / safeTarget) * 100);
   const strokePercentage = Math.min(Math.max(displayPercentage, 0), 100);
 
-  const radius = 32;
+  const radius = 34;
+  const strokeWidth = 3.5;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (strokePercentage / 100) * circumference;
 
@@ -44,15 +45,15 @@ export const MacroRing: React.FC<MacroRingProps> = ({
 
   const innerContent = (
     <>
-      <div className="relative w-14 h-14 sm:w-18 sm:h-18 flex items-center justify-center">
-        <svg className="w-14 h-14 sm:w-18 sm:h-18 transform -rotate-90" viewBox="0 0 76 76">
+      <div className="relative w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center">
+        <svg className="w-16 h-16 sm:w-20 sm:h-20 transform -rotate-90" viewBox="0 0 76 76">
           {/* Background circle */}
           <circle
             cx="38"
             cy="38"
             r={radius}
             stroke="currentColor"
-            strokeWidth="6"
+            strokeWidth={strokeWidth}
             className="text-zinc-800"
             fill="transparent"
           />
@@ -62,7 +63,7 @@ export const MacroRing: React.FC<MacroRingProps> = ({
             cy="38"
             r={radius}
             stroke={strokeColor}
-            strokeWidth="6"
+            strokeWidth={strokeWidth}
             strokeDasharray={circumference}
             strokeDashoffset={strokeDashoffset}
             strokeLinecap="round"
@@ -71,15 +72,15 @@ export const MacroRing: React.FC<MacroRingProps> = ({
           />
         </svg>
         <div className="absolute flex flex-col items-center justify-center text-center">
-          <span className={`text-sm font-bold tabular-nums ${colorClass}`}>
+          <span className={`text-sm font-bold tabular-nums leading-none tracking-tight ${colorClass}`}>
             {formattedCurrent}
           </span>
-          <span className="text-xs font-normal text-zinc-500 tabular-nums -mt-0.5">
+          <span className="text-xs font-normal text-zinc-500 tabular-nums leading-none tracking-tight mt-0.5">
             /{formattedTarget}
           </span>
         </div>
       </div>
-      <div className="mt-1.5 sm:mt-2 text-center w-full">
+      <div className="mt-1 sm:mt-1.5 text-center w-full">
         <div className="text-xs font-bold uppercase tracking-wider text-zinc-300 truncate">
           {label}
         </div>
@@ -104,7 +105,7 @@ export const MacroRing: React.FC<MacroRingProps> = ({
   );
 
   const baseClasses =
-    'flex flex-col items-center px-1.5 py-2.5 sm:p-3 bg-zinc-900/90 border border-zinc-800/80 rounded-2xl shadow-xl flex-1 w-full min-w-[56px] sm:min-w-[75px] min-h-[44px]';
+    'flex flex-col items-center px-1.5 py-2 sm:p-2.5 bg-zinc-900/90 border border-zinc-800/80 rounded-2xl shadow-xl flex-1 w-full min-w-[56px] sm:min-w-[75px] min-h-[44px]';
 
   if (onClick) {
     return (

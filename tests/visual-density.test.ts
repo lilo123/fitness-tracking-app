@@ -2678,3 +2678,261 @@ test.describe('D35 type/input consistency', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// D37: Macro Ring Clearance (>= 4px clearance from stroke inner edge)
+// ---------------------------------------------------------------------------
+
+test.describe("D37 ring clearance", () => {
+  const WORST_CASE_TARGETS = {
+    calories: 1900,
+    protein: 150,
+    carbs: 140,
+    fat: 70,
+    fiber: 30,
+  };
+
+  const WORST_CASE_DAILY_LOGS = {
+    calories: 1876,
+    protein: 159,
+    carbs: 147.3,
+    fat: 55,
+    fiber: 25,
+  };
+
+  async function setupRingsPage(
+    browser: any,
+    width: number,
+    height: number,
+    dailyTotals = WORST_CASE_DAILY_LOGS,
+    targets = WORST_CASE_TARGETS
+  ) {
+    const page = await browser.newPage({
+      viewport: { width, height },
+      deviceScaleFactor: 1,
+    });
+
+    const todayStr = new Date().toISOString().split("T")[0];
+
+    await page.route("**/rest/v1/users*", async (route: any) => {
+      if (route.request().method() === "OPTIONS") {
+        return route.fulfill({ status: 200, headers: { "access-control-allow-origin": "*" } });
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        headers: { "access-control-allow-origin": "*" },
+        body: JSON.stringify({
+          id: "a0000000-0000-0000-0000-000000000002",
+          email: "athlete@cybergym.io",
+          username: "athlete",
+          role: "athlete",
+          target_calories: targets.calories,
+          target_protein: targets.protein,
+          target_carbs: targets.carbs,
+          target_fat: targets.fat,
+          target_fiber: targets.fiber,
+          auto_rest_timer: true,
+          timezone: "America/Los_Angeles",
+        }),
+      });
+    });
+
+    await page.route("**/rest/v1/nutrition_logs*", async (route: any) => {
+      if (route.request().method() === "OPTIONS") {
+        return route.fulfill({ status: 200, headers: { "access-control-allow-origin": "*" } });
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        headers: { "access-control-allow-origin": "*" },
+        body: JSON.stringify([
+          {
+            id: "log-worst-case",
+            user_id: "a0000000-0000-0000-0000-000000000002",
+            food_name: "Worst Case Meal",
+            meal_type: "Lunch",
+            calories: dailyTotals.calories,
+            protein: dailyTotals.protein,
+            carbs: dailyTotals.carbs,
+            fat: dailyTotals.fat,
+            fiber: dailyTotals.fiber,
+            serving_size: 1,
+            serving_unit: "serving",
+            logged_at: new Date().toISOString(),
+            logged_date: todayStr,
+            created_at: new Date().toISOString(),
+            has_components: false,
+          },
+        ]),
+      });
+    });
+
+    await setupPageAndLogin(page);
+    await page.waitForSelector("[data-testid=\"macro-ring-calories\"]");
+    await page.waitForFunction((expectedKcal: number) => {
+      const el = document.querySelector("[data-testid=\"macro-ring-calories\"]");
+      return el && el.textContent && el.textContent.includes(String(expectedKcal));
+    }, dailyTotals.calories);
+
+    const sectionLocator = page
+      .locator("text=Today's Nutrition")
+      .locator("xpath=ancestor::div[contains(@class, \"rounded-3xl\")]")
+      .first();
+
+    return { page, sectionLocator };
+  }
+
+  async function measureRingClearances(page: Page) {
+    const ringIds = ["calories", "protein", "carbs", "fat", "fiber"];
+    return await page.evaluate((ids) => {
+      return ids.map((ringId) => {
+        const container = document.querySelector(`[data-testid="macro-ring-${ringId}"]`);
+        if (!container) throw new Error(`Ring container not found: macro-ring-${ringId}`);
+        const svg = container.querySelector("svg");
+        if (!svg) throw new Error(`SVG not found for ${ringId}`);
+        const circle = svg.querySelector("circle");
+        if (!circle) throw new Error(`Circle not found for ${ringId}`);
+        const svgRect = svg.getBoundingClientRect();
+        const cxAttr = parseFloat(circle.getAttribute("cx") || "38");
+        const cyAttr = parseFloat(circle.getAttribute("cy") || "38");
+        const rAttr = parseFloat(circle.getAttribute("r") || "34");
+        const swAttr = parseFloat(
+          circle.getAttribute("stroke-width") || circle.getAttribute("strokeWidth") || "3.5"
+        );
+
+        const vbWidth = svg.viewBox.baseVal?.width || 76;
+        const scale = svgRect.width / vbWidth;
+
+        const cx = svgRect.left + cxAttr * scale;
+        const cy = svgRect.top + cyAttr * scale;
+        const innerRadius = (rAttr - swAttr / 2) * scale;
+        const outerRadius = (rAttr + swAttr / 2) * scale;
+
+        const textContainer = svg.parentElement?.querySelector(".absolute.flex.flex-col");
+        if (!textContainer) throw new Error(`Text container not found for ${ringId}`);
+        const spans = textContainer.querySelectorAll("span");
+        const valSpan = spans[0] as HTMLElement;
+        const targetSpan = spans[1] as HTMLElement;
+        if (!valSpan || !targetSpan) throw new Error(`Spans not found for ${ringId}`);
+
+        function getMinCornerClearance(el: HTMLElement) {
+          const r = el.getBoundingClientRect();
+          const corners = [
+            { x: r.left, y: r.top },
+            { x: r.right, y: r.top },
+            { x: r.left, y: r.bottom },
+            { x: r.right, y: r.bottom },
+          ];
+          const maxDist = Math.max(...corners.map((c) => Math.hypot(c.x - cx, c.y - cy)));
+          return Math.round((innerRadius - maxDist) * 100) / 100;
+        }
+
+        const valClearance = getMinCornerClearance(valSpan);
+        const targetClearance = getMinCornerClearance(targetSpan);
+
+        return {
+          ringId,
+          valText: valSpan.textContent?.trim() || "",
+          targetText: targetSpan.textContent?.trim() || "",
+          valClearance,
+          targetClearance,
+          minClearance: Math.min(valClearance, targetClearance),
+          outerDiameter: Math.round(outerRadius * 2 * 10) / 10,
+          strokeWidth: Math.round(swAttr * scale * 10) / 10,
+          innerRadius: Math.round(innerRadius * 10) / 10,
+        };
+      });
+    }, ringIds);
+  }
+
+  test("D37: 320px worst-case values clearance >= 4px, font >= 12px, no clipping", async ({ browser }) => {
+    const { page, sectionLocator } = await setupRingsPage(browser, 320, 568);
+    try {
+      const clearances = await measureRingClearances(page);
+      console.log(JSON.stringify({ test: "D37: 320px clearance", clearances }));
+
+      for (const r of clearances) {
+        expect(r.valClearance, `${r.ringId} value "${r.valText}" clearance`).toBeGreaterThanOrEqual(4.0);
+        expect(r.targetClearance, `${r.ringId} target "${r.targetText}" clearance`).toBeGreaterThanOrEqual(4.0);
+      }
+
+      const fontResult = await checkFontSizes(sectionLocator);
+      expect(fontResult.offenders).toEqual([]);
+
+      const clipResult = await checkClipping(sectionLocator);
+      expect(clipResult.clippedElements).toEqual([]);
+
+      const docOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+      expect(docOverflow).toBe(false);
+    } finally {
+      await page.close();
+    }
+  });
+
+  test("D37: 390px worst-case values clearance >= 4px, section height <= base + 8, font >= 12px, no clipping", async ({ browser }) => {
+    const { page, sectionLocator } = await setupRingsPage(browser, 390, 844);
+    try {
+      const clearances = await measureRingClearances(page);
+      console.log(JSON.stringify({ test: "D37: 390px clearance", clearances }));
+
+      for (const r of clearances) {
+        expect(r.valClearance, `${r.ringId} value "${r.valText}" clearance`).toBeGreaterThanOrEqual(4.0);
+        expect(r.targetClearance, `${r.ringId} target "${r.targetText}" clearance`).toBeGreaterThanOrEqual(4.0);
+      }
+
+      const sectionHeight = await sectionLocator.evaluate((el) => el.getBoundingClientRect().height);
+      console.log(JSON.stringify({ test: "D37: 390px sectionHeight", sectionHeight }));
+      // Base section height at 390px is 334px. Budget: <= base + 8px = 342px.
+      expect(sectionHeight).toBeLessThanOrEqual(342);
+
+      const fontResult = await checkFontSizes(sectionLocator);
+      expect(fontResult.offenders).toEqual([]);
+
+      const clipResult = await checkClipping(sectionLocator);
+      expect(clipResult.clippedElements).toEqual([]);
+
+      const docOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+      expect(docOverflow).toBe(false);
+    } finally {
+      await page.close();
+    }
+  });
+
+  test("D37: 700px worst-case values clearance >= 4px, font >= 12px, no clipping", async ({ browser }) => {
+    const { page, sectionLocator } = await setupRingsPage(browser, 700, 900);
+    try {
+      const clearances = await measureRingClearances(page);
+      console.log(JSON.stringify({ test: "D37: 700px clearance", clearances }));
+
+      for (const r of clearances) {
+        expect(r.valClearance, `${r.ringId} value "${r.valText}" clearance`).toBeGreaterThanOrEqual(4.0);
+        expect(r.targetClearance, `${r.ringId} target "${r.targetText}" clearance`).toBeGreaterThanOrEqual(4.0);
+      }
+
+      const fontResult = await checkFontSizes(sectionLocator);
+      expect(fontResult.offenders).toEqual([]);
+
+      const clipResult = await checkClipping(sectionLocator);
+      expect(clipResult.clippedElements).toEqual([]);
+    } finally {
+      await page.close();
+    }
+  });
+
+  test("D37: 390px 4-digit over-target calories (2450/1900) clearance >= 4px", async ({ browser }) => {
+    const overLogs = { ...WORST_CASE_DAILY_LOGS, calories: 2450 };
+    const { page } = await setupRingsPage(browser, 390, 844, overLogs);
+    try {
+      const clearances = await measureRingClearances(page);
+      console.log(JSON.stringify({ test: "D37: 390px over-target calories", clearances }));
+
+      const cal = clearances.find((r) => r.ringId === "calories");
+      expect(cal).toBeDefined();
+      expect(cal.valClearance, `calories value "${cal.valText}" clearance`).toBeGreaterThanOrEqual(4.0);
+      expect(cal.targetClearance, `calories target "${cal.targetText}" clearance`).toBeGreaterThanOrEqual(4.0);
+    } finally {
+      await page.close();
+    }
+  });
+});
