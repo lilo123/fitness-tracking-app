@@ -34,6 +34,11 @@ Planning status: **plan drafted 2026-09-26; all open questions answered (RD-14..
 ## 2. Decision log
 Newest first. Decisions dated 2026-09-26 in the audit reports are final and are not re-decided here. They are recorded so this file stands alone.
 
+### 2.00 Nutrition deviations (user, 2026-09-26 21:34Z)
+| ID | Decision | Reasoning |
+|---|---|---|
+| RD-21 (D46) | **Whole-meal "Scale" chip replaces the D44 ×0.5/×1/×1.5/×2 bar** and is added to the staged card: a "Scale" chip next to "+ Add" turns into an inline "× [1]" numpad box (STD-CMP-5 input rules; Escape cancels without closing the sheet). Relative to the meal as staged/opened, applied as a ratio so item edits survive; the factor is never persisted. Below 390px the multi-item header label shortens to "Items (n)". **STD-DAT-3 exception:** in the edit-nutrition modal the unit is a 12px caption under each box instead of inside the label (the label keeps it as sr-only text). Shipped on `v2-rewrite` (Nutrition decision log D46). | Food-prep portions (÷5) could not be expressed by the bar; the bar also cost a row, had no active state and discarded item edits. The caption keeps all five macro boxes aligned. Phase 8 (Nutrition sweep) should treat both as the standard, not as gaps. |
+
 ### 2.0 Open-question answers (user, 2026-09-26 19:59Z)
 | ID | Decision | Reasoning |
 |---|---|---|
@@ -510,3 +515,4 @@ Add new questions here as phases surface them (e.g. the P8 Coach/Settings audit,
 |---|---|
 | 2026-09-26 | Created: standards, decisions RD-1..13 and RP-1..6, phases P0–P8, full item assignment (151), open questions, risks. No implementation started. |
 | 2026-09-26 | OQ-1..OQ-6 answered and the K9 reading confirmed (RD-14..RD-20); §7 closed; P2/P5a/P8 scope wording aligned. No implementation started. |
+| 2026-09-26 | RD-21: D46 whole-meal Scale chip (replaces the D44 scale bar) and the edit-nutrition unit-caption STD-DAT-3 exception, both shipped on `v2-rewrite`. |
