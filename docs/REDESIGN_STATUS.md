@@ -9,6 +9,7 @@
 > - Nutrition decisions D1–D45 (conv `27f07f48`)
 >
 > **Baseline:** after P0 (2026-09-26, on top of `d2ddeb7`): vitest 98 files / 1349, `test:tz` 141 + 141, density 67, E2E trio 36/0/6, oxlint 0e/33w.
+> **Execution rules:** §3a (production-DB hard rules, ship flow with migrations, anti-stall rules).
 > **Owner of this file:** whoever runs the current phase. Update the phase table, the item table and the decision log in the same commit as the work.
 
 ## 1. Status summary
@@ -122,6 +123,34 @@ Newest first. Decisions dated 2026-09-26 in the audit reports are final and are 
    - This file is updated: phase row, item rows, decision log.
 4. **Deploy flow per phase:** branch → red team → gates → PR → fast-forward `v2-rewrite` (Vercel production) → D30 smoke.
 
+## 3a. Execution rules (binding for every phase; added 2026-09-26)
+
+### Ship flow for a phase with a migration
+1. Worker(s) → red team → conductor test-diff audit → full gate (§3 item 3) on a worktree rebased on the current `origin/v2-rewrite`.
+2. The migration is **expand-first**: the currently deployed frontend must keep working against the migrated schema.
+3. Every migration has a down file at `supabase/rollbacks/<version>_<name>.down.sql`. Rehearse both on the local DB with the same helper: `PROD_DB_TARGET=local scripts/prod-db.sh rollback <down> <version>`, then `PROD_DB_TARGET=local scripts/prod-db.sh migrate <up>`, then `npm run test:db`.
+4. Open the PR and wait for CI to pass.
+5. `scripts/prod-db.sh audit <pre-migration audit>`. Any non-zero count that the plan says must be 0 means stop.
+6. `scripts/prod-db.sh migrate supabase/migrations/<file>.sql`. This makes a verified backup, applies the migration and records it in `supabase_migrations.schema_migrations`, all in one transaction. On any failure: stop, do not push.
+7. Fast-forward `origin/v2-rewrite`, check the Vercel preview and production smoke, then re-run the audit and `scripts/prod-db.sh check`.
+
+### Production database: hard rules
+The password lives in `~/.config/fitness-supabase/db_password` (mode 600). Backups go to `~/fitness-backups/` (mode 700).
+1. **Conductor only.** Worker, scout and red-team subagents never read the password file, never run `scripts/prod-db.sh` against production, and never connect to the production DB. Their prompts must say so. They use the local DB (`127.0.0.1:58822`) only.
+2. **Only through `scripts/prod-db.sh`.** No ad-hoc `psql`/`pg_dump` against production. The password is read inline and never printed, logged, pasted into a file or put in a prompt.
+3. **No write without a verified backup from the same command.** `migrate` and `rollback` back up first and refuse to continue unless the backup's row counts equal the live counts (`BACKUP_VERIFIED`).
+4. **Reads are read-only transactions** (`check`, `audit`). The helper wraps them in `BEGIN READ ONLY`.
+5. **Writes are committed migration files only.** A write must be a tracked, unmodified file under `supabase/migrations/`, with no explicit BEGIN/COMMIT, not already recorded. It is applied in one transaction. There are no manual data fixes, no `db reset` and no deletes outside a reviewed migration.
+6. **Any error means stop and report.** No retries against production, and no "fix-forward" edits on the live DB. Rollback happens only through the committed down file, via `scripts/prod-db.sh rollback`.
+7. One production-DB operation runs at a time across all sessions (the helper holds `/tmp/fitness_prod_db.flock`).
+
+### Anti-stall rules (P0 lost about 1.5 h to a stale lock)
+1. **Browser lock = `scripts/with-browser-lock.sh <cmd>`** (flock on `/tmp/fitness_browser.flock`). The kernel releases it if the holder dies, so it can't go stale. It waits at most 30 min, then exits 75 and names the holder. The old `mkdir /tmp/nutrition_browser.lock` scheme is retired, and nobody creates it any more.
+2. **Every long command gets a `timeout`**: browser/E2E 900 s, vitest 600 s, build 300 s. Exit 124 or 75 is reported as BLOCKED with the log tail, never waited on silently.
+3. **Conductor liveness check:** while any subagent or background gate is running, the conductor keeps a 20-minute `schedule` timer (TimerCondition `any`). When it fires, check each running subagent's transcript modification time. No new step for 15 min means inspect its last tool call and background task (hung process? lock holder via `fuser`?), then unblock it, or kill it and re-dispatch with the finding.
+4. **Worker wall-clock budget:** 90 min per dispatch. At the limit the worker reports `DONE_WITH_CONCERNS` or `BLOCKED` with what's left instead of continuing.
+5. **2-strike circuit breaker:** the same failure twice means stop, log it in the conversation's `DEAD_ENDS.md`, and re-scope.
+
 ---
 
 ## 4. Phases
@@ -176,6 +205,7 @@ Newest first. Decisions dated 2026-09-26 in the audit reports are final and are 
   - W50 (b) templates that point at another coach's exercise
   - exercises with blank names (would violate the CHECK)
   - all must be 0 or resolved first
+  - query: `supabase/audits/redesign_prechecks.sql` (rows 7–11). Production result 2026-09-26: **all 0**. Re-run with `scripts/prod-db.sh audit` right before `migrate` (§3a).
 - **Depends on:** P0.
 - **Acceptance:**
   - Masters show no Edit/Trash.
@@ -534,3 +564,4 @@ The agent has no production DB credentials (anon key only); re-run the query bef
 | 2026-09-26 | RD-21: D46 whole-meal Scale chip (replaces the D44 scale bar) and the edit-nutrition unit-caption STD-DAT-3 exception, both shipped on `v2-rewrite`. |
 | 2026-09-26 | P0 done (`6bc91c7`); E2E label fix for D46 (`7e7b05b`); baseline updated; two new risks (TZ-unclean full suite, D44 E2E flake); pre-P1 audit partial (blank names = 0). |
 | 2026-09-26 | P0 shipped to `v2-rewrite` at `7d907bc` (CI fixes: `test:tz` after Supabase start, Roboto for density, D23 screenshot path). Production audit recorded: every count is 0. |
+| 2026-09-26 | §3a execution rules: production-DB hard rules (`scripts/prod-db.sh`: check/audit/backup/migrate/rollback + local rehearsal), flock browser lock (`scripts/with-browser-lock.sh`), anti-stall rules. First verified production backup taken (23:25Z). |
