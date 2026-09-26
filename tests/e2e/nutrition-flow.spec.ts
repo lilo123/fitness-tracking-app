@@ -317,7 +317,11 @@ test.describe('Nutrition Flow E2E', () => {
     // Verify staged meal card appears with breakdown
     const stagedCard = page.locator('[data-testid="staged-meal-card"]');
     await expect(stagedCard).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('text=Itemized Breakdown')).toBeVisible();
+    // D46: below 390px the breakdown header reads "Items (n)"; from 390px up it reads "Itemized Breakdown (n)".
+    const isNarrow = (page.viewportSize()?.width ?? 390) < 390;
+    await expect(
+      stagedCard.getByText(isNarrow ? /^Items \(\d+\)$/ : /^Itemized Breakdown \(\d+\)$/),
+    ).toBeVisible();
     await expect(page.locator('text=Eggs').first()).toBeVisible();
 
     // D17/D32: typed [qty][unit] box with 44px hit area wrapper and 32px visible box.
