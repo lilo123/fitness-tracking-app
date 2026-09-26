@@ -331,5 +331,90 @@ describe('ManualMealForm', () => {
       });
       expect(onStageMeal).not.toHaveBeenCalled();
     });
+    it('D23: soft kcal-vs-macros hint appears/disappears as values change and does not block submit', () => {
+      const onSubmit = vi.fn();
+      const { rerender } = renderForm({
+        manualName: 'Oatmeal',
+        manualCalories: 350,
+        manualProtein: 12,
+        manualCarbs: 60,
+        manualFat: 5,
+        onSubmit,
+      });
+
+      // 1. Live region is always mounted before hint appears (takes 0 text)
+      const hint = screen.getByTestId('macro-mismatch-hint');
+      expect(hint).toBeDefined();
+      expect(hint).toHaveAttribute('aria-live', 'polite');
+      expect(hint.textContent).toBe('');
+
+      // 2. Hint appears when values mismatch (>15% and >50 kcal)
+      // est = 4*12 + 4*60 + 9*5 = 333 kcal; kcal = 500 -> diff 167 > 50 and > 15%
+      rerender(
+        <ManualMealForm
+          show={true}
+          onClose={vi.fn()}
+          selectedPhoto={null}
+          onRemovePhoto={vi.fn()}
+          manualName="Oatmeal"
+          onManualNameChange={vi.fn()}
+          manualMealType="Breakfast"
+          onManualMealTypeChange={vi.fn()}
+          manualCalories={500}
+          onManualCaloriesChange={vi.fn()}
+          manualProtein={12}
+          onManualProteinChange={vi.fn()}
+          manualCarbs={60}
+          onManualCarbsChange={vi.fn()}
+          manualFat={5}
+          onManualFatChange={vi.fn()}
+          manualFiber={8}
+          onManualFiberChange={vi.fn()}
+          manualServingSize={1}
+          onManualServingSizeChange={vi.fn()}
+          manualServingUnit="bowl"
+          onManualServingUnitChange={vi.fn()}
+          onSubmit={onSubmit}
+          isPending={false}
+        />
+      );
+      expect(hint.textContent).toBe('Macros add up to ≈ 333 kcal');
+
+      // 3. Submit still works while hint is shown (non-blocking)
+      const submitBtn = screen.getByRole('button', { name: /Log Meal/i });
+      fireEvent.click(submitBtn);
+      expect(onSubmit).toHaveBeenCalled();
+
+      // 4. Hint disappears when field is empty
+      rerender(
+        <ManualMealForm
+          show={true}
+          onClose={vi.fn()}
+          selectedPhoto={null}
+          onRemovePhoto={vi.fn()}
+          manualName="Oatmeal"
+          onManualNameChange={vi.fn()}
+          manualMealType="Breakfast"
+          onManualMealTypeChange={vi.fn()}
+          manualCalories=""
+          onManualCaloriesChange={vi.fn()}
+          manualProtein={12}
+          onManualProteinChange={vi.fn()}
+          manualCarbs={60}
+          onManualCarbsChange={vi.fn()}
+          manualFat={5}
+          onManualFatChange={vi.fn()}
+          manualFiber={8}
+          onManualFiberChange={vi.fn()}
+          manualServingSize={1}
+          onManualServingSizeChange={vi.fn()}
+          manualServingUnit="bowl"
+          onManualServingUnitChange={vi.fn()}
+          onSubmit={onSubmit}
+          isPending={false}
+        />
+      );
+      expect(hint.textContent).toBe('');
+    });
   });
 });

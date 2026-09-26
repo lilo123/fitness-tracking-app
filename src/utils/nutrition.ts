@@ -219,3 +219,71 @@ export function formatPercentage(
   }
   return `${Math.round(pct)}%`;
 }
+
+export interface KcalMacroMismatchParams {
+  kcal?: number | string | null;
+  calories?: number | string | null;
+  protein?: number | string | null;
+  carbs?: number | string | null;
+  fat?: number | string | null;
+  fiber?: number | string | null;
+}
+
+export interface KcalMacroMismatchResult {
+  estimatedKcal: number;
+  diff: number;
+  message: string;
+}
+
+function parseMacroInput(val: number | string | null | undefined): number | null {
+  if (val === null || val === undefined) return null;
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (trimmed === '') return null;
+    const num = Number(trimmed);
+    if (!Number.isFinite(num) || isNaN(num) || num < 0) return null;
+    return num;
+  }
+  if (typeof val === 'number') {
+    if (!Number.isFinite(val) || isNaN(val) || val < 0) return null;
+    return val;
+  }
+  return null;
+}
+
+/**
+ * Computes calorie vs macronutrient estimate (4*P + 4*C + 9*F; fiber ignored).
+ * Returns null if any of kcal/P/C/F is empty or unparseable.
+ * Shows hint when |kcal - est| > 0.15 * est AND |kcal - est| > 50 (both strict).
+ * If est == 0, percentage condition is met and only diff > 50 decides.
+ */
+export function kcalMacroMismatch(
+  params: KcalMacroMismatchParams
+): KcalMacroMismatchResult | null {
+  const rawKcal = params.kcal !== undefined ? params.kcal : params.calories;
+  const k = parseMacroInput(rawKcal);
+  const p = parseMacroInput(params.protein);
+  const c = parseMacroInput(params.carbs);
+  const f = parseMacroInput(params.fat);
+
+  if (k === null || p === null || c === null || f === null) {
+    return null;
+  }
+
+  const est = 4 * p + 4 * c + 9 * f;
+  const diff = Math.abs(k - est);
+
+  const percentCondition = est === 0 ? true : diff > 0.15 * est;
+  const diffCondition = diff > 50;
+
+  if (percentCondition && diffCondition) {
+    const rounded = Math.round(est);
+    return {
+      estimatedKcal: rounded,
+      diff,
+      message: `Macros add up to ≈ ${formatCalories(rounded)} kcal`,
+    };
+  }
+
+  return null;
+}

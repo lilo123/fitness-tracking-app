@@ -218,4 +218,41 @@ describe('ItemNutritionModal', () => {
 
     await expectNoA11yViolations(container);
   });
+  it('D23: soft kcal-vs-macros hint appears/disappears as values change and does not block save', () => {
+    const item = makeItem({
+      calories: 104,
+      protein: 10,
+      carbs: 0,
+      fat: 6.5,
+      fiber: 0,
+    });
+    const onSave = vi.fn();
+    render(<ItemNutritionModal isOpen={true} onClose={() => {}} item={item} onSave={onSave} />);
+
+    // 1. Live region is present before hint appears
+    const hint = screen.getByTestId('macro-mismatch-hint');
+    expect(hint).toBeDefined();
+    expect(hint).toHaveAttribute('aria-live', 'polite');
+    expect(hint.textContent).toBe('');
+
+    // 2. Hint appears when values mismatch (>15% and >50 kcal)
+    // est = 4*10 + 4*0 + 9*6.5 = 98.5 kcal; kcal = 300 -> diff 201.5 > 50 and > 15%
+    fireEvent.change(screen.getByTestId('edit-item-calories-input'), { target: { value: '300' } });
+    expect(hint.textContent).toBe('Macros add up to ≈ 99 kcal');
+
+    // 3. Save still works while hint is shown (non-blocking)
+    fireEvent.click(screen.getByTestId('save-edit-item-nutrition-btn'));
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        calories: 300,
+        protein: 10,
+        carbs: 0,
+        fat: 6.5,
+      })
+    );
+
+    // 4. Hint disappears when field is empty
+    fireEvent.change(screen.getByTestId('edit-item-calories-input'), { target: { value: '' } });
+    expect(hint.textContent).toBe('');
+  });
 });

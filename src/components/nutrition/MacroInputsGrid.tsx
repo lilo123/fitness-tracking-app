@@ -1,4 +1,5 @@
 import React, { memo } from 'react';
+import { KcalMacroHint } from './KcalMacroHint';
 
 export interface MacroValues {
   calories: number | '';
@@ -65,7 +66,8 @@ export const MacroInputsGrid: React.FC<MacroInputsGridProps> = memo(({
   };
 
   return (
-    <div className="grid grid-cols-6 sm:grid-cols-5 gap-2">
+    <div>
+      <div className="grid grid-cols-6 sm:grid-cols-5 gap-2">
       <div className="col-span-2 sm:col-span-1">
         <label
           htmlFor={ids.caloriesId}
@@ -237,9 +239,24 @@ export const MacroInputsGrid: React.FC<MacroInputsGridProps> = memo(({
         )}
       </div>
 
-      {hintSlot && (
-        <div className="col-span-6 sm:col-span-5" data-testid="macro-hint-slot">
-          {hintSlot}
+      </div>
+
+      {hintSlot !== undefined ? (
+        hintSlot && (
+          <div data-testid="macro-hint-slot">
+            {hintSlot}
+          </div>
+        )
+      ) : (
+        <div data-testid="macro-hint-slot">
+          <KcalMacroHint
+            calories={values.calories}
+            protein={values.protein}
+            carbs={values.carbs}
+            fat={values.fat}
+            fiber={values.fiber}
+            testId="macro-mismatch-hint"
+          />
         </div>
       )}
     </div>

@@ -5,6 +5,7 @@ import {
   roundTo1Decimal,
   calculateRemainingFuel,
   formatPercentage,
+  kcalMacroMismatch,
 } from './nutrition';
 
 describe('nutrition utility', () => {
@@ -378,6 +379,172 @@ describe('nutrition utility', () => {
       expect(formatPercentage('25', '100')).toBe('25%');
       expect(formatPercentage('0.5', '100')).toBe('<1%');
       expect(formatPercentage('invalid', '100')).toBe('0%');
+    });
+  });
+  describe('kcalMacroMismatch (D23)', () => {
+    it('returns null when any of kcal, protein, carbs, or fat is empty string', () => {
+      expect(kcalMacroMismatch({ kcal: '', protein: 25, carbs: 0, fat: 0 })).toBeNull();
+      expect(kcalMacroMismatch({ kcal: 200, protein: '', carbs: 0, fat: 0 })).toBeNull();
+      expect(kcalMacroMismatch({ kcal: 200, protein: 25, carbs: '', fat: 0 })).toBeNull();
+      expect(kcalMacroMismatch({ kcal: 200, protein: 25, carbs: 0, fat: '' })).toBeNull();
+      expect(kcalMacroMismatch({ calories: '', protein: 25, carbs: 0, fat: 0 })).toBeNull();
+    });
+
+    it('returns null when any input is unparseable or negative', () => {
+      expect(kcalMacroMismatch({ kcal: 'abc', protein: 25, carbs: 0, fat: 0 })).toBeNull();
+      expect(kcalMacroMismatch({ kcal: 200, protein: 'not-a-number', carbs: 0, fat: 0 })).toBeNull();
+      expect(kcalMacroMismatch({ kcal: -50, protein: 25, carbs: 0, fat: 0 })).toBeNull();
+      expect(kcalMacroMismatch({ kcal: 200, protein: -10, carbs: 0, fat: 0 })).toBeNull();
+      expect(kcalMacroMismatch({ kcal: null, protein: 25, carbs: 0, fat: 0 })).toBeNull();
+      expect(kcalMacroMismatch({ kcal: undefined, protein: 25, carbs: 0, fat: 0 })).toBeNull();
+    });
+
+    it('does not show hint when difference is exactly 15%', () => {
+      // est = 4*100 + 4*150 + 9*0 = 1000
+      // 15% of 1000 = 150
+      // diff = 150 > 50, but 150 > 150 is false (strict > 15%)
+      expect(kcalMacroMismatch({ kcal: 1150, protein: 100, carbs: 150, fat: 0 })).toBeNull();
+      expect(kcalMacroMismatch({ kcal: 850, protein: 100, carbs: 150, fat: 0 })).toBeNull();
+    });
+
+    it('does not show hint when difference is just over 15% but diff <= 50', () => {
+      // est = 4*25 + 4*0 + 9*0 = 100
+      // 15% of 100 = 15
+      // kcal = 120 -> diff = 20 > 15 (strict > 15%), but diff = 20 <= 50
+      expect(kcalMacroMismatch({ kcal: 120, protein: 25, carbs: 0, fat: 0 })).toBeNull();
+      expect(kcalMacroMismatch({ kcal: 80, protein: 25, carbs: 0, fat: 0 })).toBeNull();
+    });
+
+    it('does not show hint when difference is exactly 50', () => {
+      // est = 4*50 + 4*0 + 9*0 = 200
+      // 15% of 200 = 30
+      // kcal = 250 -> diff = 50 > 30 (true), but diff = 50 > 50 is false (strict > 50)
+      expect(kcalMacroMismatch({ kcal: 250, protein: 50, carbs: 0, fat: 0 })).toBeNull();
+      expect(kcalMacroMismatch({ kcal: 150, protein: 50, carbs: 0, fat: 0 })).toBeNull();
+    });
+
+    it('shows hint when diff is 51 and > 15%', () => {
+      // est = 4*50 = 200. 15% = 30.
+      // kcal = 251 -> diff = 51. 51 > 30 and 51 > 50 -> show.
+      const resultHigher = kcalMacroMismatch({ kcal: 251, protein: 50, carbs: 0, fat: 0 });
+      expect(resultHigher).toEqual({
+        estimatedKcal: 200,
+        diff: 51,
+        message: 'Macros add up to ≈ 200 kcal',
+      });
+
+      // kcal = 149 -> diff = 51. 51 > 30 and 51 > 50 -> show.
+      const resultLower = kcalMacroMismatch({ kcal: 149, protein: 50, carbs: 0, fat: 0 });
+      expect(resultLower).toEqual({
+        estimatedKcal: 200,
+        diff: 51,
+        message: 'Macros add up to ≈ 200 kcal',
+      });
+    });
+
+    it('handles zero values correctly (all 0 + kcal 0 -> hidden; P/C/F 0 + kcal 60 -> shown ≈ 0; kcal 0 + macros est 100 -> shown)', () => {
+      // all 0 + kcal 0 -> hidden
+      expect(kcalMacroMismatch({ kcal: 0, protein: 0, carbs: 0, fat: 0 })).toBeNull();
+      expect(kcalMacroMismatch({ kcal: '0', protein: '0', carbs: '0', fat: '0' })).toBeNull();
+
+      // P/C/F 0 + kcal 60 -> shown ≈ 0
+      // est = 0. est == 0 satisfies percentage condition. diff = 60 > 50 -> shown.
+      expect(kcalMacroMismatch({ kcal: 60, protein: 0, carbs: 0, fat: 0 })).toEqual({
+        estimatedKcal: 0,
+        diff: 60,
+        message: 'Macros add up to ≈ 0 kcal',
+      });
+
+      // kcal 0 + macros est 100 -> shown
+      // est = 100. diff = 100 > 15 and 100 > 50 -> shown.
+      expect(kcalMacroMismatch({ kcal: 0, protein: 25, carbs: 0, fat: 0 })).toEqual({
+        estimatedKcal: 100,
+        diff: 100,
+        message: 'Macros add up to ≈ 100 kcal',
+      });
+    });
+
+    it('ignores fiber (fiber > 0 does not change est)', () => {
+      // est without fiber = 4*25 + 4*0 + 9*0 = 100
+      // with fiber = 50, est must still be 100
+      expect(kcalMacroMismatch({ kcal: 0, protein: 25, carbs: 0, fat: 0, fiber: 50 })).toEqual({
+        estimatedKcal: 100,
+        diff: 100,
+        message: 'Macros add up to ≈ 100 kcal',
+      });
+    });
+
+    it('handles decimal inputs and rounds estimated kcal to nearest whole integer', () => {
+      // P = 10.5, C = 20.2, F = 5.1
+      // est = 4*10.5 + 4*20.2 + 9*5.1 = 42 + 80.8 + 45.9 = 168.7
+      // kcal = 300 -> diff = |300 - 168.7| = 131.3
+      // 0.15 * 168.7 = 25.305 -> 131.3 > 25.305 and 131.3 > 50 -> shown.
+      // Math.round(168.7) = 169
+      expect(kcalMacroMismatch({ kcal: 300, protein: 10.5, carbs: 20.2, fat: 5.1 })).toEqual({
+        estimatedKcal: 169,
+        diff: 131.3,
+        message: 'Macros add up to ≈ 169 kcal',
+      });
+    });
+
+    it('supports calories property alias as alternative to kcal', () => {
+      expect(kcalMacroMismatch({ calories: 300, protein: 10.5, carbs: 20.2, fat: 5.1 })).toEqual({
+        estimatedKcal: 169,
+        diff: 131.3,
+        message: 'Macros add up to ≈ 169 kcal',
+      });
+    });
+
+    it('covers exact spec boundary conditions (strict > 15% and strict > 50)', () => {
+      // kcal 115 / est 100 (15% exactly, diff 15 -> hidden)
+      expect(kcalMacroMismatch({ kcal: 115, protein: 25, carbs: 0, fat: 0 })).toBeNull();
+
+      // kcal 460 / est 400 (15% exactly, diff 60 > 50, but 15% not > 15% -> hidden)
+      expect(kcalMacroMismatch({ kcal: 460, protein: 100, carbs: 0, fat: 0 })).toBeNull();
+
+      // kcal 461 / est 400 (diff 61 > 60 and > 50 -> shown)
+      expect(kcalMacroMismatch({ kcal: 461, protein: 100, carbs: 0, fat: 0 })).toEqual({
+        estimatedKcal: 400,
+        diff: 61,
+        message: 'Macros add up to ≈ 400 kcal',
+      });
+
+      // kcal 150 / est 100 (diff 50 exactly, diff > 15% but diff 50 not > 50 -> hidden)
+      expect(kcalMacroMismatch({ kcal: 150, protein: 25, carbs: 0, fat: 0 })).toBeNull();
+
+      // kcal 151 / est 100 (diff 51 > 15 and > 50 -> shown)
+      expect(kcalMacroMismatch({ kcal: 151, protein: 25, carbs: 0, fat: 0 })).toEqual({
+        estimatedKcal: 100,
+        diff: 51,
+        message: 'Macros add up to ≈ 100 kcal',
+      });
+
+      // kcal below est: 45 vs 452 (shown)
+      expect(kcalMacroMismatch({ kcal: 45, protein: 50, carbs: 40, fat: 10.22 })).toEqual({
+        estimatedKcal: 452,
+        diff: 406.98,
+        message: 'Macros add up to ≈ 452 kcal',
+      });
+
+      // huge fiber is ignored
+      expect(kcalMacroMismatch({ kcal: 45, protein: 50, carbs: 40, fat: 10.22, fiber: 9999 })).toEqual({
+        estimatedKcal: 452,
+        diff: 406.98,
+        message: 'Macros add up to ≈ 452 kcal',
+      });
+
+      // '1,5' vs '1.5' decimal handling: '1.5' parses, '1,5' is unparseable and returns null
+      expect(kcalMacroMismatch({ kcal: '151', protein: '25.0', carbs: '0', fat: '0' })).toEqual({
+        estimatedKcal: 100,
+        diff: 51,
+        message: 'Macros add up to ≈ 100 kcal',
+      });
+      expect(kcalMacroMismatch({ kcal: '151', protein: '25,0', carbs: '0', fat: '0' })).toBeNull();
+      expect(kcalMacroMismatch({ kcal: '151,0', protein: '25', carbs: '0', fat: '0' })).toBeNull();
+
+      // whitespace strings return null
+      expect(kcalMacroMismatch({ kcal: '   ', protein: 25, carbs: 0, fat: 0 })).toBeNull();
+      expect(kcalMacroMismatch({ kcal: 151, protein: '  	  ', carbs: 0, fat: 0 })).toBeNull();
     });
   });
 });

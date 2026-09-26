@@ -217,4 +217,40 @@ describe('AddItemForm', () => {
     expect(screen.getByTestId('add-item-quantity-error')).toHaveTextContent('Must be 0 or more');
     expect(onAddItem).not.toHaveBeenCalled();
   });
+  it('D23: soft kcal-vs-macros hint appears/disappears as values change and does not block submit', () => {
+    const onAddItem = vi.fn();
+    renderForm({ onAddItem });
+
+    // 1. Live region is present before hint appears
+    const hint = screen.getByTestId('macro-mismatch-hint');
+    expect(hint).toBeDefined();
+    expect(hint).toHaveAttribute('aria-live', 'polite');
+    expect(hint.textContent).toBe('');
+
+    // 2. Hint appears when values mismatch (>15% and >50 kcal)
+    // est = 4*50 + 4*0 + 9*0 = 200 kcal; kcal = 251 -> diff 51 > 50 and > 15%
+    fireEvent.change(screen.getByTestId('add-item-name-input'), { target: { value: 'Protein Powder' } });
+    fireEvent.change(screen.getByTestId('add-item-calories-input'), { target: { value: '251' } });
+    fireEvent.change(screen.getByTestId('add-item-protein-input'), { target: { value: '50' } });
+    fireEvent.change(screen.getByTestId('add-item-carbs-input'), { target: { value: '0' } });
+    fireEvent.change(screen.getByTestId('add-item-fat-input'), { target: { value: '0' } });
+
+    expect(hint.textContent).toBe('Macros add up to ≈ 200 kcal');
+
+    // 3. Submit still works while hint is shown
+    fireEvent.click(screen.getByTestId('submit-add-item-button'));
+    expect(onAddItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Protein Powder',
+        calories: 251,
+        protein: 50,
+        carbs: 0,
+        fat: 0,
+      })
+    );
+
+    // 4. Hint disappears when a field is cleared
+    fireEvent.change(screen.getByTestId('add-item-calories-input'), { target: { value: '' } });
+    expect(hint.textContent).toBe('');
+  });
 });

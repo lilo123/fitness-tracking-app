@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { AccessibleModal } from '../common/AccessibleModal';
+import { KcalMacroHint } from './KcalMacroHint';
 import { roundTo1Decimal } from '../../utils/nutrition';
 import { shortUnitLabel } from '../../utils/unitConverter';
 import type { NutritionItem } from '../../utils/itemModel';
@@ -178,7 +179,8 @@ const ItemNutritionForm: React.FC<ItemNutritionFormProps> = ({ item, onClose, on
 
       {/* Form */}
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+        <div>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
           {FIELDS.map((field, index) => {
             const result = validationResults[field.key];
             const hasFieldError = result.error !== null;
@@ -224,6 +226,16 @@ const ItemNutritionForm: React.FC<ItemNutritionFormProps> = ({ item, onClose, on
               </div>
             );
           })}
+          </div>
+
+          <KcalMacroHint
+            kcal={formState.calories}
+            protein={formState.protein}
+            carbs={formState.carbs}
+            fat={formState.fat}
+            fiber={formState.fiber}
+            testId="macro-mismatch-hint"
+          />
         </div>
 
         {/* Action Buttons */}

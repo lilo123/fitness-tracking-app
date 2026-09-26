@@ -2962,3 +2962,298 @@ test.describe("D37 ring clearance", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// D23: Soft kcal-vs-macros hint density tests
+// ---------------------------------------------------------------------------
+
+test.describe('D23 kcal-vs-macros hint', () => {
+  test('D23: manual form at 320px height hidden == base (592px), visible <= base + 20 (612px), font 12px, not clipped, single line', async ({ browser }) => {
+    const page = await browser.newPage({ viewport: { width: 320, height: 844 }, deviceScaleFactor: 1 });
+    try {
+      await setupPageAndLogin(page);
+      const manualBtn = page.locator('button:has-text("Manual Entry")');
+      await manualBtn.click();
+      const formLocator = page.locator('form').filter({ hasText: 'Manual Macro Logging' });
+      await expect(formLocator).toBeVisible();
+
+      // 1. Measure height with hint hidden
+      const heightHidden = await formLocator.evaluate((el) => el.getBoundingClientRect().height);
+      const hintLocator = formLocator.locator('[data-testid="macro-mismatch-hint"]');
+      await expect(hintLocator).toBeAttached();
+      const hintTextHidden = await hintLocator.innerText();
+      expect(hintTextHidden.trim()).toBe('');
+
+      // Base height at 320px is 592px. Height with hint hidden == base height
+      expect(heightHidden).toBe(592);
+
+      // 2. Trigger hint (kcal 350, macros 0 -> est = 0, diff = 350 > 50 and > 15%)
+      await page.fill('[data-testid="calories-input"]', '350');
+      await page.fill('[data-testid="protein-input"]', '0');
+      await page.fill('[data-testid="carbs-input"]', '0');
+      await page.fill('[data-testid="fat-input"]', '0');
+
+      await expect(hintLocator).toBeVisible();
+      const hintTextVisible = await hintLocator.innerText();
+      expect(hintTextVisible).toBe('Macros add up to ≈ 0 kcal');
+
+      // 3. Measure height with hint visible (must add <= 20px)
+      const heightVisible = await formLocator.evaluate((el) => el.getBoundingClientRect().height);
+      expect(heightVisible).toBeLessThanOrEqual(592 + 20);
+
+      // Screenshot manual form with hint visible at 320px
+      await formLocator.screenshot({
+        path: '/usr/local/google/home/duynguyenn/.gemini/jetski/brain/200a9e40-21fa-4449-a8bf-d4509c01bcd4/scratch/d23_hint_320.png',
+      });
+
+      // 4. Verify hint font size == 12px
+      const fontSize = await hintLocator.evaluate((el) => parseFloat(window.getComputedStyle(el).fontSize));
+      expect(fontSize).toBe(12);
+
+      // 5. Verify hint not clipped (scrollWidth <= clientWidth)
+      const clipCheck = await hintLocator.evaluate((el) => ({
+        scrollWidth: el.scrollWidth,
+        clientWidth: el.clientWidth,
+        notClipped: el.scrollWidth <= el.clientWidth,
+      }));
+      expect(clipCheck.notClipped, `Hint is clipped: scrollWidth (${clipCheck.scrollWidth}) > clientWidth (${clipCheck.clientWidth})`).toBe(true);
+
+      // 6. Verify single line (hint height <= 20px)
+      const hintHeight = await hintLocator.evaluate((el) => el.getBoundingClientRect().height);
+      expect(hintHeight).toBeLessThanOrEqual(20);
+
+      console.log(JSON.stringify({
+        test: 'D23: manual form at 320px',
+        heightHidden,
+        heightVisible,
+        diff: heightVisible - heightHidden,
+        fontSize,
+        clipCheck,
+        hintHeight,
+      }));
+    } finally {
+      await page.close();
+    }
+  });
+
+  test('D23: manual form at 390px height hidden == base (592px), visible <= base + 20 (612px), font 12px, not clipped, single line', async ({ browser }) => {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
+    try {
+      await setupPageAndLogin(page);
+      const manualBtn = page.locator('button:has-text("Manual Entry")');
+      await manualBtn.click();
+      const formLocator = page.locator('form').filter({ hasText: 'Manual Macro Logging' });
+      await expect(formLocator).toBeVisible();
+
+      // 1. Measure height with hint hidden
+      const heightHidden = await formLocator.evaluate((el) => el.getBoundingClientRect().height);
+      const hintLocator = formLocator.locator('[data-testid="macro-mismatch-hint"]');
+      await expect(hintLocator).toBeAttached();
+      const hintTextHidden = await hintLocator.innerText();
+      expect(hintTextHidden.trim()).toBe('');
+
+      // Base height at 390px is 592px
+      expect(heightHidden).toBe(592);
+
+      // 2. Trigger hint
+      await page.fill('[data-testid="calories-input"]', '350');
+      await page.fill('[data-testid="protein-input"]', '0');
+      await page.fill('[data-testid="carbs-input"]', '0');
+      await page.fill('[data-testid="fat-input"]', '0');
+
+      await expect(hintLocator).toBeVisible();
+      const hintTextVisible = await hintLocator.innerText();
+      expect(hintTextVisible).toBe('Macros add up to ≈ 0 kcal');
+
+      // 3. Measure height with hint visible
+      const heightVisible = await formLocator.evaluate((el) => el.getBoundingClientRect().height);
+      expect(heightVisible).toBeLessThanOrEqual(592 + 20);
+
+      // 4. Verify hint font size == 12px
+      const fontSize = await hintLocator.evaluate((el) => parseFloat(window.getComputedStyle(el).fontSize));
+      expect(fontSize).toBe(12);
+
+      // 5. Verify hint not clipped
+      const clipCheck = await hintLocator.evaluate((el) => ({
+        scrollWidth: el.scrollWidth,
+        clientWidth: el.clientWidth,
+        notClipped: el.scrollWidth <= el.clientWidth,
+      }));
+      expect(clipCheck.notClipped, `Hint is clipped: scrollWidth (${clipCheck.scrollWidth}) > clientWidth (${clipCheck.clientWidth})`).toBe(true);
+
+      // 6. Verify single line
+      const hintHeight = await hintLocator.evaluate((el) => el.getBoundingClientRect().height);
+      expect(hintHeight).toBeLessThanOrEqual(20);
+
+      console.log(JSON.stringify({
+        test: 'D23: manual form at 390px',
+        heightHidden,
+        heightVisible,
+        diff: heightVisible - heightHidden,
+        fontSize,
+        clipCheck,
+        hintHeight,
+      }));
+    } finally {
+      await page.close();
+    }
+  });
+
+  test('D23: AddItemForm at 320px height hidden == base (434px), visible <= base + 20 (454px), font 12px, not clipped, single line', async ({ browser }) => {
+    const page = await browser.newPage({ viewport: { width: 320, height: 844 }, deviceScaleFactor: 1 });
+    try {
+      await setupPageAndLogin(page);
+
+      // Stage a meal to expose "+ Manual" / AddItemForm
+      const manualBtn = page.locator('button:has-text("Manual Entry")');
+      await manualBtn.click();
+      await page.fill('[data-testid="dish-name-input"]', 'Base Meal');
+      await page.fill('[data-testid="calories-input"]', '200');
+      await page.fill('[data-testid="protein-input"]', '20');
+      await page.fill('[data-testid="carbs-input"]', '20');
+      await page.fill('[data-testid="fat-input"]', '4');
+      const logBtn = page.locator('button:has-text("Log Meal")').last();
+      await logBtn.click();
+
+      const stagedCard = page.locator('[data-testid="staged-meal-card"]');
+      await expect(stagedCard).toBeVisible();
+
+      const addItemBtn = stagedCard.locator('[data-testid="add-item-button"]');
+      await addItemBtn.click();
+
+      const addItemForm = stagedCard.locator('[data-testid="add-item-form"]');
+      await expect(addItemForm).toBeVisible();
+
+      // 1. Measure height with hint hidden
+      const heightHidden = await addItemForm.evaluate((el) => el.getBoundingClientRect().height);
+      const hintLocator = addItemForm.locator('[data-testid="macro-mismatch-hint"]');
+      await expect(hintLocator).toBeAttached();
+      const hintTextHidden = await hintLocator.innerText();
+      expect(hintTextHidden.trim()).toBe('');
+
+      // Base height at 320px is 434px
+      expect(heightHidden).toBe(434);
+
+      // 2. Trigger hint
+      await page.fill('[data-testid="add-item-calories-input"]', '350');
+      await page.fill('[data-testid="add-item-protein-input"]', '0');
+      await page.fill('[data-testid="add-item-carbs-input"]', '0');
+      await page.fill('[data-testid="add-item-fat-input"]', '0');
+
+      await expect(hintLocator).toBeVisible();
+      const hintTextVisible = await hintLocator.innerText();
+      expect(hintTextVisible).toBe('Macros add up to ≈ 0 kcal');
+
+      // 3. Measure height with hint visible
+      const heightVisible = await addItemForm.evaluate((el) => el.getBoundingClientRect().height);
+      expect(heightVisible).toBeLessThanOrEqual(434 + 20);
+
+      // 4. Verify hint font size == 12px
+      const fontSize = await hintLocator.evaluate((el) => parseFloat(window.getComputedStyle(el).fontSize));
+      expect(fontSize).toBe(12);
+
+      // 5. Verify hint not clipped
+      const clipCheck = await hintLocator.evaluate((el) => ({
+        scrollWidth: el.scrollWidth,
+        clientWidth: el.clientWidth,
+        notClipped: el.scrollWidth <= el.clientWidth,
+      }));
+      expect(clipCheck.notClipped, `Hint is clipped: scrollWidth (${clipCheck.scrollWidth}) > clientWidth (${clipCheck.clientWidth})`).toBe(true);
+
+      // 6. Verify single line
+      const hintHeight = await hintLocator.evaluate((el) => el.getBoundingClientRect().height);
+      expect(hintHeight).toBeLessThanOrEqual(20);
+
+      console.log(JSON.stringify({
+        test: 'D23: AddItemForm at 320px',
+        heightHidden,
+        heightVisible,
+        diff: heightVisible - heightHidden,
+        fontSize,
+        clipCheck,
+        hintHeight,
+      }));
+    } finally {
+      await page.close();
+    }
+  });
+
+  test('D23: AddItemForm at 390px height hidden == base (418px), visible <= base + 20 (438px), font 12px, not clipped, single line', async ({ browser }) => {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
+    try {
+      await setupPageAndLogin(page);
+
+      // Stage a meal to expose "+ Manual" / AddItemForm
+      const manualBtn = page.locator('button:has-text("Manual Entry")');
+      await manualBtn.click();
+      await page.fill('[data-testid="dish-name-input"]', 'Base Meal');
+      await page.fill('[data-testid="calories-input"]', '200');
+      await page.fill('[data-testid="protein-input"]', '20');
+      await page.fill('[data-testid="carbs-input"]', '20');
+      await page.fill('[data-testid="fat-input"]', '4');
+      const logBtn = page.locator('button:has-text("Log Meal")').last();
+      await logBtn.click();
+
+      const stagedCard = page.locator('[data-testid="staged-meal-card"]');
+      await expect(stagedCard).toBeVisible();
+
+      const addItemBtn = stagedCard.locator('[data-testid="add-item-button"]');
+      await addItemBtn.click();
+
+      const addItemForm = stagedCard.locator('[data-testid="add-item-form"]');
+      await expect(addItemForm).toBeVisible();
+
+      // 1. Measure height with hint hidden
+      const heightHidden = await addItemForm.evaluate((el) => el.getBoundingClientRect().height);
+      const hintLocator = addItemForm.locator('[data-testid="macro-mismatch-hint"]');
+      await expect(hintLocator).toBeAttached();
+      const hintTextHidden = await hintLocator.innerText();
+      expect(hintTextHidden.trim()).toBe('');
+
+      // Base height at 390px is 418px
+      expect(heightHidden).toBe(418);
+
+      // 2. Trigger hint
+      await page.fill('[data-testid="add-item-calories-input"]', '350');
+      await page.fill('[data-testid="add-item-protein-input"]', '0');
+      await page.fill('[data-testid="add-item-carbs-input"]', '0');
+      await page.fill('[data-testid="add-item-fat-input"]', '0');
+
+      await expect(hintLocator).toBeVisible();
+      const hintTextVisible = await hintLocator.innerText();
+      expect(hintTextVisible).toBe('Macros add up to ≈ 0 kcal');
+
+      // 3. Measure height with hint visible
+      const heightVisible = await addItemForm.evaluate((el) => el.getBoundingClientRect().height);
+      expect(heightVisible).toBeLessThanOrEqual(418 + 20);
+
+      // 4. Verify hint font size == 12px
+      const fontSize = await hintLocator.evaluate((el) => parseFloat(window.getComputedStyle(el).fontSize));
+      expect(fontSize).toBe(12);
+
+      // 5. Verify hint not clipped
+      const clipCheck = await hintLocator.evaluate((el) => ({
+        scrollWidth: el.scrollWidth,
+        clientWidth: el.clientWidth,
+        notClipped: el.scrollWidth <= el.clientWidth,
+      }));
+      expect(clipCheck.notClipped, `Hint is clipped: scrollWidth (${clipCheck.scrollWidth}) > clientWidth (${clipCheck.clientWidth})`).toBe(true);
+
+      // 6. Verify single line
+      const hintHeight = await hintLocator.evaluate((el) => el.getBoundingClientRect().height);
+      expect(hintHeight).toBeLessThanOrEqual(20);
+
+      console.log(JSON.stringify({
+        test: 'D23: AddItemForm at 390px',
+        heightHidden,
+        heightVisible,
+        diff: heightVisible - heightHidden,
+        fontSize,
+        clipCheck,
+        hintHeight,
+      }));
+    } finally {
+      await page.close();
+    }
+  });
+});
