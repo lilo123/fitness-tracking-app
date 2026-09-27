@@ -18,7 +18,7 @@
 | P0 | Foundations and test guardrails | **done** 2026-09-26 | `6bc91c7` (+ `7e7b05b` E2E label fix for D46). Gates: tsc 0, oxlint 0e/33w, vitest 98/1349, test:tz LA 141 + Tokyo 141, check:mocks/payload, build, perf, density 67/67 ×2, E2E trio 36/0/6. No DOM change. |
 | P1 | Safety hotfixes + exercises RLS v2 | **done** 2026-09-27 | `cc64455` (PR #7). W50 policy, L1, L2, L3, L5, L6, L7, L12 + M1 `20260927000000_exercises_rls_v2` applied to production 00:50Z via `scripts/prod-db.sh migrate` (backup `prod-20260927T005007Z.dump` verified; audit 0 before and after). Gates: tsc 0, oxlint 0e/33w, vitest 98/1359, test:tz 141+141, mocks/payload/build/perf, density 67/67, pgTAP 142/142, E2E trio + workout/coach/error-states 62 passed/6 skipped, CI green. Master routines stay editable by platform coaches (L1 = exercises only). |
 | P2 | Workout data layer and cross-tab data contracts | **done** 2026-09-27 | `783b6cb` (PR #8). All 29 items. M2 `workouts_civil_date` + M3 `exercise_pr_benchmarks` applied to production 02:36Z (verified backups; per-day checksum identical before/after; audit 0). Gates: tsc 0, oxlint 0e/33w, vitest 107/1417 in UTC + LA + Tokyo (test:tz = full suite), mocks/payload/build/perf, pgTAP 168, density 67/67 ×2, E2E 64/0/6; the deployed frontend passed the same E2E set against the migrated DB. |
-| P3a | Shared primitives, exercise card, set rows, EditSetSheet | not started | |
+| P3a | Shared primitives, exercise card, set rows, EditSetSheet | **done** 2026-09-27 | `407f94b` (PR #9). UI-only (no migration). Primitives in `common/`, `EditSetSheet` replaces `EditSetModal` with deferred delete (`useDeferredDelete` + `UndoToast`), `ExerciseCard`/`SetRow` 44px hit areas, `check:design` ratchet. Gates: tsc 0, oxlint 0e/33w, vitest 123/1519 + tz, pgTAP 168, density 73/73 ×2, E2E 70/0/6 local, CI full suite green (3 projects). Deployed to `v2-rewrite` 14:53Z. |
 | P3b | Workout session flows, header, rest day, routine picker | not started | |
 | P4 | Exercise catalog + shared ExercisePicker | not started | |
 | P5a | History data, shell and session list | not started | |
@@ -77,6 +77,8 @@ Newest first. Decisions dated 2026-09-26 in the audit reports are final and are 
 | RP-4 | History phases come before Library (P5 before P7). | History has open P0s (H8, H9, H11). Library's P0s are fixed in P1. P5 and P7a have disjoint files and could run in parallel if needed. |
 | RP-5 | Coach and Settings were not audited. P8 starts with a read-only audit of both before any change. | No evidence yet. |
 | RP-6 | H40, H52 and H53 are obsolete. D44 removed EditMealModal and made the timeline row read-only. | Verified at `da67a71` (`EditMealModal.tsx` deleted; no revert UI in `MealLogRow.tsx`). |
+| D-P3a-1 | **Exercise card title 16px/800 -> 14px/700** per STD-TYP. Card header title uses 14px semibold (font-bold/700) instead of 16px extra-bold (font-extrabold/800). | STD-TYP-1/2: card titles 14px max; 16px reserved for section headers. |
+| D-P3a-2 | **CI job timeout-minutes 15 -> 25.** | P2 run was already 14m41s; full suite with 3 projects on one DB runs ~17m. |
 
 ### 2.3 Earlier decisions carried in (user, 2026-09-26; final)
 - **Workout §1a:**
@@ -560,6 +562,8 @@ The agent has no production DB credentials (anon key only); re-run the query bef
 | `save_routine_template` (SECURITY DEFINER) does not check that each `exercise_id` is visible to the caller (found in P1 review; production audit W50b = 0) | A template could reference an exercise its owner can't see | Add the visibility check when P7b owns the template builder / RPC. |
 | `ExercisesView.tsx` is at 599/600 LOC after P1 | perf gate fails on the next edit | P7a splits it before adding anything. |
 | D44 edit-meal E2E flaked once in the History half (Save stayed disabled after a name change; 6/6 passes on repeat, on both base and P0) | CI noise | Watch; if it recurs, check the edit sheet's async draft reload overwriting typed input. |
+| E2E specs must be self-sufficient on fresh seed.sql and not leave residue (CI runs 3 projects on one DB) | Cross-spec flakiness in CI when later projects (e.g. Narrow Safari) hit modified or missing seeded rows | New E2E specs create and clean up their own test data; run all 3 CI projects in order locally before pushing. |
+| CI job duration ~17 min, limit 25 | CI job cancellation on timeout if suite grows further | Timeout bumped 15 -> 25 min (D-P3a-2); watch duration as P3b-P8 add specs; shard or parallelize projects if approaching 22 min. |
 
 ## 9. Change log of this file
 | Date | Change |
@@ -572,3 +576,4 @@ The agent has no production DB credentials (anon key only); re-run the query bef
 | 2026-09-26 | §3a execution rules: production-DB hard rules (`scripts/prod-db.sh`: check/audit/backup/migrate/rollback + local rehearsal), flock browser lock (`scripts/with-browser-lock.sh`), anti-stall rules. First verified production backup taken (23:25Z). |
 | 2026-09-27 | P1 done and shipped (`cc64455`, PR #7): M1 exercises RLS v2 applied to production with a verified backup; Library hotfixes; D44 density fixture date fixed (was hardcoded 2026-09-26). Three new risks (local test:db CLI, RPC exercise visibility, ExercisesView LOC). |
 | 2026-09-27 | P2 done and shipped (`783b6cb`, PR #8): M2 civil dates (RD-5 midnight-UTC rule) + M3 benchmarks in production; data layer, History/Coach consumers; full suite time-zone clean. §3a rule 8 (production-shape audit + checksum for data-changing migrations). RD-15 audit uses the RD-5 rule. |
+| 2026-09-27 | P3a done and shipped (`407f94b`, PR #9): shared primitives in `common/`, `EditSetSheet` (deferred delete + `UndoToast`), `ExerciseCard`/`SetRow` 44px hit areas, `check:design` ratchet; no migration. Decisions D-P3a-1 (card title 14px/700) and D-P3a-2 (CI timeout 25m). Two new risks (E2E fresh seed/residue, CI duration). |
