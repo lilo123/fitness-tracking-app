@@ -1,5 +1,5 @@
-import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useMemo } from 'react';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { isValidUUID } from './workoutEngineHelpers';
 import { resolveExerciseLabel } from '../../utils/exerciseLabel';
@@ -33,11 +33,29 @@ export const RoutinePickerModal: React.FC<RoutinePickerModalProps> = ({
   exercises,
   targetUserId,
 }) => {
-  const { data: fetchedTemplates = [] } = useQuery({
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['routine_templates', targetUserId, 'picker'],
     enabled: isOpen && Boolean(targetUserId),
-    queryFn: async () => {
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }) => {
       if (!targetUserId || !isValidUUID(targetUserId)) return [];
+
+      if (typeof (supabase as any).rpc === 'function') {
+        const { data: rpcData, error: rpcError }: any = await (supabase as any).rpc('get_routine_catalog', {
+          p_user_id: targetUserId,
+          p_limit: 50,
+          p_cursor: pageParam,
+        });
+        if (!rpcError && rpcData) {
+          return rpcData as RoutineTemplate[];
+        }
+      }
+
       const filterString = [
         'user_id.eq.' + targetUserId,
         'is_master.eq.true',
@@ -45,7 +63,7 @@ export const RoutinePickerModal: React.FC<RoutinePickerModalProps> = ({
       ].join(',');
 
       // payload-gate: detail-fetch — user opens the routine picker
-      const { data, error } = await supabase
+      const { data: fallbackData, error } = await supabase
         .from('routine_templates')
         .select(
           'id, user_id, name, is_master, assigned_to, days_of_week, created_at, exercises:template_exercises(id, template_id, exercise_id, order_index, target_sets, target_reps, exercise:exercises(name))'
@@ -54,8 +72,8 @@ export const RoutinePickerModal: React.FC<RoutinePickerModalProps> = ({
         .order('created_at', { ascending: false })
         .limit(50);
       if (error) throw error;
-      if (!data) return [];
-      return (data as RoutineTemplate[]).sort((a, b) => {
+      if (!fallbackData) return [];
+      return (fallbackData as RoutineTemplate[]).sort((a, b) => {
         const getScore = (t: RoutineTemplate) => {
           if (t.assigned_to === targetUserId && !t.is_master) return 3;
           if (t.user_id === targetUserId && !t.is_master) return 2;
@@ -67,7 +85,16 @@ export const RoutinePickerModal: React.FC<RoutinePickerModalProps> = ({
         return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       });
     },
+    getNextPageParam: (lastPage) => {
+      if (!lastPage || lastPage.length < 50) return undefined;
+      const last = lastPage[lastPage.length - 1];
+      return last?.id || undefined;
+    },
   });
+
+  const fetchedTemplates = useMemo(() => {
+    return data?.pages.flatMap((page) => page) ?? [];
+  }, [data]);
 
   if (!isOpen) return null;
 
@@ -211,6 +238,18 @@ export const RoutinePickerModal: React.FC<RoutinePickerModalProps> = ({
             </button>
           );
         })}
+
+        {hasNextPage && (
+          <button
+            type="button"
+            onClick={() => fetchNextPage()}
+            disabled={isFetchingNextPage}
+            data-testid="load-more-routines-btn"
+            className="w-full min-h-[44px] py-2.5 px-3 mb-2 text-center text-xs font-bold text-cyan-400 bg-zinc-800/80 hover:bg-zinc-700 rounded-xl border border-zinc-700 transition cursor-pointer touch-manipulation disabled:opacity-50 flex items-center justify-center gap-1.5"
+          >
+            {isFetchingNextPage ? 'Loading more routines...' : 'Load more routines'}
+          </button>
+        )}
 
         {fallbackDefaults.map((tpl) => (
           <button

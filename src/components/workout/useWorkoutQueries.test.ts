@@ -216,4 +216,78 @@ describe('useWorkoutQueries (P2 / W1 / W2 / W11 / W16 / W50 / L11)', () => {
     expect(result.current.benchmarks[exerciseUUID].lastSession?.date).toBe('2026-09-20');
     expect(result.current.benchmarks[exerciseUUID].lastSession?.summaryText).toBe('185×8, 185×8');
   });
+
+  it('W3: queries get_routine_catalog RPC with p_limit: 200 when targetUserId is provided', async () => {
+    const routineId = '00000000-0000-4000-8000-000000000020';
+    let rpcCalledWith: any = null;
+
+    (supabase as any).rpc = vi.fn().mockImplementation((fn: string, params: any) => {
+      if (fn === 'get_routine_catalog') {
+        rpcCalledWith = { fn, params };
+        return Promise.resolve({
+          data: [
+            {
+              id: routineId,
+              name: 'Leg Day Catalog',
+              is_master: false,
+              user_id: targetUserId,
+              assigned_to: null,
+              days_of_week: ['Sun'],
+              exercises: [{ id: 'te-leg-1', exercise: { name: 'Leg Curl' } }],
+              created_at: '2026-09-01T00:00:00Z',
+              total_count: 1,
+            },
+          ],
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: [], error: null });
+    });
+
+    vi.spyOn(supabase, 'from').mockImplementation((table: string) => {
+      if (table === 'exercises') {
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          order: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue({
+              data: [
+                { id: 'ex-leg-1', name: 'Leg Curl', body_part: 'Legs', is_master: true },
+              ],
+              error: null,
+            }),
+          }),
+        } as any;
+      }
+      return {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        gte: vi.fn().mockReturnThis(),
+        lte: vi.fn().mockReturnThis(),
+        or: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      } as any;
+    });
+
+    const { result } = renderHook(
+      () => useWorkoutQueries(targetUserId, '2026-09-27'),
+      { wrapper }
+    );
+
+    await waitFor(() => {
+      expect(result.current.templatesFetched).toBe(true);
+    });
+
+    expect(rpcCalledWith).toEqual({
+      fn: 'get_routine_catalog',
+      params: {
+        p_user_id: targetUserId,
+        p_limit: 200,
+        p_cursor: null,
+      },
+    });
+    expect(result.current.customTemplates.some((t) => t.name === 'Leg Day Catalog')).toBe(true);
+  });
 });

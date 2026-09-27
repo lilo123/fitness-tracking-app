@@ -132,6 +132,37 @@ export function useWorkoutQueries(targetUserId: string, workoutDate: string) {
     enabled: Boolean(targetUserId),
     queryFn: async () => {
       if (!targetUserId || !isValidUUID(targetUserId)) return [];
+
+      if (typeof (supabase as any).rpc === 'function') {
+        let allTemplates: RoutineTemplate[] = [];
+        let cursor: string | null = null;
+        let rpcFailed = false;
+
+        while (true) {
+          const { data: rpcData, error: rpcError }: any = await (supabase as any).rpc('get_routine_catalog', {
+            p_user_id: targetUserId,
+            p_limit: 200,
+            p_cursor: cursor,
+          });
+          if (rpcError) {
+            rpcFailed = true;
+            break;
+          }
+          if (!rpcData || rpcData.length === 0) {
+            break;
+          }
+          allTemplates.push(...(rpcData as RoutineTemplate[]));
+          if (rpcData.length < 200) {
+            break;
+          }
+          cursor = rpcData[rpcData.length - 1].id;
+        }
+
+        if (!rpcFailed && allTemplates.length > 0) {
+          return allTemplates;
+        }
+      }
+
       const filterString = `user_id.eq.${targetUserId},is_master.eq.true,assigned_to.eq.${targetUserId}`;
 
       // accepted-list (pending P1-7 conductor measurement): routine templates metadata on /workout

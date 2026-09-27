@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { RoutineTemplate, Exercise } from '../../types/database';
 import type { DEFAULT_WORKOUT_TEMPLATES } from '../../utils/ghostSets';
 import { expectNoA11yViolations } from '../../test/a11y';
+import { supabase } from '../../lib/supabase';
 
 import { createSupabaseBuilder, clearMockHistory, getRecordedTables, getRecordedSelects } from '../../test/supabaseBuilderMock';
 
@@ -219,5 +220,102 @@ describe('RoutinePickerModal', () => {
   it('passes axe accessibility audit with no violations', async () => {
     const { container } = renderModal();
     await expectNoA11yViolations(container);
+  });
+
+  it('queries get_routine_catalog RPC with limit 50 when targetUserId is provided and rpc is available', async () => {
+    const targetUserId = '11111111-1111-4111-a111-111111111111';
+    const mockRpc = vi.fn().mockResolvedValue({
+      data: [
+        {
+          id: 'rpc-tpl-1',
+          name: 'RPC Routine 1',
+          is_master: false,
+          user_id: targetUserId,
+          assigned_to: null,
+          days_of_week: ['Mon'],
+          exercises: [{ id: 'te-1', exercise: { name: 'Incline Bench Press' } }],
+          created_at: '2026-09-01T00:00:00Z',
+          total_count: 1,
+        },
+      ],
+      error: null,
+    });
+    (supabase as any).rpc = mockRpc;
+
+    renderModal({ targetUserId });
+
+    expect(await screen.findByText('RPC Routine 1')).toBeInTheDocument();
+    expect(mockRpc).toHaveBeenCalledWith('get_routine_catalog', {
+      p_user_id: targetUserId,
+      p_limit: 50,
+      p_cursor: null,
+    });
+  });
+
+  it('renders "Load more routines" button and fetches next page with p_cursor when first page has 50 templates', async () => {
+    const targetUserId = '11111111-1111-4111-a111-111111111111';
+    const page1Templates = Array.from({ length: 50 }, (_, i) => ({
+      id: `tpl-${i + 1}`,
+      name: `Template ${i + 1}`,
+      is_master: false,
+      user_id: targetUserId,
+      assigned_to: null,
+      days_of_week: ['Mon'],
+      exercises: [],
+      created_at: new Date(Date.now() - i * 1000).toISOString(),
+      total_count: 55,
+    }));
+
+    const page2Templates = [
+      {
+        id: 'tpl-51',
+        name: 'Template 51 Beyond Cap',
+        is_master: false,
+        user_id: targetUserId,
+        assigned_to: null,
+        days_of_week: ['Tue'],
+        exercises: [],
+        created_at: '2026-08-01T00:00:00Z',
+        total_count: 55,
+      },
+    ];
+
+    const mockRpc = vi.fn().mockImplementation((fn: string, params: any) => {
+      if (fn === 'get_routine_catalog') {
+        if (!params.p_cursor) {
+          return Promise.resolve({ data: page1Templates, error: null });
+        }
+        if (params.p_cursor === 'tpl-50') {
+          return Promise.resolve({ data: page2Templates, error: null });
+        }
+      }
+      return Promise.resolve({ data: [], error: null });
+    });
+    (supabase as any).rpc = mockRpc;
+
+    renderModal({ targetUserId });
+
+    // Page 1 is displayed
+    expect(await screen.findByText('Template 1')).toBeInTheDocument();
+    expect(screen.getByText('Template 50')).toBeInTheDocument();
+
+    // Load more button is visible
+    const loadMoreBtn = screen.getByTestId('load-more-routines-btn');
+    expect(loadMoreBtn).toBeInTheDocument();
+    expect(loadMoreBtn).toHaveTextContent('Load more routines');
+
+    // Click Load more -> page 2 fetched
+    fireEvent.click(loadMoreBtn);
+
+    expect(await screen.findByText('Template 51 Beyond Cap')).toBeInTheDocument();
+    expect(mockRpc).toHaveBeenCalledWith('get_routine_catalog', {
+      p_user_id: targetUserId,
+      p_limit: 50,
+      p_cursor: 'tpl-50',
+    });
+
+    // Selecting template #51 starts it
+    fireEvent.click(screen.getByText('Template 51 Beyond Cap'));
+    expect(onSelectRoutine).toHaveBeenCalledWith('Template 51 Beyond Cap', expect.objectContaining({ id: 'tpl-51' }));
   });
 });

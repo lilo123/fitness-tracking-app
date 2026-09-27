@@ -51,6 +51,7 @@ describe('WorkoutEngine', () => {
     sessionStorage.clear();
     restTimerStore.resetForTesting();
     workoutSessionStore.resetForTesting();
+    delete (supabase as any).rpc;
     localStorage.setItem(
       'cybergym_user',
       JSON.stringify({
@@ -1223,10 +1224,34 @@ describe('WorkoutEngine', () => {
     const { unmount } = renderComponent();
     await selectWorkoutA();
 
-    // Select and add an exercise
-    const addSelect = screen.getByTestId('add-exercise-select');
-    fireEvent.change(addSelect, { target: { value: 'Lat Pull Down' } });
+    // Select and add an exercise via ExercisePicker
+    (supabase as any).rpc = vi.fn().mockImplementation((fn: string) => {
+      if (fn === "get_exercise_catalog") {
+        return Promise.resolve({
+          data: [
+            {
+              id: "ex-lat-pull",
+              name: "Lat Pull Down",
+              body_part: "Back",
+              equipment: "cable",
+              is_custom: false,
+              created_by: null,
+              usage_count: 5,
+              last_used_at: "2026-09-01T12:00:00Z",
+              is_hidden: false,
+            },
+          ],
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: [], error: null });
+    });
     fireEvent.click(screen.getByTestId('add-exercise-btn'));
+    await waitFor(() => {
+      expect(screen.getByTestId('exercise-picker-sheet')).toBeDefined();
+    });
+    fireEvent.click(await screen.findByText('Lat Pull Down'));
+    fireEvent.click(screen.getByTestId('picker-confirm-add-btn'));
 
     await waitFor(() => {
       expect(screen.getByText('Lat Pull Down')).toBeDefined();
@@ -1247,9 +1272,34 @@ describe('WorkoutEngine', () => {
     renderComponent();
     await selectWorkoutA();
 
-    const addSelect = screen.getByTestId('add-exercise-select');
-    fireEvent.change(addSelect, { target: { value: 'Lat Pull Down' } });
+    // Select and add an exercise via ExercisePicker
+    (supabase as any).rpc = vi.fn().mockImplementation((fn: string) => {
+      if (fn === "get_exercise_catalog") {
+        return Promise.resolve({
+          data: [
+            {
+              id: "ex-lat-pull",
+              name: "Lat Pull Down",
+              body_part: "Back",
+              equipment: "cable",
+              is_custom: false,
+              created_by: null,
+              usage_count: 5,
+              last_used_at: "2026-09-01T12:00:00Z",
+              is_hidden: false,
+            },
+          ],
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: [], error: null });
+    });
     fireEvent.click(screen.getByTestId('add-exercise-btn'));
+    await waitFor(() => {
+      expect(screen.getByTestId('exercise-picker-sheet')).toBeDefined();
+    });
+    fireEvent.click(await screen.findByText('Lat Pull Down'));
+    fireEvent.click(screen.getByTestId('picker-confirm-add-btn'));
 
     await waitFor(() => {
       expect(screen.getByText('Lat Pull Down')).toBeDefined();
@@ -1311,9 +1361,33 @@ describe('WorkoutEngine', () => {
     await selectWorkoutA();
 
     // Add another exercise so we have multiple
-    const addSelect = screen.getByTestId('add-exercise-select');
-    fireEvent.change(addSelect, { target: { value: 'Lat Pull Down' } });
+    (supabase as any).rpc = vi.fn().mockImplementation((fn: string) => {
+      if (fn === "get_exercise_catalog") {
+        return Promise.resolve({
+          data: [
+            {
+              id: "ex-lat-pull",
+              name: "Lat Pull Down",
+              body_part: "Back",
+              equipment: "cable",
+              is_custom: false,
+              created_by: null,
+              usage_count: 5,
+              last_used_at: "2026-09-01T12:00:00Z",
+              is_hidden: false,
+            },
+          ],
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: [], error: null });
+    });
     fireEvent.click(screen.getByTestId('add-exercise-btn'));
+    await waitFor(() => {
+      expect(screen.getByTestId('exercise-picker-sheet')).toBeDefined();
+    });
+    fireEvent.click(await screen.findByText('Lat Pull Down'));
+    fireEvent.click(screen.getByTestId('picker-confirm-add-btn'));
 
     await waitFor(() => {
       expect(screen.getByText('Lat Pull Down')).toBeDefined();

@@ -124,6 +124,13 @@ export const queryKeys = {
       limit?: number;
       cursor?: string;
     }) => ['exercise_catalog', params] as const,
+    infinite: (params?: {
+      search?: string;
+      scope?: string;
+      equipment?: string;
+      includeHidden?: boolean;
+      limit?: number;
+    }) => ['exercise_catalog', 'infinite', params] as const,
   },
 
   // planned: P4 (Hidden default exercises per user/coach)

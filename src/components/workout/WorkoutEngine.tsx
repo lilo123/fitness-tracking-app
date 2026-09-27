@@ -30,6 +30,8 @@ import { useWorkoutFinishReview } from './useWorkoutFinishReview';
 import { FinishReviewSheet } from './FinishReviewSheet';
 import { RemoveExerciseSheet } from './RemoveExerciseSheet';
 import { WorkoutEmptyState } from './WorkoutEmptyState';
+import { ExercisePicker } from '../exercises/ExercisePicker';
+import type { CatalogExercise } from '../../lib/exercises';
 
 export const WorkoutEngine: React.FC = () => {
   const { user, profile } = useAuth();
@@ -43,7 +45,7 @@ export const WorkoutEngine: React.FC = () => {
   const autoRestTimer = profile?.auto_rest_timer ?? (localStorage.getItem('cybergym_auto_rest_timer') !== 'false');
 
   const [showRoutineModal, setShowRoutineModal] = useState(false);
-  const [selectedExerciseToAdd, setSelectedExerciseToAdd] = useState('');
+  const [isExercisePickerOpen, setIsExercisePickerOpen] = useState(false);
   const [mutationError, setMutationError] = useState<string | null>(null);
 
   // Dialog States
@@ -86,7 +88,7 @@ export const WorkoutEngine: React.FC = () => {
     toggleAllAccordions,
     handleSelectRoutine: selectRoutineInternal,
     handleReloadScheduledRoutine: reloadScheduledRoutineInternal,
-    handleAddExercise: addExerciseInternal,
+    addExercises: addExercisesInternal,
     moveExercise,
     removeExercise: removeExerciseDirectly,
     restoreExercise,
@@ -261,16 +263,14 @@ export const WorkoutEngine: React.FC = () => {
         ).length >= (targetSetCounts[exName] || 3)
     );
 
-  const addSelectRef = useRef<HTMLSelectElement>(null);
-  const handleFocusAddExercise = useCallback(() => {
-    addSelectRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    addSelectRef.current?.focus();
+  const handleOpenExercisePicker = useCallback(() => {
+    setIsExercisePickerOpen(true);
   }, []);
 
   const handleLogActivityAnyway = useCallback(() => {
     selectRoutineInternal('Free Workout');
-    handleFocusAddExercise();
-  }, [selectRoutineInternal, handleFocusAddExercise]);
+    setIsExercisePickerOpen(true);
+  }, [selectRoutineInternal]);
 
   const handleReloadScheduledRoutine = useCallback(() => {
     setShowRoutineModal(false);
@@ -286,11 +286,27 @@ export const WorkoutEngine: React.FC = () => {
     }
   }, [isScheduledRoutineDirty, handleReloadScheduledRoutine]);
 
-  const handleAddExercise = useCallback(() => {
-    if (!selectedExerciseToAdd) return;
-    addExerciseInternal(selectedExerciseToAdd);
-    setSelectedExerciseToAdd('');
-  }, [selectedExerciseToAdd, addExerciseInternal]);
+  const handleAddExercisesFromPicker = useCallback(
+    (chosen: CatalogExercise[]) => {
+      if (!chosen || chosen.length === 0) return;
+      addExercisesInternal(chosen);
+      setIsExercisePickerOpen(false);
+      const firstAddedName = chosen[0]?.name;
+      if (firstAddedName) {
+        requestAnimationFrame(() => {
+          const card =
+            document.querySelector(`[data-card-for-exercise="${firstAddedName}"]`) ||
+            document.querySelector(`[data-testid="exercise-card-${firstAddedName}"]`);
+          if (card) {
+            card?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+            const focusable = card.querySelector<HTMLElement>('input, button');
+            focusable?.focus();
+          }
+        });
+      }
+    },
+    [addExercisesInternal]
+  );
 
   const allExpanded =
     activeExercises.length > 0 && activeExercises.every((e) => expandedExercises.has(e));
@@ -385,7 +401,7 @@ export const WorkoutEngine: React.FC = () => {
           {activeExercises.length === 0 ? (
             <WorkoutEmptyState
               onOpenRoutineModal={() => setShowRoutineModal(true)}
-              onAddExerciseClick={handleFocusAddExercise}
+              onAddExerciseClick={handleOpenExercisePicker}
             />
           ) : !logsFetched ? (
             <Skeleton
@@ -407,8 +423,8 @@ export const WorkoutEngine: React.FC = () => {
                 const ghostValues = computeGhostSets(exName, targetCount, userLogs, workoutDate);
 
                 return (
-                  <ExerciseCard
-                    key={exName}
+                  <div key={exName} data-card-for-exercise={exName}>
+                    <ExerciseCard
                     exName={exName}
                     exIndex={exIndex}
                     activeExercisesLength={activeExercises.length}
@@ -430,40 +446,22 @@ export const WorkoutEngine: React.FC = () => {
                     onEditSet={handleEditSet}
                     onBatchLogExercise={handleBatchLogExercise}
                   />
+                  </div>
                 );
               })}
             </div>
           )}
 
-          <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-4 shadow-xl overflow-hidden">
-            <div className="text-xs font-extrabold uppercase tracking-widest text-zinc-400 mb-2.5 flex items-center gap-1.5">
-              <Plus className="w-4 h-4 text-cyan-400" /> Add Exercise
-            </div>
-            <div className="flex items-center gap-2">
-              <select
-                ref={addSelectRef}
-                value={selectedExerciseToAdd}
-                onChange={(e) => setSelectedExerciseToAdd(e.target.value)}
-                className="flex-1 min-w-0 bg-zinc-950 border border-border-interactive text-white rounded-xl px-3 py-2 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none truncate"
-                data-testid="add-exercise-select"
-              >
-                <option value="">-- Choose Exercise --</option>
-                {exercises.map((ex) => (
-                  <option key={ex.id} value={ex.name}>
-                    {ex.name} {ex.body_part ? `(${ex.body_part})` : ''}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={handleAddExercise}
-                disabled={!selectedExerciseToAdd}
-                className="shrink-0 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold px-4 py-2 min-h-[44px] rounded-xl text-xs uppercase tracking-wider shadow-[0_0_12px_rgba(6,182,212,0.3)] transition-all active:scale-95 disabled:opacity-50"
-                data-testid="add-exercise-btn"
-              >
-                Add
-              </button>
-            </div>
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={handleOpenExercisePicker}
+              className="w-full py-3.5 px-4 rounded-2xl font-bold text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 shadow-xl min-h-[44px] bg-zinc-900/90 hover:bg-zinc-800/90 border border-zinc-800/80 hover:border-cyan-500/50 text-white active:scale-95"
+              data-testid="add-exercise-btn"
+            >
+              <Plus className="w-4 h-4 text-cyan-400" />
+              <span>Add Exercise</span>
+            </button>
           </div>
 
           {activeExercises.length > 0 && (
@@ -579,6 +577,16 @@ export const WorkoutEngine: React.FC = () => {
           stackIndex={0}
         />
       )}
+
+      {/* Exercise Picker Sheet (P4-W2) */}
+      <ExercisePicker
+        isOpen={isExercisePickerOpen}
+        onClose={() => setIsExercisePickerOpen(false)}
+        onAdd={handleAddExercisesFromPicker}
+        activeExerciseNames={activeExercises}
+        targetUserId={targetUserId}
+        userLogs={userLogs}
+      />
     </div>
   );
 };

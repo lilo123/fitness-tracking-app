@@ -16,6 +16,7 @@ import {
 } from './workoutEngineHelpers';
 import { fetchTemplateDetail } from './useWorkoutQueries';
 import { cleanSessionUUIDs, findMatchingTemplate, extractTemplateDetails } from './useWorkoutSessionHelpers';
+import { useWorkoutAccordion } from './useWorkoutAccordion';
 
 export interface UseWorkoutSessionOptions {
   targetUserId: string;
@@ -209,43 +210,19 @@ export function useWorkoutSession({
     }
   }, [workoutDate, targetUserId, templatesFetched, logsFetched, exercisesFetched, customTemplates, todaySets, exercises, getSetsForExerciseToday]);
 
-  const toggleAccordion = useCallback((exName: string) => {
-    setExpandedExercises((prev) => {
-      const next = new Set(prev);
-      if (next.has(exName)) next.delete(exName);
-      else next.add(exName);
-      workoutSessionStore.setExpandedExercises(targetUserId, workoutDate, Array.from(next));
-      return next;
-    });
-  }, [targetUserId, workoutDate]);
-
-  const collapseExercise = useCallback((exName: string) => {
-    setExpandedExercises((prev) => {
-      const next = new Set(prev);
-      next.delete(exName);
-      workoutSessionStore.setExpandedExercises(targetUserId, workoutDate, Array.from(next));
-      return next;
-    });
-  }, [targetUserId, workoutDate]);
-
-  const collapseCompleted = () => {
-    const next = new Set<string>();
-    activeExercises.forEach((exName) => {
-      const logged = getSetsForExerciseToday(exName);
-      const target = targetSetCounts[exName] || 3;
-      if (logged.length < target) {
-        next.add(exName);
-      }
-    });
-    workoutSessionStore.setExpandedExercises(targetUserId, workoutDate, Array.from(next));
-    setExpandedExercises(next);
-  };
-
-  const toggleAllAccordions = (expand: boolean) => {
-    const next = expand ? new Set(activeExercises) : new Set<string>();
-    workoutSessionStore.setExpandedExercises(targetUserId, workoutDate, Array.from(next));
-    setExpandedExercises(next);
-  };
+  const {
+    toggleAccordion,
+    collapseExercise,
+    collapseCompleted,
+    toggleAllAccordions,
+  } = useWorkoutAccordion({
+    targetUserId,
+    workoutDate,
+    activeExercises,
+    targetSetCounts,
+    getSetsForExerciseToday,
+    setExpandedExercises,
+  });
 
   const handleSelectRoutine = async (routineName: string, selectedTemplate?: RoutineTemplate) => {
     manualSelectionDateRef.current = workoutDate;
@@ -372,18 +349,51 @@ export function useWorkoutSession({
     return session;
   }, [targetUserId, workoutDate, activeRoutineName, activeExercises, targetSetCounts, targetRepCounts]);
 
-  const handleAddExercise = (exerciseToAdd: string) => {
-    if (!exerciseToAdd) return;
-    ensureSession();
-    setActiveExercises((prev) => {
-      if (prev.includes(exerciseToAdd)) return prev;
-      const next = [...prev, exerciseToAdd];
-      workoutSessionStore.addExercise(targetUserId, workoutDate, exerciseToAdd, 3);
-      return next;
-    });
-    setTargetSetCounts((prev) => ({ ...prev, [exerciseToAdd]: 3 }));
-    setExpandedExercises((prev) => new Set(prev).add(exerciseToAdd));
-  };
+  const addExercises = useCallback(
+    (exercisesToAdd: Array<string | { name: string }>) => {
+      if (!exercisesToAdd || exercisesToAdd.length === 0) return;
+      ensureSession();
+
+      const names = exercisesToAdd
+        .map((e) => (typeof e === 'string' ? e.trim() : e.name?.trim()))
+        .filter((n): n is string => Boolean(n));
+
+      if (names.length === 0) return;
+
+      setActiveExercises((prev) => {
+        const newNames = names.filter((name) => !prev.includes(name));
+        if (newNames.length === 0) return prev;
+        const next = [...prev, ...newNames];
+        newNames.forEach((name) => {
+          workoutSessionStore.addExercise(targetUserId, workoutDate, name, 3);
+        });
+        return next;
+      });
+
+      setTargetSetCounts((prev) => {
+        const next = { ...prev };
+        names.forEach((name) => {
+          if (!next[name]) next[name] = 3;
+        });
+        return next;
+      });
+
+      setExpandedExercises((prev) => {
+        const next = new Set(prev);
+        names.forEach((name) => next.add(name));
+        return next;
+      });
+    },
+    [ensureSession, targetUserId, workoutDate]
+  );
+
+  const handleAddExercise = useCallback(
+    (exerciseToAdd: string) => {
+      if (!exerciseToAdd) return;
+      addExercises([exerciseToAdd]);
+    },
+    [addExercises]
+  );
 
   const moveExercise = useCallback((index: number, direction: number) => {
     ensureSession();
@@ -573,6 +583,7 @@ export function useWorkoutSession({
     handleSelectRoutine,
     handleReloadScheduledRoutine,
     handleAddExercise,
+    addExercises,
     moveExercise,
     removeExercise,
     adjustTargetSets,

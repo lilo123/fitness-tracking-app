@@ -207,4 +207,53 @@ describe('useWorkoutSession (W5, W24, W39, W46)', () => {
     expect(result.current.targetSetCounts['Bench Press']).toBe(4);
     expect(result.current.isScheduledRoutineDirty).toBe(true);
   });
+  it('P4 W2: addExercises batch adds multiple exercises preserving order', () => {
+    const { result } = renderHook(() => useWorkoutSession(defaultProps));
+
+    act(() => {
+      result.current.addExercises([
+        'Barbell Bench Press',
+        'Overhead Press',
+      ]);
+    });
+
+    expect(result.current.activeExercises).toContain('Barbell Bench Press');
+    expect(result.current.activeExercises).toContain('Overhead Press');
+
+    const benchIdx = result.current.activeExercises.indexOf('Barbell Bench Press');
+    const ohpIdx = result.current.activeExercises.indexOf('Overhead Press');
+    expect(ohpIdx).toBeGreaterThan(benchIdx);
+
+    expect(result.current.targetSetCounts['Barbell Bench Press']).toBe(3);
+    expect(result.current.targetSetCounts['Overhead Press']).toBe(3);
+    expect(result.current.expandedExercises.has('Barbell Bench Press')).toBe(true);
+    expect(result.current.expandedExercises.has('Overhead Press')).toBe(true);
+
+    // Batch adding with exercise objects
+    act(() => {
+      result.current.addExercises([
+        { name: 'Zercher Squat' },
+        { name: 'Romanian Deadlift' },
+      ]);
+    });
+
+    expect(result.current.activeExercises).toContain('Zercher Squat');
+    expect(result.current.activeExercises).toContain('Romanian Deadlift');
+  });
+
+  it('P4 W2: addExercises ignores already added exercises', () => {
+    const { result } = renderHook(() => useWorkoutSession(defaultProps));
+
+    act(() => {
+      result.current.addExercises(['Bench Press']);
+    });
+
+    const initialLen = result.current.activeExercises.length;
+
+    act(() => {
+      result.current.addExercises(['Bench Press']);
+    });
+
+    expect(result.current.activeExercises.length).toBe(initialLen);
+  });
 });
