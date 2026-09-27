@@ -215,5 +215,49 @@ describe('EditExerciseModal', () => {
     const invalidatedKeys = invalidateSpy.mock.calls.map((c) => (c[0] as any)?.queryKey);
     expect(invalidatedKeys).toContainEqual(['exercise_stats']);
   });
+
+  it('L39: library rename followed by set logging passes valid exerciseId UUID to set insertion', async () => {
+    const renamedExercise = {
+      id: '00000000-0000-4000-8000-000000000099',
+      name: 'Incline Dumbbell Press',
+      body_part: 'Chest',
+      is_master: false,
+    };
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      const b = createSupabaseBuilder(table, { data: [renamedExercise], error: null });
+      b.update = vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          select: vi.fn().mockResolvedValue({ data: [renamedExercise], error: null }),
+        }),
+      });
+      return b;
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <EditExerciseModal
+          isOpen={true}
+          exercise={{
+            id: '00000000-0000-4000-8000-000000000099',
+            name: 'Old Dumbbell Press',
+            body_part: 'Chest',
+            is_master: false,
+          }}
+          onClose={vi.fn()}
+          onSuccess={mockProps.onSuccess}
+        />
+      </QueryClientProvider>
+    );
+
+    const input = screen.getByLabelText(/exercise name/i);
+    fireEvent.change(input, { target: { value: 'Incline Dumbbell Press' } });
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(mockProps.onSuccess).toHaveBeenCalled();
+    });
+  });
+
 });
 

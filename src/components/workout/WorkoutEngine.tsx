@@ -17,6 +17,7 @@ import { RoutinePickerModal } from './RoutinePickerModal';
 import { RestDayView } from './RestDayView';
 import { ExerciseCard } from './ExerciseCard';
 import { StatusBanner } from '../common/StatusBanner';
+import { isUUID } from './workoutEngineHelpers';
 
 
 export const WorkoutEngine: React.FC = () => {
@@ -91,6 +92,22 @@ export const WorkoutEngine: React.FC = () => {
     logsFetched,
   });
 
+  const handleDraftSuccess = useCallback(
+    (variables: { exerciseName?: string; exerciseId?: string; setIndex: number }) => {
+      setInputDrafts((prev) => {
+        const next = { ...prev };
+        if (variables.exerciseName) {
+          delete next[`${variables.exerciseName}_${variables.setIndex}`];
+        }
+        if (variables.exerciseId) {
+          delete next[`${variables.exerciseId}_${variables.setIndex}`];
+        }
+        return next;
+      });
+    },
+    [setInputDrafts]
+  );
+
   // 4. Set Mutations
   const { logSetMutation, batchLogSetsMutation, deleteSetMutation } = useWorkoutMutations({
     targetUserId,
@@ -99,6 +116,7 @@ export const WorkoutEngine: React.FC = () => {
     exercises,
     autoRestTimer,
     setMutationError,
+    onDraftSuccess: handleDraftSuccess,
   });
 
   const handleSelectRoutine = (routineName: string, template?: RoutineTemplate) => {
@@ -148,20 +166,19 @@ export const WorkoutEngine: React.FC = () => {
       return;
     }
 
+    const matchedEx = exercises.find(
+      (e) => e.name.toLowerCase() === exName.toLowerCase() || e.id === exName
+    );
+    const exerciseId = matchedEx ? matchedEx.id : isUUID(exName) ? exName : undefined;
+
     logSetMutation.mutate({
       exerciseName: exName,
+      exerciseId,
       weight: weightVal,
       reps: repsVal,
       setIndex,
     });
-
-    setInputDrafts((prev) => {
-      const next = { ...prev };
-      delete next[draftKey];
-      return next;
-    });
-    workoutSessionStore.clearDraft(targetUserId, workoutDate, exName, setIndex);
-  }, [inputDrafts, logSetMutation, setInputDrafts, targetUserId, workoutDate]);
+  }, [exercises, inputDrafts, logSetMutation]);
 
   const handleBatchLogExercise = useCallback((
     exName: string,
@@ -205,19 +222,14 @@ export const WorkoutEngine: React.FC = () => {
     }
 
     if (unloggedSets.length > 0) {
-      batchLogSetsMutation.mutate(unloggedSets);
-      setInputDrafts((prev) => {
-        const next = { ...prev };
-        unloggedSets.forEach((s) => {
-          delete next[`${s.exerciseName}_${s.setIndex}`];
-        });
-        return next;
-      });
-      unloggedSets.forEach((s) => {
-        workoutSessionStore.clearDraft(targetUserId, workoutDate, s.exerciseName, s.setIndex);
-      });
+      const matchedEx = exercises.find(
+        (e) => e.name.toLowerCase() === exName.toLowerCase() || e.id === exName
+      );
+      const exerciseId = matchedEx ? matchedEx.id : isUUID(exName) ? exName : undefined;
+      const setsWithId = unloggedSets.map((s) => ({ ...s, exerciseId }));
+      batchLogSetsMutation.mutate(setsWithId);
     }
-  }, [batchLogSetsMutation, inputDrafts, setInputDrafts, targetRepCounts, targetUserId, workoutDate]);
+  }, [batchLogSetsMutation, exercises, inputDrafts, targetRepCounts]);
 
   const handleFinishWorkout = () => {
     const allPendingSets: {
@@ -262,17 +274,14 @@ export const WorkoutEngine: React.FC = () => {
     }
 
     if (allPendingSets.length > 0) {
-      batchLogSetsMutation.mutate(allPendingSets);
-      setInputDrafts((prev) => {
-        const next = { ...prev };
-        allPendingSets.forEach((s) => {
-          delete next[`${s.exerciseName}_${s.setIndex}`];
-        });
-        return next;
+      const setsWithId = allPendingSets.map((s) => {
+        const matchedEx = exercises.find(
+          (e) => e.name.toLowerCase() === s.exerciseName.toLowerCase() || e.id === s.exerciseName
+        );
+        const exerciseId = matchedEx ? matchedEx.id : isUUID(s.exerciseName) ? s.exerciseName : undefined;
+        return { ...s, exerciseId };
       });
-      allPendingSets.forEach((s) => {
-        workoutSessionStore.clearDraft(targetUserId, workoutDate, s.exerciseName, s.setIndex);
-      });
+      batchLogSetsMutation.mutate(setsWithId);
     }
   };
 

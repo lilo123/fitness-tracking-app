@@ -8,6 +8,7 @@ import {
   DEFAULT_WORKOUT_TEMPLATES,
   getDayOfWeekAbbr,
   mergeBenchmarks,
+  getLocalDateStr,
 } from '../../utils/ghostSets';
 import { formatSet } from '../../utils/weight';
 import type { ExerciseBenchmarks } from '../../types/database';
@@ -169,7 +170,7 @@ export function useWorkoutQueries(targetUserId: string, workoutDate: string) {
       if (!targetUserId || !isValidUUID(targetUserId)) return [];
 
       // Query 1: Today's workout session and sets
-      const targetDate = workoutDate || new Date().toISOString().split('T')[0];
+      const targetDate = workoutDate || getLocalDateStr(new Date());
       const startOfDay = `${targetDate}T00:00:00.000Z`;
       const endOfDay = `${targetDate}T23:59:59.999Z`;
 

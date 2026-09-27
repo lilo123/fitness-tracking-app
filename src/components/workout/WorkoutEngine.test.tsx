@@ -3142,6 +3142,53 @@ describe('WorkoutEngine', () => {
     });
   });
 });
+
+  it('W4: retains uncommitted draft in input field and session store when set insertion fails and surfaces error banner', async () => {
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'sets') {
+        const b = createSupabaseBuilder('sets', { data: [], error: null });
+        b.insert = vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({ data: null, error: new Error('Database insert failed: connection refused') }),
+          }),
+        });
+        return b;
+      }
+      if (table === 'workouts') {
+        return createSupabaseBuilder('workouts', { data: [{ id: 'workout-w4' }], error: null });
+      }
+      return createSupabaseBuilder(table, { data: [], error: null });
+    });
+
+    renderComponent();
+    await selectWorkoutA();
+
+    // Type drafts for Bench Press row 0
+    const weightInput = screen.getByTestId('ghost-weight-0-0') as HTMLInputElement;
+    const repsInput = screen.getByTestId('ghost-reps-0-0') as HTMLInputElement;
+    await userEvent.clear(weightInput);
+    await userEvent.type(weightInput, '225');
+    await userEvent.clear(repsInput);
+    await userEvent.type(repsInput, '5');
+
+    const logBtn = screen.getByTestId('commit-set-btn-0-0');
+    fireEvent.click(logBtn);
+
+    // Wait for error banner
+    await waitFor(() => {
+      expect(screen.getAllByText(/Database insert failed: connection refused/i).length).toBeGreaterThanOrEqual(1);
+    });
+
+    // Verify uncommitted draft values were NOT wiped
+    expect(weightInput.value).toBe('225');
+    expect(repsInput.value).toBe('5');
+    workoutSessionStore.flushPendingWrites();
+    const session = workoutSessionStore.getSession('00000000-0000-4000-8000-000000000001', '2026-09-06');
+    const stored = session?.inputDrafts['Incline Bench Press_1'];
+    expect(stored?.weight).toBe('225');
+    expect(stored?.reps).toBe('5');
+  });
+
 });
 
 
