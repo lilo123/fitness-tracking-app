@@ -232,6 +232,55 @@ test.describe('P3a Set Edit and Delete Workflows (p3a-set-edit)', () => {
   test('(2c) Nutrition toast: log a quick item and assert toast outerHTML equals the one captured at base 62bd8a5', async ({
     page,
   }) => {
+    // Provide a deterministic quick-log favorite so the test is self-sufficient on fresh seed DBs
+    // (supabase/seed.sql lines 492-508 seed custom dishes only for bench-athlete, 0 for athlete@cybergym.io).
+    const favoriteDish = {
+      id: 'dish-poached-chicken-fav',
+      user_id: 'a0000000-0000-0000-0000-000000000002',
+      name: 'Poached Chicken Slices',
+      calories: 132,
+      protein: 27,
+      carbs: 0,
+      fat: 2,
+      fiber: 0,
+      created_at: new Date().toISOString(),
+      kind: 'dish',
+      use_count: 5,
+      notes: null,
+    };
+
+    await page.route('**/rest/v1/custom_dishes*', async (route) => {
+      if (route.request().method() === 'OPTIONS') {
+        await route.fulfill({
+          status: 200,
+          headers: {
+            'access-control-allow-origin': '*',
+            'access-control-allow-headers': 'authorization, x-client-info, apikey, content-type',
+            'access-control-allow-methods': 'GET, POST, PATCH, OPTIONS',
+          },
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: {
+          'access-control-allow-origin': '*',
+          'content-range': '0-0/1',
+        },
+        body: JSON.stringify([favoriteDish]),
+      });
+    });
+
+    await page.route('**/rest/v1/rpc/increment_dish_use_count*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: { 'access-control-allow-origin': '*' },
+        body: JSON.stringify({}),
+      });
+    });
+
     await page.goto('/login');
     await page.fill('input[type="email"]', 'athlete@cybergym.io');
     await page.fill('input[type="password"]', 'password123');
@@ -259,6 +308,7 @@ test.describe('P3a Set Edit and Delete Workflows (p3a-set-edit)', () => {
     const undoBtn = toast.locator('[data-testid="toast-undo-btn"]');
     if (await undoBtn.isVisible()) {
       await undoBtn.click();
+      await expect(toast).not.toBeVisible();
     }
   });
 });
