@@ -176,7 +176,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
           <span data-testid={`exercise-index-${exIndex}`} className="w-6 h-6 rounded-lg bg-zinc-800 border border-zinc-700/80 flex items-center justify-center font-bold text-cyan-400 text-xs shrink-0 tabular-nums">
             {exIndex + 1}
           </span>
-          <span className="text-white font-bold text-sm tracking-tight leading-snug break-words">
+          <span data-testid="exercise-title" className="text-white font-bold text-sm tracking-tight leading-snug break-words">
             {exName}
           </span>
         </div>

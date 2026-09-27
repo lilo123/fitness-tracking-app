@@ -2840,7 +2840,7 @@ describe('WorkoutEngine', () => {
         // The exercise cards must contain ALL SIX exercises in order_index order
         const exerciseCards = await screen.findAllByTestId(/exercise-card-/);
         const renderedExerciseNames = exerciseCards.map((card) => {
-          const nameSpan = card.querySelector('span.font-extrabold');
+          const nameSpan = card.querySelector('[data-testid="exercise-title"]');
           return nameSpan?.textContent?.trim();
         });
 
