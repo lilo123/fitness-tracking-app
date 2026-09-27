@@ -175,11 +175,19 @@ describe('React Query Key Registry (src/lib/queryKeys.ts)', () => {
         'all',
       ]);
       // src/components/history/useWorkoutHistory.ts (history_v2)
-      expect(queryKeys.workoutSets.historyV2(targetUserId, '30d')).toEqual([
+      expect(queryKeys.workoutSets.historyV2(targetUserId, '30d', '2026-08-28')).toEqual([
         'workout_sets',
         'target-user-wo',
         'history_v2',
         '30d',
+        '2026-08-28',
+      ]);
+      expect(queryKeys.workoutSets.historyV2(targetUserId, 'all')).toEqual([
+        'workout_sets',
+        'target-user-wo',
+        'history_v2',
+        'all',
+        null,
       ]);
     });
 

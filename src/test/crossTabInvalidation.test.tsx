@@ -33,7 +33,7 @@ describe('Cross-Tab Invalidation (H2)', () => {
   it('H2: logging a set triggers invalidateWorkoutDerived and updates History without reload', async () => {
     let sessionCount = 1;
     (supabase.rpc as any).mockImplementation((fn: string) => {
-      if (fn === 'get_history_sessions' || fn === 'get_history_sessions_v2') {
+      if (fn === 'get_history_sessions_v2') {
         return Promise.resolve({
           data: [
             {

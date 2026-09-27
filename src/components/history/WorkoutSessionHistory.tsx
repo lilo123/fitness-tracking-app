@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import type { WorkoutSet, Exercise } from '../../types/database';
-import { formatShortDate } from '../../utils/ghostSets';
+import { formatShortDate, normalizeDateStr } from '../../utils/ghostSets';
 import { groupSessionSetsByExercise } from '../../utils/historyGrouping';
 import { Dumbbell, Edit2, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
 import { FALLBACK_WINDOW, HISTORY_OVERSCAN } from './virtualizationConstants';
@@ -166,8 +166,8 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
   const virtualItems = virtualizer.getVirtualItems();
   const isVirtual = virtualItems.length > 0;
 
-  // H7: 3 Skeleton cards while initial fetch is pending
-  if (isSessionsPending) {
+  // H7: 3 Skeleton cards while initial fetch is pending or not yet settled
+  if (isSessionsPending || (totalCount === null && displayedSessions.length === 0)) {
     return (
       <div data-testid="history-sessions-skeleton" className="space-y-4">
         <Skeleton variant="card" count={3} />
@@ -175,8 +175,8 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
     );
   }
 
-  // H20 & H18: Empty state only when settled and totalCount / displayed is 0
-  if (displayedSessions.length === 0) {
+  // H20 & H18: Empty state only when settled and totalCount === 0
+  if (displayedSessions.length === 0 && totalCount === 0) {
     const isFiltered = timeRange !== 'all';
     return (
       <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-8 text-center space-y-4">
@@ -222,7 +222,7 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
       0;
     const sets = session.sets || [];
 
-    const civilDate = session.civil_date || session.workout_date || (session.date ? String(session.date).split('T')[0] : '');
+    const civilDate = session.civil_date || session.workout_date || (session.date ? normalizeDateStr(session.date) : '');
 
     const overflowItems: OverflowMenuItem[] = [
       {
@@ -489,8 +489,11 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
         isLoading={isDeletingSession}
         onConfirm={async () => {
           if (sessionToDelete && onDeleteSession) {
-            await onDeleteSession(sessionToDelete.id);
-            setSessionToDelete(null);
+            try {
+              await onDeleteSession(sessionToDelete.id);
+            } finally {
+              setSessionToDelete(null);
+            }
           }
         }}
         onCancel={() => setSessionToDelete(null)}

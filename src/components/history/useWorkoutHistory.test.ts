@@ -219,8 +219,8 @@ describe('useWorkoutHistory Data Layer (P5a W2)', () => {
     it('sets hasMore false and prevents third request when page 2 returns fewer than HISTORY_PAGE_SIZE rows (page1 total 60, page 2 returns 29 rows)', async () => {
       // Page 1: 30 rows, reports total_count 60
       const page1 = makePageRows(30, 'w-del-p1', 60, 30);
-      // Page 2: only 29 rows returned (a session deleted mid-pagination), reports freshest total_count 59
-      const page2 = makePageRows(29, 'w-del-p2', 59, 15);
+      // Page 2: only 29 rows (keyset end reached) while the freshest total_count is 61 because newer sessions were inserted above the cursor: only the short-page guard can stop pagination here
+      const page2 = makePageRows(29, 'w-del-p2', 61, 15);
 
       vi.mocked(supabase.rpc).mockImplementation(((fn: string, params: any) => {
         if (fn === 'get_history_sessions_v2') {
@@ -253,8 +253,8 @@ describe('useWorkoutHistory Data Layer (P5a W2)', () => {
         expect(result.current.sessions).toHaveLength(59);
       });
 
-      // totalCount: taken from the LAST fetched page (freshest server count: 59)
-      expect(result.current.totalCount).toBe(59);
+      // totalCount: taken from the LAST fetched page (freshest server count: 61)
+      expect(result.current.totalCount).toBe(61);
       // hasMore is false because page 2 has 29 rows (< HISTORY_PAGE_SIZE = 30)
       expect(result.current.hasMore).toBe(false);
 

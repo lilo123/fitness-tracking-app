@@ -221,8 +221,13 @@ export function setupHistoryMocks(options: SetupHistoryOptions = {}) {
   });
 
   (supabase.rpc as any).mockImplementation((fn: string) => {
-    if (fn === 'get_history_sessions') {
-      return Promise.resolve({ data: sessions, error: null });
+    if (fn === 'get_history_sessions_v2') {
+      const rows = sessions.map((s: any) => ({
+        ...s,
+        civil_date: s.civil_date || (s.date ? String(s.date).split('T')[0] : ''),
+        total_count: sessions.length,
+      }));
+      return Promise.resolve({ data: rows, error: null });
     }
     if (fn === 'get_exercise_stats') {
       return Promise.resolve({ data: stats, error: null });

@@ -2015,7 +2015,7 @@ describe('WorkoutEngine', () => {
 
       // Mock get_history_sessions_v2 RPC for HistoryView
       (supabase as any).rpc = vi.fn().mockImplementation((fn: string) => {
-        if (fn === 'get_history_sessions_v2' || fn === 'get_history_sessions') {
+        if (fn === 'get_history_sessions_v2') {
           return Promise.resolve({
             data: [
               {
@@ -2612,7 +2612,7 @@ describe('WorkoutEngine', () => {
         });
 
         (supabase as any).rpc = vi.fn().mockImplementation((fn: string) => {
-          if (fn === 'get_history_sessions_v2' || fn === 'get_history_sessions') {
+          if (fn === 'get_history_sessions_v2') {
             return Promise.resolve({
               data: [
                 {
@@ -2653,10 +2653,10 @@ describe('WorkoutEngine', () => {
         );
 
         await waitFor(() => {
-          expect(queryClient.getQueryData(['workout_sets', targetUserId, 'history_v2', 'all'])).toBeDefined();
+          expect(queryClient.getQueryData(['workout_sets', targetUserId, 'history_v2', 'all', null])).toBeDefined();
         });
 
-        const allData = queryClient.getQueryData<any>(['workout_sets', targetUserId, 'history_v2', 'all']);
+        const allData = queryClient.getQueryData<any>(['workout_sets', targetUserId, 'history_v2', 'all', null]);
         const ninetyData = queryClient.getQueryData<any[]>(['workout_sets', targetUserId, '90d']);
 
         // Both caches coexist without collision or cross-pollution

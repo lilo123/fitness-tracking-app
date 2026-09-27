@@ -33,9 +33,7 @@ export const HistoryView: React.FC = () => {
   const selectedAthlete = coachCtx?.selectedAthlete || null;
   const queryClient = useQueryClient();
 
-  const [inspectMode, setInspectMode] = useState<'athlete' | 'coach'>(() => {
-    return isCoachMode && selectedAthleteId ? 'athlete' : 'coach';
-  });
+  const [inspectMode, setInspectMode] = useState<'athlete' | 'coach'>('athlete');
   const [historyDomain, setHistoryDomain] = useState<'workouts' | 'nutrition'>('workouts');
   const [viewMode, setViewMode] = useState<'session' | 'exercise'>('session');
   const [searchQuery, setSearchQuery] = useState('');
@@ -101,6 +99,23 @@ export const HistoryView: React.FC = () => {
     nutritionLogsError,
     refetchNutritionLogs,
   } = useHistoryData(targetUserId, setMutationError);
+
+  const handleDeleteSession = React.useCallback(
+    async (workoutId: string) => {
+      try {
+        setMutationError(null);
+        await deleteSession(workoutId);
+      } catch (err) {
+        const msg =
+          err instanceof Error
+            ? err.message
+            : (err as { message?: string })?.message || 'Failed to delete workout session';
+        setMutationError(msg);
+        throw err;
+      }
+    },
+    [deleteSession]
+  );
 
   // Fetch exercises catalog
   const {
@@ -488,7 +503,7 @@ export const HistoryView: React.FC = () => {
             loadingSessionIds={loadingSessionIds}
             sessionErrorIds={sessionErrorIds}
             onRetrySessionSets={loadSetsForSession}
-            onDeleteSession={deleteSession}
+            onDeleteSession={isInspectingAthlete ? undefined : handleDeleteSession}
             isDeletingSession={isDeletingSession}
             onClearFilters={() => setTimeRange('all')}
           />

@@ -55,9 +55,9 @@ vi.mock('../lib/supabase', () => ({
  */
 function setupHistoryMocks(options?: any) {
   baseSetupHistoryMocks(options);
-  const origRpc = (supabase as any).rpc;
+  const origImpl = (supabase.rpc as any).getMockImplementation();
   (supabase.rpc as any).mockImplementation((fn: string, args: any) => {
-    if (fn === 'get_history_sessions_v2' || fn === 'get_history_sessions') {
+    if (fn === 'get_history_sessions_v2') {
       const sessions = options?.sessions || [];
       const rows = sessions.map((s: any) => ({
         ...s,
@@ -66,7 +66,7 @@ function setupHistoryMocks(options?: any) {
       }));
       return Promise.resolve({ data: rows, error: null });
     }
-    return origRpc(fn, args);
+    return origImpl ? origImpl(fn, args) : Promise.resolve({ data: null, error: null });
   });
 }
 

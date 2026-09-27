@@ -133,7 +133,7 @@ describe('HistoryView', () => {
     });
 
     (supabase.rpc as any).mockImplementation(async (fn: string, _args?: any) => {
-      if (fn === 'get_history_sessions' || fn === 'get_history_sessions_v2') {
+      if (fn === 'get_history_sessions_v2') {
         const prevWLen = recordedTables.length;
         const wBuilder = (supabase.from as any)('workouts');
         if (recordedTables.length > prevWLen && recordedTables[recordedTables.length - 1] === 'workouts') {
@@ -1594,7 +1594,7 @@ describe('HistoryView', () => {
   describe('P1-4: History Route Payload Optimization & RPC integration', () => {
     it('1. Zero-set workout produces card without crashing (set_count = 0, total_volume = 0)', async () => {
       (supabase.rpc as any).mockImplementation(async (fn: string) => {
-        if (fn === 'get_history_sessions' || fn === 'get_history_sessions_v2') {
+        if (fn === 'get_history_sessions_v2') {
           return {
             data: [
               {
@@ -1719,7 +1719,7 @@ describe('HistoryView', () => {
 
     it('4. Auto-expand budget guard stops 500-set session from expanding on cold load (HD-1)', async () => {
       (supabase.rpc as any).mockImplementation(async (fn: string) => {
-        if (fn === 'get_history_sessions' || fn === 'get_history_sessions_v2') {
+        if (fn === 'get_history_sessions_v2') {
           return {
             data: [
               {
@@ -1770,7 +1770,7 @@ describe('HistoryView', () => {
       }));
 
       (supabase.rpc as any).mockImplementation(async (fn: string) => {
-        if (fn === 'get_history_sessions' || fn === 'get_history_sessions_v2') {
+        if (fn === 'get_history_sessions_v2') {
           return {
             data: [
               {
@@ -1813,7 +1813,7 @@ describe('HistoryView', () => {
     it('6. Expand fetch is cached under [\'session_sets\', workoutId]', async () => {
       let setsQueryCount = 0;
       (supabase.rpc as any).mockImplementation(async (fn: string) => {
-        if (fn === 'get_history_sessions' || fn === 'get_history_sessions_v2') {
+        if (fn === 'get_history_sessions_v2') {
           return {
             data: [
               {
@@ -1883,7 +1883,7 @@ describe('HistoryView', () => {
     it("7. viewMode === 'session' issues 0 get_exercise_stats calls; switching to 'exercise' issues exactly 1", async () => {
       let exerciseStatsCalls = 0;
       (supabase.rpc as any).mockImplementation((fn: string) => {
-        if (fn === 'get_history_sessions' || fn === 'get_history_sessions_v2') {
+        if (fn === 'get_history_sessions_v2') {
           return {
             data: [
               {
@@ -1945,7 +1945,7 @@ describe('HistoryView', () => {
       }));
 
       (supabase.rpc as any).mockImplementation((fn: string) => {
-        if (fn === 'get_history_sessions' || fn === 'get_history_sessions_v2') {
+        if (fn === 'get_history_sessions_v2') {
           return {
             data: fiftySessions,
             error: null,

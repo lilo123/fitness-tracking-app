@@ -40,6 +40,18 @@ export interface RawExerciseStat {
 
 export const HISTORY_PAGE_SIZE = 30;
 
+interface SessionSetRow {
+  id: string;
+  workout_id: string;
+  exercise_id: string;
+  weight: number | null;
+  reps: number | null;
+  set_index: number | null;
+  created_at: string;
+  rpe: number | null;
+  set_type: string | null;
+}
+
 export async function fetchSessionSets(workoutId: string): Promise<HistorySet[]> {
   // detail-fetch — user expands a session card
   const { data, error } = await supabase
@@ -58,16 +70,20 @@ export async function fetchSessionSets(workoutId: string): Promise<HistorySet[]>
     );
   }
 
-  return (data as any[])
+  return ((data || []) as unknown as SessionSetRow[])
     .filter((s) => !s.set_type || s.set_type === 'working')
-    .map((s) => ({
-      ...s,
-      exercise_name: s.exercise_name || s.exercise?.name,
+    .map((s): HistorySet => ({
+      id: s.id,
+      workout_id: s.workout_id,
+      exercise_id: s.exercise_id,
+      weight: Number(s.weight) || 0,
+      reps: Number(s.reps) || 0,
       set_index: s.set_index ?? 0,
-      set_type: s.set_type || 'working',
+      set_type: (s.set_type as WorkoutSet['set_type']) || 'working',
       rpe: s.rpe ?? null,
       workout_date: '',
       workout_name: '',
+      created_at: s.created_at,
     }));
 }
 
@@ -114,13 +130,39 @@ export interface FetchExerciseHistoryOptions {
   limit?: number;
 }
 
+type RpcCaller = (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+
+export interface ExerciseHistoryRow {
+  workout_id: string;
+  civil_date: string;
+  workout_name: string;
+  set_id: string;
+  set_index: number | null;
+  weight: number | null;
+  reps: number | null;
+  rpe: number | null;
+  created_at: string;
+  total_sessions: number | null;
+}
+
+export interface HistorySessionV2Row {
+  id: string;
+  date: string;
+  civil_date?: string;
+  workout_date?: string;
+  name?: string;
+  set_count: number | null;
+  total_volume: number | null;
+  total_count: number | null;
+}
+
 export async function fetchExerciseHistoryPage(
   userId: string,
   exerciseId: string,
   options: FetchExerciseHistoryOptions = {}
 ): Promise<ExerciseHistorySet[]> {
   const { since = null, before = null, limit = 10 } = options;
-  const { data, error }: any = await (supabase as any).rpc('get_exercise_history', {
+  const { data, error } = await (supabase.rpc as unknown as RpcCaller)('get_exercise_history', {
     p_user_id: userId,
     p_exercise_id: exerciseId,
     p_since: since,
@@ -128,9 +170,9 @@ export async function fetchExerciseHistoryPage(
     p_limit: limit,
   });
 
-  if (error) throw error;
+  if (error) throw error as Error;
   if (!data) return [];
-  return ((data || []) as any[]).map((row) => ({
+  return (data as ExerciseHistoryRow[]).map((row) => ({
     workout_id: row.workout_id,
     civil_date: row.civil_date,
     workout_name: row.workout_name,
@@ -188,12 +230,12 @@ export function useWorkoutHistory(
     refetch,
     hasNextPage,
   } = useInfiniteQuery({
-    queryKey: queryKeys.workoutSets.historyV2(targetUserId, range),
+    queryKey: queryKeys.workoutSets.historyV2(targetUserId, range, since),
     enabled: Boolean(targetUserId),
     initialPageParam: null as HistoryCursor | null,
     queryFn: async ({ pageParam }) => {
       if (!targetUserId) return { sessions: [], totalCount: 0 };
-      const { data: rows, error: rpcError }: any = await (supabase as any).rpc('get_history_sessions_v2', {
+      const { data: rows, error: rpcError } = await (supabase.rpc as unknown as RpcCaller)('get_history_sessions_v2', {
         p_user_id: targetUserId,
         p_since: since,
         p_before_date: pageParam?.before_date ?? null,
@@ -201,8 +243,8 @@ export function useWorkoutHistory(
         p_limit: HISTORY_PAGE_SIZE,
       });
 
-      if (rpcError) throw rpcError;
-      const rawRows = (rows || []) as any[];
+      if (rpcError) throw rpcError as Error;
+      const rawRows = (rows || []) as HistorySessionV2Row[];
       const totalCount = rawRows.length > 0 ? Number(rawRows[0].total_count) || 0 : 0;
       const pageSessions: HistorySession[] = rawRows.map((row) => ({
         id: row.id,
