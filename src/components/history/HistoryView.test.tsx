@@ -1,3 +1,5 @@
+import React from 'react';
+import * as workoutHistoryModule from './useWorkoutHistory';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, renderHook, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -307,12 +309,19 @@ describe('HistoryView', () => {
       expect(screen.getByTestId('meal-actions-log-1')).toBeDefined();
     });
 
-    // Click delete meal button
-    openMealAction('log-1', 'delete');
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      // Click delete meal button
+      openMealAction('log-1', 'delete');
 
-    await waitFor(() => {
+      expect(mockDeleteEq).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(6000);
+
       expect(mockDeleteEq).toHaveBeenCalledWith('id', 'log-1');
-    });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('rolls a rescale rejected by a database constraint back to the stored macros', async () => {
@@ -531,7 +540,13 @@ describe('HistoryView', () => {
       expect(screen.getByTestId('meal-actions-log-1')).toBeDefined();
     });
 
-    openMealAction('log-1', 'delete');
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      openMealAction('log-1', 'delete');
+      await vi.advanceTimersByTimeAsync(6000);
+    } finally {
+      vi.useRealTimers();
+    }
 
     await waitFor(() => {
       const banner = screen.getByTestId('history-mutation-error');
@@ -559,7 +574,13 @@ describe('HistoryView', () => {
       expect(screen.getByTestId('meal-actions-log-1')).toBeDefined();
     });
 
-    openMealAction('log-1', 'delete');
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      openMealAction('log-1', 'delete');
+      await vi.advanceTimersByTimeAsync(6000);
+    } finally {
+      vi.useRealTimers();
+    }
 
     await waitFor(() => {
       expect(mutationAlert.textContent).toContain('Database deletion failed');
@@ -2029,6 +2050,235 @@ describe('HistoryView', () => {
     expect(range1y).toBeDefined();
     expect(range1y.className).toContain('min-h-[44px]');
   });
+
+  describe('P5b HistoryView Wiring (D-P5b-2..6)', () => {
+    it('calendar jump loads pages until the date then highlights', async () => {
+      let currentSessions = [
+        {
+          id: 'w-1',
+          date: '2026-09-01',
+          workout_date: '2026-09-01',
+          civil_date: '2026-09-01',
+          name: 'Workout 1',
+          set_count: 3,
+          total_volume: 300,
+        },
+      ];
+      let triggerLoadMore: (() => void) | null = null;
+
+      const spy = vi.spyOn(workoutHistoryModule, 'useWorkoutHistory').mockImplementation(() => {
+        const [, rerender] = React.useState(0);
+        triggerLoadMore = () => {
+          currentSessions = [
+            ...currentSessions,
+            {
+              id: 'w-target',
+              date: '2026-09-20',
+              workout_date: '2026-09-20',
+              civil_date: '2026-09-20',
+              name: 'Target Workout',
+              set_count: 3,
+              total_volume: 300,
+            },
+          ];
+          rerender((n) => n + 1);
+        };
+
+        return {
+          sessions: currentSessions,
+          totalCount: 2,
+          hasMore: currentSessions.length < 2,
+          loadMore: () => {
+            if (triggerLoadMore) triggerLoadMore();
+          },
+          isLoadingMore: false,
+          loadMoreError: null,
+          isSessionsPending: false,
+          isSessionsError: false,
+          sessionsError: null,
+          refetchSessions: vi.fn(),
+          deleteSession: vi.fn(),
+          isDeletingSession: false,
+        } as any;
+      });
+
+      try {
+        (supabase.from as any).mockImplementation((table: string) => {
+          if (table === 'workouts') {
+            return createSupabaseBuilder('workouts', {
+              data: [{ user_id: 'test-athlete-id', workout_date: '2026-09-20' }],
+              error: null,
+            });
+          }
+          if (table === 'nutrition_logs') {
+            return createSupabaseBuilder('nutrition_logs', { data: [], error: null });
+          }
+          return createSupabaseBuilder(table, { data: [], error: null });
+        });
+
+        const { container } = renderComponent();
+
+        await waitFor(() => {
+          expect(screen.getByTestId('open-calendar-btn')).toBeDefined();
+        });
+
+        expect(container.querySelector('[data-civil-date="2026-09-20"]')).toBeNull();
+
+        fireEvent.click(screen.getByTestId('open-calendar-btn'));
+
+        await waitFor(() => {
+          expect(screen.getByTestId('history-calendar-sheet')).toBeDefined();
+        });
+
+        let day20Btn: HTMLButtonElement | null = null;
+        await waitFor(() => {
+          day20Btn = container.querySelector('button[data-date="2026-09-20"]');
+          expect(day20Btn).not.toBeNull();
+          expect(day20Btn?.disabled).toBe(false);
+        });
+
+        fireEvent.click(day20Btn!);
+
+        await waitFor(() => {
+          const targetCard = container.querySelector('[data-civil-date="2026-09-20"]') as HTMLElement;
+          expect(targetCard).not.toBeNull();
+          expect(targetCard.className).toContain('ring-2 ring-cyan-400');
+        });
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('meal delete in History is deferred (0 DELETE before 6 s, Undo -> 0 DELETE, leaving /history flushes 1 DELETE)', async () => {
+      const { unmount } = renderComponent();
+
+      fireEvent.click(screen.getByTestId('history-tab-nutrition'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('meal-actions-log-1')).toBeDefined();
+      });
+
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+      try {
+        openMealAction('log-1', 'delete');
+
+        // 0 DELETE before 6 s
+        expect(mockDeleteEq).not.toHaveBeenCalled();
+
+        // UndoToast is visible
+        const undoBtn = screen.getByTestId('toast-undo-btn');
+        expect(undoBtn).toBeDefined();
+
+        // Click Undo -> 0 DELETE
+        fireEvent.click(undoBtn);
+        expect(mockDeleteEq).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(10000);
+        expect(mockDeleteEq).not.toHaveBeenCalled();
+
+        // Request delete again
+        openMealAction('log-1', 'delete');
+        expect(mockDeleteEq).not.toHaveBeenCalled();
+
+        // Leaving /history (unmount) flushes exactly 1 DELETE
+        unmount();
+        expect(mockDeleteEq).toHaveBeenCalledTimes(1);
+        expect(mockDeleteEq).toHaveBeenCalledWith('id', 'log-1');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('exercise card opens the exercise history sheet', async () => {
+      (supabase.rpc as any).mockImplementation(async (fn: string) => {
+        if (fn === 'get_exercise_stats') {
+          return {
+            data: [
+              {
+                exercise_id: 'ex-bench',
+                set_count: 5,
+                max_weight: 225,
+                pr_reps: 8,
+                pr_date: '2026-09-01',
+                recent_sets: [],
+              },
+            ],
+            error: null,
+          };
+        }
+        return { data: [], error: null };
+      });
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'exercises') {
+          return createSupabaseBuilder('exercises', {
+            data: [{ id: 'ex-bench', name: 'Barbell Bench Press', body_part: 'Chest' }],
+            error: null,
+          });
+        }
+        return createSupabaseBuilder(table, { data: [], error: null });
+      });
+
+      renderComponent();
+
+      const exerciseTab = screen.getByRole('tab', { name: /By Exercise/i });
+      fireEvent.click(exerciseTab);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('exercise-card-ex-bench')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByTestId('exercise-card-ex-bench'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('exercise-history-range-chips')).toBeDefined();
+      });
+    });
+
+    it('By-Session search filters sessions client-side with summary and Clear filters resets', async () => {
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'workouts') {
+          return createSupabaseBuilder('workouts', {
+            data: [
+              { id: 'w1', date: '2026-09-01', name: 'Chest & Back Hypertrophy' },
+              { id: 'w2', date: '2026-09-05', name: 'Leg Day Squats' },
+            ],
+            error: null,
+          });
+        }
+        return createSupabaseBuilder(table, { data: [], error: null });
+      });
+
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByText('Chest & Back Hypertrophy')).toBeDefined();
+        expect(screen.getByText('Leg Day Squats')).toBeDefined();
+      });
+
+      const searchInput = screen.getByTestId('session-search-input');
+      fireEvent.change(searchInput, { target: { value: 'Chest' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Chest & Back Hypertrophy')).toBeDefined();
+        expect(screen.queryByText('Leg Day Squats')).toBeNull();
+        expect(screen.getByTestId('showing-sessions-count').textContent).toContain('Showing 1 matches in 2 loaded sessions');
+      });
+
+      // Filter with no matches shows clear-filters-btn
+      fireEvent.change(searchInput, { target: { value: 'NonExistent' } });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('showing-sessions-count').textContent).toContain('Showing 0 matches in 2 loaded sessions');
+        expect(screen.getByTestId('clear-filters-btn')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByTestId('clear-filters-btn'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Chest & Back Hypertrophy')).toBeDefined();
+        expect(screen.getByText('Leg Day Squats')).toBeDefined();
+      });
+    });
+  });
 });
-
-

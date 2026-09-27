@@ -186,7 +186,7 @@ describe('HistoryView Filters & Range Integration (H13)', () => {
     it('renders 4 date range chips (All, 1Y, 90D, 30D) with touch targets and aria-pressed', () => {
       renderComponent();
 
-      const chipAll = screen.getByRole('button', { name: 'All' });
+      const chipAll = screen.getByTestId('history-range-all');
       const chip1Y = screen.getByRole('button', { name: '1Y' });
       const chip90D = screen.getByRole('button', { name: '90D' });
       const chip30D = screen.getByRole('button', { name: '30D' });
@@ -223,7 +223,7 @@ describe('HistoryView Filters & Range Integration (H13)', () => {
       fireEvent.click(chip30D);
 
       expect(chip30D).toHaveAttribute('aria-pressed', 'true');
-      const chipAll = screen.getByRole('button', { name: 'All' });
+      const chipAll = screen.getByTestId('history-range-all');
       expect(chipAll).toHaveAttribute('aria-pressed', 'false');
 
       // Hook was called with '30d' range
@@ -240,7 +240,7 @@ describe('HistoryView Filters & Range Integration (H13)', () => {
       renderComponent();
 
       // In session view, date chips exist
-      expect(screen.getByRole('button', { name: 'All' })).toBeDefined();
+      expect(screen.getByTestId('history-range-all')).toBeDefined();
       expect(screen.queryByText(/All-time stats/i)).toBeNull();
 
       // Switch to By Exercise
@@ -345,7 +345,7 @@ describe('HistoryView Filters & Range Integration (H13)', () => {
 
       // Clicking Clear filters resets to 'all'
       fireEvent.click(clearBtn);
-      const chipAll = screen.getByRole('button', { name: 'All' });
+      const chipAll = screen.getByTestId('history-range-all');
       expect(chipAll).toHaveAttribute('aria-pressed', 'true');
     });
 
