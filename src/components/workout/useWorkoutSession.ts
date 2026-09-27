@@ -12,6 +12,7 @@ import { workoutSessionStore, type SetDraftInput } from '../../utils/workoutSess
 import {
   isUUID,
   resolveRoutineAndExercises,
+  checkIsScheduledRoutineDirty,
 } from './workoutEngineHelpers';
 import { fetchTemplateDetail } from './useWorkoutQueries';
 import { cleanSessionUUIDs, findMatchingTemplate, extractTemplateDetails } from './useWorkoutSessionHelpers';
@@ -391,13 +392,7 @@ export function useWorkoutSession({
 
   const removeExercise = useCallback((index: number) => {
     const exName = activeExercises[index];
-    const loggedSets = getSetsForExerciseToday(exName);
-    if (loggedSets.length > 0) {
-      const confirmed = window.confirm(
-        `"${exName}" has ${loggedSets.length} logged set(s). Remove from workout? (Logged sets will be preserved in history)`
-      );
-      if (!confirmed) return;
-    }
+    if (!exName) return;
     ensureSession();
     const next = activeExercises.filter((_, i) => i !== index);
     setActiveExercises(next);
@@ -412,7 +407,44 @@ export function useWorkoutSession({
       return copy;
     });
     workoutSessionStore.removeExercise(targetUserId, workoutDate, exName);
-  }, [activeExercises, ensureSession, getSetsForExerciseToday, targetUserId, workoutDate]);
+  }, [activeExercises, ensureSession, targetUserId, workoutDate]);
+
+  const restoreExercise = useCallback((removed: {
+    exerciseName: string;
+    index: number;
+    targetSetCount: number;
+    targetRepCount?: number;
+    drafts: Record<string, SetDraftInput>;
+  }) => {
+    ensureSession();
+    setActiveExercises((prev) => {
+      if (prev.includes(removed.exerciseName)) return prev;
+      const next = [...prev];
+      const insertIdx = Math.min(Math.max(0, removed.index), next.length);
+      next.splice(insertIdx, 0, removed.exerciseName);
+      workoutSessionStore.reorderExercises(targetUserId, workoutDate, next);
+      return next;
+    });
+    setTargetSetCounts((prev) => ({
+      ...prev,
+      [removed.exerciseName]: removed.targetSetCount,
+    }));
+    if (removed.targetRepCount !== undefined) {
+      setTargetRepCounts((prev) => ({
+        ...prev,
+        [removed.exerciseName]: removed.targetRepCount!,
+      }));
+    }
+    setInputDrafts((prev) => {
+      const next = { ...prev, ...removed.drafts };
+      Object.entries(removed.drafts).forEach(([k, d]) => {
+        const idx = k.lastIndexOf('_');
+        const sIdx = idx > 0 ? parseInt(k.slice(idx + 1), 10) : 1;
+        workoutSessionStore.setDraftInput(targetUserId, workoutDate, removed.exerciseName, sIdx, d);
+      });
+      return next;
+    });
+  }, [ensureSession, targetUserId, workoutDate]);
 
   const adjustTargetSets = useCallback((exName: string, delta: number) => {
     const minSets = Math.max(1, getSetsForExerciseToday(exName).length);
@@ -455,17 +487,26 @@ export function useWorkoutSession({
     });
   }, [ensureSession, targetUserId, workoutDate]);
 
-  const handleClearWorkout = () => {
-    if (window.confirm("Clear all exercises from today's workout?")) {
-      setActiveRoutineName('Free Workout');
-      setActiveExercises([]);
-      setTargetSetCounts({});
-      setTargetRepCounts({});
-      setInputDrafts({});
-      manualSelectionDateRef.current = workoutDate;
-      workoutSessionStore.clearWorkout(targetUserId, workoutDate);
-    }
-  };
+  const handleClearWorkout = useCallback(() => {
+    setActiveRoutineName('Free Workout');
+    setActiveExercises([]);
+    setTargetSetCounts({});
+    setTargetRepCounts({});
+    setInputDrafts({});
+    manualSelectionDateRef.current = workoutDate;
+    workoutSessionStore.clearWorkout(targetUserId, workoutDate);
+  }, [targetUserId, workoutDate]);
+
+  const isScheduledRoutineDirty = useMemo(() => {
+    return checkIsScheduledRoutineDirty({
+      workoutDate,
+      activeRoutineName,
+      activeExercises,
+      customTemplates,
+      exercises,
+      inputDrafts,
+    });
+  }, [workoutDate, activeRoutineName, activeExercises, customTemplates, exercises, inputDrafts]);
 
   const isWholeWorkoutCompleted =
     activeExercises.length > 0 &&
@@ -525,6 +566,8 @@ export function useWorkoutSession({
     adjustTargetSets,
     updateDraft,
     handleClearWorkout,
+    restoreExercise,
+    isScheduledRoutineDirty,
     isWholeWorkoutCompleted,
   };
 }

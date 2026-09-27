@@ -43,6 +43,7 @@ describe('WorkoutEngine', () => {
   });
 
   beforeEach(() => {
+    window.history.replaceState(null, '', '/workout');
     vi.clearAllMocks();
     clearMockHistory();
     vi.setSystemTime(new Date('2026-09-06T12:00:00Z'));
@@ -127,7 +128,7 @@ describe('WorkoutEngine', () => {
     await waitFor(() => {
       expect(screen.getByText('Push, Quads, & Core - Reduced')).toBeDefined();
       expect(screen.getByText('Incline Bench Press')).toBeDefined();
-      expect(screen.getByText('Cable Lateral Raises')).toBeDefined();
+      expect(screen.getAllByTestId('exercise-title').map((e) => e.textContent?.trim())).toContain('Cable Lateral Raises');
       expect(screen.getByText('Dips')).toBeDefined();
       expect(screen.getByText('Leg Extension Machine')).toBeDefined();
       expect(screen.getByText('Overhead Tricep Cable Pull')).toBeDefined();
@@ -322,6 +323,9 @@ describe('WorkoutEngine', () => {
     expect(finishBtn).toBeDefined();
 
     fireEvent.click(finishBtn);
+
+    const logReviewedBtn = await screen.findByTestId('log-reviewed-sets-btn');
+    fireEvent.click(logReviewedBtn);
 
     await waitFor(() => {
       expect(mockInsert).toHaveBeenCalled();
@@ -668,7 +672,7 @@ describe('WorkoutEngine', () => {
     // Incline Bench Press was logged, but all remaining exercises in Workout A should still be preserved
     await waitFor(() => {
       expect(screen.getByText('Incline Bench Press')).toBeDefined();
-      expect(screen.getByText('Cable Lateral Raises')).toBeDefined();
+      expect(screen.getAllByTestId('exercise-title').map((e) => e.textContent?.trim())).toContain('Cable Lateral Raises');
       expect(screen.getByText('Dips')).toBeDefined();
       expect(screen.getByText('Leg Extension Machine')).toBeDefined();
     });
@@ -1269,7 +1273,6 @@ describe('WorkoutEngine', () => {
   });
 
   it('persists cleared workout state (Free Workout) across unmount and remount', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     sessionStorage.clear();
     const { unmount } = renderComponent();
     await selectWorkoutA();
@@ -1280,6 +1283,10 @@ describe('WorkoutEngine', () => {
     // Click Clear Workout
     const clearBtn = screen.getByTitle('Clear Workout');
     fireEvent.click(clearBtn);
+
+    const dialog = await screen.findByRole('dialog');
+    const confirmClearBtn = within(dialog).getByRole('button', { name: 'Clear workout' });
+    fireEvent.click(confirmClearBtn);
 
     await waitFor(() => {
       expect(screen.getByText("No exercises in today's workout yet")).toBeDefined();
@@ -1363,14 +1370,14 @@ describe('WorkoutEngine', () => {
       const removeBtn = screen.getByLabelText(/Remove Incline Bench Press from workout/i);
       fireEvent.click(removeBtn);
 
-      expect(screen.queryByText('Incline Bench Press')).toBeNull();
+      expect(screen.queryAllByTestId('exercise-title').map((e) => e.textContent?.trim())).not.toContain('Incline Bench Press');
 
       unmount();
       renderComponent();
 
       await waitFor(() => {
         expect(screen.queryByText('Incline Bench Press')).toBeNull();
-        expect(screen.getByText('Cable Lateral Raises')).toBeDefined();
+        expect(screen.getAllByTestId('exercise-title').map((e) => e.textContent?.trim())).toContain('Cable Lateral Raises');
       });
     });
 
@@ -1415,7 +1422,7 @@ describe('WorkoutEngine', () => {
       const removeDipsBtn = screen.getByLabelText(/Remove Dips from workout/i);
       fireEvent.click(removeDipsBtn);
 
-      expect(screen.queryByText('Dips')).toBeNull();
+      expect(screen.queryAllByTestId('exercise-title').map((e) => e.textContent?.trim())).not.toContain('Dips');
 
       unmount();
       renderComponent();
@@ -1641,7 +1648,7 @@ describe('WorkoutEngine', () => {
       const removeBtn = screen.getByLabelText(/Remove Cable Lateral Raises from workout/i);
       fireEvent.click(removeBtn);
       await waitFor(() => {
-        expect(screen.queryByText('Cable Lateral Raises')).toBeNull();
+        expect(screen.queryAllByTestId('exercise-title').map((e) => e.textContent?.trim())).not.toContain('Cable Lateral Raises');
       });
 
       // Open Routine Modal
@@ -1652,10 +1659,14 @@ describe('WorkoutEngine', () => {
       const reloadBtn = await screen.findByTestId('reload-scheduled-routine-btn');
       fireEvent.click(reloadBtn);
 
+      // Confirm reload dialog (W10)
+      const confirmReloadBtn = await screen.findByRole('button', { name: 'Reload routine' });
+      fireEvent.click(confirmReloadBtn);
+
       // Verify that the virgin scheduled routine was restored (Cable Lateral Raises restored, target sets back to 4, NOT Free Workout)
       await waitFor(() => {
         expect(screen.getByText('Push, Quads, & Core - Reduced')).toBeDefined();
-        expect(screen.getByText('Cable Lateral Raises')).toBeDefined();
+        expect(screen.getAllByTestId('exercise-title').map((e) => e.textContent?.trim())).toContain('Cable Lateral Raises');
         expect(screen.getByText('0/4 Sets')).toBeDefined();
         expect(screen.queryByText('Free Workout')).toBeNull();
       });
@@ -2038,7 +2049,7 @@ describe('WorkoutEngine', () => {
       });
 
       // Tier 2: Synthetic Default List resolved
-      expect(screen.getByText('Cable Lateral Raises')).toBeDefined();
+      expect(screen.getAllByTestId('exercise-title').map((e) => e.textContent?.trim())).toContain('Cable Lateral Raises');
 
       // Tier 3: Today's joined sets resolved
       expect(screen.getByText('Cable Face Pulls')).toBeDefined();

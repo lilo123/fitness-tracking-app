@@ -97,147 +97,161 @@ export const RoutinePickerModal: React.FC<RoutinePickerModalProps> = ({
       className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 max-w-md w-full shadow-2xl space-y-4"
     >
       <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-        <h3 id="routine-picker-modal-title" className="text-base font-black text-white flex items-center gap-2">
-          <Layers className="w-4 h-4 text-cyan-400" /> Select Routine
+        <h3 id="routine-picker-modal-title" className="text-base font-bold text-white flex items-center gap-2">
+          <Layers className="w-4 h-4 text-cyan-400 shrink-0" aria-hidden="true" />
+          <span>Select Routine</span>
         </h3>
         <button
+          type="button"
           onClick={onClose}
           aria-label="Close dialog"
-          className="text-zinc-400 hover:text-white text-xs font-bold p-1 min-h-[44px] min-w-[44px] flex items-center justify-center"
+          className="text-zinc-400 hover:text-white text-xs font-bold p-1 min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer touch-manipulation"
         >
           Close
         </button>
       </div>
 
-        <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
-          <button
-            type="button"
-            onClick={onReloadScheduledRoutine}
-            className="w-full py-2.5 px-3 mb-2 rounded-xl border border-border-interactive bg-zinc-800/80 hover:bg-zinc-700 text-cyan-400 font-bold text-xs flex items-center justify-center gap-1.5 transition"
-            data-testid="reload-scheduled-routine-btn"
-            title="Discard draft and reload scheduled routine"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reload Scheduled Routine</span>
-          </button>
+      <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+        <button
+          type="button"
+          onClick={onReloadScheduledRoutine}
+          className="w-full h-11 min-h-[44px] px-3 mb-2 rounded-xl border border-border-interactive bg-zinc-800/80 hover:bg-zinc-700 text-cyan-400 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer touch-manipulation"
+          data-testid="reload-scheduled-routine-btn"
+          title="Discard draft and reload scheduled routine"
+        >
+          <RotateCcw className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          <span>Reload Scheduled Routine</span>
+        </button>
 
-          <button
-            onClick={() => onSelectRoutine('Free Workout')}
-            className={`w-full text-left p-3.5 rounded-xl border flex items-center justify-between font-black transition ${
-              activeRoutineName === 'Free Workout'
-                ? 'bg-cyan-500/15 border-cyan-500 text-cyan-300'
-                : 'bg-zinc-950 border-border-interactive text-white hover:bg-zinc-800'
-            }`}
-          >
-            <span>Free Workout</span>
-            {activeRoutineName === 'Free Workout' && <Check className="w-4 h-4 text-cyan-400" />}
-          </button>
+        <button
+          type="button"
+          onClick={() => onSelectRoutine('Free Workout')}
+          className={`w-full min-h-[44px] text-left p-3.5 rounded-xl border flex items-center justify-between font-bold text-sm transition cursor-pointer touch-manipulation ${
+            activeRoutineName === 'Free Workout'
+              ? 'bg-cyan-500/15 border-cyan-500 text-cyan-300'
+              : 'bg-zinc-950 border-border-interactive text-white hover:bg-zinc-800'
+          }`}
+        >
+          <span>Free Workout</span>
+          {activeRoutineName === 'Free Workout' && (
+            <Check className="w-4 h-4 text-cyan-400 shrink-0" aria-hidden="true" />
+          )}
+        </button>
 
-          <button
-            onClick={() => onSelectRoutine('Rest Day')}
-            className={`w-full text-left p-3.5 rounded-xl border flex items-center justify-between font-black transition ${
-              activeRoutineName === 'Rest Day'
-                ? 'bg-indigo-500/20 border-indigo-500 text-indigo-300'
-                : 'bg-zinc-950 border-border-interactive text-white hover:bg-zinc-800'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <Bed className="w-4 h-4 text-indigo-400" />
-              <span>Rest Day</span>
-            </div>
-            {activeRoutineName === 'Rest Day' && <Check className="w-4 h-4 text-indigo-400" />}
-          </button>
+        <button
+          type="button"
+          onClick={() => onSelectRoutine('Rest Day')}
+          className={`w-full min-h-[44px] text-left p-3.5 rounded-xl border flex items-center justify-between font-bold text-sm transition cursor-pointer touch-manipulation ${
+            activeRoutineName === 'Rest Day'
+              ? 'bg-indigo-500/20 border-indigo-500 text-indigo-300'
+              : 'bg-zinc-950 border-border-interactive text-white hover:bg-zinc-800'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <Bed className="w-4 h-4 text-indigo-400 shrink-0" aria-hidden="true" />
+            <span>Rest Day</span>
+          </div>
+          {activeRoutineName === 'Rest Day' && (
+            <Check className="w-4 h-4 text-indigo-400 shrink-0" aria-hidden="true" />
+          )}
+        </button>
 
-          {dedupedCustom.map((tpl) => {
-            const isScheduledToday = tpl.days_of_week && tpl.days_of_week.includes(currentDayAbbr);
-            return (
-              <button
-                key={tpl.id}
-                onClick={() => onSelectRoutine(tpl.name, tpl)}
-                className={`w-full text-left p-3.5 rounded-xl border transition ${
-                  activeRoutineName === tpl.name
-                    ? 'bg-cyan-500/15 border-cyan-500 text-cyan-300'
-                    : 'bg-zinc-950 border-border-interactive text-white hover:bg-zinc-800'
-                }`}
-              >
-                <div className="flex items-center justify-between font-black">
-                  <div className="flex items-center gap-2">
-                    <span>{tpl.name}</span>
-                    {isScheduledToday && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                        Scheduled Today
-                      </span>
-                    )}
-                  </div>
-                  {activeRoutineName === tpl.name && <Check className="w-4 h-4 text-cyan-400" />}
-                </div>
-                {tpl.days_of_week && tpl.days_of_week.length > 0 && (
-                  <div className="flex gap-1 mt-1">
-                    {tpl.days_of_week.map((d) => (
-                      <span
-                        key={d}
-                        className="bg-violet-500/20 text-violet-300 font-bold px-1.5 py-0.5 rounded text-[10px]"
-                      >
-                        {d}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {tpl.exercises && (
-                  <div className="text-[11px] font-normal text-zinc-400 mt-1 truncate">
-                    {tpl.exercises
-                      .map((e) =>
-                        resolveExerciseLabel(
-                          e.exercise?.name ||
-                            e.exercise_name ||
-                            exercises.find((ex) => ex.id === e.exercise_id)?.name ||
-                            e.exercise_id
-                        )
-                      )
-                      .join(', ')}
-                  </div>
-                )}
-              </button>
-            );
-          })}
-
-          {fallbackDefaults.map((tpl) => (
+        {dedupedCustom.map((tpl) => {
+          const isScheduledToday = tpl.days_of_week && tpl.days_of_week.includes(currentDayAbbr);
+          return (
             <button
-              key={tpl.name}
-              onClick={() => onSelectRoutine(tpl.name)}
-              className={`w-full text-left p-3.5 rounded-xl border transition ${
+              key={tpl.id}
+              type="button"
+              onClick={() => onSelectRoutine(tpl.name, tpl)}
+              className={`w-full min-h-[44px] text-left p-3.5 rounded-xl border transition cursor-pointer touch-manipulation ${
                 activeRoutineName === tpl.name
                   ? 'bg-cyan-500/15 border-cyan-500 text-cyan-300'
                   : 'bg-zinc-950 border-border-interactive text-white hover:bg-zinc-800'
               }`}
             >
-              <div className="flex items-center justify-between font-black">
+              <div className="flex items-center justify-between font-bold text-sm">
                 <div className="flex items-center gap-2">
                   <span>{tpl.name}</span>
-                  {tpl.days.includes(currentDayAbbr) && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  {isScheduledToday && (
+                    <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                       Scheduled Today
                     </span>
                   )}
                 </div>
-                {activeRoutineName === tpl.name && <Check className="w-4 h-4 text-cyan-400" />}
+                {activeRoutineName === tpl.name && (
+                  <Check className="w-4 h-4 text-cyan-400 shrink-0" aria-hidden="true" />
+                )}
               </div>
-              <div className="flex gap-1 mt-1">
-                {tpl.days.map((d) => (
-                  <span
-                    key={d}
-                    className="bg-violet-500/20 text-violet-300 font-bold px-1.5 py-0.5 rounded text-[10px]"
-                  >
-                    {d}
-                  </span>
-                ))}
-              </div>
-              <div className="text-[11px] font-normal text-zinc-400 mt-1 truncate">
-                {tpl.exercises.join(', ')}
-              </div>
+              {tpl.days_of_week && tpl.days_of_week.length > 0 && (
+                <div className="flex gap-1 mt-1">
+                  {tpl.days_of_week.map((d) => (
+                    <span
+                      key={d}
+                      className="bg-violet-500/20 text-violet-300 font-bold px-1.5 py-0.5 rounded text-xs"
+                    >
+                      {d}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {tpl.exercises && (
+                <div className="text-xs font-normal text-zinc-400 mt-1 truncate">
+                  {tpl.exercises
+                    .map((e) =>
+                      resolveExerciseLabel(
+                        e.exercise?.name ||
+                          e.exercise_name ||
+                          exercises.find((ex) => ex.id === e.exercise_id)?.name ||
+                        e.exercise_id
+                      )
+                    )
+                    .join(', ')}
+                </div>
+              )}
             </button>
-          ))}
-        </div>
+          );
+        })}
+
+        {fallbackDefaults.map((tpl) => (
+          <button
+            key={tpl.name}
+            type="button"
+            onClick={() => onSelectRoutine(tpl.name)}
+            className={`w-full min-h-[44px] text-left p-3.5 rounded-xl border transition cursor-pointer touch-manipulation ${
+              activeRoutineName === tpl.name
+                ? 'bg-cyan-500/15 border-cyan-500 text-cyan-300'
+                : 'bg-zinc-950 border-border-interactive text-white hover:bg-zinc-800'
+            }`}
+          >
+            <div className="flex items-center justify-between font-bold text-sm">
+              <div className="flex items-center gap-2">
+                <span>{tpl.name}</span>
+                {tpl.days.includes(currentDayAbbr) && (
+                  <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    Scheduled Today
+                  </span>
+                )}
+              </div>
+              {activeRoutineName === tpl.name && (
+                <Check className="w-4 h-4 text-cyan-400 shrink-0" aria-hidden="true" />
+              )}
+            </div>
+            <div className="flex gap-1 mt-1">
+              {tpl.days.map((d) => (
+                <span
+                  key={d}
+                  className="bg-violet-500/20 text-violet-300 font-bold px-1.5 py-0.5 rounded text-xs"
+                >
+                  {d}
+                </span>
+              ))}
+            </div>
+            <div className="text-xs font-normal text-zinc-400 mt-1 truncate">
+              {tpl.exercises.join(', ')}
+            </div>
+          </button>
+        ))}
+      </div>
     </AccessibleModal>
   );
 };

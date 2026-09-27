@@ -140,6 +140,7 @@ export const SetRow: React.FC<SetRowProps> = memo((props) => {
             if (e.key === 'Enter') {
               e.preventDefault();
               onCommitSet(exName, setIndex, ghost);
+              focusNextPendingSet(exIndex, rowIdx);
             }
           }}
           aria-label={`Set ${setIndex} reps`}
@@ -150,7 +151,10 @@ export const SetRow: React.FC<SetRowProps> = memo((props) => {
       <div className="col-span-2 flex justify-end pr-1">
         <button
           type="button"
-          onClick={() => onCommitSet(exName, setIndex, ghost)}
+          onClick={() => {
+            onCommitSet(exName, setIndex, ghost);
+            focusNextPendingSet(exIndex, rowIdx);
+          }}
           disabled={isMutating}
           className="relative w-8 h-8 rounded-full border-2 border-border-interactive hover:border-cyan-400 hover:bg-cyan-500/10 text-transparent hover:text-cyan-400 flex items-center justify-center transition active:scale-95 disabled:opacity-50 touch-manipulation cursor-pointer before:absolute before:-inset-2 before:content-['']"
           title="Commit Set (One-tap)"
@@ -165,3 +169,55 @@ export const SetRow: React.FC<SetRowProps> = memo((props) => {
 });
 
 SetRow.displayName = 'SetRow';
+
+export function focusNextPendingSet(exIndex: number, rowIdx: number) {
+  if (typeof document === 'undefined') return;
+  const doFocus = () => {
+    // 1. Look for next pending set in the same exercise: rowIdx + 1
+    let nextWeightInput = document.querySelector<HTMLInputElement>(
+      `input[data-testid="ghost-weight-${exIndex}-${rowIdx + 1}"]`
+    );
+    let nextRepsInput = document.querySelector<HTMLInputElement>(
+      `input[data-testid="ghost-reps-${exIndex}-${rowIdx + 1}"]`
+    );
+
+    // 2. If not found in current exercise, find the first pending set in subsequent exercises
+    if (!nextWeightInput) {
+      const allPendingWeights = Array.from(
+        document.querySelectorAll<HTMLInputElement>('input[data-testid^="ghost-weight-"]')
+      );
+      for (const input of allPendingWeights) {
+        const testId = input.getAttribute('data-testid') || '';
+        const match = testId.match(/ghost-weight-(\d+)-(\d+)/);
+        if (match) {
+          const eIdx = parseInt(match[1], 10);
+          const rIdx = parseInt(match[2], 10);
+          if (eIdx > exIndex || (eIdx === exIndex && rIdx > rowIdx)) {
+            nextWeightInput = input;
+            const rTestId = testId.replace('ghost-weight-', 'ghost-reps-');
+            nextRepsInput = document.querySelector<HTMLInputElement>(`input[data-testid="${rTestId}"]`);
+            break;
+          }
+        }
+      }
+    }
+
+    // 3. Move focus: if weight is prefilled (has non-empty value), focus reps input, otherwise weight input
+    if (nextWeightInput) {
+      const isWeightPrefilled = Boolean(nextWeightInput.value && nextWeightInput.value.trim() !== '');
+      if (isWeightPrefilled && nextRepsInput) {
+        nextRepsInput.focus();
+        nextRepsInput.select();
+      } else {
+        nextWeightInput.focus();
+        nextWeightInput.select();
+      }
+    }
+  };
+
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(doFocus);
+  } else {
+    setTimeout(doFocus, 0);
+  }
+}

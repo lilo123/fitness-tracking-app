@@ -209,6 +209,93 @@ describe('SetRow', () => {
       expect(onCommitSet).toHaveBeenCalledWith('Bench Press', 1, defaultGhost);
     });
 
+    it('W34: after commit, moves focus to next pending set weight input (or reps if weight prefilled)', async () => {
+      vi.useFakeTimers();
+      const onCommitSet = vi.fn();
+      render(
+        <div>
+          <SetRow
+            exName="Bench Press"
+            exIndex={0}
+            rowIdx={0}
+            setIndex={1}
+            ghost={defaultGhost}
+            draftWeight="185"
+            draftReps="8"
+            isMutating={false}
+            onUpdateDraft={vi.fn()}
+            onCommitSet={onCommitSet}
+          />
+          <SetRow
+            exName="Bench Press"
+            exIndex={0}
+            rowIdx={1}
+            setIndex={2}
+            ghost={defaultGhost}
+            draftWeight=""
+            draftReps=""
+            isMutating={false}
+            onUpdateDraft={vi.fn()}
+            onCommitSet={vi.fn()}
+          />
+        </div>
+      );
+
+      const repsInput0 = screen.getByTestId('ghost-reps-0-0');
+      fireEvent.keyDown(repsInput0, { key: 'Enter', code: 'Enter' });
+
+      expect(onCommitSet).toHaveBeenCalledWith('Bench Press', 1, defaultGhost);
+
+      vi.runAllTimers();
+
+      const nextWeightInput = screen.getByTestId('ghost-weight-0-1');
+      expect(document.activeElement).toBe(nextWeightInput);
+
+      vi.useRealTimers();
+    });
+
+    it('W34: moves focus to reps input if next pending set weight is prefilled', async () => {
+      vi.useFakeTimers();
+      render(
+        <div>
+          <SetRow
+            exName="Bench Press"
+            exIndex={0}
+            rowIdx={0}
+            setIndex={1}
+            ghost={defaultGhost}
+            draftWeight="185"
+            draftReps="8"
+            isMutating={false}
+            onUpdateDraft={vi.fn()}
+            onCommitSet={vi.fn()}
+          />
+          <SetRow
+            exName="Bench Press"
+            exIndex={0}
+            rowIdx={1}
+            setIndex={2}
+            ghost={defaultGhost}
+            draftWeight="200"
+            draftReps=""
+            isMutating={false}
+            onUpdateDraft={vi.fn()}
+            onCommitSet={vi.fn()}
+          />
+        </div>
+      );
+
+      const commitBtn0 = screen.getByTestId('commit-set-btn-0-0');
+      fireEvent.click(commitBtn0);
+
+      vi.runAllTimers();
+
+      const nextRepsInput = screen.getByTestId('ghost-reps-0-1');
+      expect(document.activeElement).toBe(nextRepsInput);
+
+      vi.useRealTimers();
+    });
+
     it('satisfies a11y standards on pending row', async () => {
       const { container } = render(
         <SetRow

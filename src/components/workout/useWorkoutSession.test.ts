@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useWorkoutSession } from './useWorkoutSession';
 import { workoutSessionStore } from '../../utils/workoutSessionStore';
@@ -23,8 +23,13 @@ describe('useWorkoutSession (W5, W24, W39, W46)', () => {
   };
 
   beforeEach(() => {
+    vi.setSystemTime(new Date('2026-09-06T12:00:00Z'));
     localStorage.clear();
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('W46: clamps target sets stepper to maximum of 20', () => {
@@ -114,5 +119,52 @@ describe('useWorkoutSession (W5, W24, W39, W46)', () => {
       const lastCall = saveSpy.mock.calls[saveSpy.mock.calls.length - 1];
       expect(lastCall[1]).toBe(true);
     }
+  });
+
+  it('W8: restoreExercise restores exercise at position with targets and drafts', () => {
+    const { result } = renderHook(() => useWorkoutSession(defaultProps));
+
+    act(() => {
+      result.current.handleAddExercise('Bench Press');
+      result.current.handleAddExercise('Squat');
+    });
+
+    expect(result.current.activeExercises).toEqual(['Bench Press', 'Squat']);
+
+    // Remove Bench Press
+    act(() => {
+      result.current.removeExercise(0);
+    });
+    expect(result.current.activeExercises).toEqual(['Squat']);
+
+    // Restore Bench Press
+    act(() => {
+      result.current.restoreExercise({
+        exerciseName: 'Bench Press',
+        index: 0,
+        targetSetCount: 4,
+        targetRepCount: 8,
+        drafts: { 'Bench Press_1': { weight: '225', reps: '5' } },
+      });
+    });
+
+    expect(result.current.activeExercises).toEqual(['Bench Press', 'Squat']);
+    expect(result.current.targetSetCounts['Bench Press']).toBe(4);
+    expect(result.current.targetRepCounts['Bench Press']).toBe(8);
+    expect(result.current.inputDrafts['Bench Press_1']).toEqual({ weight: '225', reps: '5' });
+  });
+
+  it('W10: isScheduledRoutineDirty returns true when exercises or drafts differ from scheduled', () => {
+    const { result } = renderHook(() => useWorkoutSession(defaultProps));
+
+    // Initially clean or on rest day
+    expect(result.current.isScheduledRoutineDirty).toBeDefined();
+
+    // Adding drafts makes it dirty
+    act(() => {
+      result.current.updateDraft('Bench Press', 1, 'weight', '135');
+    });
+
+    expect(result.current.isScheduledRoutineDirty).toBe(true);
   });
 });

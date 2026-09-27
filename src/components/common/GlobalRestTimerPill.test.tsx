@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { GlobalRestTimerPill } from './GlobalRestTimerPill';
 import { restTimerStore } from '../../utils/restTimerStore';
+import { expectNoA11yViolations } from '../../test/a11y';
 
 describe('GlobalRestTimerPill', () => {
   beforeEach(() => {
@@ -78,5 +79,60 @@ describe('GlobalRestTimerPill', () => {
 
     expect(screen.queryByTestId('rest-timer-pill')).toBeNull();
     expect(restTimerStore.getSnapshot().isRunning).toBe(false);
+  });
+
+  it('renders Stop button with Square icon, visible "Stop" label, and 44px hit target', () => {
+    render(<GlobalRestTimerPill />);
+
+    act(() => {
+      restTimerStore.start(90);
+    });
+
+    const stopBtn = screen.getByTitle('Stop timer');
+    expect(stopBtn).toBeInTheDocument();
+    expect(stopBtn.textContent).toContain('Stop');
+    expect(stopBtn.className).toContain('min-h-[44px]');
+    expect(stopBtn.className).toContain('min-w-[44px]');
+    expect(stopBtn.querySelector('svg')).not.toBeNull();
+  });
+
+  it('satisfies STD-TYP rules (12px floor, tabular-nums, no font-mono/font-black)', () => {
+    const { container } = render(<GlobalRestTimerPill />);
+
+    act(() => {
+      restTimerStore.start(90);
+    });
+
+    const display = screen.getByTestId('rest-timer-display');
+    expect(display.className).toContain('tabular-nums');
+    expect(display.className).toContain('font-bold');
+    expect(display.className).not.toContain('font-mono');
+    expect(display.className).not.toContain('font-black');
+
+    expect(container.innerHTML).not.toContain('font-mono');
+    expect(container.innerHTML).not.toContain('font-black');
+    expect(container.innerHTML).not.toContain('text-[10px]');
+    expect(container.innerHTML).not.toContain('text-[11px]');
+  });
+
+  it('honours motion-reduce on pulse animation', () => {
+    render(<GlobalRestTimerPill />);
+
+    act(() => {
+      restTimerStore.start(90);
+    });
+
+    const pill = screen.getByTestId('rest-timer-pill');
+    expect(pill.className).toContain('motion-reduce:animate-none');
+  });
+
+  it('passes axe accessibility audit with no violations', async () => {
+    vi.useRealTimers();
+    act(() => {
+      restTimerStore.start(90);
+    });
+
+    const { container } = render(<GlobalRestTimerPill />);
+    await expectNoA11yViolations(container);
   });
 });

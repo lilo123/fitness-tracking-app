@@ -1,6 +1,7 @@
 import type { WorkoutSet, Exercise, RoutineTemplate } from '../../types/database';
 import {
   getDayOfWeekAbbr,
+  getLocalDateStr,
   DEFAULT_EXERCISES_LIST,
   DEFAULT_WORKOUT_TEMPLATES,
 } from '../../utils/ghostSets';
@@ -55,7 +56,8 @@ export function resolveRoutineAndExercises(
   workoutDate: string,
   todaySets: WorkoutSet[],
   customTemplates: RoutineTemplate[],
-  exerciseCatalog: Exercise[]
+  exerciseCatalog: Exercise[],
+  removedExercises: string[] = []
 ): ResolvedRoutineResult {
   let resolvedRoutine = 'Rest Day';
   let resolvedExList: string[] = [];
@@ -166,7 +168,16 @@ export function resolveRoutineAndExercises(
     );
     const distinctLoggedNotInBase = loggedExercises.filter((name) => !baseExercises.includes(name));
 
-    resolvedExList = [...baseExercises, ...distinctLoggedNotInBase];
+    const isToday = workoutDate === getLocalDateStr(new Date());
+    let effectiveBase = baseExercises;
+    if (!isToday && todaySets.length > 0) {
+      // For past dates / finished workouts, only include exercises that were actually performed
+      effectiveBase = baseExercises.filter((name) => todaySets.some((s) => isSetForExercise(s, name)));
+    }
+
+    resolvedExList = [...effectiveBase, ...distinctLoggedNotInBase].filter(
+      (name) => !removedExercises.includes(name)
+    );
     resolvedTargets = setTargets;
     resolvedReps = repTargets;
 
@@ -212,4 +223,50 @@ export function resolveRoutineAndExercises(
     targetSets: resolvedTargets,
     targetReps: resolvedReps,
   };
+}
+
+export function checkIsScheduledRoutineDirty({
+  workoutDate,
+  activeRoutineName,
+  activeExercises,
+  customTemplates,
+  exercises,
+  inputDrafts,
+}: {
+  workoutDate: string;
+  activeRoutineName: string;
+  activeExercises: string[];
+  customTemplates: RoutineTemplate[];
+  exercises: Exercise[];
+  inputDrafts: Record<string, any>;
+}): boolean {
+  const dayAbbr = getDayOfWeekAbbr(workoutDate);
+  const scheduledCustom = customTemplates.find((t) => t.days_of_week?.includes(dayAbbr));
+  const scheduledDef = DEFAULT_WORKOUT_TEMPLATES.find((t) =>
+    t.days.some((d) => d === dayAbbr || d.slice(0, 3) === dayAbbr)
+  );
+  const scheduledName = scheduledCustom?.name || scheduledDef?.name || 'Rest Day';
+  if (activeRoutineName !== scheduledName) return true;
+
+  const hasDrafts = Object.values(inputDrafts).some(
+    (d: any) => (d.weight && d.weight.trim() !== '') || (d.reps && d.reps.trim() !== '')
+  );
+  if (hasDrafts) return true;
+
+  let scheduledExercises: string[] = [];
+  if (scheduledCustom && scheduledCustom.exercises) {
+    scheduledExercises = [...scheduledCustom.exercises]
+      .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+      .map((e) => e.exercise?.name || e.exercise_name || exercises.find((ex) => ex.id === e.exercise_id)?.name || e.exercise_id)
+      .filter(Boolean);
+  } else if (scheduledDef) {
+    scheduledExercises = [...scheduledDef.exercises];
+  }
+
+  if (activeExercises.length !== scheduledExercises.length) return true;
+  for (let i = 0; i < activeExercises.length; i++) {
+    if (activeExercises[i] !== scheduledExercises[i]) return true;
+  }
+
+  return false;
 }

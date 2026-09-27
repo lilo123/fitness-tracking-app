@@ -1,0 +1,127 @@
+import { useState, useCallback, type RefObject } from 'react';
+import type { Exercise, WorkoutSet } from '../../types/database';
+import type { UseMutationResult } from '@tanstack/react-query';
+import type { SetDraftInput } from '../../utils/workoutSessionStore';
+import { computeGhostSets } from '../../utils/ghostSets';
+import { isUUID } from './workoutEngineHelpers';
+import type { PendingReviewSet } from './FinishReviewSheet';
+
+export interface UseWorkoutFinishReviewOptions {
+  activeExercises: string[];
+  getSetsForExerciseToday: (exName: string) => WorkoutSet[];
+  pendingSetId: string | null;
+  pendingDeletedSetIds: Set<string>;
+  targetSetCounts: Record<string, number>;
+  targetRepCountsRef: RefObject<Record<string, number>>;
+  inputDraftsRef: RefObject<Record<string, SetDraftInput>>;
+  userLogs: WorkoutSet[];
+  workoutDate: string;
+  exercises: Exercise[];
+  batchLogSetsMutation: UseMutationResult<any, any, any, any>;
+}
+
+export function useWorkoutFinishReview({
+  activeExercises,
+  getSetsForExerciseToday,
+  pendingSetId,
+  pendingDeletedSetIds,
+  targetSetCounts,
+  targetRepCountsRef,
+  inputDraftsRef,
+  userLogs,
+  workoutDate,
+  exercises,
+  batchLogSetsMutation,
+}: UseWorkoutFinishReviewOptions) {
+  const [isFinishReviewOpen, setIsFinishReviewOpen] = useState(false);
+  const [pendingReviewSets, setPendingReviewSets] = useState<PendingReviewSet[]>([]);
+
+  const handleFinishWorkout = useCallback(() => {
+    const allPendingSets: PendingReviewSet[] = [];
+
+    for (const exName of activeExercises) {
+      const rawSets = getSetsForExerciseToday(exName);
+      const exerciseSetsToday = rawSets.filter(
+        (s) => s.id !== pendingSetId && (!s.id || !pendingDeletedSetIds.has(s.id))
+      );
+      const targetCount = targetSetCounts[exName] || 3;
+      const ghostValues = computeGhostSets(exName, targetCount, userLogs, workoutDate);
+
+      for (let rowIdx = exerciseSetsToday.length; rowIdx < targetCount; rowIdx++) {
+        const setIndex = rowIdx + 1;
+        const ghost = ghostValues[rowIdx] || { weight: '', reps: '' };
+        const draftKey = `${exName}_${setIndex}`;
+        const draft = inputDraftsRef.current?.[draftKey];
+
+        const weightVal =
+          draft?.weight !== undefined && draft.weight.trim() !== ''
+            ? Number(draft.weight)
+            : typeof ghost.weight === 'number'
+            ? ghost.weight
+            : NaN;
+
+        const repsVal =
+          draft?.reps !== undefined && draft.reps.trim() !== ''
+            ? Number(draft.reps)
+            : typeof ghost.reps === 'number'
+            ? ghost.reps
+            : targetRepCountsRef.current?.[exName] || NaN;
+
+        if (!Number.isFinite(weightVal) || weightVal < 0 || !Number.isFinite(repsVal) || repsVal <= 0) continue;
+
+        allPendingSets.push({
+          exerciseName: exName,
+          weight: weightVal,
+          reps: repsVal,
+          setIndex,
+        });
+      }
+    }
+
+    if (allPendingSets.length === 0) {
+      return;
+    }
+
+    setPendingReviewSets(allPendingSets);
+    setIsFinishReviewOpen(true);
+  }, [
+    activeExercises,
+    getSetsForExerciseToday,
+    pendingSetId,
+    pendingDeletedSetIds,
+    targetSetCounts,
+    targetRepCountsRef,
+    inputDraftsRef,
+    userLogs,
+    workoutDate,
+  ]);
+
+  const handleConfirmFinishWithSets = useCallback(
+    (reviewedSets: PendingReviewSet[]) => {
+      setIsFinishReviewOpen(false);
+      if (reviewedSets.length === 0) return;
+      const setsWithIds = reviewedSets.map((s) => {
+        const matchedEx = exercises.find(
+          (e) => e.name.toLowerCase() === s.exerciseName.toLowerCase() || e.id === s.exerciseName
+        );
+        const exerciseId = matchedEx ? matchedEx.id : isUUID(s.exerciseName) ? s.exerciseName : undefined;
+        return { ...s, exerciseId };
+      });
+      batchLogSetsMutation.mutate(setsWithIds);
+    },
+    [batchLogSetsMutation, exercises]
+  );
+
+  const handleFinishWithoutSets = useCallback(() => {
+    setIsFinishReviewOpen(false);
+  }, []);
+
+  return {
+    isFinishReviewOpen,
+    setIsFinishReviewOpen,
+    pendingReviewSets,
+    handleFinishWorkout,
+    handleConfirmFinishWithSets,
+    handleFinishWithoutSets,
+  };
+}

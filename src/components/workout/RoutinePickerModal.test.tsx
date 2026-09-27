@@ -4,6 +4,7 @@ import { RoutinePickerModal } from './RoutinePickerModal';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { RoutineTemplate, Exercise } from '../../types/database';
 import type { DEFAULT_WORKOUT_TEMPLATES } from '../../utils/ghostSets';
+import { expectNoA11yViolations } from '../../test/a11y';
 
 import { createSupabaseBuilder, clearMockHistory, getRecordedTables, getRecordedSelects } from '../../test/supabaseBuilderMock';
 
@@ -126,6 +127,27 @@ describe('RoutinePickerModal', () => {
     expect(onReloadScheduledRoutine).toHaveBeenCalled();
   });
 
+  it('satisfies touch target and STD-TYP rules (no font-black, nothing < 12px, >= 44px hit)', () => {
+    const { container } = renderModal();
+
+    const reloadBtn = screen.getByTestId('reload-scheduled-routine-btn');
+    expect(reloadBtn.className).toContain('min-h-[44px]');
+
+    const freeWorkoutBtn = screen.getByRole('button', { name: /free workout/i });
+    expect(freeWorkoutBtn.className).toContain('min-h-[44px]');
+
+    const restDayBtn = screen.getByRole('button', { name: /rest day/i });
+    expect(restDayBtn.className).toContain('min-h-[44px]');
+
+    const customBtn = screen.getByRole('button', { name: /upper body custom/i });
+    expect(customBtn.className).toContain('min-h-[44px]');
+
+    // STD-TYP: no font-black and no sub-12px classes
+    expect(container.innerHTML).not.toContain('font-black');
+    expect(container.innerHTML).not.toContain('text-[10px]');
+    expect(container.innerHTML).not.toContain('text-[11px]');
+  });
+
   it('meets accessibility requirements: role="dialog", aria-modal, aria-labelledby, and focus trap/restoration', () => {
     const opener = document.createElement('button');
     opener.setAttribute('data-testid', 'test-opener');
@@ -192,5 +214,10 @@ describe('RoutinePickerModal', () => {
       projection:
         'id, user_id, name, is_master, assigned_to, days_of_week, created_at, exercises:template_exercises(id, template_id, exercise_id, order_index, target_sets, target_reps, exercise:exercises(name))',
     });
+  });
+
+  it('passes axe accessibility audit with no violations', async () => {
+    const { container } = renderModal();
+    await expectNoA11yViolations(container);
   });
 });

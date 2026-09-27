@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "CyberGym V2 — Design Ratchet Baseline (STD-TYP-1..4, STD-INT-3, STD-CMP-7)",
+  "description": "CyberGym V2 \u2014 Design Ratchet Baseline (STD-TYP-1..4, STD-INT-3, STD-CMP-7)",
   "rules": [
     "confirm",
     "font-mono",
@@ -15,15 +15,11 @@
   "flaggedConfirm": {
     "src/components/workout/EditSetModal.tsx": {
       "count": 1,
-      "reason": "Legacy window.confirm at P3a base (EditSetModal.tsx) — flagged for removal"
-    },
-    "src/components/workout/useWorkoutSession.ts": {
-      "count": 2,
-      "reason": "Legacy window.confirm at P3a base (useWorkoutSession.ts) — flagged for removal"
+      "reason": "Legacy window.confirm at P3a base (EditSetModal.tsx) \u2014 flagged for removal"
     }
   },
   "totals": {
-    "confirm": 8,
+    "confirm": 6,
     "font-mono": 79,
     "font-black": 69,
     "sub-12px": 111
@@ -234,7 +230,7 @@
       "sub-12px": 0
     },
     "src/components/workout/useWorkoutSession.ts": {
-      "confirm": 2,
+      "confirm": 0,
       "font-mono": 0,
       "font-black": 0,
       "sub-12px": 0

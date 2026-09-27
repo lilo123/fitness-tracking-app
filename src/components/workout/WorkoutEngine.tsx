@@ -1,7 +1,6 @@
-import React, { useState, useCallback, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import type { WorkoutSet, RoutineTemplate } from '../../types/database';
+import type { RoutineTemplate } from '../../types/database';
 import {
   computeGhostSets,
   getExerciseBenchmarks,
@@ -19,25 +18,27 @@ import { RestDayView } from './RestDayView';
 import { ExerciseCard } from './ExerciseCard';
 import { StatusBanner } from '../common/StatusBanner';
 import { UndoToast } from '../common/UndoToast';
+import { ConfirmDialog } from '../common/ConfirmDialog';
+import { Skeleton } from '../common/Skeleton';
+import { Button } from '../common/Button';
 import { EditSetSheet } from '../sets/EditSetSheet';
 import { useSetDeletion } from './useSetDeletion';
-import { invalidateWorkoutDerived } from '../../lib/invalidate';
-import { isUUID } from './workoutEngineHelpers';
+import { useExerciseRemoval } from './useExerciseRemoval';
+import { useWorkoutUrlParams } from './useWorkoutUrlParams';
+import { useWorkoutEditSheet } from './useWorkoutEditSheet';
+import { useWorkoutSetCommit } from './useWorkoutSetCommit';
+import { useWorkoutFinishReview } from './useWorkoutFinishReview';
+import { FinishReviewSheet } from './FinishReviewSheet';
+import { RemoveExerciseSheet } from './RemoveExerciseSheet';
 
 export const WorkoutEngine: React.FC = () => {
   const { user, profile } = useAuth();
-  const queryClient = useQueryClient();
 
   const targetUserId =
     user?.id ||
     (() => {
-      try {
-        const cached = localStorage.getItem('cybergym_user');
-        if (cached) return JSON.parse(cached)?.id || '';
-      } catch {
-        return '';
-      }
-      return '';
+      try { return JSON.parse(localStorage.getItem('cybergym_user') || '{}')?.id || ''; }
+      catch { return ''; }
     })();
   const autoRestTimer = profile?.auto_rest_timer ?? (localStorage.getItem('cybergym_auto_rest_timer') !== 'false');
 
@@ -45,9 +46,9 @@ export const WorkoutEngine: React.FC = () => {
   const [selectedExerciseToAdd, setSelectedExerciseToAdd] = useState('');
   const [mutationError, setMutationError] = useState<string | null>(null);
 
-  // Edit Set Sheet State (W3, W17)
-  const [editingSet, setEditingSet] = useState<(WorkoutSet & { workout_date?: string; workout_name?: string }) | null>(null);
-  const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
+  // Dialog States
+  const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
+  const [isReloadConfirmOpen, setIsReloadConfirmOpen] = useState(false);
 
   // 1. Workout Session State & Stores
   const activeSession = workoutSessionStore.getActiveSession(targetUserId);
@@ -86,11 +87,12 @@ export const WorkoutEngine: React.FC = () => {
     handleReloadScheduledRoutine: reloadScheduledRoutineInternal,
     handleAddExercise: addExerciseInternal,
     moveExercise,
-    removeExercise,
+    removeExercise: removeExerciseDirectly,
+    restoreExercise,
     adjustTargetSets,
     updateDraft,
-    handleClearWorkout,
-    isWholeWorkoutCompleted: _isWholeWorkoutSessionCompleted,
+    handleClearWorkout: executeClearWorkout,
+    isScheduledRoutineDirty,
   } = useWorkoutSession({
     targetUserId,
     exercises,
@@ -100,6 +102,25 @@ export const WorkoutEngine: React.FC = () => {
     userLogs,
     logsFetched,
   });
+
+  const handleSelectRoutine = useCallback((routineName: string, template?: RoutineTemplate) => {
+    setShowRoutineModal(false);
+    selectRoutineInternal(routineName, template);
+  }, [selectRoutineInternal]);
+
+  // URL Query Parameters Handling (URL-1, URL-2)
+  const { syncDateToUrl } = useWorkoutUrlParams({
+    customTemplates,
+    templatesFetched,
+    onSelectRoutine: handleSelectRoutine,
+    workoutDate,
+    onDateChange: setWorkoutDate,
+  });
+
+  const handleDateChange = useCallback((newDate: string) => {
+    setWorkoutDate(newDate);
+    syncDateToUrl(newDate);
+  }, [setWorkoutDate, syncDateToUrl]);
 
   const handleDraftSuccess = useCallback(
     (variables: { exerciseName?: string; exerciseId?: string; setIndex: number }) => {
@@ -140,219 +161,135 @@ export const WorkoutEngine: React.FC = () => {
     timeoutMs: 6000,
   });
 
+  // 6. Exercise Removal with Undo Toast & RemoveExerciseSheet (W8)
+  const {
+    sheetState: removeSheetState,
+    requestRemoveExercise,
+    handleConfirmRemoveAndDelete,
+    handleKeepSetsAndCollapse,
+    handleCloseSheet: handleCloseRemoveSheet,
+    toast: exerciseRemovalToast,
+    pendingDeletedSetIds,
+  } = useExerciseRemoval({
+    onCommitDeleteSets: async (setIds: string[]) => {
+      for (const id of setIds) {
+        await deleteSetMutation.mutateAsync(id);
+      }
+    },
+    onRestoreExercise: restoreExercise,
+    onRemoveExerciseLocally: removeExerciseDirectly,
+    onCollapseExercise: toggleAccordion,
+    getSetsForExercise: getSetsForExerciseToday,
+    activeExercises,
+    targetSetCounts,
+    targetRepCounts,
+    inputDrafts,
+    timeoutMs: 6000,
+  });
+
+  // 7. Edit Set Sheet (W3, W17)
+  const {
+    editingSet,
+    isEditSheetOpen,
+    handleEditSet,
+    handleCloseEditSheet,
+    handleSavedEditSet,
+    handleDeleteRequested,
+  } = useWorkoutEditSheet({
+    activeExercises,
+    activeRoutineName,
+    workoutDate,
+    targetUserId,
+    getSetsForExerciseToday,
+    pendingSetId,
+    pendingDeletedSetIds,
+    scheduleDelete,
+  });
+
+  const inputDraftsRef = useRef(inputDrafts);
+  const targetRepCountsRef = useRef(targetRepCounts);
+  useEffect(() => {
+    inputDraftsRef.current = inputDrafts;
+    targetRepCountsRef.current = targetRepCounts;
+  });
+
+  // 8. Set Commit & Batch Log
+  const { handleCommitSet, handleBatchLogExercise } = useWorkoutSetCommit({
+    exercises,
+    inputDraftsRef,
+    targetRepCountsRef,
+    logSetMutation,
+    batchLogSetsMutation,
+    setMutationError,
+  });
+
+  // 9. Finish Workout Review Sheet (W18)
+  const {
+    isFinishReviewOpen,
+    setIsFinishReviewOpen,
+    pendingReviewSets,
+    handleFinishWorkout,
+    handleConfirmFinishWithSets,
+    handleFinishWithoutSets,
+  } = useWorkoutFinishReview({
+    activeExercises,
+    getSetsForExerciseToday,
+    pendingSetId,
+    pendingDeletedSetIds,
+    targetSetCounts,
+    targetRepCountsRef,
+    inputDraftsRef,
+    userLogs,
+    workoutDate,
+    exercises,
+    batchLogSetsMutation,
+  });
+
   const isWholeWorkoutCompleted =
     activeExercises.length > 0 &&
     activeExercises.every(
       (exName) =>
-        getSetsForExerciseToday(exName).filter((s) => s.id !== pendingSetId).length >=
-        (targetSetCounts[exName] || 3)
+        getSetsForExerciseToday(exName).filter(
+          (s) => s.id !== pendingSetId && (!s.id || !pendingDeletedSetIds.has(s.id))
+        ).length >= (targetSetCounts[exName] || 3)
     );
 
-  const inputDraftsRef = useRef(inputDrafts);
-  inputDraftsRef.current = inputDrafts;
-  const targetRepCountsRef = useRef(targetRepCounts);
-  targetRepCountsRef.current = targetRepCounts;
+  const addSelectRef = useRef<HTMLSelectElement>(null);
+  const handleFocusAddExercise = useCallback(() => {
+    addSelectRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    addSelectRef.current?.focus();
+  }, []);
 
-  const handleSelectRoutine = (routineName: string, template?: RoutineTemplate) => {
-    setShowRoutineModal(false);
-    selectRoutineInternal(routineName, template);
-  };
+  const handleLogActivityAnyway = useCallback(() => {
+    selectRoutineInternal('Free Workout');
+    handleFocusAddExercise();
+  }, [selectRoutineInternal, handleFocusAddExercise]);
 
-  const handleReloadScheduledRoutine = () => {
+  const handleReloadScheduledRoutine = useCallback(() => {
     setShowRoutineModal(false);
     reloadScheduledRoutineInternal();
-  };
+  }, [reloadScheduledRoutineInternal]);
 
-  const handleAddExercise = () => {
+  const handleRequestReload = useCallback(() => {
+    setShowRoutineModal(false);
+    if (isScheduledRoutineDirty) {
+      setIsReloadConfirmOpen(true);
+    } else {
+      handleReloadScheduledRoutine();
+    }
+  }, [isScheduledRoutineDirty, handleReloadScheduledRoutine]);
+
+  const handleAddExercise = useCallback(() => {
     if (!selectedExerciseToAdd) return;
     addExerciseInternal(selectedExerciseToAdd);
     setSelectedExerciseToAdd('');
-  };
-
-  const handleEditSet = useCallback((exIndex: number, rowIdx: number) => {
-    const exName = activeExercises[exIndex];
-    if (!exName) return;
-    const rawSets = getSetsForExerciseToday(exName);
-    const visibleSets = rawSets.filter((s) => s.id !== pendingSetId);
-    const targetSet = visibleSets[rowIdx];
-    if (targetSet) {
-      setEditingSet({
-        ...targetSet,
-        workout_date: workoutDate,
-        workout_name: activeRoutineName,
-      });
-      setIsEditSheetOpen(true);
-    }
-  }, [activeExercises, activeRoutineName, getSetsForExerciseToday, pendingSetId, workoutDate]);
-
-  const handleCloseEditSheet = useCallback(() => {
-    setIsEditSheetOpen(false);
-    setEditingSet(null);
-  }, []);
-
-  const handleSavedEditSet = useCallback(async (_updated: WorkoutSet) => {
-    setIsEditSheetOpen(false);
-    setEditingSet(null);
-    await invalidateWorkoutDerived(queryClient, targetUserId);
-  }, [queryClient, targetUserId]);
-
-  const handleDeleteRequested = useCallback((set: WorkoutSet) => {
-    setIsEditSheetOpen(false);
-    setEditingSet(null);
-    scheduleDelete(set);
-  }, [scheduleDelete]);
-
-  const handleCommitSet = useCallback((
-    exName: string,
-    setIndex: number,
-    ghostValues: { weight: number | ''; reps: number | '' }
-  ) => {
-    const draftKey = `${exName}_${setIndex}`;
-    const draft = inputDraftsRef.current[draftKey];
-
-    const hasDraftWeight = draft?.weight !== undefined && draft.weight.trim() !== '';
-    const weightVal = hasDraftWeight
-      ? Number(draft.weight)
-      : typeof ghostValues.weight === 'number'
-      ? ghostValues.weight
-      : NaN;
-
-    const hasDraftReps = draft?.reps !== undefined && draft.reps.trim() !== '';
-    const repsVal = hasDraftReps
-      ? Number(draft.reps)
-      : typeof ghostValues.reps === 'number'
-      ? ghostValues.reps
-      : NaN;
-
-    if (!Number.isFinite(weightVal) || weightVal < 0 || !Number.isFinite(repsVal) || repsVal <= 0) {
-      setMutationError('Please enter weight and reps or use previous set values.');
-      return;
-    }
-
-    const matchedEx = exercises.find(
-      (e) => e.name.toLowerCase() === exName.toLowerCase() || e.id === exName
-    );
-    const exerciseId = matchedEx ? matchedEx.id : isUUID(exName) ? exName : undefined;
-
-    logSetMutation.mutate({
-      exerciseName: exName,
-      exerciseId,
-      weight: weightVal,
-      reps: repsVal,
-      setIndex,
-    });
-  }, [exercises, logSetMutation]);
-
-  const handleBatchLogExercise = useCallback((
-    exName: string,
-    targetCount: number,
-    ghostValues: { weight: number | ''; reps: number | '' }[],
-    exerciseSetsToday: WorkoutSet[]
-  ) => {
-    const unloggedSets: {
-      exerciseName: string;
-      weight: number;
-      reps: number;
-      setIndex: number;
-    }[] = [];
-
-    for (let rowIdx = exerciseSetsToday.length; rowIdx < targetCount; rowIdx++) {
-      const setIndex = rowIdx + 1;
-      const ghost = ghostValues[rowIdx] || { weight: '', reps: '' };
-      const draftKey = `${exName}_${setIndex}`;
-      const draft = inputDraftsRef.current[draftKey];
-
-      const weightVal = draft?.weight !== undefined && draft.weight.trim() !== ''
-        ? Number(draft.weight)
-        : typeof ghost.weight === 'number'
-        ? ghost.weight
-        : NaN;
-
-      const repsVal = draft?.reps !== undefined && draft.reps.trim() !== ''
-        ? Number(draft.reps)
-        : typeof ghost.reps === 'number'
-        ? ghost.reps
-        : targetRepCountsRef.current[exName] || NaN;
-
-      if (!Number.isFinite(weightVal) || weightVal < 0 || !Number.isFinite(repsVal) || repsVal <= 0) continue;
-
-      unloggedSets.push({
-        exerciseName: exName,
-        weight: weightVal,
-        reps: repsVal,
-        setIndex,
-      });
-    }
-
-    if (unloggedSets.length > 0) {
-      const matchedEx = exercises.find(
-        (e) => e.name.toLowerCase() === exName.toLowerCase() || e.id === exName
-      );
-      const exerciseId = matchedEx ? matchedEx.id : isUUID(exName) ? exName : undefined;
-      const setsWithId = unloggedSets.map((s) => ({ ...s, exerciseId }));
-      batchLogSetsMutation.mutate(setsWithId);
-    }
-  }, [batchLogSetsMutation, exercises]);
-
-  const handleFinishWorkout = () => {
-    const allPendingSets: {
-      exerciseName: string;
-      weight: number;
-      reps: number;
-      setIndex: number;
-    }[] = [];
-
-    for (const exName of activeExercises) {
-      const rawSets = getSetsForExerciseToday(exName);
-      const exerciseSetsToday = rawSets.filter((s) => s.id !== pendingSetId);
-      const targetCount = targetSetCounts[exName] || 3;
-      const ghostValues = computeGhostSets(exName, targetCount, userLogs, workoutDate);
-
-      for (let rowIdx = exerciseSetsToday.length; rowIdx < targetCount; rowIdx++) {
-        const setIndex = rowIdx + 1;
-        const ghost = ghostValues[rowIdx] || { weight: '', reps: '' };
-        const draftKey = `${exName}_${setIndex}`;
-        const draft = inputDrafts[draftKey];
-
-        const weightVal = draft?.weight !== undefined && draft.weight.trim() !== ''
-          ? Number(draft.weight)
-          : typeof ghost.weight === 'number'
-          ? ghost.weight
-          : NaN;
-
-        const repsVal = draft?.reps !== undefined && draft.reps.trim() !== ''
-          ? Number(draft.reps)
-          : typeof ghost.reps === 'number'
-          ? ghost.reps
-          : targetRepCounts[exName] || NaN;
-
-        if (!Number.isFinite(weightVal) || weightVal < 0 || !Number.isFinite(repsVal) || repsVal <= 0) continue;
-
-        allPendingSets.push({
-          exerciseName: exName,
-          weight: weightVal,
-          reps: repsVal,
-          setIndex,
-        });
-      }
-    }
-
-    if (allPendingSets.length > 0) {
-      const setsWithIds = allPendingSets.map((s) => {
-        const matchedEx = exercises.find(
-          (e) => e.name.toLowerCase() === s.exerciseName.toLowerCase() || e.id === s.exerciseName
-        );
-        const exerciseId = matchedEx ? matchedEx.id : isUUID(s.exerciseName) ? s.exerciseName : undefined;
-        return { ...s, exerciseId };
-      });
-      batchLogSetsMutation.mutate(setsWithIds);
-    }
-  };
+  }, [selectedExerciseToAdd, addExerciseInternal]);
 
   const allExpanded =
     activeExercises.length > 0 && activeExercises.every((e) => expandedExercises.has(e));
 
   const currentDayAbbr = getDayOfWeekAbbr(workoutDate);
+  const activeToast = exerciseRemovalToast || deleteToast;
 
   return (
     <div className="space-y-6 pb-24 text-white">
@@ -363,8 +300,8 @@ export const WorkoutEngine: React.FC = () => {
         activeRoutineName={activeRoutineName}
         onOpenRoutineModal={() => setShowRoutineModal(true)}
         workoutDate={workoutDate}
-        onDateChange={setWorkoutDate}
-        onClearWorkout={handleClearWorkout}
+        onDateChange={handleDateChange}
+        onClearWorkout={() => setIsClearConfirmOpen(true)}
       />
 
       {/* Logs Read Error Banner */}
@@ -399,7 +336,7 @@ export const WorkoutEngine: React.FC = () => {
       <RoutinePickerModal
         isOpen={showRoutineModal}
         onClose={() => setShowRoutineModal(false)}
-        onReloadScheduledRoutine={handleReloadScheduledRoutine}
+        onReloadScheduledRoutine={handleRequestReload}
         onSelectRoutine={handleSelectRoutine}
         activeRoutineName={activeRoutineName}
         currentDayAbbr={currentDayAbbr}
@@ -410,7 +347,10 @@ export const WorkoutEngine: React.FC = () => {
       />
 
       {activeRoutineName === 'Rest Day' ? (
-        <RestDayView onOpenRoutineModal={() => setShowRoutineModal(true)} />
+        <RestDayView
+          onOpenRoutineModal={() => setShowRoutineModal(true)}
+          onLogActivity={handleLogActivityAnyway}
+        />
       ) : (
         <>
           {activeExercises.length > 0 && (
@@ -421,14 +361,14 @@ export const WorkoutEngine: React.FC = () => {
               <div className="flex items-center gap-2">
                 <button
                   onClick={collapseCompleted}
-                  className="text-xs font-bold text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 border border-border-interactive px-2.5 py-1 rounded-lg transition flex items-center gap-1.5"
+                  className="text-xs font-bold text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 border border-border-interactive px-2.5 py-1 rounded-lg transition flex items-center gap-1.5 min-h-[44px]"
                   title="Collapse completed exercises"
                 >
                   <span>Collapse Completed</span>
                 </button>
                 <button
                   onClick={() => toggleAllAccordions(!allExpanded)}
-                  className="text-xs font-bold text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 border border-border-interactive px-2.5 py-1 rounded-lg transition"
+                  className="text-xs font-bold text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 border border-border-interactive px-2.5 py-1 rounded-lg transition min-h-[44px]"
                 >
                   {allExpanded ? 'Collapse All' : 'Expand All'}
                 </button>
@@ -437,16 +377,49 @@ export const WorkoutEngine: React.FC = () => {
           )}
 
           {activeExercises.length === 0 ? (
-            <div className="bg-zinc-900/90 rounded-2xl shadow-xl p-8 text-center border border-dashed border-zinc-800 text-white">
-              <Dumbbell className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
-              <p className="text-white font-bold text-base mb-1">No exercises in today's workout yet</p>
-              <p className="text-xs text-zinc-400">Select a routine above or add an exercise below to start logging.</p>
+            <div className="bg-zinc-900/90 rounded-2xl shadow-xl p-8 text-center border border-dashed border-zinc-800 text-white space-y-4">
+              <Dumbbell className="w-10 h-10 text-zinc-600 mx-auto mb-1" />
+              <div>
+                <p className="text-white font-bold text-base mb-1">No exercises in today's workout yet</p>
+                <p className="text-xs text-zinc-400">Select a routine above or add an exercise below to start logging.</p>
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="md"
+                  onClick={() => setShowRoutineModal(true)}
+                  testId="empty-choose-routine-btn"
+                  className="min-h-[44px]"
+                >
+                  Choose routine
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="md"
+                  onClick={handleFocusAddExercise}
+                  testId="empty-add-exercise-btn"
+                  className="min-h-[44px]"
+                >
+                  Add exercise
+                </Button>
+              </div>
             </div>
+          ) : !logsFetched ? (
+            <Skeleton
+              variant="card"
+              count={3}
+              testId="workout-loading-skeleton"
+              ariaLabel="Loading workout data..."
+            />
           ) : (
             <div className="space-y-4">
               {activeExercises.map((exName, exIndex) => {
                 const rawSets = getSetsForExerciseToday(exName);
-                const exerciseSetsToday = rawSets.filter((s) => s.id !== pendingSetId);
+                const exerciseSetsToday = rawSets.filter(
+                  (s) => s.id !== pendingSetId && (!s.id || !pendingDeletedSetIds.has(s.id))
+                );
                 const benchmarks = getExerciseBenchmarks(exName, userLogs, workoutDate);
                 const isExpanded = expandedExercises.has(exName);
                 const targetCount = targetSetCounts[exName] || 3;
@@ -470,7 +443,7 @@ export const WorkoutEngine: React.FC = () => {
                     onToggleAccordion={toggleAccordion}
                     onAdjustTargetSets={adjustTargetSets}
                     onMoveExercise={moveExercise}
-                    onRemoveExercise={removeExercise}
+                    onRemoveExercise={requestRemoveExercise}
                     onUpdateDraft={updateDraft}
                     onCommitSet={handleCommitSet}
                     onEditSet={handleEditSet}
@@ -487,6 +460,7 @@ export const WorkoutEngine: React.FC = () => {
             </div>
             <div className="flex items-center gap-2">
               <select
+                ref={addSelectRef}
                 value={selectedExerciseToAdd}
                 onChange={(e) => setSelectedExerciseToAdd(e.target.value)}
                 className="flex-1 min-w-0 bg-zinc-950 border border-border-interactive text-white rounded-xl px-3 py-2 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none truncate"
@@ -517,7 +491,7 @@ export const WorkoutEngine: React.FC = () => {
                 type="button"
                 onClick={handleFinishWorkout}
                 disabled={batchLogSetsMutation.isPending || isWholeWorkoutCompleted}
-                className={`w-full py-3.5 px-4 rounded-2xl font-bold text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 shadow-2xl ${
+                className={`w-full py-3.5 px-4 rounded-2xl font-bold text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 shadow-2xl min-h-[44px] ${
                   isWholeWorkoutCompleted
                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 cursor-default'
                     : 'bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white shadow-neon-cyan active:scale-95'
@@ -554,10 +528,63 @@ export const WorkoutEngine: React.FC = () => {
         onDeleteRequested={handleDeleteRequested}
       />
 
-      {/* Deferred Delete Undo Toast (W3, RD-7) */}
-      {deleteToast && (
+      {/* Remove Exercise Sheet (W8) */}
+      <RemoveExerciseSheet
+        isOpen={removeSheetState.isOpen}
+        onClose={handleCloseRemoveSheet}
+        exerciseName={removeSheetState.exerciseName}
+        loggedSetsCount={removeSheetState.loggedSetsCount}
+        onRemoveAndDeleteSets={handleConfirmRemoveAndDelete}
+        onKeepSetsAndCollapse={handleKeepSetsAndCollapse}
+        isDeleting={deleteSetMutation.isPending}
+      />
+
+      {/* Finish Review Sheet (W18) */}
+      <FinishReviewSheet
+        isOpen={isFinishReviewOpen}
+        onClose={() => setIsFinishReviewOpen(false)}
+        pendingSets={pendingReviewSets}
+        onConfirmFinishWithSets={handleConfirmFinishWithSets}
+        onFinishWithoutSets={handleFinishWithoutSets}
+        isSubmitting={batchLogSetsMutation.isPending}
+      />
+
+      {/* Clear Workout Confirm Dialog (W9) */}
+      <ConfirmDialog
+        isOpen={isClearConfirmOpen}
+        onCancel={() => setIsClearConfirmOpen(false)}
+        onConfirm={() => {
+          setIsClearConfirmOpen(false);
+          executeClearWorkout();
+        }}
+        title="Clear workout?"
+        consequence="Logged sets stay in history. All exercises and drafts will be cleared from today's workout."
+        confirmLabel="Clear workout"
+        cancelLabel="Cancel"
+        isDestructive={true}
+        testId="clear-workout-dialog"
+      />
+
+      {/* Reload Scheduled Routine Confirm Dialog (W10) */}
+      <ConfirmDialog
+        isOpen={isReloadConfirmOpen}
+        onCancel={() => setIsReloadConfirmOpen(false)}
+        onConfirm={() => {
+          setIsReloadConfirmOpen(false);
+          handleReloadScheduledRoutine();
+        }}
+        title="Reload scheduled routine?"
+        consequence="This will discard your customized exercises and any unlogged set drafts."
+        confirmLabel="Reload routine"
+        cancelLabel="Cancel"
+        isDestructive={true}
+        testId="reload-routine-dialog"
+      />
+
+      {/* Deferred Delete Undo Toast (W3, W8, RD-7) */}
+      {activeToast && (
         <UndoToast
-          toast={deleteToast}
+          toast={activeToast}
           onDismiss={() => {}}
         />
       )}
