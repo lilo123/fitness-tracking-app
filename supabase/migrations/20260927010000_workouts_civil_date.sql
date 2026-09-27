@@ -8,30 +8,56 @@
 ALTER TABLE public.workouts
   ADD COLUMN IF NOT EXISTS workout_date date;
 
--- 2. Deterministic backfill based on user's timezone (validated; fallback to UTC if null or invalid)
+-- 2. Helper function for RD-5 civil date derivation:
+-- Midnight-UTC rows represent date-only legacy records and take their UTC date.
+-- Rows with an explicit time are converted with users.timezone (fallback to UTC if null or invalid).
+CREATE OR REPLACE FUNCTION public.workout_civil_date(ts timestamptz, tz text)
+RETURNS date
+LANGUAGE plpgsql
+STABLE
+AS $$
+BEGIN
+  IF ts IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  -- RD-5: Midnight-UTC rows represent date-only legacy records and take their UTC date.
+  IF (ts AT TIME ZONE 'UTC')::time = '00:00:00'::time THEN
+    RETURN (ts AT TIME ZONE 'UTC')::date;
+  END IF;
+
+  -- Rows with an explicit time are converted with users.timezone (fallback to UTC if null or invalid)
+  IF tz IS NOT NULL AND length(trim(tz)) > 0 THEN
+    BEGIN
+      RETURN (ts AT TIME ZONE trim(tz))::date;
+    EXCEPTION WHEN OTHERS THEN
+      RETURN (ts AT TIME ZONE 'UTC')::date;
+    END;
+  END IF;
+
+  RETURN (ts AT TIME ZONE 'UTC')::date;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.workout_civil_date(timestamptz, text) TO authenticated, anon;
+
+-- 3. Deterministic backfill based on RD-5 rule
 UPDATE public.workouts w
-SET workout_date = (
-  w.date AT TIME ZONE CASE
-    WHEN u.timezone IS NOT NULL AND length(trim(u.timezone)) > 0
-         AND EXISTS (SELECT 1 FROM pg_timezone_names tz WHERE tz.name = trim(u.timezone))
-    THEN trim(u.timezone)
-    ELSE 'UTC'
-  END
-)::date
+SET workout_date = public.workout_civil_date(w.date, u.timezone)
 FROM public.users u
 WHERE w.user_id = u.id
   AND w.workout_date IS NULL;
 
 -- Fallback for any workouts without matching user row
 UPDATE public.workouts
-SET workout_date = (date AT TIME ZONE 'UTC')::date
+SET workout_date = public.workout_civil_date(date, 'UTC')
 WHERE workout_date IS NULL;
 
--- 3. Set NOT NULL constraint on workout_date
+-- 4. Set NOT NULL constraint on workout_date
 ALTER TABLE public.workouts
   ALTER COLUMN workout_date SET NOT NULL;
 
--- 4. Trigger on workouts for legacy writers
+-- 5. Trigger on workouts for legacy writers (leaves explicit workout_date untouched)
 CREATE OR REPLACE FUNCTION public.set_workouts_civil_date()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -40,33 +66,16 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_user_tz text;
-  v_effective_tz text := 'UTC';
 BEGIN
   IF TG_OP = 'INSERT' THEN
     IF NEW.workout_date IS NULL THEN
       SELECT timezone INTO v_user_tz FROM public.users WHERE id = NEW.user_id;
-      IF v_user_tz IS NOT NULL AND length(trim(v_user_tz)) > 0 THEN
-        BEGIN
-          PERFORM (COALESCE(NEW.date, now()) AT TIME ZONE v_user_tz);
-          v_effective_tz := v_user_tz;
-        EXCEPTION WHEN OTHERS THEN
-          v_effective_tz := 'UTC';
-        END;
-      END IF;
-      NEW.workout_date := (COALESCE(NEW.date, now()) AT TIME ZONE v_effective_tz)::date;
+      NEW.workout_date := public.workout_civil_date(COALESCE(NEW.date, now()), v_user_tz);
     END IF;
   ELSIF TG_OP = 'UPDATE' THEN
     IF NEW.workout_date IS NULL OR (NEW.date IS DISTINCT FROM OLD.date AND NEW.workout_date IS NOT DISTINCT FROM OLD.workout_date) THEN
       SELECT timezone INTO v_user_tz FROM public.users WHERE id = NEW.user_id;
-      IF v_user_tz IS NOT NULL AND length(trim(v_user_tz)) > 0 THEN
-        BEGIN
-          PERFORM (COALESCE(NEW.date, now()) AT TIME ZONE v_user_tz);
-          v_effective_tz := v_user_tz;
-        EXCEPTION WHEN OTHERS THEN
-          v_effective_tz := 'UTC';
-        END;
-      END IF;
-      NEW.workout_date := (COALESCE(NEW.date, now()) AT TIME ZONE v_effective_tz)::date;
+      NEW.workout_date := public.workout_civil_date(COALESCE(NEW.date, now()), v_user_tz);
     END IF;
   END IF;
 

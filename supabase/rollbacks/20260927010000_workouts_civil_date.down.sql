@@ -8,6 +8,7 @@ ALTER TABLE public.workouts
 -- 2. Drop trigger and function for workout_date
 DROP TRIGGER IF EXISTS trg_set_workouts_civil_date ON public.workouts;
 DROP FUNCTION IF EXISTS public.set_workouts_civil_date();
+DROP FUNCTION IF EXISTS public.workout_civil_date(timestamptz, text);
 
 -- 3. Drop workout_date column
 ALTER TABLE public.workouts

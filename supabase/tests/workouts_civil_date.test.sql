@@ -1,141 +1,119 @@
 BEGIN;
-SELECT plan(9);
+SELECT plan(16);
 
 -- 1. Table & Column assertions
 SELECT has_table('public', 'workouts', 'workouts table exists');
 SELECT has_column('public', 'workouts', 'workout_date', 'workouts table has workout_date column');
 SELECT col_not_null('public', 'workouts', 'workout_date', 'workouts.workout_date is NOT NULL');
 SELECT col_type_is('public', 'workouts', 'workout_date', 'date', 'workouts.workout_date is type date');
+SELECT has_function('public', 'workout_civil_date', ARRAY['timestamp with time zone', 'text'], 'workout_civil_date helper exists');
 
--- 2. Timezone handling and backfill / legacy trigger tests
+-- 2. Pure function unit tests for RD-5 civil date derivation
+SELECT is(
+  public.workout_civil_date('2026-09-26 00:00:00+00'::timestamptz, 'America/Los_Angeles'),
+  '2026-09-26'::date,
+  'LA user midnight-UTC row -> its UTC date (production shape)'
+);
+
+SELECT is(
+  public.workout_civil_date('2026-09-26 06:30:00+00'::timestamptz, 'America/Los_Angeles'),
+  '2026-09-25'::date,
+  'LA row 2026-09-26T06:30Z -> 2026-09-25'
+);
+
+SELECT is(
+  public.workout_civil_date('2026-09-26 16:00:00+00'::timestamptz, 'Asia/Tokyo'),
+  '2026-09-27'::date,
+  'Tokyo row 2026-09-26T16:00Z -> 2026-09-27'
+);
+
+SELECT is(
+  public.workout_civil_date('2026-09-26 00:00:00+00'::timestamptz, 'Asia/Saigon'),
+  '2026-09-26'::date,
+  'Saigon midnight-UTC -> UTC date'
+);
+
+SELECT is(
+  public.workout_civil_date('2026-09-26 06:30:00+00'::timestamptz, NULL),
+  '2026-09-26'::date,
+  'Null timezone falls back to UTC date'
+);
+
+SELECT is(
+  public.workout_civil_date('2026-09-26 06:30:00+00'::timestamptz, 'Invalid/Zone'),
+  '2026-09-26'::date,
+  'Invalid timezone falls back to UTC date'
+);
+
+-- 3. Trigger tests on workouts table (legacy INSERT, UPDATE, explicit workout_date)
 DO $$
 DECLARE
   v_user_la uuid := gen_random_uuid();
-  v_user_tokyo uuid := gen_random_uuid();
-  v_user_utc uuid := gen_random_uuid();
-  v_user_null_tz uuid := gen_random_uuid();
-  v_user_inv_tz uuid := gen_random_uuid();
-  v_wid uuid;
-  v_wid_null uuid;
-  v_wid_inv uuid;
+  v_user_saigon uuid := gen_random_uuid();
+  v_wid_la_mid uuid;
+  v_wid_la_time uuid;
+  v_wid_exp uuid;
   v_wdate date;
 BEGIN
-  -- Create test users with various timezones
   INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES
     (v_user_la, 'user_la@test.com', '{"role":"athlete","timezone":"America/Los_Angeles"}'::jsonb),
-    (v_user_tokyo, 'user_tokyo@test.com', '{"role":"athlete","timezone":"Asia/Tokyo"}'::jsonb),
-    (v_user_utc, 'user_utc@test.com', '{"role":"athlete","timezone":"UTC"}'::jsonb),
-    (v_user_null_tz, 'user_null_tz@test.com', '{"role":"athlete"}'::jsonb),
-    (v_user_inv_tz, 'user_inv_tz@test.com', '{"role":"athlete","timezone":"Invalid/Zone"}'::jsonb);
+    (v_user_saigon, 'user_saigon@test.com', '{"role":"athlete","timezone":"Asia/Saigon"}'::jsonb);
 
   UPDATE public.users SET timezone = 'America/Los_Angeles' WHERE id = v_user_la;
-  UPDATE public.users SET timezone = 'Asia/Tokyo' WHERE id = v_user_tokyo;
-  UPDATE public.users SET timezone = 'UTC' WHERE id = v_user_utc;
-  UPDATE public.users SET timezone = NULL WHERE id = v_user_null_tz;
-  UPDATE public.users SET timezone = 'Invalid/Zone' WHERE id = v_user_inv_tz;
+  UPDATE public.users SET timezone = 'Asia/Saigon' WHERE id = v_user_saigon;
 
-  -- Test Case 1: LA athlete works out at 23:30 local time on 2026-09-15.
-  -- In America/Los_Angeles (EDT/PDT is UTC-7), 23:30 on 2026-09-15 is 06:30 UTC on 2026-09-16.
-  -- The civil workout_date must be 2026-09-15!
+  -- Test: Legacy INSERT with midnight UTC for an LA user -> UTC date (production shape)
   INSERT INTO public.workouts (id, user_id, name, date)
-  VALUES (gen_random_uuid(), v_user_la, 'LA Late Night', '2026-09-16 06:30:00+00')
-  RETURNING workout_date INTO v_wdate;
+  VALUES (gen_random_uuid(), v_user_la, 'LA Midnight Production Shape', '2026-09-26 00:00:00+00')
+  RETURNING id, workout_date INTO v_wid_la_mid, v_wdate;
 
-  IF v_wdate <> '2026-09-15'::date THEN
-    RAISE EXCEPTION 'Expected LA 23:30 workout (06:30 UTC next day) to have workout_date 2026-09-15, got %', v_wdate;
+  IF v_wdate <> '2026-09-26'::date THEN
+    RAISE EXCEPTION 'Legacy INSERT with midnight UTC for LA user failed: expected 2026-09-26, got %', v_wdate;
   END IF;
 
-  -- Test Case 2: Tokyo athlete works out at 02:00 local time on 2026-09-16.
-  -- In Asia/Tokyo (UTC+9), 02:00 on 2026-09-16 is 17:00 UTC on 2026-09-15.
-  -- The civil workout_date must be 2026-09-16!
+  -- Test: Legacy INSERT with explicit time (06:30 UTC = 23:30 PDT previous day) for LA user -> local civil date
   INSERT INTO public.workouts (id, user_id, name, date)
-  VALUES (gen_random_uuid(), v_user_tokyo, 'Tokyo Early Morning', '2026-09-15 17:00:00+00')
-  RETURNING workout_date INTO v_wdate;
+  VALUES (gen_random_uuid(), v_user_la, 'LA Late Night', '2026-09-26 06:30:00+00')
+  RETURNING id, workout_date INTO v_wid_la_time, v_wdate;
 
-  IF v_wdate <> '2026-09-16'::date THEN
-    RAISE EXCEPTION 'Expected Tokyo 02:00 workout (17:00 UTC prev day) to have workout_date 2026-09-16, got %', v_wdate;
+  IF v_wdate <> '2026-09-25'::date THEN
+    RAISE EXCEPTION 'Legacy INSERT with time for LA user failed: expected 2026-09-25, got %', v_wdate;
   END IF;
 
-  -- Test Case 3: UTC user
-  INSERT INTO public.workouts (id, user_id, name, date)
-  VALUES (gen_random_uuid(), v_user_utc, 'UTC Noon', '2026-09-15 12:00:00+00')
-  RETURNING workout_date INTO v_wdate;
-
-  IF v_wdate <> '2026-09-15'::date THEN
-    RAISE EXCEPTION 'Expected UTC 12:00 workout to have workout_date 2026-09-15, got %', v_wdate;
-  END IF;
-
-  -- Test Case 4: Null timezone user falls back to UTC
-  INSERT INTO public.workouts (id, user_id, name, date)
-  VALUES (gen_random_uuid(), v_user_null_tz, 'Null TZ Workout', '2026-09-15 20:00:00+00')
-  RETURNING id, workout_date INTO v_wid_null, v_wdate;
-
-  IF v_wdate <> '2026-09-15'::date THEN
-    RAISE EXCEPTION 'Expected Null TZ workout to fallback to UTC date 2026-09-15, got %', v_wdate;
-  END IF;
-
-  -- Test Case 5: Invalid timezone user falls back to UTC
-  INSERT INTO public.workouts (id, user_id, name, date)
-  VALUES (gen_random_uuid(), v_user_inv_tz, 'Invalid TZ Workout', '2026-09-15 20:00:00+00')
-  RETURNING id, workout_date INTO v_wid_inv, v_wdate;
-
-  IF v_wdate <> '2026-09-15'::date THEN
-    RAISE EXCEPTION 'Expected Invalid TZ workout to fallback to UTC date 2026-09-15, got %', v_wdate;
-  END IF;
-
-  -- Test Case 6: Legacy writer update of date triggers workout_date recalculation (LA user)
-  INSERT INTO public.workouts (id, user_id, name, date)
-  VALUES (gen_random_uuid(), v_user_la, 'Initial Workout', '2026-09-10 12:00:00+00')
-  RETURNING id, workout_date INTO v_wid, v_wdate;
-
-  IF v_wdate <> '2026-09-10'::date THEN
-    RAISE EXCEPTION 'Initial workout_date wrong: %', v_wdate;
-  END IF;
-
+  -- Test: UPDATE of date to midnight UTC -> UTC date
   UPDATE public.workouts
-  SET date = '2026-09-11 12:00:00+00'
-  WHERE id = v_wid
+  SET date = '2026-09-28 00:00:00+00'
+  WHERE id = v_wid_la_time
   RETURNING workout_date INTO v_wdate;
 
-  IF v_wdate <> '2026-09-11'::date THEN
-    RAISE EXCEPTION 'Updated workout_date was not recalculated: %', v_wdate;
+  IF v_wdate <> '2026-09-28'::date THEN
+    RAISE EXCEPTION 'UPDATE of date to midnight UTC failed: expected 2026-09-28, got %', v_wdate;
   END IF;
 
-  -- Test Case 7: Legacy writer update of date for user with NO timezone (null) updates workout_date via UTC fallback
-  UPDATE public.workouts
-  SET date = '2026-09-18 12:00:00+00'
-  WHERE id = v_wid_null
-  RETURNING workout_date INTO v_wdate;
+  -- Test: Explicit workout_date respected on INSERT
+  INSERT INTO public.workouts (id, user_id, name, date, workout_date)
+  VALUES (gen_random_uuid(), v_user_la, 'Explicit Date Workout', '2026-09-26 00:00:00+00', '2026-09-20'::date)
+  RETURNING id, workout_date INTO v_wid_exp, v_wdate;
 
-  IF v_wdate <> '2026-09-18'::date THEN
-    RAISE EXCEPTION 'Null timezone date update failed: expected 2026-09-18, got %', v_wdate;
+  IF v_wdate <> '2026-09-20'::date THEN
+    RAISE EXCEPTION 'Explicit workout_date not respected on INSERT: expected 2026-09-20, got %', v_wdate;
   END IF;
 
-  -- Test Case 8: Legacy writer update of date for user with INVALID timezone updates workout_date via UTC fallback
+  -- Test: Explicit workout_date respected on UPDATE
   UPDATE public.workouts
-  SET date = '2026-09-19 12:00:00+00'
-  WHERE id = v_wid_inv
+  SET workout_date = '2026-09-19'::date
+  WHERE id = v_wid_exp
   RETURNING workout_date INTO v_wdate;
 
   IF v_wdate <> '2026-09-19'::date THEN
-    RAISE EXCEPTION 'Invalid timezone date update failed: expected 2026-09-19, got %', v_wdate;
-  END IF;
-
-  -- Test Case 9: Explicit workout_date is preserved on update
-  UPDATE public.workouts
-  SET workout_date = '2026-09-08'::date
-  WHERE id = v_wid
-  RETURNING workout_date INTO v_wdate;
-
-  IF v_wdate <> '2026-09-08'::date THEN
-    RAISE EXCEPTION 'Explicit workout_date not preserved: %', v_wdate;
+    RAISE EXCEPTION 'Explicit workout_date not respected on UPDATE: expected 2026-09-19, got %', v_wdate;
   END IF;
 END;
 $$;
 
-SELECT pass('Civil workout_date derived correctly for LA/Tokyo/UTC/null/invalid timezones and legacy updates');
+SELECT pass('Trigger sets civil date correctly for legacy INSERTs, UPDATEs, and respects explicit workout_date');
 
--- 3. Unique day constraint rejects second workout for same user and day
+-- 4. Unique day constraint rejects second workout for same user and day
 DO $$
 DECLARE
   v_user uuid := gen_random_uuid();
@@ -158,7 +136,7 @@ $$;
 
 SELECT pass('workouts unique(user_id, workout_date) constraint correctly rejects duplicate day');
 
--- 4. get_ghost_sets and get_history_sessions expose civil_date
+-- 5. get_ghost_sets and get_history_sessions expose civil_date
 DO $$
 DECLARE
   v_user uuid := gen_random_uuid();
