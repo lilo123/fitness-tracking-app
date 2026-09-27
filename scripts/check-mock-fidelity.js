@@ -139,7 +139,7 @@ const SERVICED_QUERIES_REGISTRY = {
       description: 'Mutation-only insert for template creation',
     },
   ],
-  'src/components/history/HistoryView.test.tsx': [
+  'src/components/history/HistoryView.filters.test.tsx': [
     {
       table: 'exercises',
       type: 'EXACT',
@@ -147,10 +147,30 @@ const SERVICED_QUERIES_REGISTRY = {
       description: 'Exercise lookup query',
     },
     {
-      table: 'workouts',
+      table: 'sets',
       type: 'EXACT',
-      projection: 'id',
-      description: 'Workouts connectivity probe query',
+      projection: 'id, workout_id, exercise_id, weight, reps, set_index, created_at, rpe, set_type',
+      description: 'On-demand session sets detail query',
+    },
+    {
+      table: 'nutrition_logs',
+      type: 'EXACT',
+      projection: 'id, user_id, food_name, meal_type, calories, protein, carbs, fat, fiber, serving_size, serving_unit, logged_at, logged_date, created_at, has_components',
+      description: 'Nutrition history query',
+    },
+    {
+      table: 'users',
+      type: 'EXACT',
+      projection: 'id, email, username, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, is_coach_mode, coach_code, coach_tier, max_athletes, created_at, timezone',
+      description: 'User profile query',
+    },
+  ],
+  'src/components/history/HistoryView.test.tsx': [
+    {
+      table: 'exercises',
+      type: 'EXACT',
+      projection: 'id, name, body_part, is_master',
+      description: 'Exercise lookup query',
     },
     {
       table: 'sets',

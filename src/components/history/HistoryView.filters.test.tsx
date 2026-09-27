@@ -6,6 +6,11 @@ import { HistoryView } from './HistoryView';
 import { AuthProvider } from '../../context/AuthContext';
 import { CoachProvider } from '../../context/CoachContext';
 import * as workoutHistoryModule from './useWorkoutHistory';
+import {
+  createSupabaseBuilder,
+  getRecordedSelects,
+  clearMockHistory,
+} from '../../test/supabaseBuilderMock';
 
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async (importOriginal) => {
@@ -24,33 +29,29 @@ const { mockUser, mockSession } = vi.hoisted(() => {
   };
 });
 
+const mockExercises = [
+  { id: 'ex-1', name: 'Barbell Bench Press', body_part: 'Chest', is_master: true },
+  { id: 'ex-2', name: 'Incline Dumbbell Press', body_part: 'Chest', is_master: true },
+  { id: 'ex-3', name: 'Barbell Back Squat', body_part: 'Legs', is_master: true },
+  { id: 'ex-4', name: 'Pull-Up (Café Edition)', body_part: 'Back', is_master: true },
+];
+
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: vi.fn().mockImplementation((table: string) => {
       if (table === 'exercises') {
-        return {
-          select: vi.fn().mockReturnThis(),
-          order: vi.fn().mockReturnThis(),
-          limit: vi.fn().mockResolvedValue({
-            data: [
-              { id: 'ex-1', name: 'Barbell Bench Press', body_part: 'Chest', is_master: true },
-              { id: 'ex-2', name: 'Incline Dumbbell Press', body_part: 'Chest', is_master: true },
-              { id: 'ex-3', name: 'Barbell Back Squat', body_part: 'Legs', is_master: true },
-              { id: 'ex-4', name: 'Pull-Up (Café Edition)', body_part: 'Back', is_master: true },
-            ],
-            error: null,
-          }),
-        };
+        return createSupabaseBuilder('exercises', { data: mockExercises, error: null });
       }
-      return {
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        order: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockReturnThis(),
-        range: vi.fn().mockResolvedValue({ data: [], error: null }),
-        delete: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
-        update: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) }) }),
-      };
+      if (table === 'nutrition_logs') {
+        return createSupabaseBuilder('nutrition_logs', { data: [], error: null });
+      }
+      if (table === 'users') {
+        return createSupabaseBuilder('users', { data: [mockUser], error: null });
+      }
+      if (table === 'coach_athlete_links') {
+        return createSupabaseBuilder('coach_athlete_links', { data: [], error: null });
+      }
+      return createSupabaseBuilder(table, { data: [], error: null });
     }),
     rpc: vi.fn().mockImplementation((fn: string) => {
       if (fn === 'get_exercise_stats') {
@@ -92,6 +93,7 @@ describe('HistoryView Filters & Range Integration (H13)', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    clearMockHistory();
     queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
@@ -151,6 +153,36 @@ describe('HistoryView Filters & Range Integration (H13)', () => {
     );
 
   describe('Date Range Chips (H9, H22, H34)', () => {
+    it('services expected database query contracts for exercises, sets, nutrition, and user profile', async () => {
+      renderComponent();
+      await waitFor(() => {
+        expect(getRecordedSelects()).toContainEqual({
+          table: 'exercises',
+          projection: 'id, name, body_part, is_master',
+        });
+      });
+      await waitFor(() => {
+        expect(getRecordedSelects()).toContainEqual({
+          table: 'users',
+          projection:
+            'id, email, username, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, is_coach_mode, coach_code, coach_tier, max_athletes, created_at, timezone',
+        });
+      });
+      await waitFor(() => {
+        expect(getRecordedSelects()).toContainEqual({
+          table: 'nutrition_logs',
+          projection:
+            'id, user_id, food_name, meal_type, calories, protein, carbs, fat, fiber, serving_size, serving_unit, logged_at, logged_date, created_at, has_components',
+        });
+      });
+      await waitFor(() => {
+        expect(getRecordedSelects()).toContainEqual({
+          table: 'sets',
+          projection: 'id, workout_id, exercise_id, weight, reps, set_index, created_at, rpe, set_type',
+        });
+      });
+    });
+
     it('renders 4 date range chips (All, 1Y, 90D, 30D) with touch targets and aria-pressed', () => {
       renderComponent();
 

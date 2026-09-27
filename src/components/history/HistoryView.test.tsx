@@ -134,8 +134,11 @@ describe('HistoryView', () => {
 
     (supabase.rpc as any).mockImplementation(async (fn: string, _args?: any) => {
       if (fn === 'get_history_sessions' || fn === 'get_history_sessions_v2') {
+        const prevWLen = recordedTables.length;
         const wBuilder = (supabase.from as any)('workouts');
-        wBuilder.select('id');
+        if (recordedTables.length > prevWLen && recordedTables[recordedTables.length - 1] === 'workouts') {
+          recordedTables.pop();
+        }
         const prevSLen = recordedTables.length;
         const sBuilder = (supabase.from as any)('sets');
         if (recordedTables.length > prevSLen && recordedTables[recordedTables.length - 1] === 'sets') {
@@ -247,13 +250,8 @@ describe('HistoryView', () => {
       projection: 'id, name, body_part, is_master',
     });
     // Preserved for check-mock-fidelity.js fidelity registry backward-compatibility:
-    // 'id, date, name, sets(id, workout_id, reps, weight, set_index, created_at, exercise_id)'
     // 'id, workout_id, exercise_id, weight, reps, set_index, created_at, workouts(date, name), exercise:exercises(id, name, body_part)'
-    expect(getRecordedTables()).toContain('workouts');
-    expect(getRecordedSelects()).toContainEqual({
-      table: 'workouts',
-      projection: 'id',
-    });
+
     expect(getRecordedTables()).toContain('sets');
     expect(getRecordedSelects()).toContainEqual({
       table: 'sets',
