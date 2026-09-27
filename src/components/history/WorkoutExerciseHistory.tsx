@@ -13,6 +13,7 @@ export interface ExerciseStat {
   maxWeight: number;
   prReps: number;
   setCount?: number;
+  prDate?: string | null;
 }
 
 interface WorkoutExerciseHistoryProps {

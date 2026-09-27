@@ -60,6 +60,7 @@ describe('HistoryView', () => {
       fat: 10,
       fiber: 5,
       logged_at: '2026-09-01T12:00:00Z',
+      logged_date: '2026-09-01',
     },
     {
       id: 'log-2',
@@ -72,6 +73,7 @@ describe('HistoryView', () => {
       fat: 2,
       fiber: 3,
       logged_at: '2026-09-01T15:00:00Z',
+      logged_date: '2026-09-01',
     },
   ];
 
@@ -246,7 +248,7 @@ describe('HistoryView', () => {
     expect(getRecordedTables()).toContain('sets');
     expect(getRecordedSelects()).toContainEqual({
       table: 'sets',
-      projection: 'id, workout_id, exercise_id, weight, reps, set_index, created_at',
+      projection: 'id, workout_id, exercise_id, weight, reps, set_index, created_at, rpe, set_type',
     });
     expect(getRecordedTables()).toContain('nutrition_logs');
     expect(getRecordedSelects()).toContainEqual({

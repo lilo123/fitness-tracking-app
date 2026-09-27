@@ -183,5 +183,37 @@ describe('EditExerciseModal', () => {
     expect(saveBtn).toBeDisabled();
     expect(screen.getByText(/Exercise name cannot be blank or whitespace-only./i)).toBeDefined();
   });
+
+  it('L26: successful rename invalidates exercise_stats query cache to update History PR card title', async () => {
+    (supabase.from as any).mockImplementation((table: string) => {
+      const b = createSupabaseBuilder(table, { data: [{ id: 'ex-1', name: 'Incline Bench Press' }], error: null });
+      b.update = vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          select: vi.fn().mockResolvedValue({ data: [{ id: 'ex-1', name: 'Incline Bench Press' }], error: null }),
+        }),
+      });
+      return b;
+    });
+
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <EditExerciseModal {...mockProps} />
+      </QueryClientProvider>
+    );
+
+    const input = screen.getByLabelText(/exercise name/i);
+    fireEvent.change(input, { target: { value: 'Incline Bench Press' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(mockProps.onSuccess).toHaveBeenCalled();
+    });
+
+    const invalidatedKeys = invalidateSpy.mock.calls.map((c) => (c[0] as any)?.queryKey);
+    expect(invalidatedKeys).toContainEqual(['exercise_stats']);
+  });
 });
 

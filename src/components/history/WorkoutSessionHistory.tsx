@@ -9,6 +9,8 @@ import { FALLBACK_WINDOW } from './virtualizationConstants';
 export interface HistorySession {
   id: string;
   date: string;
+  workout_date?: string;
+  civil_date?: string;
   name: string;
   set_count?: number;
   total_volume?: number;
@@ -178,7 +180,7 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
           <div>
             <h3 className="text-sm font-black text-white">{session.name || 'Workout Session'}</h3>
             <div className="text-[11px] font-mono text-cyan-400 mt-0.5">
-              {formatShortDate(session.date)} ({session.date})
+              {formatShortDate(session.civil_date || session.workout_date || session.date)}
             </div>
           </div>
           <div className="flex items-center gap-3">

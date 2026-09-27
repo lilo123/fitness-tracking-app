@@ -107,6 +107,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
       await queryClient.invalidateQueries({ queryKey: ['exercises'] });
       await queryClient.invalidateQueries({ queryKey: ['routine_templates'] });
       await queryClient.invalidateQueries({ queryKey: ['workout_sets'] });
+      await queryClient.invalidateQueries({ queryKey: ['exercise_stats'] });
 
       if (onSuccess) onSuccess();
       onClose();

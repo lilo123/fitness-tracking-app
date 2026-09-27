@@ -35,6 +35,8 @@ export interface CoachWorkoutSet {
 export interface CoachWorkoutSession {
   id: string;
   date?: string;
+  workout_date?: string;
+  civil_date?: string;
   name?: string | null;
   sets?: CoachWorkoutSet[];
 }

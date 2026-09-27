@@ -55,4 +55,36 @@ describe('CoachAthleteTimeline accessibility (NEW-15)', () => {
     expect(assertiveAfter!.textContent).toContain('Network failure');
     expect(politeAfter!.textContent).toBe('');
   });
+
+  it('H4: renders civil date in timeline day header with zero raw ISO timestamp text', () => {
+    const timelineDays = [
+      {
+        date: '2026-09-15',
+        workouts: [
+          {
+            id: 'w-1',
+            date: '2026-09-15T00:00:00.000Z',
+            civil_date: '2026-09-15',
+            workout_date: '2026-09-15',
+            name: 'Push Day',
+            sets: [],
+          },
+        ],
+        nutrition: [],
+      },
+    ];
+
+    const { container } = render(
+      <CoachAthleteTimeline
+        {...defaultProps}
+        timelineDays={timelineDays}
+        athleteWorkoutsWithSets={timelineDays[0].workouts}
+      />
+    );
+
+    // Formatted civil date header
+    expect(container.textContent).toContain('Sep 15');
+    // Zero raw ISO text
+    expect(container.textContent).not.toContain('2026-09-15T00:00:00');
+  });
 });

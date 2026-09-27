@@ -206,13 +206,19 @@ export const HistoryView: React.FC = () => {
         match.setCount = Number(row.set_count) || 0;
         match.maxWeight = Number(row.max_weight) || 0;
         match.prReps = Number(row.pr_reps) || 0;
+        match.prDate = row.pr_date || null;
         match.sets = Array.isArray(row.recent_sets) ? row.recent_sets : [];
+        if (row.exercise_name && (!match.exercise.name || match.exercise.name === match.exercise.id)) {
+          match.exercise.name = row.exercise_name;
+        }
       } else {
+        const name = row.exercise_name || resolveExerciseLabel(row.exercise_id);
         stats[row.exercise_id] = {
-          exercise: { id: row.exercise_id, name: resolveExerciseLabel(row.exercise_id), body_part: 'Other' },
+          exercise: { id: row.exercise_id, name, body_part: 'Other' },
           sets: Array.isArray(row.recent_sets) ? row.recent_sets : [],
           maxWeight: Number(row.max_weight) || 0,
           prReps: Number(row.pr_reps) || 0,
+          prDate: row.pr_date || null,
           setCount: Number(row.set_count) || 0,
         };
       }

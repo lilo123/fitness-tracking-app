@@ -20,6 +20,8 @@ export interface HistorySet extends WorkoutSet {
 export interface HistorySession {
   id: string;
   date: string;
+  workout_date?: string;
+  civil_date?: string;
   name: string;
   set_count: number;
   total_volume: number;
@@ -28,9 +30,11 @@ export interface HistorySession {
 
 export interface RawExerciseStat {
   exercise_id: string;
+  exercise_name?: string;
   set_count: number;
   max_weight: number;
   pr_reps: number;
+  pr_date?: string | null;
   recent_sets: any;
 }
 
@@ -40,7 +44,7 @@ export async function fetchSessionSets(workoutId: string): Promise<HistorySet[]>
   // detail-fetch — user expands a session card
   const { data, error } = await supabase
     .from('sets')
-    .select('id, workout_id, exercise_id, weight, reps, set_index, created_at')
+    .select('id, workout_id, exercise_id, weight, reps, set_index, created_at, rpe, set_type')
     .eq('workout_id', workoutId)
     .order('set_index', { ascending: true })
     .limit(500);
@@ -54,14 +58,17 @@ export async function fetchSessionSets(workoutId: string): Promise<HistorySet[]>
     );
   }
 
-  return (data as any[]).map((s) => ({
-    ...s,
-    exercise_name: s.exercise_name || s.exercise?.name,
-    set_index: s.set_index ?? 0,
-    set_type: 'working',
-    workout_date: '',
-    workout_name: '',
-  }));
+  return (data as any[])
+    .filter((s) => !s.set_type || s.set_type === 'working')
+    .map((s) => ({
+      ...s,
+      exercise_name: s.exercise_name || s.exercise?.name,
+      set_index: s.set_index ?? 0,
+      set_type: s.set_type || 'working',
+      rpe: s.rpe ?? null,
+      workout_date: '',
+      workout_name: '',
+    }));
 }
 
 async function fetchWorkoutsPage(
@@ -91,9 +98,11 @@ async function fetchWorkoutsPage(
       return { sessions: [], hasMore: false };
     }
 
-    const sessions: HistorySession[] = data.map((row) => ({
+    const sessions: HistorySession[] = data.map((row: any) => ({
       id: row.id,
       date: row.date,
+      workout_date: row.civil_date || row.workout_date || (row.date ? String(row.date).split('T')[0] : ''),
+      civil_date: row.civil_date || row.workout_date || (row.date ? String(row.date).split('T')[0] : ''),
       name: row.name || 'Workout Session',
       set_count: Number(row.set_count) || 0,
       total_volume: Number(row.total_volume) || 0,
@@ -120,6 +129,8 @@ async function fetchWorkoutsPage(
   const sessions: HistorySession[] = (data as any[]).map((row) => ({
     id: row.id,
     date: row.date,
+    workout_date: row.workout_date || (row.date ? String(row.date).split('T')[0] : ''),
+    civil_date: row.civil_date || row.workout_date || (row.date ? String(row.date).split('T')[0] : ''),
     name: row.name || 'Workout Session',
     set_count: 0,
     total_volume: 0,
@@ -173,7 +184,7 @@ export function useHistoryData(targetUserId: string, onMutationError?: (msg: str
         .from('exercises')
         .select('id, name, body_part, is_master')
         .order('name')
-        .limit(200);
+        .limit(1000);
       if (error) throw error;
       if (!data || data.length === 0) return DEFAULT_EXERCISES_LIST;
       return data as Exercise[];
