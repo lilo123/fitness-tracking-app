@@ -20,7 +20,7 @@
 | P2 | Workout data layer and cross-tab data contracts | **done** 2026-09-27 | `783b6cb` (PR #8). All 29 items. M2 `workouts_civil_date` + M3 `exercise_pr_benchmarks` applied to production 02:36Z (verified backups; per-day checksum identical before/after; audit 0). Gates: tsc 0, oxlint 0e/33w, vitest 107/1417 in UTC + LA + Tokyo (test:tz = full suite), mocks/payload/build/perf, pgTAP 168, density 67/67 ×2, E2E 64/0/6; the deployed frontend passed the same E2E set against the migrated DB. |
 | P3a | Shared primitives, exercise card, set rows, EditSetSheet | **done** 2026-09-27 | `407f94b` (PR #9). UI-only (no migration). Primitives in `common/`, `EditSetSheet` replaces `EditSetModal` with deferred delete (`useDeferredDelete` + `UndoToast`), `ExerciseCard`/`SetRow` 44px hit areas, `check:design` ratchet. Gates: tsc 0, oxlint 0e/33w, vitest 123/1519 + tz, pgTAP 168, density 73/73 ×2, E2E 70/0/6 local, CI full suite green (3 projects). Deployed to `v2-rewrite` 14:53Z. |
 | P3b | Workout session flows, header, rest day, routine picker | **done** 2026-09-27 | `7597545` (PR #10). UI-only (no migration). Exercise removal (0 logged -> UndoToast; logged -> `RemoveExerciseSheet` deferred delete), Clear/Reload ConfirmDialog, `FinishReviewSheet`, skeletons, empty-state CTAs, URL `?date=`/`?routine=` contracts, header/picker/pill 44px + STD-TYP (D-P3b-1). Gates: tsc 0, oxlint 0e/31w, vitest 131/1563 + tz, pgTAP 168, density 78/78 ×2, E2E 82/0/6 local (ran vs M4-applied DB = parity), CI green (18m47s). Deployed to `v2-rewrite` 17:21Z. |
-| P4 | Exercise catalog + shared ExercisePicker | not started | |
+| P4 | Exercise catalog + shared ExercisePicker | **done** 2026-09-27 | `03de69e` (PR #11). M4 `20260927030000_exercise_catalog` applied to production 19:44Z via `scripts/prod-db.sh migrate` (backup `prod-20260927T194454Z.dump` verified; pre/post checksum `785f564f9ae0142caeacadb59d3133f6` identical, post invariants 0). Shared `ExercisePicker` (catalog RPC, search normalizer, chips, multi-add, inline create with duplicate check), `RoutinePickerModal` on `get_routine_catalog` (D-P4-4 payload projection), Library/History DOM compat proof. Gates (79557ab): tsc 0, oxlint 0e/31w, vitest 135/1602 + tz, pgTAP 201, density 83/83 ×2, E2E 88/0/6; full E2E in CI order (`03de69e`) 141/0/12s; CI green (18m2s, attempt 2). Deployed to `v2-rewrite` 19:45Z. |
 | P5a | History data, shell and session list | not started | |
 | P5b | History exercise sheet, trends, calendar, nutrition timeline | not started | |
 | P6 | kg/lb units across tabs | not started | |
@@ -80,6 +80,10 @@ Newest first. Decisions dated 2026-09-26 in the audit reports are final and are 
 | D-P3a-1 | **Exercise card title 16px/800 -> 14px/700** per STD-TYP. Card header title uses 14px semibold (font-bold/700) instead of 16px extra-bold (font-extrabold/800). | STD-TYP-1/2: card titles 14px max; 16px reserved for section headers. |
 | D-P3a-2 | **CI job timeout-minutes 15 -> 25.** | P2 run was already 14m41s; full suite with 3 projects on one DB runs ~17m. |
 | D-P3b-1 | **Rest timer display and RestDayView title 18-20px -> 14px (text-sm/bold)** per STD-TYP-1. `GlobalRestTimerPill` timer digits text-xl (20px) -> text-sm (14px font-bold tabular-nums); `RestDayView` title text-lg (18px) -> text-sm (14px font-bold). | STD-TYP-1 12/14/16 type scale. Fixed at source rather than filtered out in visual density checks. |
+| D-P4-1 | **Compatibility trigger: writes specifying only body_parts set body_part = array_to_string(body_parts, ', ')**. | Ensures reverse compatibility for legacy readers while enabling new array-based writes (approved by user 15:47Z). |
+| D-P4-2 | **get_exercise_catalog excludes archived rows unless p_scope='archived'**. | Archived exercises are hidden from active pickers and coach views unless explicitly browsing the archive (approved by user 15:47Z). |
+| D-P4-3 | **Catalog pagination default limit 50 / max 200 keyset; exercise_hides apply to master exercises only**. | Custom exercises are archived rather than hidden; default limit 50 caps round-trip size while 200 allows deep search (approved by user 15:47Z). |
+| D-P4-4 | **/workout routine list projects get_routine_catalog to pre-P4 columns via .rpc().select()**. | exercises jsonb per template blew the 51,200 B payload budget (62,323 B -> 21,298 B); exercise lists are fetched on-demand in template detail (conductor decision). |
 
 ### 2.3 Earlier decisions carried in (user, 2026-09-26; final)
 - **Workout §1a:**
@@ -318,6 +322,8 @@ The password lives in `~/.config/fitness-supabase/db_password` (mode 600). Backu
   - `src/constants/muscleGroups.ts`
   - `src/lib/exercises.ts` (catalog hook + the single custom-exercise insert path)
   - `RoutinePickerModal.tsx` (catalog query)
+- **Pre-migration read-only audit:**
+  - `supabase/audits/m4_exercise_catalog_audit.sql`: 25 exercises (23 master, 2 custom), 24 single token, 1 slash ('Chest / Triceps'), 0 comma, 0 NULL; checksum `785f564f9ae0142caeacadb59d3133f6`. M4 applied to production 19:44Z via `scripts/prod-db.sh migrate` (backup `prod-20260927T194454Z.dump` verified; counts unchanged, checksum identical pre/post, invariants 0, master equipment dumbbell 1 / cable 7 / machine 1 / NULL 14).
 - **Depends on:** P3b.
 - **Acceptance:**
   - Workout §3 picker design:
@@ -566,6 +572,10 @@ The agent has no production DB credentials (anon key only); re-run the query bef
 | E2E specs must be self-sufficient on fresh seed.sql and not leave residue (CI runs 3 projects on one DB) | Cross-spec flakiness in CI when later projects (e.g. Narrow Safari) hit modified or missing seeded rows | New E2E specs create and clean up their own test data; run all 3 CI projects in order locally before pushing. |
 | CI job duration ~17 min, limit 25 | CI job cancellation on timeout if suite grows further | Timeout bumped 15 -> 25 min (D-P3a-2); watch duration as P3b-P8 add specs; shard or parallelize projects if approaching 22 min. |
 | `WorkoutEngine.tsx` (586 LOC) and `useWorkoutSession.ts` (585 LOC) near 600 LOC budget after P3b | perf gate fails on next edit | Next phase touching either must extract sub-components/hooks before adding code. |
+| Local gate runs subset of E2E specs; rfix-06-payload was outside gate set and caught a real payload regression in CI | CI failure and delayed feedback loop | Local pre-PR gates must run the FULL tests/e2e in CI order (all 3 projects) before opening/updating PRs. |
+| Library ExercisesView still has direct exercises table insert path instead of shared insertCustomExercise | Fragmented validation and duplicate-check logic | Adopt insertCustomExercise in Library during P7a/P7b. |
+| useWorkoutQueries retains legacy REST fallback when get_routine_catalog errors (logged to console) | Obscures RPC issues and maintains dead code path | Remove REST fallback once M4 RPC is confirmed stable in production. |
+| Master exercises equipment is NULL for 14/23 rows (inference unmatched) | Exercise picker equipment chips show fewer results | Curate remaining master equipment values in future migration/seed (e.g. M8). |
 
 ## 9. Change log of this file
 | Date | Change |
@@ -580,3 +590,4 @@ The agent has no production DB credentials (anon key only); re-run the query bef
 | 2026-09-27 | P2 done and shipped (`783b6cb`, PR #8): M2 civil dates (RD-5 midnight-UTC rule) + M3 benchmarks in production; data layer, History/Coach consumers; full suite time-zone clean. §3a rule 8 (production-shape audit + checksum for data-changing migrations). RD-15 audit uses the RD-5 rule. |
 | 2026-09-27 | P3a done and shipped (`407f94b`, PR #9): shared primitives in `common/`, `EditSetSheet` (deferred delete + `UndoToast`), `ExerciseCard`/`SetRow` 44px hit areas, `check:design` ratchet; no migration. Decisions D-P3a-1 (card title 14px/700) and D-P3a-2 (CI timeout 25m). Two new risks (E2E fresh seed/residue, CI duration). |
 | 2026-09-27 | P3b done and shipped (`7597545`, PR #10): session flows (`RemoveExerciseSheet`, Clear/Reload ConfirmDialog, `FinishReviewSheet`, skeletons, empty-state CTAs, URL contracts `?date=`/`?routine=`), header/picker/timer pill 44px + STD-TYP; no migration. Decision D-P3b-1 (timer digits and rest-day title 14px/bold). One new risk (WorkoutEngine / useWorkoutSession LOC near 600). |
+| 2026-09-27 | P4 done and shipped (`03de69e`, PR #11): M4 `exercise_catalog` applied to production with verified backup and identical checksum; shared ExercisePicker, `get_routine_catalog` RPC with payload budget projection (D-P4-4), Library/History compat verified. Decisions D-P4-1..4; four new risks (CI-order E2E gate, Library insertCustomExercise, REST fallback removal, NULL master equipment). |
