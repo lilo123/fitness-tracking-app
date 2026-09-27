@@ -16,7 +16,7 @@
 | Phase | Title | Status | Progress notes |
 |---|---|---|---|
 | P0 | Foundations and test guardrails | **done** 2026-09-26 | `6bc91c7` (+ `7e7b05b` E2E label fix for D46). Gates: tsc 0, oxlint 0e/33w, vitest 98/1349, test:tz LA 141 + Tokyo 141, check:mocks/payload, build, perf, density 67/67 ×2, E2E trio 36/0/6. No DOM change. |
-| P1 | Safety hotfixes + exercises RLS v2 | not started | |
+| P1 | Safety hotfixes + exercises RLS v2 | **done** 2026-09-27 | `cc64455` (PR #7). W50 policy, L1, L2, L3, L5, L6, L7, L12 + M1 `20260927000000_exercises_rls_v2` applied to production 00:50Z via `scripts/prod-db.sh migrate` (backup `prod-20260927T005007Z.dump` verified; audit 0 before and after). Gates: tsc 0, oxlint 0e/33w, vitest 98/1359, test:tz 141+141, mocks/payload/build/perf, density 67/67, pgTAP 142/142, E2E trio + workout/coach/error-states 62 passed/6 skipped, CI green. Master routines stay editable by platform coaches (L1 = exercises only). |
 | P2 | Workout data layer and cross-tab data contracts | not started | |
 | P3a | Shared primitives, exercise card, set rows, EditSetSheet | not started | |
 | P3b | Workout session flows, header, rest day, routine picker | not started | |
@@ -205,7 +205,7 @@ The password lives in `~/.config/fitness-supabase/db_password` (mode 600). Backu
   - W50 (b) templates that point at another coach's exercise
   - exercises with blank names (would violate the CHECK)
   - all must be 0 or resolved first
-  - query: `supabase/audits/redesign_prechecks.sql` (rows 7–11). Production result 2026-09-26: **all 0**. Re-run with `scripts/prod-db.sh audit` right before `migrate` (§3a).
+  - query: `supabase/audits/redesign_prechecks.sql` (rows 7–11). Production result 2026-09-26: **all 0**. Re-run 2026-09-27 00:49Z right before `migrate`: all 0; after: all 0.
 - **Depends on:** P0.
 - **Acceptance:**
   - Masters show no Edit/Trash.
@@ -554,6 +554,9 @@ The agent has no production DB credentials (anon key only); re-run the query bef
 | LOC budget (600) on HistoryView/ExercisesView/CoachCockpit (543/543/587 today) | perf gate fails | Split files as part of each phase (listed under Owns). |
 | Coach/Settings unaudited | Hidden defects reach P8 late | The P8 audit runs first; it may split P8. |
 | Full vitest suite is not time-zone clean (found in P0): under `TZ=America/Los_Angeles` 1 test fails, under `Asia/Tokyo` 6 fail (NutritionEngine.test, HistoryView.test, useCustomDishActions.test). `test:tz` covers the 7 date suites, which pass. | Hidden day-boundary bugs, or tests that assume UTC | Triage in P2 (date contract): fix the test or the product per case, then widen `test:tz` to the full suite. |
+| Local `npm run test:db` fails with the repo's Supabase CLI 2.31 (`config.toml` has newer keys: `oauth_server`, `pgdelta`, `local_smtp`); CI's CLI is fine | Local pgTAP looks broken | Copy `supabase/tests` to `/tmp/<dir>/supabase/` and run `npx supabase test db --workdir /tmp/<dir> --db-url postgresql://postgres:postgres@127.0.0.1:58822/postgres`. |
+| `save_routine_template` (SECURITY DEFINER) does not check that each `exercise_id` is visible to the caller (found in P1 review; production audit W50b = 0) | A template could reference an exercise its owner can't see | Add the visibility check when P7b owns the template builder / RPC. |
+| `ExercisesView.tsx` is at 599/600 LOC after P1 | perf gate fails on the next edit | P7a splits it before adding anything. |
 | D44 edit-meal E2E flaked once in the History half (Save stayed disabled after a name change; 6/6 passes on repeat, on both base and P0) | CI noise | Watch; if it recurs, check the edit sheet's async draft reload overwriting typed input. |
 
 ## 9. Change log of this file
@@ -565,3 +568,4 @@ The agent has no production DB credentials (anon key only); re-run the query bef
 | 2026-09-26 | P0 done (`6bc91c7`); E2E label fix for D46 (`7e7b05b`); baseline updated; two new risks (TZ-unclean full suite, D44 E2E flake); pre-P1 audit partial (blank names = 0). |
 | 2026-09-26 | P0 shipped to `v2-rewrite` at `7d907bc` (CI fixes: `test:tz` after Supabase start, Roboto for density, D23 screenshot path). Production audit recorded: every count is 0. |
 | 2026-09-26 | §3a execution rules: production-DB hard rules (`scripts/prod-db.sh`: check/audit/backup/migrate/rollback + local rehearsal), flock browser lock (`scripts/with-browser-lock.sh`), anti-stall rules. First verified production backup taken (23:25Z). |
+| 2026-09-27 | P1 done and shipped (`cc64455`, PR #7): M1 exercises RLS v2 applied to production with a verified backup; Library hotfixes; D44 density fixture date fixed (was hardcoded 2026-09-26). Three new risks (local test:db CLI, RPC exercise visibility, ExercisesView LOC). |
