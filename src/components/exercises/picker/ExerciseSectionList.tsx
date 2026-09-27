@@ -91,7 +91,7 @@ export const ExerciseSectionList: React.FC<ExerciseSectionListProps> = ({
         </h3>
 
         {filteredCatalog.length === 0 && !searchQuery.trim() ? (
-          <div className="text-center py-8 text-zinc-500 space-y-2">
+          <div className="text-center py-8 text-zinc-400 space-y-2">
             <Dumbbell className="w-8 h-8 mx-auto text-zinc-600" />
             <p className="text-sm">No exercises found.</p>
           </div>
@@ -113,7 +113,7 @@ export const ExerciseSectionList: React.FC<ExerciseSectionListProps> = ({
       {/* Infinite Scroll Sentinel and Load More */}
       <div ref={sentinelRef} className="py-2 text-center">
         {isFetchingNextPage ? (
-          <p className="text-xs text-zinc-500 animate-pulse">
+          <p className="text-xs text-zinc-400 animate-pulse">
             Loading more exercises...
           </p>
         ) : hasNextPage ? (

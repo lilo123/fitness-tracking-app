@@ -48,7 +48,7 @@ export const ExerciseRow: React.FC<ExerciseRowProps> = ({
             {exercise.name}
           </span>
           {exercise.is_master && (
-            <span className="text-xs uppercase font-bold tracking-wider text-zinc-500 px-1.5 py-0.5 rounded bg-zinc-800/60 border border-zinc-700/40 shrink-0">
+            <span className="text-xs uppercase font-bold tracking-wider text-zinc-300 px-1.5 py-0.5 rounded bg-zinc-800/60 border border-zinc-700/40 shrink-0">
               Default
             </span>
           )}
