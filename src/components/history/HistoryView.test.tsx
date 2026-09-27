@@ -1713,7 +1713,7 @@ describe('HistoryView', () => {
       // asserting synchronously on stats-derived text raced the re-render and
       // failed ~20% of full-suite runs. Await something only the RPC can produce.
       expect(await screen.findByText('Deadlift')).toBeDefined();
-      expect(await screen.findByText('Recent Activity (42 sets):')).toBeDefined();
+      expect(await screen.findByText('All-time: 42 sets · Last 3:')).toBeDefined();
       expect(screen.getByText('PR: 405 lbs × 5')).toBeDefined();
     });
 
