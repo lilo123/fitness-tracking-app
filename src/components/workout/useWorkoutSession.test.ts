@@ -23,6 +23,7 @@ describe('useWorkoutSession (W5, W24, W39, W46)', () => {
   };
 
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-09-06T12:00:00Z'));
     localStorage.clear();
     vi.clearAllMocks();
@@ -255,5 +256,68 @@ describe('useWorkoutSession (W5, W24, W39, W46)', () => {
     });
 
     expect(result.current.activeExercises.length).toBe(initialLen);
+  });
+  it('W39/TZ regression: rapid sequential moveExercise is deterministic near midnight across timezones (23:59:59 and 00:00:01 local)', () => {
+    // 1. Within a single civil date (Sunday Rest Day): 00:00:01 and 23:59:59 local behave identically
+    for (const timeStr of ['2026-09-27T00:00:01', '2026-09-27T23:59:59']) {
+      localStorage.clear();
+      vi.setSystemTime(new Date(timeStr));
+      const { result } = renderHook(() => useWorkoutSession(defaultProps));
+
+      expect(result.current.workoutDate).toBe('2026-09-27');
+      expect(result.current.activeRoutineName).toBe('Rest Day');
+      expect(result.current.activeExercises).toEqual([]);
+
+      act(() => {
+        result.current.handleAddExercise('Bench Press');
+        result.current.handleAddExercise('Squat');
+        result.current.handleAddExercise('Barbell Row');
+      });
+
+      expect(result.current.activeExercises).toEqual(['Bench Press', 'Squat', 'Barbell Row']);
+
+      act(() => {
+        result.current.moveExercise(2, -1);
+        result.current.moveExercise(1, -1);
+      });
+
+      expect(result.current.activeExercises).toEqual(['Barbell Row', 'Bench Press', 'Squat']);
+    }
+
+    // 2. Midnight boundary rollover: active session started at 23:59:59 local is preserved across midnight at 00:00:01 local
+    localStorage.clear();
+    vi.setSystemTime(new Date('2026-09-27T23:59:59'));
+    const session1 = renderHook(() => useWorkoutSession(defaultProps));
+    act(() => {
+      session1.result.current.handleAddExercise('Bench Press');
+      session1.result.current.handleAddExercise('Squat');
+      session1.result.current.handleAddExercise('Barbell Row');
+    });
+    session1.unmount();
+
+    // Clock ticks past midnight into Monday 00:00:01 local
+    vi.setSystemTime(new Date('2026-09-28T00:00:01'));
+    const session2 = renderHook(() => useWorkoutSession(defaultProps));
+    expect(session2.result.current.workoutDate).toBe('2026-09-27');
+    expect(session2.result.current.activeExercises).toEqual(['Bench Press', 'Squat', 'Barbell Row']);
+
+    act(() => {
+      session2.result.current.moveExercise(2, -1);
+      session2.result.current.moveExercise(1, -1);
+    });
+    expect(session2.result.current.activeExercises).toEqual(['Barbell Row', 'Bench Press', 'Squat']);
+
+    // 3. Fresh unseeded session at Monday 00:00:01 local deterministically loads scheduled Monday routine
+    localStorage.clear();
+    const session3 = renderHook(() => useWorkoutSession(defaultProps));
+    expect(session3.result.current.workoutDate).toBe('2026-09-28');
+    expect(session3.result.current.activeRoutineName).toBe('Push, Quads, & Core - Reduced');
+    expect(session3.result.current.activeExercises).toEqual([
+      'Incline Bench Press',
+      'Cable Lateral Raises',
+      'Dips',
+      'Leg Extension Machine',
+      'Overhead Tricep Cable Pull',
+    ]);
   });
 });
