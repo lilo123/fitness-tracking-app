@@ -1,4 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import type { Exercise, NutritionLog } from '../../types/database';
 import { DEFAULT_EXERCISES_LIST } from '../../utils/ghostSets';
@@ -9,6 +10,7 @@ import {
   deleteCachedLogItems,
   rehydrateLogWithCachedItems,
 } from '../nutrition/useNutritionData';
+import { getLocalDateStr } from '../../utils/date';
 
 export {
   fetchSessionSets,
@@ -18,6 +20,15 @@ export {
   type HistorySession,
   type RawExerciseStat,
 } from './useWorkoutHistory';
+
+export function addDaysCivil(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + days));
+  const year = dt.getUTCFullYear();
+  const month = String(dt.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(dt.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 export function useHistoryData(targetUserId: string, onMutationError?: (msg: string) => void) {
   const queryClient = useQueryClient();
@@ -43,31 +54,62 @@ export function useHistoryData(targetUserId: string, onMutationError?: (msg: str
     staleTime: 5 * 60 * 1000,
   });
 
-  // Fetch nutrition logs for target user
+  // Fetch nutrition logs for target user via 14-day window infinite query (H11, D-P5b-2)
   const {
-    data: nutritionLogs = [],
+    data: nutritionData,
+    isPending: isNutritionPending,
     isError: isNutritionLogsError,
     error: nutritionLogsError,
+    isFetchingNextPage: isLoadingMoreNutrition,
+    fetchNextPage: loadMoreNutrition,
+    hasNextPage: hasMoreNutrition,
     refetch: refetchNutritionLogs,
-  } = useQuery({
-    queryKey: ['nutrition_logs', targetUserId],
+  } = useInfiniteQuery({
+    queryKey: ['nutrition_logs', targetUserId, 'history_window'],
     enabled: Boolean(targetUserId),
-    queryFn: async () => {
-      if (!targetUserId) return [];
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }) => {
+      if (!targetUserId) return { logs: [], nextCursor: undefined };
+      const windowEnd = pageParam || getLocalDateStr();
+      const windowStart = addDaysCivil(windowEnd, -13);
+
       const { data, error } = await supabase
         .from('nutrition_logs')
         .select(
           'id, user_id, food_name, meal_type, calories, protein, carbs, fat, fiber, serving_size, serving_unit, logged_at, logged_date, created_at, has_components'
         )
         .eq('user_id', targetUserId)
+        .gte('logged_date', windowStart)
+        .lte('logged_date', windowEnd)
+        .order('logged_date', { ascending: false })
         .order('logged_at', { ascending: false })
-        .limit(50);
+        .limit(500);
 
       if (error) throw error;
-      if (!data) return [];
-      return (data as NutritionLog[]).map(rehydrateLogWithCachedItems);
+      const logs = (data ? (data as NutritionLog[]) : []).map(rehydrateLogWithCachedItems);
+
+      // Probe whether an older row exists before windowStart (H11, D-P5b-2)
+      const { data: olderRows, error: probeError } = await supabase
+        .from('nutrition_logs')
+        .select('logged_date')
+        .eq('user_id', targetUserId)
+        .lt('logged_date', windowStart)
+        .order('logged_date', { ascending: false })
+        .limit(1);
+
+      if (probeError) throw probeError;
+
+      const hasOlder = Boolean(olderRows && olderRows.length > 0);
+      const nextCursor = hasOlder ? addDaysCivil(windowStart, -1) : undefined;
+
+      return { logs, nextCursor };
     },
+    getNextPageParam: (lastPage) => lastPage?.nextCursor,
   });
+
+  const nutritionLogs = useMemo(() => {
+    return nutritionData?.pages.flatMap((page) => page.logs) ?? [];
+  }, [nutritionData]);
 
   // Delete nutrition log mutation
   const deleteMealMutation = useMutation({
@@ -147,6 +189,10 @@ export function useHistoryData(targetUserId: string, onMutationError?: (msg: str
   return {
     exercises,
     nutritionLogs,
+    hasMoreNutrition: Boolean(hasMoreNutrition),
+    loadMoreNutrition,
+    isNutritionPending,
+    isLoadingMoreNutrition,
     deleteMealMutation,
     scaleMealMutation,
     isNutritionLogsError,
@@ -156,4 +202,53 @@ export function useHistoryData(targetUserId: string, onMutationError?: (msg: str
     exercisesError,
     refetchExercises,
   };
+}
+
+
+export function formatNutritionDayHeader(
+  dateStr: string,
+  mealsCount: number
+): { title: string; subtitle: string } {
+  const [yearStr, monthStr, dayStr] = dateStr.split("-");
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10);
+  const day = parseInt(dayStr, 10);
+  const dt = new Date(year, month - 1, day);
+  const weekdaysShort = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const weekdaysFull = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+  const months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+
+  const weekdayShort = weekdaysShort[dt.getDay()] || "";
+  const weekdayFull = weekdaysFull[dt.getDay()] || "";
+  const monthName = months[month - 1] || monthStr;
+
+  const currentYear = new Date().getFullYear();
+  const yearSuffix = year !== currentYear ? `, ${year}` : "";
+
+  const title = `${weekdayShort}, ${monthName} ${day}${yearSuffix}`;
+  const mealWord = mealsCount === 1 ? "meal" : "meals";
+  const subtitle = `${weekdayFull} · ${mealsCount} ${mealWord} logged`;
+
+  return { title, subtitle };
 }

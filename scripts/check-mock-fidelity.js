@@ -490,6 +490,33 @@ const SERVICED_QUERIES_REGISTRY = {
       description: 'On-demand meal log items and macros query for rescale',
     },
   ],
+  'src/components/history/useHistoryMealDeferredDelete.test.ts': [
+    {
+      table: 'nutrition_logs',
+      type: 'NO_PROJECTION_APPLIES',
+      description: 'Meal deferred delete mutation only; no database select queries issued',
+    },
+  ],
+  'src/components/history/useHistoryDataWindow.test.ts': [
+    {
+      table: 'exercises',
+      type: 'EXACT',
+      projection: 'id, name, body_part, is_master',
+      description: 'Exercise lookup query',
+    },
+    {
+      table: 'nutrition_logs',
+      type: 'EXACT',
+      projection: 'id, user_id, food_name, meal_type, calories, protein, carbs, fat, fiber, serving_size, serving_unit, logged_at, logged_date, created_at, has_components',
+      description: 'Nutrition logs 14-day window query',
+    },
+    {
+      table: 'nutrition_logs',
+      type: 'EXACT',
+      projection: 'logged_date',
+      description: 'Older nutrition log probe query',
+    },
+  ],
 };
 
 function findTestFiles(dir) {
