@@ -11,7 +11,11 @@ day_utc AS (
   FROM public.workouts w GROUP BY 1, 2
 ),
 day_local AS (
-  SELECT w.user_id, (w.date AT TIME ZONE coalesce(utz.tz, 'UTC'))::date AS d, count(*) AS n
+  -- RD-5 civil date: midnight-UTC rows keep their UTC date; rows with a time use the user's zone.
+  SELECT w.user_id,
+         CASE WHEN (w.date AT TIME ZONE 'UTC')::time = '00:00:00' THEN (w.date AT TIME ZONE 'UTC')::date
+              ELSE (w.date AT TIME ZONE coalesce(utz.tz, 'UTC'))::date END AS d,
+         count(*) AS n
   FROM public.workouts w LEFT JOIN utz ON utz.user_id = w.user_id GROUP BY 1, 2
 ),
 linked AS (
@@ -39,8 +43,8 @@ cross_templates AS (
   WHERE e.is_master = false AND t.user_id IS DISTINCT FROM e.user_id
 )
 SELECT 1 AS ord, 'RD-15 duplicate workout days (UTC date)' AS metric, count(*)::text AS value FROM day_utc WHERE n > 1
-UNION ALL SELECT 2, 'RD-15 duplicate workout days (user time zone)', count(*)::text FROM day_local WHERE n > 1
-UNION ALL SELECT 3, 'RD-15 users affected (user time zone)', count(DISTINCT user_id)::text FROM day_local WHERE n > 1
+UNION ALL SELECT 2, 'RD-15 duplicate workout days (RD-5 civil date)', count(*)::text FROM day_local WHERE n > 1
+UNION ALL SELECT 3, 'RD-15 users affected (RD-5 civil date)', count(DISTINCT user_id)::text FROM day_local WHERE n > 1
 UNION ALL SELECT 4, 'RD-16 warm-up sets', count(*)::text FROM public.sets WHERE set_type = 'warmup'
 UNION ALL SELECT 5, 'RD-16 drop sets', count(*)::text FROM public.sets WHERE set_type = 'drop'
 UNION ALL SELECT 6, 'RD-16 users with warm-up/drop sets', count(DISTINCT w.user_id)::text
