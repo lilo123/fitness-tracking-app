@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../../lib/supabase";
 import type { WorkoutSet, Exercise } from "../../types/database";
 import { useDeferredDelete } from "../common/useDeferredDelete";
+import { invalidateWorkoutDerived } from "../../lib/invalidate";
 import type { UndoToastItem } from "../common/UndoToast";
 import type { HistorySet } from "./useHistoryData";
 
@@ -37,15 +38,7 @@ export function useHistorySetDeferredDelete({
         setMutationError(error.message || "Failed to delete set.");
         throw error;
       }
-      queryClient.invalidateQueries({ queryKey: ["workout_sets"] });
-      queryClient.invalidateQueries({ queryKey: ["history_sessions"] });
-      queryClient.invalidateQueries({ queryKey: ["exercise_stats"] });
-      queryClient.invalidateQueries({ queryKey: ["session_sets"] });
-      if (targetUserId) {
-        queryClient.invalidateQueries({ queryKey: ["workout_sets", targetUserId] });
-        queryClient.invalidateQueries({ queryKey: ["history_sessions", targetUserId] });
-        queryClient.invalidateQueries({ queryKey: ["exercise_stats", targetUserId] });
-      }
+      await invalidateWorkoutDerived(queryClient, targetUserId);
       const workoutId = item.workout_id;
       if (workoutId) {
         setSessionSetsMap((prev) => {
@@ -58,6 +51,13 @@ export function useHistorySetDeferredDelete({
       }
     },
     durationMs: 6000,
+    onError: (err: unknown) => {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : (err as { message?: string })?.message || "Failed to delete set.";
+      setMutationError(msg);
+    },
   });
 
   const handleDeleteSetRequested = useCallback(

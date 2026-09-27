@@ -1151,6 +1151,62 @@ describe('HistoryView', () => {
       expect(mockDeleteEq).not.toHaveBeenCalled();
     });
 
+    it('executes delete mutation after 6s expiry when delete is requested via EditSetSheet', async () => {
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('edit-set-btn-s1')).toBeDefined();
+      });
+
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+      try {
+        fireEvent.click(screen.getByTestId('edit-set-btn-s1'));
+
+        expect(screen.getByTestId('delete-set-btn')).toBeDefined();
+
+        fireEvent.click(screen.getByTestId('delete-set-btn'));
+
+        expect(screen.queryByTestId('edit-set-sheet')).toBeNull();
+        expect(screen.queryByTestId('edit-set-btn-s1')).toBeNull();
+        expect(mockDeleteEq).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(6000);
+
+        expect(mockDeleteEq).toHaveBeenCalledTimes(1);
+        expect(mockDeleteEq).toHaveBeenCalledWith('id', 's1');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('flushes pending delete mutation exactly once if HistoryView unmounts before 6s expiry', async () => {
+      const { unmount } = renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('edit-set-btn-s1')).toBeDefined();
+      });
+
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+      try {
+        fireEvent.click(screen.getByTestId('edit-set-btn-s1'));
+
+        expect(screen.getByTestId('delete-set-btn')).toBeDefined();
+
+        fireEvent.click(screen.getByTestId('delete-set-btn'));
+        expect(mockDeleteEq).not.toHaveBeenCalled();
+
+        unmount();
+
+        expect(mockDeleteEq).toHaveBeenCalledTimes(1);
+        expect(mockDeleteEq).toHaveBeenCalledWith('id', 's1');
+
+        await vi.advanceTimersByTimeAsync(10000);
+        expect(mockDeleteEq).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('restores session rows when EditSetSheet is dismissed via Cancel or Escape without data mutation', async () => {
       renderComponent();
 

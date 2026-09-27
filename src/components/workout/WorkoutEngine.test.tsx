@@ -3299,7 +3299,7 @@ describe('WorkoutEngine', () => {
         expect(screen.getByTestId("edit-set-sheet")).toBeDefined();
 
         // Request delete from sheet
-        fireEvent.click(screen.getByTestId("edit-set-sheet-delete"));
+        fireEvent.click(screen.getByTestId("delete-set-btn"));
 
         // Sheet closes immediately
         expect(screen.queryByTestId("edit-set-sheet")).toBeNull();
@@ -3341,7 +3341,7 @@ describe('WorkoutEngine', () => {
       try {
         // Tap logged row and delete via sheet
         fireEvent.click(screen.getByTestId("logged-set-row-0-0"));
-        fireEvent.click(screen.getByTestId("edit-set-sheet-delete"));
+        fireEvent.click(screen.getByTestId("delete-set-btn"));
 
         // Set is hidden, toast shown
         expect(screen.queryByTestId("logged-set-row-0-0")).toBeNull();

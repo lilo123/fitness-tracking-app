@@ -6,6 +6,7 @@ import { formatSet } from '../../utils/weight';
 export interface UseSetDeletionOptions {
   onCommitDelete: (setId: string) => Promise<void> | void;
   timeoutMs?: number;
+  onError?: (error: unknown, set: WorkoutSet) => void;
 }
 
 export interface UseSetDeletionReturn {
@@ -21,6 +22,7 @@ export interface UseSetDeletionReturn {
 export function useSetDeletion({
   onCommitDelete,
   timeoutMs = 6000,
+  onError,
 }: UseSetDeletionOptions): UseSetDeletionReturn {
   const { pending, schedule, undo, flush } = useDeferredDelete<WorkoutSet>({
     commit: async (set) => {
@@ -29,6 +31,7 @@ export function useSetDeletion({
       }
     },
     durationMs: timeoutMs,
+    onError,
   });
 
   const pendingSet = pending?.item ?? null;

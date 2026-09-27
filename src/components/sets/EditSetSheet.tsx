@@ -7,6 +7,7 @@ import { Trash2, AlertCircle } from "lucide-react";
 import { Sheet } from "../common/Sheet";
 import { Button } from "../common/Button";
 import { StatusBanner } from "../common/StatusBanner";
+import { invalidateWorkoutDerived } from "../../lib/invalidate";
 
 export interface EditSetSheetProps {
   isOpen: boolean;
@@ -91,16 +92,8 @@ const EditSetForm: React.FC<EditSetFormProps> = ({
       }
       return data;
     },
-    onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["workout_sets"] });
-      queryClient.invalidateQueries({ queryKey: ["history_sessions"] });
-      queryClient.invalidateQueries({ queryKey: ["exercise_stats"] });
-      queryClient.invalidateQueries({ queryKey: ["session_sets"] });
-      if (targetUserId) {
-        queryClient.invalidateQueries({ queryKey: ["workout_sets", targetUserId] });
-        queryClient.invalidateQueries({ queryKey: ["history_sessions", targetUserId] });
-        queryClient.invalidateQueries({ queryKey: ["exercise_stats", targetUserId] });
-      }
+    onSuccess: async (data, variables) => {
+      await invalidateWorkoutDerived(queryClient, targetUserId);
       const updatedRow = (Array.isArray(data) ? data[0] : data) as WorkoutSet | undefined;
       const savedRow: WorkoutSet = {
         ...set,
@@ -346,7 +339,7 @@ const EditSetForm: React.FC<EditSetFormProps> = ({
             leftIcon={<Trash2 className="w-4 h-4 text-rose-400" aria-hidden="true" />}
             className="flex-1"
           >
-            Delete Set
+            <span data-testid="edit-set-sheet-delete">Delete Set</span>
           </Button>
 
           <Button

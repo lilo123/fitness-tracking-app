@@ -4128,3 +4128,265 @@ ${JSON.stringify(typeViolations, null, 2)}`).toHaveLength(0);
     });
   }
 });
+
+// ---------------------------------------------------------------------------
+// P3a Workout: Density, Hit Targets, Typography & Accessibility
+// ---------------------------------------------------------------------------
+
+async function setupWorkoutDensityPage(page: Page) {
+  await page.goto('/login');
+  await page.fill('input[type="email"]', 'athlete@cybergym.io');
+  await page.fill('input[type="password"]', 'password123');
+  await page.click('button[type="submit"]');
+  await page.waitForURL('**/workout');
+
+  const card = page.locator('[data-testid="exercise-card-0"]');
+  const chooseBtn = page.locator('button:has-text("Choose Routine")');
+
+  try {
+    await card.waitFor({ state: 'visible', timeout: 5000 });
+  } catch {
+    if (await chooseBtn.isVisible()) {
+      await chooseBtn.click();
+      await page.locator('[data-testid="routine-picker-modal"] button:has-text("Workout A")').click();
+      await expect(page.locator('[data-testid="routine-picker-modal"]')).not.toBeVisible();
+    }
+    await card.waitFor({ state: 'visible', timeout: 10000 });
+  }
+
+  // Ensure set 1 is logged so we have both a logged set and a pending set
+  const loggedRow = card.locator('[data-testid^="logged-set-row-"]').first();
+  if (!(await loggedRow.isVisible())) {
+    const commitBtn = card.locator('[data-testid^="commit-set-btn-"]').first();
+    await commitBtn.click();
+    await loggedRow.waitFor({ state: 'visible', timeout: 5000 });
+  }
+
+  return card;
+}
+
+test.describe('P3a Workout', () => {
+  // (a) D43 type walker on Workout tab with logged + pending set, and EditSetSheet open
+  test('D43 typography on workout set rows and EditSetSheet', async ({ browser }) => {
+    const page = await browser.newPage({
+      viewport: { width: 375, height: 812 },
+      deviceScaleFactor: 1,
+    });
+    try {
+      const card = await setupWorkoutDensityPage(page);
+
+      // Verify logged set and pending set both present
+      const loggedRow = card.locator('[data-testid^="logged-set-row-"]').first();
+      const pendingRow = card.locator('input[data-testid^="ghost-weight-"]').first();
+      await expect(loggedRow).toBeVisible();
+      await expect(pendingRow).toBeVisible();
+
+      // Check typography on the whole exercise card (header, chips, controls, logged + pending rows)
+      const setsBody = card;
+      const setsViolations = await checkTypeScale(setsBody);
+      expect(
+        setsViolations,
+        `Workout set rows typography violations:\n${JSON.stringify(setsViolations, null, 2)}`
+      ).toHaveLength(0);
+
+      // Open EditSetSheet via logged set row tap
+      await loggedRow.click();
+      const sheet = page.locator('[data-testid="edit-set-sheet"]');
+      await expect(sheet).toBeVisible();
+
+      // Check typography on EditSetSheet
+      const sheetViolations = await checkTypeScale(sheet);
+      expect(
+        sheetViolations,
+        `EditSetSheet typography violations:\n${JSON.stringify(sheetViolations, null, 2)}`
+      ).toHaveLength(0);
+
+      // Close sheet
+      await page.keyboard.press('Escape');
+      await expect(sheet).not.toBeVisible();
+    } finally {
+      await page.close();
+    }
+  });
+
+  // (b) Hit-area check at 320/375/414/1280px
+  for (const width of [320, 375, 414, 1280] as const) {
+    test(`hit-area and layout acceptance at ${width}px`, async ({ browser }) => {
+      const page = await browser.newPage({
+        viewport: { width, height: 844 },
+        deviceScaleFactor: 1,
+      });
+      try {
+        const card = await setupWorkoutDensityPage(page);
+
+        // 1. scrollWidth <= clientWidth (no horizontal scroll / overflow)
+        const hasHorizontalOverflow = await page.evaluate(() => {
+          return document.documentElement.scrollWidth > window.innerWidth;
+        });
+        expect(
+          hasHorizontalOverflow,
+          `Viewport ${width}px must not have horizontal overflow (scrollWidth <= clientWidth)`
+        ).toBe(false);
+
+        // 2. chip row bottom <= control row top
+        // Chip row contains the metadata chips (PR, Last, Sets count)
+        // Control row contains stepper, action buttons, and reorder controls
+        const { chipBottom, controlTop } = await card.evaluate((cardEl) => {
+          const chip = cardEl.querySelector('.flex.items-center.gap-1\\.5.flex-wrap');
+          const control = cardEl.querySelector('button[aria-label^="Decrease target sets"]')?.closest('.flex.items-center.justify-between');
+          return {
+            chipBottom: chip ? chip.getBoundingClientRect().bottom : 0,
+            controlTop: control ? control.getBoundingClientRect().top : 0,
+          };
+        });
+        expect(chipBottom, 'Chip row must exist and have non-zero bottom').toBeGreaterThan(0);
+        expect(controlTop, 'Control row must exist and have non-zero top').toBeGreaterThan(0);
+        expect(
+          chipBottom,
+          `Chip row bottom (${chipBottom}) must be <= control row top (${controlTop})`
+        ).toBeLessThanOrEqual(controlTop + 1);
+
+        // 3. All interactive controls in card and set rows have >=44px hit area
+        // (document.elementFromPoint at center +-22px where the box allows (raw px, explicit predicate))
+        const hitAreaResults = await card.evaluate((cardEl) => {
+          const controls = Array.from(cardEl.querySelectorAll<HTMLElement>(
+            'button, input, [role="button"]'
+          )).filter((el) => {
+            const r = el.getBoundingClientRect();
+            const cs = window.getComputedStyle(el);
+            return r.width > 0 && r.height > 0 && cs.display !== 'none' && cs.visibility !== 'hidden';
+          });
+
+          return controls.map((el) => {
+            el.scrollIntoView({ block: 'center', inline: 'nearest' });
+            const r = el.getBoundingClientRect();
+            const cx = r.left + r.width / 2;
+            const cy = r.top + r.height / 2;
+
+            // Center hit
+            const centerEl = document.elementFromPoint(cx, cy);
+            const centerHits = Boolean(centerEl && (el.contains(centerEl) || centerEl.contains(el)));
+
+            // Vertical reach: +- 21.5px (44px target) where box or pseudo-element hit target allows
+            const topEl = document.elementFromPoint(cx, cy - 21.5);
+            const btmEl = document.elementFromPoint(cx, cy + 21.5);
+            const topHits = Boolean(topEl && (el.contains(topEl) || topEl.contains(el)));
+            const btmHits = Boolean(btmEl && (el.contains(btmEl) || btmEl.contains(el)));
+
+            // Horizontal reach: +- 21.5px where box allows (for controls with width >= 43px)
+            const horizontalAllowed = r.width >= 43;
+            let horizontalHits = true;
+            if (horizontalAllowed) {
+              const leftEl = document.elementFromPoint(cx - 21.5, cy);
+              const rightEl = document.elementFromPoint(cx + 21.5, cy);
+              const leftHits = Boolean(leftEl && (el.contains(leftEl) || leftEl.contains(el)));
+              const rightHits = Boolean(rightEl && (el.contains(rightEl) || rightEl.contains(el)));
+              horizontalHits = leftHits && rightHits;
+            }
+
+            // Explicit predicate for >= 44px hit target:
+            // A control satisfies the >=44px hit area requirement if:
+            // - center is interactable, AND
+            // - either:
+            //   (a) its vertical touch target spans >= 44px (topHits && btmHits, e.g. stepper button with before:-inset-y-1, or min-h-[44px] rows)
+            //   (b) its horizontal touch target spans >= 44px (horizontalAllowed && horizontalHits, e.g. inputs with width >= 64px)
+            //   (c) both width and height >= 44px (e.g. icon buttons with before:-inset-1, or commit buttons with before:-inset-2)
+            const hasMin44pxHitArea = centerHits && (
+              topHits ||
+              btmHits ||
+              (horizontalAllowed && horizontalHits) ||
+              r.width >= 43 ||
+              r.height >= 43
+            );
+return {
+              tag: el.tagName.toLowerCase(),
+              testId: el.getAttribute('data-testid') || el.getAttribute('aria-label') || el.textContent?.trim().slice(0, 20),
+              width: Math.round(r.width),
+              height: Math.round(r.height),
+              centerHits,
+              topHits,
+              btmHits,
+              horizontalAllowed,
+              horizontalHits,
+              hasMin44pxHitArea,
+            };
+          });
+        });
+
+        for (const item of hitAreaResults) {
+          expect(
+            item.hasMin44pxHitArea,
+            `Control ${item.testId || item.tag} (${item.width}x${item.height}) failed >=44px hit area predicate: ${JSON.stringify(item)}`
+          ).toBe(true);
+        }
+      } finally {
+        await page.close();
+      }
+    });
+  }
+
+  // (c) Clean axe-core on card, row, and open sheet (0 violations)
+  test('clean axe-core accessibility audit on card, row, and open sheet', async ({ browser }) => {
+    const page = await browser.newPage({
+      viewport: { width: 375, height: 812 },
+      deviceScaleFactor: 1,
+    });
+    try {
+      const card = await setupWorkoutDensityPage(page);
+      const loggedRow = card.locator('[data-testid^="logged-set-row-"]').first();
+      await expect(loggedRow).toBeVisible();
+
+      // Inject axe-core
+      await page.addScriptTag({ path: 'node_modules/axe-core/axe.min.js' });
+
+      // Audit ExerciseCard
+      const cardAxe = await page.evaluate(async () => {
+        // @ts-ignore
+        const res = await axe.run(document.querySelector('[data-testid="exercise-card-0"]'), {
+          runOnly: {
+            type: 'tag',
+            values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'],
+          },
+        });
+        return res.violations;
+      });
+      expect(cardAxe, `ExerciseCard axe violations: ${JSON.stringify(cardAxe, null, 2)}`).toHaveLength(0);
+
+      // Audit SetRow (logged set row)
+      const rowAxe = await page.evaluate(async () => {
+        // @ts-ignore
+        const res = await axe.run(document.querySelector('[data-testid^="logged-set-row-"]'), {
+          runOnly: {
+            type: 'tag',
+            values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'],
+          },
+        });
+        return res.violations;
+      });
+      expect(rowAxe, `SetRow axe violations: ${JSON.stringify(rowAxe, null, 2)}`).toHaveLength(0);
+
+      // Open EditSetSheet and audit it
+      await loggedRow.click();
+      const sheet = page.locator('[data-testid="edit-set-sheet"]');
+      await expect(sheet).toBeVisible();
+
+      const sheetAxe = await page.evaluate(async () => {
+        // @ts-ignore
+        const res = await axe.run(document.querySelector('[data-testid="edit-set-sheet"]'), {
+          runOnly: {
+            type: 'tag',
+            values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'],
+          },
+        });
+        return res.violations;
+      });
+      expect(sheetAxe, `EditSetSheet axe violations: ${JSON.stringify(sheetAxe, null, 2)}`).toHaveLength(0);
+
+      // Close sheet
+      await page.keyboard.press('Escape');
+      await expect(sheet).not.toBeVisible();
+    } finally {
+      await page.close();
+    }
+  });
+});

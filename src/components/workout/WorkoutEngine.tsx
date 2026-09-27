@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth';
 import type { WorkoutSet, RoutineTemplate } from '../../types/database';
@@ -90,7 +90,7 @@ export const WorkoutEngine: React.FC = () => {
     adjustTargetSets,
     updateDraft,
     handleClearWorkout,
-    isWholeWorkoutCompleted,
+    isWholeWorkoutCompleted: _isWholeWorkoutSessionCompleted,
   } = useWorkoutSession({
     targetUserId,
     exercises,
@@ -139,6 +139,19 @@ export const WorkoutEngine: React.FC = () => {
     },
     timeoutMs: 6000,
   });
+
+  const isWholeWorkoutCompleted =
+    activeExercises.length > 0 &&
+    activeExercises.every(
+      (exName) =>
+        getSetsForExerciseToday(exName).filter((s) => s.id !== pendingSetId).length >=
+        (targetSetCounts[exName] || 3)
+    );
+
+  const inputDraftsRef = useRef(inputDrafts);
+  inputDraftsRef.current = inputDrafts;
+  const targetRepCountsRef = useRef(targetRepCounts);
+  targetRepCountsRef.current = targetRepCounts;
 
   const handleSelectRoutine = (routineName: string, template?: RoutineTemplate) => {
     setShowRoutineModal(false);
@@ -195,7 +208,7 @@ export const WorkoutEngine: React.FC = () => {
     ghostValues: { weight: number | ''; reps: number | '' }
   ) => {
     const draftKey = `${exName}_${setIndex}`;
-    const draft = inputDrafts[draftKey];
+    const draft = inputDraftsRef.current[draftKey];
 
     const hasDraftWeight = draft?.weight !== undefined && draft.weight.trim() !== '';
     const weightVal = hasDraftWeight
@@ -228,7 +241,7 @@ export const WorkoutEngine: React.FC = () => {
       reps: repsVal,
       setIndex,
     });
-  }, [exercises, inputDrafts, logSetMutation]);
+  }, [exercises, logSetMutation]);
 
   const handleBatchLogExercise = useCallback((
     exName: string,
@@ -247,7 +260,7 @@ export const WorkoutEngine: React.FC = () => {
       const setIndex = rowIdx + 1;
       const ghost = ghostValues[rowIdx] || { weight: '', reps: '' };
       const draftKey = `${exName}_${setIndex}`;
-      const draft = inputDrafts[draftKey];
+      const draft = inputDraftsRef.current[draftKey];
 
       const weightVal = draft?.weight !== undefined && draft.weight.trim() !== ''
         ? Number(draft.weight)
@@ -259,7 +272,7 @@ export const WorkoutEngine: React.FC = () => {
         ? Number(draft.reps)
         : typeof ghost.reps === 'number'
         ? ghost.reps
-        : targetRepCounts[exName] || NaN;
+        : targetRepCountsRef.current[exName] || NaN;
 
       if (!Number.isFinite(weightVal) || weightVal < 0 || !Number.isFinite(repsVal) || repsVal <= 0) continue;
 
@@ -279,7 +292,7 @@ export const WorkoutEngine: React.FC = () => {
       const setsWithId = unloggedSets.map((s) => ({ ...s, exerciseId }));
       batchLogSetsMutation.mutate(setsWithId);
     }
-  }, [batchLogSetsMutation, exercises, inputDrafts, targetRepCounts]);
+  }, [batchLogSetsMutation, exercises]);
 
   const handleFinishWorkout = () => {
     const allPendingSets: {
