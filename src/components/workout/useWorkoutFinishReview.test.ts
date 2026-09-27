@@ -15,7 +15,7 @@ describe('useWorkoutFinishReview', () => {
       },
     };
     const targetRepCountsRef = { current: { 'Bench Press': 10 } };
-    const batchLogSetsMutation = { mutate: vi.fn(), isPending: false } as any;
+    const batchLogSetsMutation = { mutate: vi.fn(), mutateAsync: vi.fn().mockResolvedValue([]), isPending: false } as any;
 
     const { result } = renderHook(() =>
       useWorkoutFinishReview({
@@ -52,7 +52,7 @@ describe('useWorkoutFinishReview', () => {
   it('does not open sheet if all pending sets have no valid values', () => {
     const inputDraftsRef = { current: {} };
     const targetRepCountsRef = { current: {} };
-    const batchLogSetsMutation = { mutate: vi.fn(), isPending: false } as any;
+    const batchLogSetsMutation = { mutate: vi.fn(), mutateAsync: vi.fn().mockResolvedValue([]), isPending: false } as any;
 
     const { result } = renderHook(() =>
       useWorkoutFinishReview({
@@ -80,7 +80,7 @@ describe('useWorkoutFinishReview', () => {
   it('calls batchLogSetsMutation with mapped exerciseId when confirmed', () => {
     const inputDraftsRef = { current: {} };
     const targetRepCountsRef = { current: {} };
-    const batchLogSetsMutation = { mutate: vi.fn(), isPending: false } as any;
+    const batchLogSetsMutation = { mutate: vi.fn(), mutateAsync: vi.fn().mockResolvedValue([]), isPending: false } as any;
 
     const { result } = renderHook(() =>
       useWorkoutFinishReview({
@@ -104,8 +104,59 @@ describe('useWorkoutFinishReview', () => {
       ]);
     });
 
-    expect(batchLogSetsMutation.mutate).toHaveBeenCalledWith([
+    expect(batchLogSetsMutation.mutateAsync).toHaveBeenCalledWith([
       { exerciseName: 'Bench Press', exerciseId: 'ex-1', weight: 200, reps: 5, setIndex: 1 },
     ]);
+  });
+
+  it('keeps sheet open on error and prevents double-submit while isPending', async () => {
+    const inputDraftsRef = { current: {} };
+    const targetRepCountsRef = { current: {} };
+    const batchLogSetsMutation = {
+      mutateAsync: vi.fn().mockRejectedValue(new Error('Server error')),
+      isPending: false,
+    } as any;
+
+    const { result } = renderHook(() =>
+      useWorkoutFinishReview({
+        activeExercises: ['Bench Press'],
+        getSetsForExerciseToday: () => [],
+        pendingSetId: null,
+        pendingDeletedSetIds: new Set(),
+        targetSetCounts: {},
+        targetRepCountsRef,
+        inputDraftsRef,
+        userLogs: [],
+        workoutDate: '2026-09-27',
+        exercises: dummyExercises,
+        batchLogSetsMutation,
+      })
+    );
+
+    act(() => {
+      result.current.setIsFinishReviewOpen(true);
+    });
+    expect(result.current.isFinishReviewOpen).toBe(true);
+
+    await act(async () => {
+      await result.current.handleConfirmFinishWithSets([
+        { exerciseName: 'Bench Press', weight: 200, reps: 5, setIndex: 1 },
+      ]);
+    });
+
+    // Sheet remains open on error
+    expect(result.current.isFinishReviewOpen).toBe(true);
+
+    // Double submit guard: when mutation isPending, calls are ignored
+    batchLogSetsMutation.isPending = true;
+    batchLogSetsMutation.mutateAsync.mockClear();
+
+    await act(async () => {
+      await result.current.handleConfirmFinishWithSets([
+        { exerciseName: 'Bench Press', weight: 200, reps: 5, setIndex: 1 },
+      ]);
+    });
+
+    expect(batchLogSetsMutation.mutateAsync).not.toHaveBeenCalled();
   });
 });

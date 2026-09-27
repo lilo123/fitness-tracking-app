@@ -21,6 +21,7 @@ export interface UseWorkoutUrlParamsOptions {
   onSelectRoutine: (routineName: string, template?: RoutineTemplate) => void;
   workoutDate: string;
   onDateChange: (newDate: string) => void;
+  targetUserId?: string;
 }
 
 export function useWorkoutUrlParams({
@@ -29,9 +30,19 @@ export function useWorkoutUrlParams({
   onSelectRoutine,
   workoutDate,
   onDateChange,
+  targetUserId,
 }: UseWorkoutUrlParamsOptions) {
   const dateParamAppliedRef = useRef(false);
   const routineParamAppliedRef = useRef<string | null>(null);
+  const lastTargetUserRef = useRef(targetUserId);
+
+  useEffect(() => {
+    if (lastTargetUserRef.current !== targetUserId) {
+      lastTargetUserRef.current = targetUserId;
+      dateParamAppliedRef.current = false;
+      routineParamAppliedRef.current = null;
+    }
+  }, [targetUserId]);
 
   const getSearchParams = useCallback(() => {
     if (typeof window === 'undefined') return new URLSearchParams();
@@ -79,11 +90,9 @@ export function useWorkoutUrlParams({
     routineParamAppliedRef.current = routineParam;
 
     const trimmed = routineParam.trim();
-    const matchedCustom = customTemplates.find(
-      (t) =>
-        t.id.toLowerCase() === trimmed.toLowerCase() ||
-        t.name.toLowerCase() === trimmed.toLowerCase()
-    );
+    const matchedCustom =
+      customTemplates.find((t) => t.id.toLowerCase() === trimmed.toLowerCase()) ||
+      customTemplates.find((t) => t.name.toLowerCase() === trimmed.toLowerCase());
 
     if (matchedCustom) {
       onSelectRoutine(matchedCustom.name, matchedCustom);

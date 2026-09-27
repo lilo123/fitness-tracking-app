@@ -173,36 +173,18 @@ SetRow.displayName = 'SetRow';
 export function focusNextPendingSet(exIndex: number, rowIdx: number) {
   if (typeof document === 'undefined') return;
   const doFocus = () => {
-    // 1. Look for next pending set in the same exercise: rowIdx + 1
-    let nextWeightInput = document.querySelector<HTMLInputElement>(
+    // Do not steal focus into background cards if a modal, sheet, or dialog is active
+    if (document.querySelector('[role="dialog"]')) return;
+
+    // Look for next pending set in the same exercise: rowIdx + 1 (W34: restricted to active card)
+    const nextWeightInput = document.querySelector<HTMLInputElement>(
       `input[data-testid="ghost-weight-${exIndex}-${rowIdx + 1}"]`
     );
-    let nextRepsInput = document.querySelector<HTMLInputElement>(
+    const nextRepsInput = document.querySelector<HTMLInputElement>(
       `input[data-testid="ghost-reps-${exIndex}-${rowIdx + 1}"]`
     );
 
-    // 2. If not found in current exercise, find the first pending set in subsequent exercises
-    if (!nextWeightInput) {
-      const allPendingWeights = Array.from(
-        document.querySelectorAll<HTMLInputElement>('input[data-testid^="ghost-weight-"]')
-      );
-      for (const input of allPendingWeights) {
-        const testId = input.getAttribute('data-testid') || '';
-        const match = testId.match(/ghost-weight-(\d+)-(\d+)/);
-        if (match) {
-          const eIdx = parseInt(match[1], 10);
-          const rIdx = parseInt(match[2], 10);
-          if (eIdx > exIndex || (eIdx === exIndex && rIdx > rowIdx)) {
-            nextWeightInput = input;
-            const rTestId = testId.replace('ghost-weight-', 'ghost-reps-');
-            nextRepsInput = document.querySelector<HTMLInputElement>(`input[data-testid="${rTestId}"]`);
-            break;
-          }
-        }
-      }
-    }
-
-    // 3. Move focus: if weight is prefilled (has non-empty value), focus reps input, otherwise weight input
+    // Move focus: if weight is prefilled (has non-empty value), focus reps input, otherwise weight input
     if (nextWeightInput) {
       const isWeightPrefilled = Boolean(nextWeightInput.value && nextWeightInput.value.trim() !== '');
       if (isWeightPrefilled && nextRepsInput) {

@@ -74,4 +74,32 @@ describe('FinishReviewSheet (W18, STD-CMP-1/4/7)', () => {
     fireEvent.click(screen.getByTestId('finish-without-sets-btn'));
     expect(onFinishWithoutSets).toHaveBeenCalledTimes(1);
   });
+
+  it('renders 0 weight as "0" for bodyweight exercises and validates positive reps', () => {
+    const onConfirmFinishWithSets = vi.fn();
+    const bodyweightSets: PendingReviewSet[] = [
+      { exerciseName: 'Pull-up', weight: 0, reps: 10, setIndex: 1 },
+    ];
+
+    render(
+      <FinishReviewSheet
+        {...defaultProps}
+        pendingSets={bodyweightSets}
+        onConfirmFinishWithSets={onConfirmFinishWithSets}
+      />
+    );
+
+    const weightInput = screen.getByTestId('finish-review-weight-0');
+    expect(weightInput).toHaveValue('0');
+
+    const logBtn = screen.getByTestId('log-reviewed-sets-btn');
+    expect(logBtn).toBeEnabled();
+
+    // Setting reps to 0 marks set invalid and disables submit
+    const repsInput = screen.getByTestId('finish-review-reps-0');
+    fireEvent.change(repsInput, { target: { value: '0' } });
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/valid reps/i);
+    expect(logBtn).toBeDisabled();
+  });
 });

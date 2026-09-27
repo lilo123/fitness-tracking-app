@@ -20,6 +20,7 @@ export interface UndoToastProps {
   isStaged?: boolean;
   isTimerActive?: boolean;
   bottom?: number;
+  stackIndex?: number;
   testId?: string;
   subjectTestId?: string;
   undoBtnTestId?: string;
@@ -35,6 +36,7 @@ export const UndoToast: React.FC<UndoToastProps> = ({
   isStaged = false,
   isTimerActive = false,
   bottom: customBottom,
+  stackIndex = 0,
   testId = 'quick-log-toast',
   subjectTestId = 'toast-dish-text',
   undoBtnTestId = 'toast-undo-btn',
@@ -52,7 +54,7 @@ export const UndoToast: React.FC<UndoToastProps> = ({
     return 74;
   });
 
-  const effectiveBottom = customBottom !== undefined ? customBottom : dynamicBottom;
+  const effectiveBottom = (customBottom !== undefined ? customBottom : dynamicBottom) + stackIndex * 68;
 
   useEffect(() => {
     if (customBottom !== undefined) return;

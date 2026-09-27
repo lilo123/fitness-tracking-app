@@ -232,6 +232,8 @@ export function checkIsScheduledRoutineDirty({
   customTemplates,
   exercises,
   inputDrafts,
+  targetSetCounts,
+  targetRepCounts,
 }: {
   workoutDate: string;
   activeRoutineName: string;
@@ -239,6 +241,8 @@ export function checkIsScheduledRoutineDirty({
   customTemplates: RoutineTemplate[];
   exercises: Exercise[];
   inputDrafts: Record<string, any>;
+  targetSetCounts?: Record<string, number>;
+  targetRepCounts?: Record<string, number>;
 }): boolean {
   const dayAbbr = getDayOfWeekAbbr(workoutDate);
   const scheduledCustom = customTemplates.find((t) => t.days_of_week?.includes(dayAbbr));
@@ -254,18 +258,47 @@ export function checkIsScheduledRoutineDirty({
   if (hasDrafts) return true;
 
   let scheduledExercises: string[] = [];
+  const scheduledTargetSets: Record<string, number> = {};
+  const scheduledTargetReps: Record<string, number> = {};
+
   if (scheduledCustom && scheduledCustom.exercises) {
-    scheduledExercises = [...scheduledCustom.exercises]
-      .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-      .map((e) => e.exercise?.name || e.exercise_name || exercises.find((ex) => ex.id === e.exercise_id)?.name || e.exercise_id)
+    const sorted = [...scheduledCustom.exercises].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+    scheduledExercises = sorted
+      .map((e) => {
+        const name = e.exercise?.name || e.exercise_name || exercises.find((ex) => ex.id === e.exercise_id)?.name || e.exercise_id;
+        if (name) {
+          scheduledTargetSets[name] = e.target_sets || 3;
+          if (e.target_reps) scheduledTargetReps[name] = e.target_reps;
+        }
+        return name;
+      })
       .filter(Boolean);
   } else if (scheduledDef) {
     scheduledExercises = [...scheduledDef.exercises];
+    Object.assign(scheduledTargetSets, scheduledDef.targetSets);
+    if (scheduledDef.targetReps) Object.assign(scheduledTargetReps, scheduledDef.targetReps);
   }
 
   if (activeExercises.length !== scheduledExercises.length) return true;
   for (let i = 0; i < activeExercises.length; i++) {
     if (activeExercises[i] !== scheduledExercises[i]) return true;
+  }
+
+  if (targetSetCounts) {
+    for (const exName of activeExercises) {
+      const scheduledTarget = scheduledTargetSets[exName] ?? 3;
+      if (targetSetCounts[exName] !== undefined && targetSetCounts[exName] !== scheduledTarget) {
+        return true;
+      }
+    }
+  }
+
+  if (targetRepCounts) {
+    for (const exName of activeExercises) {
+      if (scheduledTargetReps[exName] !== undefined && targetRepCounts[exName] !== undefined && targetRepCounts[exName] !== scheduledTargetReps[exName]) {
+        return true;
+      }
+    }
   }
 
   return false;

@@ -296,6 +296,55 @@ describe('SetRow', () => {
       vi.useRealTimers();
     });
 
+    it('W34: does not steal focus when a dialog or sheet is open', async () => {
+      vi.useFakeTimers();
+      render(
+        <div>
+          <div role="dialog" aria-modal="true">
+            <button data-testid="dialog-btn">Dialog button</button>
+          </div>
+          <SetRow
+            exName="Bench Press"
+            exIndex={0}
+            rowIdx={0}
+            setIndex={1}
+            ghost={defaultGhost}
+            draftWeight="185"
+            draftReps="8"
+            isMutating={false}
+            onUpdateDraft={vi.fn()}
+            onCommitSet={vi.fn()}
+          />
+          <SetRow
+            exName="Bench Press"
+            exIndex={0}
+            rowIdx={1}
+            setIndex={2}
+            ghost={defaultGhost}
+            draftWeight=""
+            draftReps=""
+            isMutating={false}
+            onUpdateDraft={vi.fn()}
+            onCommitSet={vi.fn()}
+          />
+        </div>
+      );
+
+      const dialogBtn = screen.getByTestId('dialog-btn');
+      dialogBtn.focus();
+      expect(document.activeElement).toBe(dialogBtn);
+
+      const commitBtn0 = screen.getByTestId('commit-set-btn-0-0');
+      fireEvent.click(commitBtn0);
+
+      vi.runAllTimers();
+
+      // Focus was NOT stolen away from dialog button to next set
+      expect(document.activeElement).toBe(dialogBtn);
+
+      vi.useRealTimers();
+    });
+
     it('satisfies a11y standards on pending row', async () => {
       const { container } = render(
         <SetRow

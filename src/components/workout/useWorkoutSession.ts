@@ -219,6 +219,15 @@ export function useWorkoutSession({
     });
   }, [targetUserId, workoutDate]);
 
+  const collapseExercise = useCallback((exName: string) => {
+    setExpandedExercises((prev) => {
+      const next = new Set(prev);
+      next.delete(exName);
+      workoutSessionStore.setExpandedExercises(targetUserId, workoutDate, Array.from(next));
+      return next;
+    });
+  }, [targetUserId, workoutDate]);
+
   const collapseCompleted = () => {
     const next = new Set<string>();
     activeExercises.forEach((exName) => {
@@ -505,8 +514,10 @@ export function useWorkoutSession({
       customTemplates,
       exercises,
       inputDrafts,
+      targetSetCounts,
+      targetRepCounts,
     });
-  }, [workoutDate, activeRoutineName, activeExercises, customTemplates, exercises, inputDrafts]);
+  }, [workoutDate, activeRoutineName, activeExercises, customTemplates, exercises, inputDrafts, targetSetCounts, targetRepCounts]);
 
   const isWholeWorkoutCompleted =
     activeExercises.length > 0 &&
@@ -556,6 +567,7 @@ export function useWorkoutSession({
     todaySets,
     getSetsForExerciseToday,
     toggleAccordion,
+    collapseExercise,
     collapseCompleted,
     toggleAllAccordions,
     handleSelectRoutine,

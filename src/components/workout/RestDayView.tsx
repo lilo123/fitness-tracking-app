@@ -19,7 +19,7 @@ export const RestDayView: React.FC<RestDayViewProps> = ({
       <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-bold uppercase tracking-wider mb-2.5">
         <Calendar className="w-3.5 h-3.5" aria-hidden="true" /> Rest Day
       </div>
-      <h2 className="text-lg font-bold text-white mb-1.5">Rest & Recovery</h2>
+      <h2 className="text-sm font-bold text-white mb-1.5">Rest & Recovery</h2>
       <p className="text-xs text-zinc-400 max-w-sm mx-auto mb-6 leading-relaxed">
         Take today to rest and recover, stretch, or choose a routine if you want to train today.
       </p>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { Sheet } from '../common/Sheet';
 import { Button } from '../common/Button';
@@ -30,12 +30,12 @@ export const FinishReviewSheet: React.FC<FinishReviewSheetProps> = ({
   isSubmitting = false,
 }) => {
   const [sets, setSets] = useState<PendingReviewSet[]>(pendingSets);
+  const [prevPendingSets, setPrevPendingSets] = useState(pendingSets);
 
-  useEffect(() => {
-    if (isOpen) {
-      setSets(pendingSets);
-    }
-  }, [isOpen, pendingSets]);
+  if (pendingSets !== prevPendingSets) {
+    setPrevPendingSets(pendingSets);
+    setSets(pendingSets);
+  }
 
   const handleUpdateWeight = (index: number, val: string) => {
     const sanitized = val.replace(',', '.');
@@ -57,6 +57,10 @@ export const FinishReviewSheet: React.FC<FinishReviewSheetProps> = ({
       return next;
     });
   };
+
+  const hasInvalidSets = sets.some(
+    (s) => !Number.isFinite(s.reps) || s.reps <= 0 || !Number.isFinite(s.weight) || s.weight < 0
+  );
 
   const handleRemoveSet = (index: number) => {
     setSets((prev) => prev.filter((_, i) => i !== index));
@@ -108,7 +112,7 @@ export const FinishReviewSheet: React.FC<FinishReviewSheetProps> = ({
                       id={`finish-weight-${idx}`}
                       type="text"
                       inputMode="decimal"
-                      value={s.weight || ''}
+                      value={s.weight === 0 ? '0' : s.weight || ''}
                       onChange={(e) => handleUpdateWeight(idx, e.target.value)}
                       onFocus={(e) => e.target.select()}
                       aria-label={`${s.exerciseName} set ${s.setIndex} weight`}
@@ -156,12 +160,18 @@ export const FinishReviewSheet: React.FC<FinishReviewSheetProps> = ({
         ) : null}
 
         <div className="space-y-2 pt-2 border-t border-zinc-800/80">
+          {hasInvalidSets && (
+            <p className="text-xs text-rose-400 font-semibold" role="alert">
+              Each set must have valid reps (&gt; 0) and weight (&ge; 0).
+            </p>
+          )}
           {sets.length > 0 && (
             <Button
               type="button"
               variant="primary"
               size="md"
               isLoading={isSubmitting}
+              disabled={isSubmitting || hasInvalidSets}
               onClick={() => onConfirmFinishWithSets(sets)}
               testId="log-reviewed-sets-btn"
               className="w-full min-h-[44px]"

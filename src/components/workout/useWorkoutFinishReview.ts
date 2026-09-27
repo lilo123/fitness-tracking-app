@@ -97,17 +97,30 @@ export function useWorkoutFinishReview({
   ]);
 
   const handleConfirmFinishWithSets = useCallback(
-    (reviewedSets: PendingReviewSet[]) => {
-      setIsFinishReviewOpen(false);
-      if (reviewedSets.length === 0) return;
-      const setsWithIds = reviewedSets.map((s) => {
+    async (reviewedSets: PendingReviewSet[]) => {
+      if (batchLogSetsMutation.isPending) return;
+      if (reviewedSets.length === 0) {
+        setIsFinishReviewOpen(false);
+        return;
+      }
+      const validSets = reviewedSets.filter(
+        (s) => Number.isFinite(s.weight) && s.weight >= 0 && Number.isFinite(s.reps) && s.reps > 0
+      );
+      if (validSets.length === 0) return;
+
+      const setsWithIds = validSets.map((s) => {
         const matchedEx = exercises.find(
           (e) => e.name.toLowerCase() === s.exerciseName.toLowerCase() || e.id === s.exerciseName
         );
         const exerciseId = matchedEx ? matchedEx.id : isUUID(s.exerciseName) ? s.exerciseName : undefined;
         return { ...s, exerciseId };
       });
-      batchLogSetsMutation.mutate(setsWithIds);
+      try {
+        await batchLogSetsMutation.mutateAsync(setsWithIds);
+        setIsFinishReviewOpen(false);
+      } catch {
+        // Keep the sheet open on error so the user does not lose edited values or drafts
+      }
     },
     [batchLogSetsMutation, exercises]
   );

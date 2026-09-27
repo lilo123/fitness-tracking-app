@@ -29,7 +29,7 @@ export const GlobalRestTimerPill: React.FC = () => {
           <div className="text-xs uppercase tracking-wider text-cyan-400 font-bold">
             Rest Timer
           </div>
-          <div className="text-xl font-bold tabular-nums text-white" data-testid="rest-timer-display">
+          <div className="text-sm font-bold tabular-nums text-white" data-testid="rest-timer-display">
             {mins}:{secs}
           </div>
         </div>

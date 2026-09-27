@@ -153,4 +153,40 @@ describe('useExerciseRemoval (W8, RD-7)', () => {
     // Exactly N DELETEs committed on expiry
     expect(onCommitDeleteSets).toHaveBeenCalledWith(['s1']);
   });
+
+  it('commit failure restores exercise rows and surfaces error via onError', async () => {
+    const onRestoreExercise = vi.fn();
+    const onError = vi.fn();
+    const onCommitDeleteSets = vi.fn().mockRejectedValue(new Error('Network error on delete'));
+
+    const { result } = renderHook(() =>
+      useExerciseRemoval({
+        ...defaultProps,
+        getSetsForExercise: () => [mockSet1],
+        onCommitDeleteSets,
+        onRestoreExercise,
+        onError,
+      })
+    );
+
+    act(() => {
+      result.current.requestRemoveExercise(0);
+    });
+
+    act(() => {
+      result.current.handleConfirmRemoveAndDelete();
+    });
+
+    // Advance 6000ms to trigger commit
+    await act(async () => {
+      vi.advanceTimersByTime(6000);
+      await Promise.resolve();
+    });
+
+    expect(onCommitDeleteSets).toHaveBeenCalledWith(['s1']);
+    expect(onRestoreExercise).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith(expect.any(Error), expect.objectContaining({
+      exerciseName: 'Bench Press',
+    }));
+  });
 });

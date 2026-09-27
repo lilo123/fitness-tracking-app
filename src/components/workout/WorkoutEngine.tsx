@@ -8,7 +8,7 @@ import {
   getLocalDateStr,
 } from '../../utils/ghostSets';
 import { workoutSessionStore } from '../../utils/workoutSessionStore';
-import { Layers, Plus, Check, Dumbbell, AlertCircle, RotateCcw } from 'lucide-react';
+import { Layers, Plus, Check, AlertCircle, RotateCcw } from 'lucide-react';
 import { useWorkoutQueries } from './useWorkoutQueries';
 import { useWorkoutSession } from './useWorkoutSession';
 import { useWorkoutMutations } from './useWorkoutMutations';
@@ -20,7 +20,6 @@ import { StatusBanner } from '../common/StatusBanner';
 import { UndoToast } from '../common/UndoToast';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { Skeleton } from '../common/Skeleton';
-import { Button } from '../common/Button';
 import { EditSetSheet } from '../sets/EditSetSheet';
 import { useSetDeletion } from './useSetDeletion';
 import { useExerciseRemoval } from './useExerciseRemoval';
@@ -30,6 +29,7 @@ import { useWorkoutSetCommit } from './useWorkoutSetCommit';
 import { useWorkoutFinishReview } from './useWorkoutFinishReview';
 import { FinishReviewSheet } from './FinishReviewSheet';
 import { RemoveExerciseSheet } from './RemoveExerciseSheet';
+import { WorkoutEmptyState } from './WorkoutEmptyState';
 
 export const WorkoutEngine: React.FC = () => {
   const { user, profile } = useAuth();
@@ -81,6 +81,7 @@ export const WorkoutEngine: React.FC = () => {
     setInputDrafts,
     getSetsForExerciseToday,
     toggleAccordion,
+    collapseExercise,
     collapseCompleted,
     toggleAllAccordions,
     handleSelectRoutine: selectRoutineInternal,
@@ -115,6 +116,7 @@ export const WorkoutEngine: React.FC = () => {
     onSelectRoutine: handleSelectRoutine,
     workoutDate,
     onDateChange: setWorkoutDate,
+    targetUserId,
   });
 
   const handleDateChange = useCallback((newDate: string) => {
@@ -178,13 +180,18 @@ export const WorkoutEngine: React.FC = () => {
     },
     onRestoreExercise: restoreExercise,
     onRemoveExerciseLocally: removeExerciseDirectly,
-    onCollapseExercise: toggleAccordion,
-    getSetsForExercise: getSetsForExerciseToday,
+    onCollapseExercise: collapseExercise,
+    getSetsForExercise: (exName) =>
+      getSetsForExerciseToday(exName).filter((s) => s.id !== pendingSetId),
     activeExercises,
     targetSetCounts,
     targetRepCounts,
     inputDrafts,
     timeoutMs: 6000,
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : 'Failed to delete exercise sets';
+      setMutationError(msg);
+    },
   });
 
   // 7. Edit Set Sheet (W3, W17)
@@ -289,7 +296,6 @@ export const WorkoutEngine: React.FC = () => {
     activeExercises.length > 0 && activeExercises.every((e) => expandedExercises.has(e));
 
   const currentDayAbbr = getDayOfWeekAbbr(workoutDate);
-  const activeToast = exerciseRemovalToast || deleteToast;
 
   return (
     <div className="space-y-6 pb-24 text-white">
@@ -377,35 +383,10 @@ export const WorkoutEngine: React.FC = () => {
           )}
 
           {activeExercises.length === 0 ? (
-            <div className="bg-zinc-900/90 rounded-2xl shadow-xl p-8 text-center border border-dashed border-zinc-800 text-white space-y-4">
-              <Dumbbell className="w-10 h-10 text-zinc-600 mx-auto mb-1" />
-              <div>
-                <p className="text-white font-bold text-base mb-1">No exercises in today's workout yet</p>
-                <p className="text-xs text-zinc-400">Select a routine above or add an exercise below to start logging.</p>
-              </div>
-              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="md"
-                  onClick={() => setShowRoutineModal(true)}
-                  testId="empty-choose-routine-btn"
-                  className="min-h-[44px]"
-                >
-                  Choose routine
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="md"
-                  onClick={handleFocusAddExercise}
-                  testId="empty-add-exercise-btn"
-                  className="min-h-[44px]"
-                >
-                  Add exercise
-                </Button>
-              </div>
-            </div>
+            <WorkoutEmptyState
+              onOpenRoutineModal={() => setShowRoutineModal(true)}
+              onAddExerciseClick={handleFocusAddExercise}
+            />
           ) : !logsFetched ? (
             <Skeleton
               variant="card"
@@ -581,11 +562,21 @@ export const WorkoutEngine: React.FC = () => {
         testId="reload-routine-dialog"
       />
 
-      {/* Deferred Delete Undo Toast (W3, W8, RD-7) */}
-      {activeToast && (
+      {/* Deferred Delete Undo Toasts (W3, W8, RD-7) */}
+      {exerciseRemovalToast && (
         <UndoToast
-          toast={activeToast}
+          toast={exerciseRemovalToast}
           onDismiss={() => {}}
+          testId="quick-log-toast"
+          stackIndex={deleteToast ? 1 : 0}
+        />
+      )}
+      {deleteToast && (
+        <UndoToast
+          toast={deleteToast}
+          onDismiss={() => {}}
+          testId="quick-log-toast"
+          stackIndex={0}
         />
       )}
     </div>

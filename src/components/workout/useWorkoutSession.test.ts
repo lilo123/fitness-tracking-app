@@ -158,13 +158,53 @@ describe('useWorkoutSession (W5, W24, W39, W46)', () => {
     const { result } = renderHook(() => useWorkoutSession(defaultProps));
 
     // Initially clean or on rest day
-    expect(result.current.isScheduledRoutineDirty).toBeDefined();
+    expect(result.current.isScheduledRoutineDirty).toBe(false);
 
     // Adding drafts makes it dirty
     act(() => {
       result.current.updateDraft('Bench Press', 1, 'weight', '135');
     });
 
+    expect(result.current.isScheduledRoutineDirty).toBe(true);
+  });
+
+  it('W10: isScheduledRoutineDirty detects target set changes as dirty', () => {
+    const customTemplate: RoutineTemplate = {
+      id: 'tpl-1',
+      user_id: targetUserId,
+      name: 'Sunday Routine',
+      days_of_week: ['Sun'],
+      is_master: false,
+      assigned_to: null,
+      created_at: '2026-09-01',
+      exercises: [
+        {
+          id: 'te-1',
+          template_id: 'tpl-1',
+          exercise_id: 'ex-bench',
+          order_index: 0,
+          target_sets: 3,
+          target_reps: 10,
+          exercise: { name: 'Bench Press' },
+        },
+      ],
+    };
+
+    const { result } = renderHook(() =>
+      useWorkoutSession({
+        ...defaultProps,
+        customTemplates: [customTemplate],
+      })
+    );
+
+    expect(result.current.isScheduledRoutineDirty).toBe(false);
+
+    // Adjust target sets
+    act(() => {
+      result.current.adjustTargetSets('Bench Press', 1);
+    });
+
+    expect(result.current.targetSetCounts['Bench Press']).toBe(4);
     expect(result.current.isScheduledRoutineDirty).toBe(true);
   });
 });

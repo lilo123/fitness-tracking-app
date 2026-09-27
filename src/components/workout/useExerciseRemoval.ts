@@ -24,6 +24,7 @@ export interface UseExerciseRemovalOptions {
   targetRepCounts: Record<string, number>;
   inputDrafts: Record<string, SetDraftInput>;
   timeoutMs?: number;
+  onError?: (error: unknown, removed: RemovedExerciseState) => void;
 }
 
 export function useExerciseRemoval({
@@ -37,6 +38,7 @@ export function useExerciseRemoval({
   targetRepCounts,
   inputDrafts,
   timeoutMs = 6000,
+  onError,
 }: UseExerciseRemovalOptions) {
   const [sheetState, setSheetState] = useState<{
     isOpen: boolean;
@@ -58,6 +60,10 @@ export function useExerciseRemoval({
       }
     },
     durationMs: timeoutMs,
+    onError: (err, item) => {
+      onRestoreExercise(item);
+      onError?.(err, item);
+    },
   });
 
   const pendingItem = pending?.item ?? null;

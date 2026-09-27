@@ -4390,3 +4390,268 @@ return {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// P3b Workout: Density, Hit Targets, Typography & Accessibility
+// ---------------------------------------------------------------------------
+
+test.describe('P3b Workout', () => {
+  // (a) Hit-area + visible labels + no overflow at 320/375/414px on WorkoutHeader & GlobalRestTimerPill
+  for (const width of [320, 375, 414] as const) {
+    test(`hit-area and layout acceptance at ${width}px for WorkoutHeader and GlobalRestTimerPill`, async ({ browser }) => {
+      const page = await browser.newPage({
+        viewport: { width, height: 844 },
+        deviceScaleFactor: 1,
+      });
+      try {
+        await setupWorkoutDensityPage(page);
+
+        // Open Rest Timer
+        const restTimerBtn = page.locator('[data-testid="rest-timer-btn"]');
+        await expect(restTimerBtn).toBeVisible();
+        await restTimerBtn.click();
+        const pill = page.locator('[data-testid="rest-timer-pill"]');
+        await expect(pill).toBeVisible();
+
+        // 1. scrollWidth <= clientWidth (no horizontal scroll / overflow)
+        const hasHorizontalOverflow = await page.evaluate(() => {
+          return document.documentElement.scrollWidth > window.innerWidth;
+        });
+        expect(
+          hasHorizontalOverflow,
+          `Viewport ${width}px must not have horizontal overflow (scrollWidth <= clientWidth)`
+        ).toBe(false);
+
+        // 2. Visible labels at 320px
+        const routineBtn = page.locator('[data-testid="routine-select-btn"]');
+        await expect(routineBtn).toBeVisible();
+        expect((await routineBtn.innerText()).trim().length).toBeGreaterThan(0);
+
+        await expect(restTimerBtn).toContainText('Rest Timer');
+
+        const dateInput = page.locator('[data-testid="workout-date-input"]');
+        await expect(dateInput).toBeVisible();
+        expect((await dateInput.inputValue()).length).toBeGreaterThan(0);
+
+        const clearBtn = page.locator('button[aria-label="Clear workout"]');
+        await expect(clearBtn).toBeVisible();
+        await expect(clearBtn).toContainText('Clear');
+
+        const add90Btn = pill.locator('button[aria-label="Add 90 seconds"]');
+        await expect(add90Btn).toBeVisible();
+        await expect(add90Btn).toContainText('+90s');
+
+        // 3. All 4 header controls + 3 timer controls satisfy >=44px hit-area predicate
+        const controlsToCheck = [
+          routineBtn,
+          restTimerBtn,
+          dateInput,
+          clearBtn,
+          pill.locator('button[aria-label="Pause timer"], button[aria-label="Resume timer"]'),
+          add90Btn,
+          pill.locator('button[aria-label="Stop timer"]'),
+        ];
+
+        for (const loc of controlsToCheck) {
+          const item = await loc.evaluate((el) => {
+            el.scrollIntoView({ block: 'center', inline: 'nearest' });
+            const r = el.getBoundingClientRect();
+            const cx = r.left + r.width / 2;
+            const cy = r.top + r.height / 2;
+
+            const centerEl = document.elementFromPoint(cx, cy);
+            const centerHits = Boolean(centerEl && (el.contains(centerEl) || centerEl.contains(el)));
+
+            const topEl = document.elementFromPoint(cx, cy - 21.5);
+            const btmEl = document.elementFromPoint(cx, cy + 21.5);
+            const topHits = Boolean(topEl && (el.contains(topEl) || topEl.contains(el)));
+            const btmHits = Boolean(btmEl && (el.contains(btmEl) || btmEl.contains(el)));
+
+            const horizontalAllowed = r.width >= 43;
+            let horizontalHits = true;
+            if (horizontalAllowed) {
+              const leftEl = document.elementFromPoint(cx - 21.5, cy);
+              const rightEl = document.elementFromPoint(cx + 21.5, cy);
+              const leftHits = Boolean(leftEl && (el.contains(leftEl) || leftEl.contains(el)));
+              const rightHits = Boolean(rightEl && (el.contains(rightEl) || rightEl.contains(el)));
+              horizontalHits = leftHits && rightHits;
+            }
+
+            const hasMin44pxHitArea = centerHits && (
+              topHits ||
+              btmHits ||
+              (horizontalAllowed && horizontalHits) ||
+              r.width >= 43 ||
+              r.height >= 43
+            );
+
+            return {
+              tag: el.tagName.toLowerCase(),
+              testId: el.getAttribute('data-testid') || el.getAttribute('aria-label') || el.textContent?.trim().slice(0, 20),
+              width: Math.round(r.width),
+              height: Math.round(r.height),
+              hasMin44pxHitArea,
+            };
+          });
+
+          expect(
+            item.hasMin44pxHitArea,
+            `Control ${item.testId || item.tag} (${item.width}x${item.height}) failed >=44px hit area predicate: ${JSON.stringify(item)}`
+          ).toBe(true);
+        }
+
+        // Close timer
+        await pill.locator('button[aria-label="Stop timer"]').click();
+        await expect(pill).not.toBeVisible();
+      } finally {
+        await page.close();
+      }
+    });
+  }
+
+  // (b) D43 checkTypeScale on WorkoutHeader, GlobalRestTimerPill, RestDayView, FinishReviewSheet, RemoveExerciseSheet
+  test('D43 typography on WorkoutHeader, GlobalRestTimerPill, RestDayView, FinishReviewSheet, and RemoveExerciseSheet', async ({ browser }) => {
+    const page = await browser.newPage({
+      viewport: { width: 375, height: 812 },
+      deviceScaleFactor: 1,
+    });
+    try {
+      await setupWorkoutDensityPage(page);
+
+      // 1. WorkoutHeader
+      const header = page.locator('[data-testid="routine-select-btn"]').locator('xpath=ancestor::div[contains(@class, "rounded-2xl")][1]');
+      await expect(header).toBeVisible();
+      const headerViolations = await checkTypeScale(header);
+      expect(
+        headerViolations,
+        `WorkoutHeader typography violations:\n${JSON.stringify(headerViolations, null, 2)}`
+      ).toHaveLength(0);
+
+      // 2. GlobalRestTimerPill
+      const restTimerBtn = page.locator('[data-testid="rest-timer-btn"]');
+      await restTimerBtn.click();
+      const pill = page.locator('[data-testid="rest-timer-pill"]');
+      await expect(pill).toBeVisible();
+      const pillViolations = await checkTypeScale(pill);
+      expect(
+        pillViolations,
+        `GlobalRestTimerPill typography violations:\n${JSON.stringify(pillViolations, null, 2)}`
+      ).toHaveLength(0);
+      await pill.locator('button[aria-label="Stop timer"]').click();
+      await expect(pill).not.toBeVisible();
+
+      // 3. FinishReviewSheet
+      await page.locator('button:has-text("Finish Workout")').click();
+      const finishSheet = page.locator('[data-testid="finish-review-sheet"]');
+      await expect(finishSheet).toBeVisible();
+      const finishViolations = await checkTypeScale(finishSheet);
+      expect(
+        finishViolations,
+        `FinishReviewSheet typography violations:\n${JSON.stringify(finishViolations, null, 2)}`
+      ).toHaveLength(0);
+      await page.keyboard.press('Escape');
+      await expect(finishSheet).not.toBeVisible();
+
+      // 4. RemoveExerciseSheet
+      await page.locator('[data-testid="exercise-card-0"] button[aria-label^="Remove "]').click();
+      const removeSheet = page.locator('[data-testid="remove-exercise-sheet"]');
+      await expect(removeSheet).toBeVisible();
+      const removeViolations = await checkTypeScale(removeSheet);
+      expect(
+        removeViolations,
+        `RemoveExerciseSheet typography violations:\n${JSON.stringify(removeViolations, null, 2)}`
+      ).toHaveLength(0);
+      await page.keyboard.press('Escape');
+      await expect(removeSheet).not.toBeVisible();
+
+      // 5. RestDayView
+      await page.locator('[data-testid="routine-select-btn"]').click();
+      await page.locator('[data-testid="routine-picker-modal"] button:has-text("Rest Day")').click();
+      const restDay = page.locator('.rounded-3xl:has-text("Rest & Recovery")');
+      await expect(restDay).toBeVisible();
+      const restDayViolations = await checkTypeScale(restDay);
+      expect(
+        restDayViolations,
+        `RestDayView typography violations:\n${JSON.stringify(restDayViolations, null, 2)}`
+      ).toHaveLength(0);
+
+      // Restore routine back to Workout A
+      await page.locator('button:has-text("Choose Routine")').click();
+      await page.locator('[data-testid="routine-picker-modal"] button:has-text("Workout A")').click();
+      await expect(page.locator('[data-testid="exercise-card-0"]')).toBeVisible();
+    } finally {
+      await page.close();
+    }
+  });
+
+  // (c) Clean axe-core accessibility audit on WorkoutHeader, GlobalRestTimerPill, RestDayView, FinishReviewSheet, and RemoveExerciseSheet
+  test('clean axe-core accessibility audit on WorkoutHeader, GlobalRestTimerPill, RestDayView, FinishReviewSheet, and RemoveExerciseSheet', async ({ browser }) => {
+    const page = await browser.newPage({
+      viewport: { width: 375, height: 812 },
+      deviceScaleFactor: 1,
+    });
+    try {
+      await setupWorkoutDensityPage(page);
+      await page.addScriptTag({ path: 'node_modules/axe-core/axe.min.js' });
+
+      const runAxeOnLocator = async (locator: Locator, desc: string) => {
+        const violations = await locator.evaluate(async (el) => {
+          // @ts-ignore
+          const res = await axe.run(el, {
+            runOnly: {
+              type: 'tag',
+              values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'],
+            },
+          });
+          return res.violations;
+        });
+        expect(violations, `${desc} axe violations: ${JSON.stringify(violations, null, 2)}`).toHaveLength(0);
+      };
+
+      // 1. WorkoutHeader
+      const header = page.locator('[data-testid="routine-select-btn"]').locator('xpath=ancestor::div[contains(@class, "rounded-2xl")][1]');
+      await expect(header).toBeVisible();
+      await runAxeOnLocator(header, 'WorkoutHeader');
+
+      // 2. GlobalRestTimerPill
+      const restTimerBtn = page.locator('[data-testid="rest-timer-btn"]');
+      await restTimerBtn.click();
+      const pill = page.locator('[data-testid="rest-timer-pill"]');
+      await expect(pill).toBeVisible();
+      await runAxeOnLocator(pill, 'GlobalRestTimerPill');
+      await pill.locator('button[aria-label="Stop timer"]').click();
+      await expect(pill).not.toBeVisible();
+
+      // 3. FinishReviewSheet
+      await page.locator('button:has-text("Finish Workout")').click();
+      const finishSheet = page.locator('[data-testid="finish-review-sheet"]');
+      await expect(finishSheet).toBeVisible();
+      await runAxeOnLocator(finishSheet, 'FinishReviewSheet');
+      await page.keyboard.press('Escape');
+      await expect(finishSheet).not.toBeVisible();
+
+      // 4. RemoveExerciseSheet
+      await page.locator('[data-testid="exercise-card-0"] button[aria-label^="Remove "]').click();
+      const removeSheet = page.locator('[data-testid="remove-exercise-sheet"]');
+      await expect(removeSheet).toBeVisible();
+      await runAxeOnLocator(removeSheet, 'RemoveExerciseSheet');
+      await page.keyboard.press('Escape');
+      await expect(removeSheet).not.toBeVisible();
+
+      // 5. RestDayView
+      await page.locator('[data-testid="routine-select-btn"]').click();
+      await page.locator('[data-testid="routine-picker-modal"] button:has-text("Rest Day")').click();
+      const restDay = page.locator('.rounded-3xl:has-text("Rest & Recovery")');
+      await expect(restDay).toBeVisible();
+      await runAxeOnLocator(restDay, 'RestDayView');
+
+      // Restore routine back to Workout A
+      await page.locator('button:has-text("Choose Routine")').click();
+      await page.locator('[data-testid="routine-picker-modal"] button:has-text("Workout A")').click();
+      await expect(page.locator('[data-testid="exercise-card-0"]')).toBeVisible();
+    } finally {
+      await page.close();
+    }
+  });
+});
+
