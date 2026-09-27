@@ -504,5 +504,28 @@ describe('workoutSessionStore', () => {
     });
     expect(session?.inputDrafts['Leg Press 45° (Plate-Loaded)_0']).toBeUndefined();
   });
+
+  it('20. W24: persists session pointer for active past-date sessions and reloads them', () => {
+    const pastDate = '2026-09-15';
+    const session = workoutSessionStore.getOrInitSession('user-w24', pastDate, {
+      routineName: 'Past Session',
+      exercises: ['Bench Press'],
+      targetSetCounts: { 'Bench Press': 3 },
+      targetRepCounts: { 'Bench Press': 8 },
+    });
+
+    // Save with setPointer = true (as when navigating/editing a past date workout)
+    workoutSessionStore.saveSession(session, true);
+
+    // Pointer must be set to the past date
+    const pointer = localStorage.getItem('cybergym_current_session_pointer_user-w24');
+    expect(pointer).toBe(pastDate);
+
+    // getActiveSession without date argument must resolve to the active past session
+    const active = workoutSessionStore.getActiveSession('user-w24');
+    expect(active).not.toBeNull();
+    expect(active?.workoutDate).toBe(pastDate);
+    expect(active?.routineName).toBe('Past Session');
+  });
 });
 

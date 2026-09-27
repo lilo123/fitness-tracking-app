@@ -7,7 +7,10 @@ import {
   DEFAULT_EXERCISES_LIST,
   DEFAULT_WORKOUT_TEMPLATES,
   getDayOfWeekAbbr,
+  mergeBenchmarks,
 } from '../../utils/ghostSets';
+import { formatSet } from '../../utils/weight';
+import type { ExerciseBenchmarks } from '../../types/database';
 import { isValidUUID } from './workoutEngineHelpers';
 
 export const WORKOUT_WITH_SETS_PROJECTION =
@@ -101,6 +104,7 @@ export const workoutExercisesQueryOptions = {
     const { data, error } = await supabase
       .from('exercises')
       .select('id, name, body_part, is_master')
+      .eq('is_archived', false)
       .order('name')
       .limit(200);
     if (error) throw error;
@@ -112,8 +116,12 @@ export const workoutExercisesQueryOptions = {
 
 export function useWorkoutQueries(targetUserId: string, workoutDate: string) {
   const queryClient = useQueryClient();
-  const { data: exercises = DEFAULT_EXERCISES_LIST, isFetched: exercisesFetched } =
-    useQuery(workoutExercisesQueryOptions);
+  const {
+    data: exercises = DEFAULT_EXERCISES_LIST,
+    isFetched: exercisesFetched,
+    isError: isExercisesError,
+    error: exercisesError,
+  } = useQuery(workoutExercisesQueryOptions);
 
   const currentDayAbbr =
     getDayOfWeekAbbr(workoutDate) || ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date().getDay()];
@@ -155,7 +163,7 @@ export function useWorkoutQueries(targetUserId: string, workoutDate: string) {
     error: logsError,
     refetch: refetchLogs,
   } = useQuery({
-    queryKey: ['workout_sets', targetUserId, '90d'],
+    queryKey: ['workout_sets', targetUserId, workoutDate],
     enabled: Boolean(targetUserId),
     queryFn: async () => {
       if (!targetUserId || !isValidUUID(targetUserId)) return [];
@@ -303,13 +311,95 @@ export function useWorkoutQueries(targetUserId: string, workoutDate: string) {
         }
       }
 
-      return [...todaySets, ...ghostSets];
+      const combinedSets = [...todaySets, ...ghostSets];
+      queryClient.setQueryData(['workout_sets', targetUserId, '90d'], combinedSets);
+      return combinedSets;
     },
   });
 
   const todaySets = useMemo(() => {
     return userLogs.filter((s) => normalizeDateStr(s.workout_date) === workoutDate);
   }, [userLogs, workoutDate]);
+
+  const exerciseIds = useMemo(() => {
+    return exercises
+      .filter((e) => isValidUUID(e.id))
+      .map((e) => e.id)
+      .sort();
+  }, [exercises]);
+
+  const {
+    data: rawBenchmarks = {},
+    isFetched: benchmarksFetched,
+    isError: isBenchmarksError,
+    error: benchmarksError,
+  } = useQuery({
+    queryKey: ['exercise_benchmarks', targetUserId, workoutDate, exerciseIds],
+    enabled: Boolean(targetUserId && isValidUUID(targetUserId) && exerciseIds.length > 0),
+    queryFn: async (): Promise<Record<string, ExerciseBenchmarks>> => {
+      if (!targetUserId || !isValidUUID(targetUserId) || exerciseIds.length === 0) {
+        return {};
+      }
+      if (typeof (supabase as any).rpc !== 'function') {
+        return {};
+      }
+      const res = await (supabase as any).rpc('get_exercise_benchmarks', {
+        p_user_id: targetUserId,
+        p_date: workoutDate,
+        p_exercise_ids: exerciseIds,
+      });
+      if (!res) return {};
+      const { data, error } = res;
+      if (error) {
+        console.warn('[useWorkoutQueries] get_exercise_benchmarks RPC warning:', error);
+        return {};
+      }
+      const benchmarksMap: Record<string, ExerciseBenchmarks> = {};
+      if (data && Array.isArray(data)) {
+        for (const row of data as any[]) {
+          if (!row.exercise_id) continue;
+          const hasPR = row.pr_weight != null && row.pr_reps != null;
+          const pr = hasPR
+            ? {
+                weight: Number(row.pr_weight),
+                reps: Number(row.pr_reps),
+                date: row.pr_date || '',
+              }
+            : null;
+
+          let lastSession: ExerciseBenchmarks['lastSession'] = null;
+          if (row.last_date && Array.isArray(row.last_sets) && row.last_sets.length > 0) {
+            const sets: WorkoutSet[] = row.last_sets.map((s: any) => ({
+              id: s.id,
+              workout_id: row.last_workout_id || '',
+              exercise_id: row.exercise_id,
+              weight: Number(s.weight) || 0,
+              reps: Number(s.reps) || 0,
+              set_index: s.set_index ?? 0,
+              set_type: s.set_type || 'working',
+              rpe: s.rpe ?? null,
+            }));
+            const summaryText = sets.map((s) => formatSet(s.weight, s.reps)).join(', ');
+            lastSession = {
+              date: row.last_date,
+              summaryText,
+              sets,
+            };
+          }
+
+          benchmarksMap[row.exercise_id] = {
+            pr,
+            lastSession,
+          };
+        }
+      }
+      return benchmarksMap;
+    },
+  });
+
+  const benchmarks = useMemo(() => {
+    return mergeBenchmarks(rawBenchmarks, todaySets);
+  }, [rawBenchmarks, todaySets]);
 
   const resolvedTemplateId = useMemo(() => {
     if (!rawTemplatesFetched || !logsFetched) return null;
@@ -380,6 +470,12 @@ export function useWorkoutQueries(targetUserId: string, workoutDate: string) {
   return {
     exercises,
     exercisesFetched,
+    isExercisesError,
+    exercisesError,
+    benchmarks,
+    benchmarksFetched,
+    isBenchmarksError,
+    benchmarksError,
     customTemplates,
     templatesFetched,
     userLogs,

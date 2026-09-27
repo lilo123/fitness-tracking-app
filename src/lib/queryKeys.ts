@@ -166,6 +166,8 @@ export const queryKeys = {
   workoutSets: {
     all: ['workout_sets'] as const,
     byUser: (userId: string | null | undefined) => ['workout_sets', userId] as const,
+    byDate: (userId: string | null | undefined, workoutDate: string) =>
+      ['workout_sets', userId, workoutDate] as const,
     recent90d: (userId: string | null | undefined) => ['workout_sets', userId, '90d'] as const,
     allForUser: (userId: string | null | undefined) => ['workout_sets', userId, 'all'] as const,
   },

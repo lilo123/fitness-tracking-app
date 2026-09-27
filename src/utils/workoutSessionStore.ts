@@ -21,11 +21,14 @@ export interface ActiveWorkoutSession {
   completedAt: string | null;
 }
 
-const SESSION_PREFIX = 'cybergym_active_session_';
-const POINTER_PREFIX = 'cybergym_current_session_pointer_';
-const DRAFT_EXERCISES_PREFIX = 'cybergym_active_exercises_';
-const ROUTINE_PREFIX = 'cybergym_routine_';
-const TTL_MS = 24 * 60 * 60 * 1000;
+import {
+  SESSION_PREFIX,
+  POINTER_PREFIX,
+  DRAFT_EXERCISES_PREFIX,
+  ROUTINE_PREFIX,
+  TTL_MS,
+  renameExerciseInSessions,
+} from './workoutSessionHelpers';
 
 interface QueuedDraft {
   userId: string;
@@ -176,7 +179,8 @@ export class WorkoutSessionStore {
       }
     }
 
-    if (setPointer && session.workoutDate === getLocalDateStr(new Date()) && session.completedAt === null) {
+    // W24: Persist pointer for any active open session date (including past dates)
+    if (setPointer && session.completedAt === null) {
       localStorage.setItem(this.getPointerKey(session.userId), session.workoutDate);
     }
 
@@ -476,117 +480,18 @@ export class WorkoutSessionStore {
    * Renames an exercise across all active workout sessions for a user,
    * updating exercise lists, target sets/reps records, expanded state, and input drafts.
    */
+  /**
+   * Renames an exercise across all active workout sessions for a user (shim for L39).
+   */
   renameExercise(userId: string, oldName: string, newName: string): void {
-    if (!this.isStorageAvailable() || !userId || !oldName || !newName) return;
-    const trimmedOld = oldName.trim();
-    const trimmedNew = newName.trim();
-    if (!trimmedOld || !trimmedNew || trimmedOld === trimmedNew) return;
-
-    // 1. Flush any pending debounced in-memory draft entries before renaming
     this.flushPendingWrites();
-
-    // 2. Scan active sessions matching cybergym_active_session_${userId}_
-    const prefix = `${SESSION_PREFIX}${userId}_`;
-    const keysToUpdate: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith(prefix)) {
-        keysToUpdate.push(key);
-      }
-    }
-
-    const matchesOld = (name: string) => name === oldName || name === trimmedOld;
-
-    for (const key of keysToUpdate) {
-      try {
-        const raw = localStorage.getItem(key);
-        if (!raw) continue;
-        const session: ActiveWorkoutSession = JSON.parse(raw);
-        if (!session || session.schemaVersion !== 1) continue;
-
-        let changed = false;
-
-        // Update exercises array (preserving array index)
-        if (Array.isArray(session.exercises) && session.exercises.some(matchesOld)) {
-          session.exercises = session.exercises.map((n) => (matchesOld(n) ? trimmedNew : n));
-          changed = true;
-        }
-
-        // Migrate targetSetCounts
-        const oldSetKey = session.targetSetCounts
-          ? session.targetSetCounts[oldName] !== undefined
-            ? oldName
-            : session.targetSetCounts[trimmedOld] !== undefined
-            ? trimmedOld
-            : null
-          : null;
-        if (oldSetKey && session.targetSetCounts) {
-          session.targetSetCounts[trimmedNew] = session.targetSetCounts[oldSetKey];
-          delete session.targetSetCounts[oldSetKey];
-          changed = true;
-        }
-
-        // Migrate targetRepCounts
-        const oldRepKey = session.targetRepCounts
-          ? session.targetRepCounts[oldName] !== undefined
-            ? oldName
-            : session.targetRepCounts[trimmedOld] !== undefined
-            ? trimmedOld
-            : null
-          : null;
-        if (oldRepKey && session.targetRepCounts) {
-          session.targetRepCounts[trimmedNew] = session.targetRepCounts[oldRepKey];
-          delete session.targetRepCounts[oldRepKey];
-          changed = true;
-        }
-
-        // Migrate expandedExercises
-        if (Array.isArray(session.expandedExercises) && session.expandedExercises.some(matchesOld)) {
-          session.expandedExercises = session.expandedExercises.map((n) => (matchesOld(n) ? trimmedNew : n));
-          changed = true;
-        }
-
-        // Re-key inputDrafts: `${oldName}_${idx}` -> `${newName}_${idx}`
-        // Strictly validate numeric set index suffix to prevent colliding with longer exercise names
-        if (session.inputDrafts) {
-          const draftKeys = Object.keys(session.inputDrafts);
-          for (const dKey of draftKeys) {
-            let matchedPrefix: string | null = null;
-            if (dKey.startsWith(`${oldName}_`)) {
-              matchedPrefix = `${oldName}_`;
-            } else if (dKey.startsWith(`${trimmedOld}_`)) {
-              matchedPrefix = `${trimmedOld}_`;
-            }
-
-            if (matchedPrefix) {
-              const setSuffix = dKey.slice(matchedPrefix.length);
-              if (/^\d+$/.test(setSuffix)) {
-                session.inputDrafts[`${trimmedNew}_${setSuffix}`] = session.inputDrafts[dKey];
-                delete session.inputDrafts[dKey];
-                changed = true;
-              }
-            }
-          }
-        }
-
-        if (changed) {
-          this.saveSession(session, false);
-        }
-      } catch {
-        // Ignore corrupted entries
-      }
-    }
-
-    // 3. Migrate any pending in-memory drafts (as fallback)
-    const pendingKeys = Array.from(this.pendingDrafts.keys());
-    for (const qKey of pendingKeys) {
-      const item = this.pendingDrafts.get(qKey);
-      if (item && item.userId === userId && (item.exName === oldName || item.exName === trimmedOld)) {
-        this.pendingDrafts.delete(qKey);
-        const newQKey = `${item.userId}::${item.date}::${trimmedNew}_${item.setIndex}`;
-        this.pendingDrafts.set(newQKey, { ...item, exName: trimmedNew });
-      }
-    }
+    renameExerciseInSessions(
+      userId,
+      oldName,
+      newName,
+      (s, p) => this.saveSession(s, p),
+      this.pendingDrafts
+    );
   }
 
   resetForTesting(): void {

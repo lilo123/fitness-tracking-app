@@ -1,3 +1,4 @@
+import { formatSet } from "./weight";
 import type { WorkoutSet, GhostSetValues, ExerciseBenchmarks } from '../types/database';
 import {
   normalizeDateStr,
@@ -15,6 +16,11 @@ export {
   formatLocalTimestamp,
 };
 
+
+function isUuid(str: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+}
+
 export function computeGhostSets(
   exerciseId: string,
   targetSetCount: number,
@@ -25,9 +31,13 @@ export function computeGhostSets(
 
   // Filter sets for this exercise occurring before or on previous dates (excluding today's active session if specified)
   const pastSets = allSets.filter((s) => {
-    const matchesId = s.exercise_id === exerciseId;
-    const matchesName = Boolean(s.exercise_name && s.exercise_name.toLowerCase() === exerciseId.toLowerCase());
-    if (!matchesId && !matchesName) return false;
+    if (isUuid(exerciseId) && s.exercise_id) {
+      if (s.exercise_id !== exerciseId) return false;
+    } else {
+      const matchesId = s.exercise_id === exerciseId;
+      const matchesName = Boolean(s.exercise_name && s.exercise_name.toLowerCase() === exerciseId.toLowerCase());
+      if (!matchesId && !matchesName) return false;
+    }
     if (s.weight == null || s.reps == null || isNaN(Number(s.weight)) || isNaN(Number(s.reps))) return false;
     const setDate = normalizeDateStr(s.workout_date || s.date || s.created_at);
     if (!setDate) return false;
@@ -54,9 +64,8 @@ export function computeGhostSets(
     .filter((s) => normalizeDateStr(s.workout_date || s.date || s.created_at) === mostRecentDate)
     .sort((a, b) => (a.set_index || 0) - (b.set_index || 0));
 
-  // Prefer working sets, but fallback to all sets if no working sets
-  const workingSets = sessionSets.filter((s) => s.set_type === 'working' || !s.set_type);
-  const candidateSets = workingSets.length > 0 ? workingSets : sessionSets;
+  // Working sets only (RD-9, W6: warm-up and drop sets hidden and excluded)
+  const candidateSets = sessionSets.filter((s) => s.set_type === 'working' || !s.set_type);
 
   const results: GhostSetValues[] = [];
 
@@ -99,10 +108,17 @@ export function getExerciseBenchmarks(
   const normCurrentDate = currentDateStr ? normalizeDateStr(currentDateStr) : '';
 
   const validSets = allSets.filter((s) => {
-    const matchesId = s.exercise_id === exerciseId;
-    const matchesName = Boolean(s.exercise_name && s.exercise_name.toLowerCase() === exerciseId.toLowerCase());
-    if (!matchesId && !matchesName) return false;
+    if (isUuid(exerciseId) && s.exercise_id) {
+      if (s.exercise_id !== exerciseId) return false;
+    } else {
+      const matchesId = s.exercise_id === exerciseId;
+      const matchesName = Boolean(s.exercise_name && s.exercise_name.toLowerCase() === exerciseId.toLowerCase());
+      if (!matchesId && !matchesName) return false;
+    }
     if (s.weight == null || s.reps == null) return false;
+    // Working sets only (RD-9, W6)
+    const type = s.set_type ? s.set_type.toLowerCase() : 'working';
+    if (type === 'warmup' || type === 'drop') return false;
     return true;
   });
 
@@ -134,7 +150,7 @@ export function getExerciseBenchmarks(
       .filter((s) => normalizeDateStr(s.workout_date || s.date || s.created_at) === lastDate)
       .sort((a, b) => (a.set_index || 0) - (b.set_index || 0));
 
-    const summaryText = sessionSets.map((s) => `${s.weight}×${s.reps}`).join(', ');
+    const summaryText = sessionSets.map((s) => formatSet(s.weight, s.reps)).join(', ');
     lastSession = {
       date: lastDate,
       summaryText,
@@ -288,3 +304,67 @@ export const DEFAULT_WORKOUT_TEMPLATES: WorkoutTemplateDefinition[] = [
     },
   },
 ];
+
+/**
+ * Merges server benchmarks with today's committed working sets in real-time (W1, RD-4, RD-9).
+ * Working sets only: warm-up and drop sets are strictly excluded.
+ * Ties broken by: higher weight, then higher reps, then earliest date (RD-4).
+ */
+export function mergeBenchmarks(
+  benchmarks: Record<string, ExerciseBenchmarks>,
+  todaySets: Array<WorkoutSet & { workout_date?: string; date?: string }>
+): Record<string, ExerciseBenchmarks> {
+  const result: Record<string, ExerciseBenchmarks> = {};
+
+  // Clone existing benchmarks
+  for (const [key, bm] of Object.entries(benchmarks)) {
+    result[key] = {
+      lastSession: bm.lastSession ? { ...bm.lastSession, sets: [...(bm.lastSession.sets || [])] } : null,
+      pr: bm.pr ? { ...bm.pr } : null,
+    };
+  }
+
+  // Filter today's sets to working sets only
+  const workingTodaySets = (todaySets || []).filter((s) => {
+    if (s.weight == null || s.reps == null || isNaN(Number(s.weight)) || isNaN(Number(s.reps))) return false;
+    const type = s.set_type ? s.set_type.toLowerCase() : 'working';
+    return type !== 'warmup' && type !== 'drop';
+  });
+
+  for (const s of workingTodaySets) {
+    const exId = s.exercise_id;
+    if (!exId) continue;
+
+    const weight = Number(s.weight);
+    const reps = Number(s.reps);
+    const setDate = normalizeDateStr(s.workout_date || s.date || s.created_at);
+
+    if (!result[exId]) {
+      result[exId] = {
+        lastSession: null,
+        pr: null,
+      };
+    }
+
+    const currentPR = result[exId].pr;
+    if (!currentPR) {
+      result[exId].pr = {
+        weight,
+        reps,
+        date: setDate,
+      };
+    } else {
+      const curWeight = Number(currentPR.weight) || 0;
+      const curReps = Number(currentPR.reps) || 0;
+      if (weight > curWeight || (weight === curWeight && reps > curReps)) {
+        result[exId].pr = {
+          weight,
+          reps,
+          date: setDate,
+        };
+      }
+    }
+  }
+
+  return result;
+}

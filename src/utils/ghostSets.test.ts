@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   computeGhostSets,
   getExerciseBenchmarks,
+  mergeBenchmarks,
   normalizeDateStr,
   getLocalDateStr,
   getDayOfWeekAbbr,
@@ -760,6 +761,119 @@ describe('Ghost Sets Algorithm & Benchmarks', () => {
         expect(ghosts[0].isFromPrevious).toBe(true);
         expect(ghosts[0].hintText).not.toBe('—');
       }
+    });
+  });
+
+  describe('P2 mergeBenchmarks & working-sets filters (W1, W6, W42)', () => {
+    it('mergeBenchmarks updates PR when today logs a new best working set (W1)', () => {
+      const initialBenchmarks = {
+        'ex-uuid-1': {
+          lastSession: {
+            date: '2026-09-20',
+            summaryText: '205×5',
+            sets: [{ id: 's1', exercise_id: 'ex-uuid-1', weight: 205, reps: 5 }],
+          },
+          pr: { weight: 225, reps: 3, date: '2026-09-01' },
+        },
+      };
+
+      const todaySets = [
+        {
+          id: 'today-1',
+          exercise_id: 'ex-uuid-1',
+          weight: 230,
+          reps: 1,
+          set_type: 'working',
+          workout_date: '2026-09-27',
+        },
+      ];
+
+      const merged = mergeBenchmarks(initialBenchmarks as any, todaySets as any);
+      expect(merged['ex-uuid-1'].pr).toEqual({
+        weight: 230,
+        reps: 1,
+        date: '2026-09-27',
+      });
+      // Last session remains untouched by today's in-progress session
+      expect(merged['ex-uuid-1'].lastSession?.date).toBe('2026-09-20');
+    });
+
+    it('mergeBenchmarks ignores warm-up and drop sets (W6 acceptance)', () => {
+      const initialBenchmarks = {
+        'ex-uuid-1': {
+          lastSession: null,
+          pr: { weight: 200, reps: 5, date: '2026-09-01' },
+        },
+      };
+
+      // Heavy warmup 240x1 logged today must be ignored
+      const todaySets = [
+        {
+          id: 'today-warmup',
+          exercise_id: 'ex-uuid-1',
+          weight: 240,
+          reps: 1,
+          set_type: 'warmup',
+          workout_date: '2026-09-27',
+        },
+      ];
+
+      const merged = mergeBenchmarks(initialBenchmarks as any, todaySets as any);
+      expect(merged['ex-uuid-1'].pr).toEqual({
+        weight: 200,
+        reps: 5,
+        date: '2026-09-01',
+      });
+    });
+
+    it('formats bodyweight (0 lbs) as BW in lastSession summaryText (W7)', () => {
+      const history = [
+        {
+          id: 's-bw',
+          exercise_id: 'ex-pullup',
+          weight: 0,
+          reps: 8,
+          workout_date: '2026-09-20',
+          set_type: 'working',
+        },
+      ];
+
+      const bm = getExerciseBenchmarks('ex-pullup', history as any, '2026-09-27');
+      expect(bm.lastSession?.summaryText).toBe('BW×8');
+    });
+
+    it('isolates custom vs master same-named exercises by exercise_id UUID (W42)', () => {
+      const customExId = '00000000-0000-0000-0000-000000000001';
+      const masterExId = '00000000-0000-0000-0000-000000000002';
+
+      const history = [
+        {
+          id: 's-master',
+          exercise_id: masterExId,
+          exercise_name: 'Bench Press',
+          weight: 315,
+          reps: 1,
+          workout_date: '2026-09-20',
+          set_type: 'working',
+        },
+        {
+          id: 's-custom',
+          exercise_id: customExId,
+          exercise_name: 'Bench Press',
+          weight: 185,
+          reps: 5,
+          workout_date: '2026-09-21',
+          set_type: 'working',
+        },
+      ];
+
+      const customBm = getExerciseBenchmarks(customExId, history as any, '2026-09-27');
+      expect(customBm.pr?.weight).toBe(185);
+      expect(customBm.lastSession?.sets[0].exercise_id).toBe(customExId);
+
+      const masterBm = getExerciseBenchmarks(masterExId, history as any, '2026-09-27');
+      expect(masterBm.pr?.weight).toBe(315);
+      expect(masterBm.lastSession?.sets[0].exercise_id).toBe(masterExId);
     });
   });
 });

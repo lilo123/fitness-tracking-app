@@ -4,6 +4,8 @@ import {
   normalizeDateStr,
   getDayOfWeekAbbr,
   formatShortDate,
+  formatCivilDate,
+  isCivilDate,
   formatLocalTimestamp,
   getDayBounds,
   getStartOfDay,
@@ -806,6 +808,27 @@ describe('Canonical Date Utility (src/utils/date.ts)', () => {
           expect(durationMs).toBe(23.5 * 3600000);
         });
       });
+    });
+  });
+
+
+  describe("Civil date helpers (H4, RD-5)", () => {
+    it("isCivilDate correctly validates YYYY-MM-DD format", () => {
+      expect(isCivilDate("2026-09-15")).toBe(true);
+      expect(isCivilDate("2026-01-01")).toBe(true);
+      expect(isCivilDate("2026-09-15T00:00:00.000Z")).toBe(false);
+      expect(isCivilDate("Sep 15")).toBe(false);
+      expect(isCivilDate("")).toBe(false);
+    });
+
+    it("formatCivilDate formats YYYY-MM-DD directly without timezone shifts (H4 acceptance)", () => {
+      expect(formatCivilDate("2026-09-15")).toBe("Sep 15");
+      expect(formatCivilDate("2026-01-01")).toBe("Jan 1");
+      expect(formatCivilDate("2026-12-31")).toBe("Dec 31");
+    });
+
+    it("formatCivilDate falls back to formatShortDate for ISO timestamps", () => {
+      expect(formatCivilDate("2026-09-15T12:00:00.000Z")).toBe("Sep 15");
     });
   });
 

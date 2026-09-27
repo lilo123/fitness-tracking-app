@@ -38,6 +38,10 @@ export async function invalidateWorkoutDerived(
     queryClient.invalidateQueries({ queryKey: queryKeys.exerciseStats.all }),
     // src/components/workout/EditSetModal.tsx:80, 109
     queryClient.invalidateQueries({ queryKey: queryKeys.sessionSets.all }),
+    // P2: workouts civil date, benchmarks, and stats v2 (W2, W20, H2, H10)
+    queryClient.invalidateQueries({ queryKey: queryKeys.workouts.all }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.exerciseBenchmarks.all }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.exerciseStatsV2.all }),
   ];
 
   if (userId) {
@@ -52,6 +56,10 @@ export async function invalidateWorkoutDerived(
     // src/components/workout/EditSetModal.tsx:84, 113
     promises.push(
       queryClient.invalidateQueries({ queryKey: queryKeys.exerciseStats.byUser(userId) })
+    );
+    // P2: exercise_stats_v2 scoped by user
+    promises.push(
+      queryClient.invalidateQueries({ queryKey: queryKeys.exerciseStatsV2.byUser(userId) })
     );
   }
 

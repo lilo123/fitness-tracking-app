@@ -354,3 +354,29 @@ export function formatLocalTimestamp(
   return validTime.toISOString();
 }
 
+/**
+ * Checks whether a given string is a valid civil calendar date (YYYY-MM-DD).
+ */
+export function isCivilDate(str: string): boolean {
+  if (!str || typeof str !== "string") return false;
+  return /^\d{4}-\d{2}-\d{2}$/.test(str);
+}
+
+/**
+ * Formats a civil date (YYYY-MM-DD) or ISO timestamp into short human format (e.g. "Sep 15").
+ * Directly parses calendar components without astronomical timezone shifting (H4, RD-5).
+ */
+export function formatCivilDate(dateStr: string): string {
+  if (!dateStr || typeof dateStr !== "string") return "";
+  if (isCivilDate(dateStr)) {
+    const parts = dateStr.split("-");
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const mIdx = parseInt(parts[1], 10) - 1;
+    const monthStr = months[mIdx] || parts[1];
+    const dayStr = parseInt(parts[2], 10);
+    if (!isNaN(mIdx) && !isNaN(dayStr)) {
+      return `${monthStr} ${dayStr}`;
+    }
+  }
+  return formatShortDate(dateStr);
+}
