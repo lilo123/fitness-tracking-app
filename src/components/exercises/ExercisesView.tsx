@@ -46,6 +46,8 @@ export const ExercisesView: React.FC = () => {
   const [exerciseName, setExerciseName] = useState('');
   const [selectedBodyParts, setSelectedBodyParts] = useState<string[]>([]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [createExerciseError, setCreateExerciseError] = useState<string | null>(null);
+  const [templateError, setTemplateError] = useState<string | null>(null);
   const [editingExercise, setEditingExercise] = useState<Exercise | null>(null);
 
   // Template Management State
@@ -133,14 +135,19 @@ export const ExercisesView: React.FC = () => {
   // Mutations
   const createExerciseMutation = useMutation({
     mutationFn: async () => {
+      setCreateExerciseError(null);
+      const trimmedName = exerciseName.trim();
+      if (!trimmedName) {
+        throw new Error('Exercise name cannot be blank or whitespace-only.');
+      }
       const bodyPartStr = selectedBodyParts.length > 0 ? selectedBodyParts.join(', ') : null;
-      const isMasterExercise = isCoach && !selectedAthleteId;
+      // L7: A coach with 0 athletes creates a personal row (user_id = user.id, is_master = false)
       const { error } = await supabase.from('exercises').insert([
         {
-          name: exerciseName.trim(),
+          name: trimmedName,
           body_part: bodyPartStr,
-          user_id: isMasterExercise ? null : user?.id,
-          is_master: isMasterExercise,
+          user_id: user?.id,
+          is_master: false,
           is_archived: false,
         }
       ]);
@@ -150,39 +157,71 @@ export const ExercisesView: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['exercises'] });
       setExerciseName('');
       setSelectedBodyParts([]);
+      setCreateExerciseError(null);
+    },
+    onError: (err: any) => {
+      let msg = err?.message || 'Failed to create exercise';
+      if (err?.code === '23514' || String(err?.message).includes('23514')) {
+        msg = 'Exercise name cannot be blank or whitespace-only.';
+      }
+      setCreateExerciseError(msg);
     },
   });
 
   const deleteExerciseMutation = useMutation({
     mutationFn: async (ex: Exercise) => {
       setDeleteError(null);
-      const { error } = await supabase
+      // L3: a failed archive never falls back to a DELETE
+      // 0-row update: PostgREST returns no error on 0 rows under RLS; use .select() and treat [] as failure
+      const { data, error } = await supabase
         .from('exercises')
         .update({ is_archived: true })
-        .eq('id', ex.id);
+        .eq('id', ex.id)
+        .select();
 
-      if (error) {
-        const { error: delErr } = await supabase
-          .from('exercises')
-          .delete()
-          .eq('id', ex.id);
-        if (delErr) {
-          throw new Error('Cannot delete exercise because workout logs reference it.');
-        }
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('Exercise could not be archived. You may not have permission to modify this exercise.');
       }
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['exercises'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['exercises'] });
+      queryClient.invalidateQueries({ queryKey: ['routine_templates'] });
+    },
     onError: (err: any) => {
-      setDeleteError(err.message || 'Failed to delete exercise');
+      let msg = err?.message || 'Failed to archive exercise';
+      if (err?.code === '23503' || String(err?.message).includes('23503')) {
+        msg = 'Cannot archive exercise because other records reference it.';
+      }
+      setDeleteError(msg);
     },
   });
 
   const deleteTemplateMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('routine_templates').delete().eq('id', id);
+      setTemplateError(null);
+      // 0-row delete: use .select() and treat [] as failure
+      const { data, error } = await supabase
+        .from('routine_templates')
+        .delete()
+        .eq('id', id)
+        .select();
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('Routine template could not be deleted. You may not have permission to modify this template.');
+      }
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['routine_templates'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['routine_templates'] });
+      setTemplateError(null);
+    },
+    onError: (err: any) => {
+      let msg = err?.message || 'Failed to delete routine template';
+      if (err?.code === '23503' || String(err?.message).includes('23503')) {
+        msg = 'Cannot delete routine template because other records reference it.';
+      }
+      setTemplateError(msg);
+    },
   });
 
   const toggleBodyPart = (part: string) => {
@@ -276,6 +315,11 @@ export const ExercisesView: React.FC = () => {
                   className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-3 text-base sm:text-sm font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none"
                   placeholder="e.g. Incline Bench Press"
                 />
+                {exerciseName.length > 0 && !exerciseName.trim() && (
+                  <p className="text-xs text-rose-400 mt-1" role="alert" data-testid="exercise-name-whitespace-error">
+                    Exercise name cannot be blank or whitespace-only.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -299,7 +343,7 @@ export const ExercisesView: React.FC = () => {
               </div>
 
               <button
-                disabled={!exerciseName || createExerciseMutation.isPending}
+                disabled={!exerciseName.trim() || createExerciseMutation.isPending}
                 onClick={() => createExerciseMutation.mutate()}
                 className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black py-3 min-h-[44px] rounded-xl disabled:opacity-50 touch-manipulation"
               >
@@ -312,10 +356,11 @@ export const ExercisesView: React.FC = () => {
             <h3 className="font-black text-white text-base mb-3 flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-cyan-400" /> Exercise Library ({exercises.length})
             </h3>
-            {/* Delete Error Banner */}
+            {/* Exercise Action Error Banner (Create/Archive) */}
             <StatusBanner
-              message={deleteError}
+              message={deleteError || createExerciseError}
               tone="error"
+              testId="exercise-action-error"
               className="mb-3"
               icon={<AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />}
             />
@@ -327,8 +372,9 @@ export const ExercisesView: React.FC = () => {
                 </div>
               )}
               {exercises.map((ex) => {
-                const canEditExercise = isCoach || (ex.user_id === user?.id && !ex.is_master);
-                const canDelete = isCoach || (ex.user_id === user?.id && !ex.is_master);
+                // L1: masters show no Edit/Trash for anyone (incl. coaches); only own non-master rows are editable
+                const canEditExercise = !ex.is_master && Boolean(user?.id) && ex.user_id === user?.id;
+                const canDelete = !ex.is_master && Boolean(user?.id) && ex.user_id === user?.id;
                 return (
                   <div key={ex.id} className="bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-4 flex justify-between items-center text-sm font-medium">
                     <div>
@@ -373,6 +419,15 @@ export const ExercisesView: React.FC = () => {
 
       {activeTab === 'templates' && (
         <div className="space-y-4">
+          {/* Template Action Error Banner */}
+          <StatusBanner
+            message={templateError}
+            tone="error"
+            testId="template-action-error"
+            className="mb-3"
+            icon={<AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />}
+          />
+
           {/* List-first Header with + New Routine Action */}
           <div className="flex items-center justify-between gap-3">
             <h3 className="font-black text-white text-base flex items-center gap-2">

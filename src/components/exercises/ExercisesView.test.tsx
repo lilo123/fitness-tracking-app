@@ -42,9 +42,9 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
   let queryClient: QueryClient;
   const mockInsertExercise = vi.fn().mockResolvedValue({ error: null });
   const mockInsertTemplate = vi.fn();
-  const mockUpdateExercise = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
+  const mockUpdateExercise = vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [{ id: 'ex-custom-1' }], error: null }) }) });
   const mockUpdateTemplate = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
-  const mockDeleteTemplate = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
+  const mockDeleteTemplate = vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [{ id: 'tpl-1' }], error: null }) }) });
   const mockRpc = vi.fn().mockResolvedValue({ error: null });
 
   beforeEach(() => {
@@ -55,6 +55,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     workoutSessionStore.resetForTesting();
     mockCoachState.isCoach = false;
     mockCoachState.selectedAthleteId = 'a0000000-0000-4000-8000-000000000123';
+    mockAthleteSession.user.id = 'a0000000-0000-4000-8000-000000000123';
     (supabase.rpc as any) = mockRpc;
 
     const sampleExercises = [
@@ -162,6 +163,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
       table: 'users',
       projection: 'id, email, username, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, is_coach_mode, coach_code, coach_tier, max_athletes, created_at, timezone',
     });
+    // template_exercises is mutation-only (insert); NO_PROJECTION_APPLIES
   });
 
   it('creates custom exercise scoped to the athlete', async () => {
@@ -248,6 +250,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
           }),
         ],
         p_user_id: 'a0000000-0000-4000-8000-000000000123',
+        p_is_master: false,
       });
       expect(screen.queryByTestId('edit-template-modal')).toBeNull();
     });
@@ -323,15 +326,16 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
           }),
         ],
         p_user_id: 'a0000000-0000-4000-8000-000000000123',
+        p_is_master: false,
       });
     });
   });
 
-  it('performs transactional rollback deleting newly created template if exercise insertion fails during fork', async () => {
-    mockRpc.mockResolvedValueOnce({ error: { message: 'Function not found' } });
+  it('L5: template-save RPC error sends NO fallback table writes and displays error banner', async () => {
+    mockRpc.mockResolvedValueOnce({ error: { message: 'RPC save error' } });
 
-    const mockDeleteTplEq = vi.fn().mockResolvedValue({ error: null });
-    const mockDeleteTpl = vi.fn().mockReturnValue({ eq: mockDeleteTplEq });
+    const mockDeleteTpl = vi.fn();
+    const mockInsertTpl = vi.fn();
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'routine_templates') {
@@ -348,20 +352,13 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
           ],
           error: null,
         });
-        b.insert = vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({
-              data: { id: 'tpl-new-failed-fork', name: 'Master Routine (Copy)' },
-              error: null,
-            }),
-          }),
-        });
+        b.insert = mockInsertTpl;
         b.delete = mockDeleteTpl;
         return b;
       }
       if (table === 'template_exercises') {
         const b = createSupabaseBuilder('template_exercises', { data: [], error: null });
-        b.insert = vi.fn().mockResolvedValue({ error: { message: 'Network insertion timeout' } });
+        b.insert = vi.fn();
         return b;
       }
       if (table === 'exercises') {
@@ -387,13 +384,11 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     const saveBtn = screen.getByTestId('save-template-btn');
     fireEvent.click(saveBtn);
 
-    // Should display error banner and execute rollback deletion of orphaned template
+    // L5: Should display error banner and execute NO fallback writes
     await waitFor(() => {
       expect(screen.getByTestId('template-error')).toBeDefined();
-      expect(mockDeleteTpl).toHaveBeenCalled();
-      expect(mockDeleteTplEq).toHaveBeenCalledWith('id', 'tpl-new-failed-fork');
-      // template_exercises is mutation-only (insert); NO_PROJECTION_APPLIES
-      expect(getRecordedTables()).toContain('template_exercises');
+      expect(mockInsertTpl).not.toHaveBeenCalled();
+      expect(mockDeleteTpl).not.toHaveBeenCalled();
     });
   });
 
@@ -668,6 +663,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
           }),
         ],
         p_user_id: 'a0000000-0000-4000-8000-000000000123',
+        p_is_master: false,
       });
       expect(screen.queryByTestId('edit-template-modal')).toBeNull();
     });
@@ -723,6 +719,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
 
   it('mounts deleteError live region empty while idle and updates on delete failure (NEW-15)', async () => {
     mockCoachState.isCoach = true;
+    const mockDelete = vi.fn();
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'exercises') {
         const b = createSupabaseBuilder('exercises', {
@@ -730,18 +727,22 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
           error: null,
         });
         b.update = vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ error: { message: 'Update failed' } }),
+          eq: vi.fn().mockReturnValue({
+            select: vi.fn().mockResolvedValue({ data: null, error: { message: 'Update failed' } }),
+          }),
         });
-        b.delete = vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ error: { message: 'Delete failed' } }),
-        });
+        b.delete = mockDelete;
         return b;
+      }
+      if (table === 'users') {
+        return createSupabaseBuilder('users', {
+          data: { id: 'a0000000-0000-4000-8000-000000000123', role: 'athlete', username: 'TestAthlete' },
+          error: null,
+        });
       }
 
       return createSupabaseBuilder(table, { data: [], error: null });
     });
-
-
 
     const { container } = renderComponent();
     await screen.findByText('My Athlete Curl');
@@ -759,10 +760,173 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     fireEvent.click(deleteBtn);
 
     await waitFor(() => {
-      expect(deleteAlert.textContent).toContain('Cannot delete exercise because workout logs reference it.');
+      // L3: archive failure never falls back to DELETE
+      expect(mockDelete).not.toHaveBeenCalled();
+      expect(deleteAlert.textContent).toContain('Update failed');
     });
 
     expect(container.querySelectorAll('[role="alert"]')[1]).toBe(deleteAlert);
+  });
+
+  it('0-row writes: exercise archive with 0 rows affected throws and displays StatusBanner error', async () => {
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'exercises') {
+        const b = createSupabaseBuilder('exercises', {
+          data: [{ id: 'ex-custom-1', name: 'My Athlete Curl', body_part: 'Arms', is_master: false, user_id: 'a0000000-0000-4000-8000-000000000123', is_archived: false }],
+          error: null,
+        });
+        b.update = vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            select: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        });
+        return b;
+      }
+      if (table === 'users') {
+        return createSupabaseBuilder('users', {
+          data: { id: 'a0000000-0000-4000-8000-000000000123', role: 'athlete', username: 'TestAthlete' },
+          error: null,
+        });
+      }
+      return createSupabaseBuilder(table, { data: [], error: null });
+    });
+
+    renderComponent();
+    await screen.findByText('My Athlete Curl');
+
+    const deleteBtn = screen.getByTitle('Delete');
+    fireEvent.click(deleteBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('exercise-action-error')).toBeDefined();
+      expect(screen.getByTestId('exercise-action-error').textContent).toContain('Exercise could not be archived.');
+    });
+  });
+
+  it('0-row writes: template delete with 0 rows affected displays StatusBanner error', async () => {
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'routine_templates') {
+        const b = createSupabaseBuilder('routine_templates', {
+          data: [{
+            id: 'tpl-user-1',
+            user_id: 'a0000000-0000-4000-8000-000000000123',
+            name: 'Athlete Routine',
+            is_master: false,
+            days_of_week: ['Mon'],
+            exercises: [],
+          }],
+          error: null,
+        });
+        b.delete = vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            select: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        });
+        return b;
+      }
+      if (table === 'users') {
+        return createSupabaseBuilder('users', {
+          data: { id: 'a0000000-0000-4000-8000-000000000123', role: 'athlete', username: 'TestAthlete' },
+          error: null,
+        });
+      }
+      return createSupabaseBuilder(table, { data: [], error: null });
+    });
+
+    renderComponent();
+    fireEvent.click(screen.getByRole('button', { name: /Templates/i }));
+
+    await screen.findByText('Athlete Routine');
+    const deleteBtn = screen.getByTestId('delete-template-tpl-user-1');
+    fireEvent.click(deleteBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('template-action-error')).toBeDefined();
+      expect(screen.getByTestId('template-action-error').textContent).toContain('Routine template could not be deleted.');
+    });
+  });
+
+  it('L6: create-exercise error shows StatusBanner and keeps form input', async () => {
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'exercises') {
+        const b = createSupabaseBuilder('exercises', { data: [], error: null });
+        b.insert = vi.fn().mockResolvedValue({ data: null, error: { message: 'Insert failed: RLS denied' } });
+        return b;
+      }
+      if (table === 'users') {
+        return createSupabaseBuilder('users', {
+          data: { id: 'a0000000-0000-4000-8000-000000000123', role: 'athlete', username: 'TestAthlete' },
+          error: null,
+        });
+      }
+      return createSupabaseBuilder(table, { data: [], error: null });
+    });
+
+    renderComponent();
+    await screen.findByText(/Create Custom Exercise/i);
+
+    const input = screen.getByLabelText(/exercise name/i);
+    fireEvent.change(input, { target: { value: 'Standing Overhead Press' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /Save to Library/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('exercise-action-error')).toBeDefined();
+      expect(screen.getByTestId('exercise-action-error').textContent).toContain('Insert failed: RLS denied');
+    });
+
+    expect(screen.getByLabelText(/exercise name/i)).toHaveValue('Standing Overhead Press');
+  });
+
+  it('L7: inserts personal exercise (user_id = user.id, is_master = false) when coach has 0 athletes', async () => {
+    mockCoachState.isCoach = true;
+    mockCoachState.selectedAthleteId = '';
+
+    const mockInsert = vi.fn().mockResolvedValue({ error: null });
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'exercises') {
+        const b = createSupabaseBuilder('exercises', { data: [], error: null });
+        b.insert = mockInsert;
+        return b;
+      }
+      if (table === 'users') {
+        return createSupabaseBuilder('users', {
+          data: { id: 'a0000000-0000-4000-8000-000000000123', role: 'coach', username: 'TestCoach' },
+          error: null,
+        });
+      }
+      return createSupabaseBuilder(table, { data: [], error: null });
+    });
+
+    renderComponent();
+    await screen.findByText(/Create Custom Exercise/i);
+
+    const input = screen.getByLabelText(/exercise name/i);
+    fireEvent.change(input, { target: { value: 'Coach Personal Lift' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /Save to Library/i }));
+
+    await waitFor(() => {
+      expect(mockInsert).toHaveBeenCalledWith([
+        expect.objectContaining({
+          name: 'Coach Personal Lift',
+          user_id: 'a0000000-0000-4000-8000-000000000123',
+          is_master: false,
+        }),
+      ]);
+    });
+  });
+
+  it('L12: ExercisesView disables save button and displays inline error on whitespace name', async () => {
+    renderComponent();
+    await screen.findByText(/Create Custom Exercise/i);
+
+    const input = screen.getByLabelText(/exercise name/i);
+    fireEvent.change(input, { target: { value: '   ' } });
+
+    const saveBtn = screen.getByRole('button', { name: /Save to Library/i });
+    expect(saveBtn).toBeDisabled();
+    expect(screen.getByText(/Exercise name cannot be blank or whitespace-only./i)).toBeDefined();
   });
 });
 

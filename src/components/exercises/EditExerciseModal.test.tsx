@@ -138,5 +138,50 @@ describe('EditExerciseModal', () => {
       expect(document.activeElement).toBe(opener);
     });
   });
+
+  it('0 rows affected on update displays error and keeps input intact', async () => {
+    (supabase.from as any).mockImplementation((table: string) => {
+      const b = createSupabaseBuilder(table, { data: [], error: null });
+      b.update = vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          select: vi.fn().mockResolvedValue({ data: [], error: null }),
+        }),
+      });
+      return b;
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <EditExerciseModal {...mockProps} />
+      </QueryClientProvider>
+    );
+
+    const input = screen.getByLabelText(/exercise name/i);
+    fireEvent.change(input, { target: { value: 'Updated Bench Press' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('edit-exercise-error')).toBeDefined();
+      expect(screen.getByTestId('edit-exercise-error').textContent).toContain('Exercise could not be updated.');
+    });
+
+    expect(screen.getByLabelText(/exercise name/i)).toHaveValue('Updated Bench Press');
+  });
+
+  it('L12: disables save button and displays inline error on whitespace name', () => {
+    render(
+      <QueryClientProvider client={queryClient}>
+        <EditExerciseModal {...mockProps} />
+      </QueryClientProvider>
+    );
+
+    const input = screen.getByLabelText(/exercise name/i);
+    fireEvent.change(input, { target: { value: '    ' } });
+
+    const saveBtn = screen.getByRole('button', { name: /save changes/i });
+    expect(saveBtn).toBeDisabled();
+    expect(screen.getByText(/Exercise name cannot be blank or whitespace-only./i)).toBeDefined();
+  });
 });
 

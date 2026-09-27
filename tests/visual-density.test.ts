@@ -3885,8 +3885,8 @@ test.describe('D44 edit sheet density & layout', () => {
             fiber: 4,
             serving_size: 1,
             serving_unit: 'serving',
-            logged_at: '2026-09-26T19:00:00Z',
-            logged_date: '2026-09-26',
+            logged_at: new Date().toISOString(),
+            logged_date: new Date().toISOString().split('T')[0],
             has_components: true,
             items: [
               {

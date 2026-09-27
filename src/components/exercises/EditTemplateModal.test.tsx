@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { describe, it, expect, vi , beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { EditTemplateModal } from './EditTemplateModal';
 import { expectNoA11yViolationsForRules } from '../../test/a11y';
 import type { Exercise, RoutineTemplate } from '../../types/database';
+import { supabase } from '../../lib/supabase';
 import { createSupabaseBuilder, clearMockHistory, getRecordedTables } from '../../test/supabaseBuilderMock';
 
 vi.mock('../../lib/supabase', () => ({
@@ -164,6 +165,102 @@ describe('EditTemplateModal', () => {
     expect(exBuilder.tableName).toBe('template_exercises');
     expect(getRecordedTables()).toContain('routine_templates');
     expect(getRecordedTables()).toContain('template_exercises');
+  });
+
+  it('L2: passes p_is_master: true when saving an existing master routine template', async () => {
+    const masterTpl: RoutineTemplate = {
+      id: 'tpl-master-1',
+      user_id: 'user-1',
+      name: 'Master Routine',
+      is_master: true,
+      days_of_week: ['Mon'],
+      assigned_to: null,
+      exercises: [{ id: 'te-1', template_id: 'tpl-master-1', exercise_id: 'ex-1', order_index: 0, target_sets: 3, target_reps: 10 }],
+    };
+
+    const mockRpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    (supabase.rpc as any) = mockRpc;
+
+    render(
+      <EditTemplateModal
+        {...mockProps}
+        template={masterTpl}
+        exercises={[{ id: 'ex-1', name: 'Squat', body_part: 'Legs', is_master: true, user_id: 'master-owner', is_archived: false }]}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('save-template-btn'));
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith(
+        'save_routine_template',
+        expect.objectContaining({
+          p_template_id: 'tpl-master-1',
+          p_is_master: true,
+        })
+      );
+    });
+  });
+
+  it('L5: when save_routine_template RPC fails, no fallback queries are executed and error is shown', async () => {
+    const tpl: RoutineTemplate = {
+      id: 'tpl-1',
+      user_id: 'user-1',
+      name: 'Push Routine',
+      is_master: false,
+      days_of_week: ['Mon'],
+      assigned_to: null,
+      exercises: [{ id: 'te-1', template_id: 'tpl-1', exercise_id: 'ex-1', order_index: 0, target_sets: 3, target_reps: 10 }],
+    };
+
+    const mockRpc = vi.fn().mockResolvedValue({ data: null, error: new Error('RPC save failed') });
+    (supabase.rpc as any) = mockRpc;
+
+    const mockFrom = vi.fn();
+    (supabase.from as any) = mockFrom;
+
+    render(
+      <EditTemplateModal
+        {...mockProps}
+        template={tpl}
+        exercises={[{ id: 'ex-1', name: 'Squat', body_part: 'Legs', is_master: true, user_id: 'master-owner', is_archived: false }]}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('save-template-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('template-error')).toBeDefined();
+    });
+
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it('L12: disables save button and displays inline error on whitespace name', () => {
+    const tpl: RoutineTemplate = {
+      id: 'tpl-1',
+      user_id: 'user-1',
+      name: 'Push Routine',
+      is_master: false,
+      days_of_week: ['Mon'],
+      assigned_to: null,
+      exercises: [{ id: 'te-1', template_id: 'tpl-1', exercise_id: 'ex-1', order_index: 0, target_sets: 3, target_reps: 10 }],
+    };
+
+    render(
+      <EditTemplateModal
+        {...mockProps}
+        template={tpl}
+        exercises={[{ id: 'ex-1', name: 'Squat', body_part: 'Legs', is_master: true, user_id: 'master-owner', is_archived: false }]}
+      />
+    );
+
+    const input = screen.getByLabelText(/template name/i);
+    fireEvent.change(input, { target: { value: '    ' } });
+
+    const saveBtn = screen.getByTestId('save-template-btn');
+    expect(saveBtn).toBeDisabled();
+    expect(screen.getByText(/Template name cannot be blank or whitespace-only./i)).toBeDefined();
   });
 });
 

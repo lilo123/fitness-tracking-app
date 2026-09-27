@@ -197,7 +197,7 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
     }));
 
     try {
-      // 1. Try atomic database RPC function first
+      // 1. Database atomic RPC function (L5: single write path, no fallback table writes)
       const rpcId = isFork ? null : template?.id || null;
       const { error: rpcErr } = await supabase.rpc('save_routine_template', {
         p_template_id: rpcId as unknown as string,
@@ -205,95 +205,11 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
         p_days_of_week: days,
         p_exercises: exercisePayload,
         p_user_id: targetUserId,
+        p_is_master: Boolean(template?.is_master) && !isFork,
       });
 
-      if (!rpcErr) {
-        onSuccess();
-        onClose();
-        return;
-      }
-
-      // 2. Resilient client-side mutation with snapshot rollback
-      const existingSnapshot = template?.exercises || [];
-      if (isFork || !template?.id) {
-        const { data: newTpl, error: newTplErr } = await supabase
-          .from('routine_templates')
-          .insert([
-            {
-              user_id: targetUserId,
-              name: name.trim(),
-              days_of_week: days,
-              is_master: false,
-            },
-          ])
-          .select()
-          .single();
-        if (newTplErr) throw newTplErr;
-
-        const newExRows = templateExercises.map((e, idx) => ({
-          template_id: newTpl.id,
-          exercise_id: e.exercise_id,
-          order_index: idx,
-          target_sets: e.target_sets,
-          target_reps: e.target_reps,
-        }));
-        const { error: insErr } = await supabase.from('template_exercises').insert(newExRows);
-        if (insErr) {
-          // Clean up newly created orphaned template
-          await supabase.from('routine_templates').delete().eq('id', newTpl.id);
-          throw insErr;
-        }
-      } else {
-        const originalName = template.name;
-        const originalDays = template.days_of_week ? [...template.days_of_week] : [];
-
-        const { error: updErr } = await supabase
-          .from('routine_templates')
-          .update({ name: name.trim(), days_of_week: days })
-          .eq('id', template.id);
-        if (updErr) throw updErr;
-
-        const { error: delErr } = await supabase
-          .from('template_exercises')
-          .delete()
-          .eq('template_id', template.id);
-        if (delErr) {
-          await supabase
-            .from('routine_templates')
-            .update({ name: originalName, days_of_week: originalDays })
-            .eq('id', template.id);
-          throw delErr;
-        }
-
-        const newExRows = templateExercises.map((e, idx) => ({
-          template_id: template.id,
-          exercise_id: e.exercise_id,
-          order_index: idx,
-          target_sets: e.target_sets,
-          target_reps: e.target_reps,
-        }));
-        const { error: insErr } = await supabase.from('template_exercises').insert(newExRows);
-        if (insErr) {
-          // Restore metadata snapshot
-          await supabase
-            .from('routine_templates')
-            .update({ name: originalName, days_of_week: originalDays })
-            .eq('id', template.id);
-
-          // Restore exercise snapshot
-          if (existingSnapshot.length > 0) {
-            await supabase.from('template_exercises').insert(
-              existingSnapshot.map((e: any) => ({
-                template_id: template.id,
-                exercise_id: e.exercise_id,
-                order_index: e.order_index ?? 0,
-                target_sets: e.target_sets ?? 3,
-                target_reps: e.target_reps ?? 10,
-              }))
-            );
-          }
-          throw insErr;
-        }
+      if (rpcErr) {
+        throw rpcErr;
       }
 
       onSuccess();
@@ -412,6 +328,11 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
                   placeholder="e.g., Push Day - Hypertrophy"
                   className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-3 input-text-sm focus:border-violet-500 focus:ring-2 focus:ring-violet-500/50 outline-none"
                 />
+                {name.length > 0 && !name.trim() && (
+                  <p className="text-xs text-rose-400 mt-1" role="alert" data-testid="template-name-whitespace-error">
+                    Template name cannot be blank or whitespace-only.
+                  </p>
+                )}
               </div>
 
               {/* Scheduled Days */}
@@ -501,7 +422,7 @@ export const EditTemplateModal: React.FC<EditTemplateModalProps> = ({
           <button
             type="button"
             data-testid="save-template-btn"
-            disabled={saving}
+            disabled={saving || !name.trim()}
             onClick={handleSave}
             className="px-6 py-2.5 min-h-[44px] rounded-xl text-xs font-black bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-400 hover:to-indigo-500 text-white shadow-neon-violet transition active:scale-95 disabled:opacity-50 flex items-center gap-2 touch-manipulation"
           >

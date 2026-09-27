@@ -82,15 +82,19 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
     const bodyPartStr = selectedBodyParts.length > 0 ? selectedBodyParts.join(', ') : null;
 
     try {
-      const { error: updErr } = await supabase
+      const { data, error: updErr } = await supabase
         .from('exercises')
         .update({
           name: trimmedName,
           body_part: bodyPartStr,
         })
-        .eq('id', exercise.id);
+        .eq('id', exercise.id)
+        .select();
 
       if (updErr) throw updErr;
+      if (!data || data.length === 0) {
+        throw new Error('Exercise could not be updated. You may not have permission to modify this exercise.');
+      }
 
       // In-place cascade sync to active workout session drafts
       const userIdsToSync = new Set<string>();
@@ -107,7 +111,13 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
       if (onSuccess) onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err?.message || 'Failed to update exercise.');
+      let msg = err?.message || 'Failed to update exercise.';
+      if (err?.code === '23503' || String(err?.message).includes('23503')) {
+        msg = 'Cannot update exercise because other records reference it.';
+      } else if (err?.code === '23514' || String(err?.message).includes('23514')) {
+        msg = 'Exercise name cannot be blank or whitespace-only.';
+      }
+      setError(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -177,6 +187,11 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
               placeholder="e.g. Incline Bench Press"
               className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-3 input-text-sm font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none transition"
             />
+            {name.length > 0 && !name.trim() && (
+              <p className="text-xs text-rose-400 mt-1" role="alert" data-testid="edit-exercise-name-whitespace-error">
+                Exercise name cannot be blank or whitespace-only.
+              </p>
+            )}
           </div>
 
           {/* Target Muscle Groups Multi-select */}
