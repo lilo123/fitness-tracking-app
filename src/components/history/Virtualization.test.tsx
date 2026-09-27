@@ -83,8 +83,8 @@ describe('DIR-C2: List Virtualization with @tanstack/react-virtual', () => {
     // Count all DOM elements mounted inside the rendered container
     const allMountedNodes = container.querySelectorAll('*');
     // Without virtualization, 400 sessions × ~45 nodes each would be ~18,000 DOM nodes.
-    // With virtualization in standard window viewport, only ~3-4 sessions are mounted (<= 200 nodes).
-    expect(allMountedNodes.length).toBeLessThanOrEqual(200);
+    // With virtualization and HISTORY_OVERSCAN = 5 (H30), ~8-9 sessions are mounted (<= 800 nodes).
+    expect(allMountedNodes.length).toBeLessThanOrEqual(800);
     // Ensure the list container is present and has virtualized dimensions
     expect(container.firstChild).toBeDefined();
 
@@ -479,9 +479,9 @@ describe('DIR-C2: List Virtualization with @tanstack/react-virtual', () => {
       />
     );
 
-    // Verify DOM node threshold: <= 200 DOM nodes even with 400 items
+    // Verify DOM node threshold: <= 250 DOM nodes even with 400 items (includes H45 controls)
     const allMountedNodes = container.querySelectorAll('*');
-    expect(allMountedNodes.length).toBeLessThanOrEqual(200);
+    expect(allMountedNodes.length).toBeLessThanOrEqual(250);
 
     // Verify visible affordance
     expect(screen.getByText(`Showing first ${FALLBACK_WINDOW} of 400 (virtualization disabled)`)).toBeDefined();

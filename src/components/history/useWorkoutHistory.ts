@@ -1,0 +1,293 @@
+import { useMemo, useCallback } from 'react';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+  useQuery,
+} from '@tanstack/react-query';
+import { supabase } from '../../lib/supabase';
+import { queryKeys } from '../../lib/queryKeys';
+import { invalidateWorkoutDerived } from '../../lib/invalidate';
+import type { WorkoutSet } from '../../types/database';
+import { getTimelineDaysAgoStr } from '../../utils/timelineGrouping';
+
+export interface HistorySet extends WorkoutSet {
+  workout_date: string;
+  workout_name: string;
+  exercise_name?: string;
+}
+
+export interface HistorySession {
+  id: string;
+  date: string;
+  workout_date?: string;
+  civil_date?: string;
+  name: string;
+  set_count: number;
+  total_volume: number;
+  sets?: HistorySet[];
+}
+
+export interface RawExerciseStat {
+  exercise_id: string;
+  exercise_name?: string;
+  set_count: number;
+  max_weight: number;
+  pr_reps: number;
+  pr_date?: string | null;
+  recent_sets: any;
+}
+
+export const HISTORY_PAGE_SIZE = 30;
+
+export async function fetchSessionSets(workoutId: string): Promise<HistorySet[]> {
+  // detail-fetch — user expands a session card
+  const { data, error } = await supabase
+    .from('sets')
+    .select('id, workout_id, exercise_id, weight, reps, set_index, created_at, rpe, set_type')
+    .eq('workout_id', workoutId)
+    .order('set_index', { ascending: true })
+    .limit(500);
+
+  if (error) throw error;
+  if (!data) return [];
+
+  if (data.length === 500) {
+    console.warn(
+      `[useHistoryData] fetchSessionSets query reached cap of 500 rows; older historical sets may be truncated.`
+    );
+  }
+
+  return (data as any[])
+    .filter((s) => !s.set_type || s.set_type === 'working')
+    .map((s) => ({
+      ...s,
+      exercise_name: s.exercise_name || s.exercise?.name,
+      set_index: s.set_index ?? 0,
+      set_type: s.set_type || 'working',
+      rpe: s.rpe ?? null,
+      workout_date: '',
+      workout_name: '',
+    }));
+}
+
+export function useExerciseStats(targetUserId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['exercise_stats', targetUserId],
+    enabled: Boolean(targetUserId) && enabled,
+    queryFn: async () => {
+      if (!targetUserId || typeof supabase.rpc !== 'function') return [];
+      const { data, error } = await supabase.rpc('get_exercise_stats', {
+        p_user_id: targetUserId,
+      });
+      if (error) throw error;
+      return (data || []) as RawExerciseStat[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export type HistoryRange = '30d' | '90d' | '1y' | 'all';
+
+export function computeHistorySince(range: HistoryRange, timeZone?: string): string | null {
+  if (range === 'all') return null;
+  const days = range === '30d' ? 30 : range === '90d' ? 90 : 365;
+  return getTimelineDaysAgoStr(days, timeZone);
+}
+
+export interface ExerciseHistorySet {
+  workout_id: string;
+  civil_date: string;
+  workout_name: string;
+  set_id: string;
+  set_index: number;
+  weight: number;
+  reps: number;
+  rpe?: number | null;
+  created_at: string;
+  total_sessions: number;
+}
+
+export interface FetchExerciseHistoryOptions {
+  since?: string | null;
+  before?: string | null;
+  limit?: number;
+}
+
+export async function fetchExerciseHistoryPage(
+  userId: string,
+  exerciseId: string,
+  options: FetchExerciseHistoryOptions = {}
+): Promise<ExerciseHistorySet[]> {
+  const { since = null, before = null, limit = 10 } = options;
+  const { data, error }: any = await (supabase as any).rpc('get_exercise_history', {
+    p_user_id: userId,
+    p_exercise_id: exerciseId,
+    p_since: since,
+    p_before: before,
+    p_limit: limit,
+  });
+
+  if (error) throw error;
+  if (!data) return [];
+  return ((data || []) as any[]).map((row) => ({
+    workout_id: row.workout_id,
+    civil_date: row.civil_date,
+    workout_name: row.workout_name,
+    set_id: row.set_id,
+    set_index: Number(row.set_index) || 0,
+    weight: Number(row.weight) || 0,
+    reps: Number(row.reps) || 0,
+    rpe: row.rpe != null ? Number(row.rpe) : null,
+    created_at: row.created_at,
+    total_sessions: Number(row.total_sessions) || 0,
+  }));
+}
+
+export interface HistoryCursor {
+  before_date: string;
+  before_id: string;
+}
+
+export interface HistoryPage {
+  sessions: HistorySession[];
+  totalCount: number;
+}
+
+export interface UseWorkoutHistoryResult {
+  sessions: HistorySession[];
+  totalCount: number | null;
+  hasMore: boolean;
+  loadMore: () => void;
+  isLoadingMore: boolean;
+  loadMoreError: Error | null;
+  isSessionsPending: boolean;
+  isSessionsError: boolean;
+  sessionsError: unknown;
+  refetchSessions: () => Promise<unknown>;
+  deleteSession: (workoutId: string) => Promise<void>;
+  isDeletingSession: boolean;
+}
+
+export function useWorkoutHistory(
+  targetUserId: string,
+  range: HistoryRange,
+  userTimeZone?: string
+): UseWorkoutHistoryResult {
+  const queryClient = useQueryClient();
+
+  const since = useMemo(() => computeHistorySince(range, userTimeZone), [range, userTimeZone]);
+
+  const {
+    data,
+    error,
+    isPending,
+    isError,
+    isFetchingNextPage,
+    fetchNextPage,
+    refetch,
+    hasNextPage,
+  } = useInfiniteQuery({
+    queryKey: queryKeys.workoutSets.historyV2(targetUserId, range),
+    enabled: Boolean(targetUserId),
+    initialPageParam: null as HistoryCursor | null,
+    queryFn: async ({ pageParam }) => {
+      if (!targetUserId) return { sessions: [], totalCount: 0 };
+      const { data: rows, error: rpcError }: any = await (supabase as any).rpc('get_history_sessions_v2', {
+        p_user_id: targetUserId,
+        p_since: since,
+        p_before_date: pageParam?.before_date ?? null,
+        p_before_id: pageParam?.before_id ?? null,
+        p_limit: HISTORY_PAGE_SIZE,
+      });
+
+      if (rpcError) throw rpcError;
+      const rawRows = (rows || []) as any[];
+      const totalCount = rawRows.length > 0 ? Number(rawRows[0].total_count) || 0 : 0;
+      const pageSessions: HistorySession[] = rawRows.map((row) => ({
+        id: row.id,
+        date: row.date,
+        workout_date: row.civil_date || row.workout_date || (row.date ? String(row.date).split('T')[0] : ''),
+        civil_date: row.civil_date || row.workout_date || (row.date ? String(row.date).split('T')[0] : ''),
+        name: row.name || 'Workout Session',
+        set_count: Number(row.set_count) || 0,
+        total_volume: Number(row.total_volume) || 0,
+        sets: [],
+      }));
+
+      return { sessions: pageSessions, totalCount };
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      if (!lastPage || lastPage.sessions.length === 0) return undefined;
+      if (lastPage.sessions.length < HISTORY_PAGE_SIZE) return undefined;
+      const loaded = allPages.reduce((acc, p) => acc + p.sessions.length, 0);
+      const totalCount = lastPage.totalCount;
+      if (loaded >= totalCount) return undefined;
+      const last = lastPage.sessions[lastPage.sessions.length - 1];
+      const before_date = last.civil_date || (last.date ? String(last.date).split('T')[0] : '');
+      return {
+        before_date,
+        before_id: last.id,
+      };
+    },
+  });
+
+  const sessions = useMemo(() => {
+    if (!data?.pages) return [];
+    return data.pages.flatMap((page) => page.sessions);
+  }, [data]);
+
+  const totalCount = useMemo(() => {
+    if (!data?.pages || data.pages.length === 0) return null;
+    if (data.pages[0]?.sessions.length === 0) return 0;
+    const lastPage = data.pages[data.pages.length - 1];
+    return lastPage?.totalCount ?? 0;
+  }, [data]);
+
+  const hasMore = Boolean(hasNextPage);
+
+  const loadMore = useCallback(() => {
+    if (hasMore && !isFetchingNextPage) {
+      void fetchNextPage();
+    }
+  }, [hasMore, isFetchingNextPage, fetchNextPage]);
+
+  const isInitialError = isError && (!data?.pages || data.pages.length === 0);
+  const isLoadMoreError = isError && Boolean(data?.pages && data.pages.length > 0);
+
+  const deleteMutation = useMutation({
+    mutationFn: async (workoutId: string) => {
+      if (!targetUserId) throw new Error('Cannot delete session without user id');
+      const { error: delError } = await supabase
+        .from('workouts')
+        .delete()
+        .eq('id', workoutId)
+        .eq('user_id', targetUserId);
+
+      if (delError) throw delError;
+      await invalidateWorkoutDerived(queryClient, targetUserId);
+    },
+  });
+
+  const deleteSession = useCallback(
+    async (workoutId: string) => {
+      await deleteMutation.mutateAsync(workoutId);
+    },
+    [deleteMutation]
+  );
+
+  return {
+    sessions,
+    totalCount,
+    hasMore,
+    loadMore,
+    isLoadingMore: isFetchingNextPage,
+    loadMoreError: isLoadMoreError ? (error as Error) : null,
+    isSessionsPending: Boolean(targetUserId) && isPending,
+    isSessionsError: isInitialError,
+    sessionsError: isInitialError ? error : null,
+    refetchSessions: refetch,
+    deleteSession,
+    isDeletingSession: deleteMutation.isPending,
+  };
+}

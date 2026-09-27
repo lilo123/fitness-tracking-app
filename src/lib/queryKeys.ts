@@ -177,6 +177,8 @@ export const queryKeys = {
       ['workout_sets', userId, workoutDate] as const,
     recent90d: (userId: string | null | undefined) => ['workout_sets', userId, '90d'] as const,
     allForUser: (userId: string | null | undefined) => ['workout_sets', userId, 'all'] as const,
+    historyV2: (userId: string | null | undefined, range: string) =>
+      ['workout_sets', userId, 'history_v2', range] as const,
   },
 
   // planned: P2 (Workouts date key / civil date)

@@ -530,7 +530,7 @@ describe('HistoryView', () => {
       const banner = screen.getByTestId('history-mutation-error');
       expect(banner).toBeDefined();
       expect(within(banner).getByText('Database deletion failed')).toBeDefined();
-      const dismissBtn = within(banner).getByRole('button', { name: '✕' });
+      const dismissBtn = within(banner).getByRole('button', { name: /✕|Dismiss/ });
       expect(dismissBtn.className).toContain('min-w-[44px]');
       expect(dismissBtn.className).toContain('min-h-[44px]');
     });
@@ -1652,6 +1652,8 @@ describe('HistoryView', () => {
 
       expect(await screen.findByText('Barbell Bench Press')).toBeDefined();
       expect(await screen.findByText('PR: 225 lbs × 8')).toBeDefined();
+      // Expand unlogged exercises collapsed by default under H14/D4
+      fireEvent.click(screen.getByTestId('toggle-unlogged-exercises'));
       expect(screen.getByText('Barbell Back Squat')).toBeDefined();
       expect(screen.getByText('No logs yet')).toBeDefined();
     });

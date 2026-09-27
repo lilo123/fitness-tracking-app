@@ -151,7 +151,7 @@ describe('React Query Key Registry (src/lib/queryKeys.ts)', () => {
     });
 
     // workout_sets
-    it('matches workout_sets call sites (src/components/exercises/EditExerciseModal.tsx:105, EditSetSheet.tsx:77, 82, 106, 111, useWorkoutMutations.ts:105, 170, 187, useWorkoutQueries.ts:158, useHistoryData.ts:191)', () => {
+    it('matches workout_sets call sites (src/components/exercises/EditExerciseModal.tsx:105, EditSetSheet.tsx:77, 82, 106, 111, useWorkoutMutations.ts:105, 170, 187, useWorkoutQueries.ts:158, useWorkoutHistory.ts:45)', () => {
       const targetUserId = 'target-user-wo';
       // src/components/exercises/EditExerciseModal.tsx:105
       // src/components/sets/EditSetSheet.tsx:77, 106
@@ -168,11 +168,18 @@ describe('React Query Key Registry (src/lib/queryKeys.ts)', () => {
         'target-user-wo',
         '90d',
       ]);
-      // src/components/history/useHistoryData.ts:191
+      // legacy all
       expect(queryKeys.workoutSets.allForUser(targetUserId)).toEqual([
         'workout_sets',
         'target-user-wo',
         'all',
+      ]);
+      // src/components/history/useWorkoutHistory.ts (history_v2)
+      expect(queryKeys.workoutSets.historyV2(targetUserId, '30d')).toEqual([
+        'workout_sets',
+        'target-user-wo',
+        'history_v2',
+        '30d',
       ]);
     });
 
@@ -204,12 +211,12 @@ describe('React Query Key Registry (src/lib/queryKeys.ts)', () => {
     });
 
     // exercise_stats
-    it('matches exercise_stats call sites (src/components/sets/EditSetSheet.tsx:79, 84, 108, 113, useHistoryData.ts:135)', () => {
+    it('matches exercise_stats call sites (src/components/sets/EditSetSheet.tsx:79, 84, 108, 113, useWorkoutHistory.ts:80)', () => {
       const targetUserId = 'stat-user-1';
       // src/components/sets/EditSetSheet.tsx:79, 108
       expect(queryKeys.exerciseStats.all).toEqual(['exercise_stats']);
       // src/components/sets/EditSetSheet.tsx:84, 113
-      // src/components/history/useHistoryData.ts:135
+      // src/components/history/useWorkoutHistory.ts
       expect(queryKeys.exerciseStats.byUser(targetUserId)).toEqual([
         'exercise_stats',
         'stat-user-1',
