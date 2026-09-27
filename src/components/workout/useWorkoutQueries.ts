@@ -139,23 +139,35 @@ export function useWorkoutQueries(targetUserId: string, workoutDate: string) {
         let rpcFailed = false;
 
         while (true) {
-          const { data: rpcData, error: rpcError }: any = await (supabase as any).rpc('get_routine_catalog', {
-            p_user_id: targetUserId,
-            p_limit: 200,
-            p_cursor: cursor,
-          });
-          if (rpcError) {
+          try {
+            const rpcCall = (supabase as any).rpc('get_routine_catalog', {
+              p_user_id: targetUserId,
+              p_limit: 200,
+              p_cursor: cursor,
+            });
+            const query =
+              typeof rpcCall?.select === 'function'
+                ? rpcCall.select('id,user_id,name,is_master,assigned_to,days_of_week,created_at')
+                : rpcCall;
+            const { data: rpcData, error: rpcError }: any = await query;
+            if (rpcError) {
+              console.warn('[useWorkoutQueries] get_routine_catalog RPC warning:', rpcError);
+              rpcFailed = true;
+              break;
+            }
+            if (!rpcData || rpcData.length === 0) {
+              break;
+            }
+            allTemplates.push(...(rpcData as RoutineTemplate[]));
+            if (rpcData.length < 200) {
+              break;
+            }
+            cursor = rpcData[rpcData.length - 1].id;
+          } catch (err) {
+            console.warn('[useWorkoutQueries] get_routine_catalog RPC warning:', err);
             rpcFailed = true;
             break;
           }
-          if (!rpcData || rpcData.length === 0) {
-            break;
-          }
-          allTemplates.push(...(rpcData as RoutineTemplate[]));
-          if (rpcData.length < 200) {
-            break;
-          }
-          cursor = rpcData[rpcData.length - 1].id;
         }
 
         if (!rpcFailed && allTemplates.length > 0) {

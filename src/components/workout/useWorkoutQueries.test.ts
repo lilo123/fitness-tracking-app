@@ -172,7 +172,9 @@ describe('useWorkoutQueries (P2 / W1 / W2 / W11 / W16 / W50 / L11)', () => {
           error: null,
         });
       }
-      return Promise.resolve({ data: [], error: null });
+      const fallback = Promise.resolve({ data: [], error: null });
+      (fallback as any).select = vi.fn().mockReturnValue(fallback);
+      return fallback;
     });
 
     vi.spyOn(supabase, 'from').mockImplementation((table: string) => {
@@ -217,31 +219,37 @@ describe('useWorkoutQueries (P2 / W1 / W2 / W11 / W16 / W50 / L11)', () => {
     expect(result.current.benchmarks[exerciseUUID].lastSession?.summaryText).toBe('185×8, 185×8');
   });
 
-  it('W3: queries get_routine_catalog RPC with p_limit: 200 when targetUserId is provided', async () => {
+  it('W3: queries get_routine_catalog RPC with p_limit: 200 and projects narrow columns', async () => {
     const routineId = '00000000-0000-4000-8000-000000000020';
     let rpcCalledWith: any = null;
+    let selectCalledWith: any = null;
+
+    const selectSpy = vi.fn().mockImplementation((projection: string) => {
+      selectCalledWith = projection;
+      return Promise.resolve({
+        data: [
+          {
+            id: routineId,
+            name: 'Leg Day Catalog',
+            is_master: false,
+            user_id: targetUserId,
+            assigned_to: null,
+            days_of_week: ['Sun'],
+            created_at: '2026-09-01T00:00:00Z',
+          },
+        ],
+        error: null,
+      });
+    });
 
     (supabase as any).rpc = vi.fn().mockImplementation((fn: string, params: any) => {
       if (fn === 'get_routine_catalog') {
         rpcCalledWith = { fn, params };
-        return Promise.resolve({
-          data: [
-            {
-              id: routineId,
-              name: 'Leg Day Catalog',
-              is_master: false,
-              user_id: targetUserId,
-              assigned_to: null,
-              days_of_week: ['Sun'],
-              exercises: [{ id: 'te-leg-1', exercise: { name: 'Leg Curl' } }],
-              created_at: '2026-09-01T00:00:00Z',
-              total_count: 1,
-            },
-          ],
-          error: null,
-        });
+        return { select: selectSpy };
       }
-      return Promise.resolve({ data: [], error: null });
+      const fallback = Promise.resolve({ data: [], error: null });
+      (fallback as any).select = vi.fn().mockReturnValue(fallback);
+      return fallback;
     });
 
     vi.spyOn(supabase, 'from').mockImplementation((table: string) => {
@@ -288,6 +296,78 @@ describe('useWorkoutQueries (P2 / W1 / W2 / W11 / W16 / W50 / L11)', () => {
         p_cursor: null,
       },
     });
+    expect(selectCalledWith).toBe('id,user_id,name,is_master,assigned_to,days_of_week,created_at');
     expect(result.current.customTemplates.some((t) => t.name === 'Leg Day Catalog')).toBe(true);
+    const loadedRoutine = result.current.customTemplates.find((t) => t.id === routineId);
+    expect((loadedRoutine as any)?.exercises).toBeUndefined();
+  });
+
+  it('W3: falls back to legacy REST routine_templates query and logs warning when get_routine_catalog RPC errors', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const rpcError = new Error('RPC connection failure');
+
+    (supabase as any).rpc = vi.fn().mockImplementation((fn: string) => {
+      if (fn === 'get_routine_catalog') {
+        return {
+          select: vi.fn().mockResolvedValue({ data: null, error: rpcError }),
+        };
+      }
+      const fallback = Promise.resolve({ data: [], error: null });
+      (fallback as any).select = vi.fn().mockReturnValue(fallback);
+      return fallback;
+    });
+
+    let restQueried = false;
+    vi.spyOn(supabase, 'from').mockImplementation((table: string) => {
+      if (table === 'routine_templates') {
+        restQueried = true;
+        return {
+          select: vi.fn().mockReturnThis(),
+          or: vi.fn().mockReturnThis(),
+          order: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockResolvedValue({
+            data: [
+              {
+                id: 'rest-fallback-1',
+                name: 'Fallback Routine',
+                is_master: false,
+                user_id: targetUserId,
+                assigned_to: null,
+                days_of_week: ['Sun'],
+                created_at: '2026-09-01T00:00:00Z',
+              },
+            ],
+            error: null,
+          }),
+        } as any;
+      }
+      return {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        gte: vi.fn().mockReturnThis(),
+        lte: vi.fn().mockReturnThis(),
+        or: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      } as any;
+    });
+
+    const { result } = renderHook(
+      () => useWorkoutQueries(targetUserId, '2026-09-27'),
+      { wrapper }
+    );
+
+    await waitFor(() => {
+      expect(result.current.templatesFetched).toBe(true);
+    });
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[useWorkoutQueries] get_routine_catalog RPC warning:',
+      rpcError
+    );
+    expect(restQueried).toBe(true);
+    expect(result.current.customTemplates.some((t) => t.name === 'Fallback Routine')).toBe(true);
+    warnSpy.mockRestore();
   });
 });

@@ -47,6 +47,7 @@ test.describe('RFIX-06 Payload & Cache Key Disambiguation Verification', () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.length).toBeLessThanOrEqual(reqBody.p_limit);
     expect(Object.keys(rows[0])).not.toContain('template_exercises');
+    expect(Object.keys(rows[0])).not.toContain('exercises');
 
     expect(body.length).toBeGreaterThan(0);
     expect(body.length).toBeLessThanOrEqual(51200);
@@ -160,6 +161,7 @@ test.describe('RFIX-06 Payload & Cache Key Disambiguation Verification', () => {
     expect(exercisesSelect).toContain('template_exercises');
     expect(workoutUrl).not.toContain('template_exercises');
     expect(Object.keys(workoutRows[0])).not.toContain('template_exercises');
+    expect(Object.keys(workoutRows[0])).not.toContain('exercises');
 
     console.log(`VERIFICATION_ORDER_B_EXERCISES_LIMIT=${exercisesLimit}`);
     console.log(`VERIFICATION_ORDER_B_WORKOUT_LIMIT=${workoutLimit}`);
