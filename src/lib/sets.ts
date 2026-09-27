@@ -64,15 +64,42 @@ export async function getOrCreateWorkout(
   const startOfDay = `${workoutDate}T00:00:00.000Z`;
   const endOfDay = `${workoutDate}T23:59:59.999Z`;
 
+  // Helper to query workout session by civil date (M2 workout_date column with pre-M2 date-window fallback)
+  async function findWorkoutSession(): Promise<{ data: { id: string } | null; error?: any }> {
+    const primary = await client
+      .from('workouts')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('workout_date', workoutDate)
+      .limit(1)
+      .maybeSingle();
+
+    if (!primary.error) {
+      return primary;
+    }
+
+    const errCode = String(primary.error?.code || '');
+    const isMissingColumn =
+      errCode.includes('PGRST') ||
+      errCode === '42703' ||
+      primary.error?.message?.includes('workout_date');
+
+    if (isMissingColumn) {
+      return await client
+        .from('workouts')
+        .select('id')
+        .eq('user_id', userId)
+        .gte('date', startOfDay)
+        .lte('date', endOfDay)
+        .limit(1)
+        .maybeSingle();
+    }
+
+    return primary;
+  }
+
   // 1. Check for existing workout row for this user on this civil date
-  const { data: existingWorkout } = await client
-    .from('workouts')
-    .select('id')
-    .eq('user_id', userId)
-    .gte('date', startOfDay)
-    .lte('date', endOfDay)
-    .limit(1)
-    .maybeSingle();
+  const { data: existingWorkout } = await findWorkoutSession();
 
   if (existingWorkout?.id) {
     return existingWorkout.id;
@@ -94,7 +121,13 @@ export async function getOrCreateWorkout(
     .single();
 
   // If workout_date column does not exist yet (pre-M2 local DB fallback)
-  if (insertError && (insertError.code === 'PGRST204' || insertError.message?.includes('workout_date'))) {
+  if (
+    insertError &&
+    (insertError.code === 'PGRST204' ||
+      insertError.code === '42703' ||
+      String(insertError.code).includes('PGRST') ||
+      insertError.message?.includes('workout_date'))
+  ) {
     delete insertPayload.workout_date;
     const retry = await client
       .from('workouts')
@@ -113,14 +146,7 @@ export async function getOrCreateWorkout(
       insertError.message?.includes('unique constraint');
 
     if (isConflict) {
-      const { data: winningWorkout } = await client
-        .from('workouts')
-        .select('id')
-        .eq('user_id', userId)
-        .gte('date', startOfDay)
-        .lte('date', endOfDay)
-        .limit(1)
-        .maybeSingle();
+      const { data: winningWorkout } = await findWorkoutSession();
 
       if (winningWorkout?.id) {
         return winningWorkout.id;

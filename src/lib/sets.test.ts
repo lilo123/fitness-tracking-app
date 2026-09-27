@@ -113,6 +113,229 @@ describe('sets data layer writers (src/lib/sets.ts)', () => {
       const id = await getOrCreateWorkout(mockClient, 'user-1', '2026-09-27');
       expect(id).toBe('w-concurrent-winner');
     });
+
+    it('lookup uses workout_date to find existing workout', async () => {
+      const eqMock = vi.fn().mockReturnThis();
+      const mockClient: any = {
+        ['from']: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnThis(),
+          eq: eqMock,
+          limit: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({
+            data: { id: 'w-workout-date-123' },
+            error: null,
+          }),
+        }),
+      };
+
+      const id = await getOrCreateWorkout(mockClient, 'user-1', '2026-09-27');
+      expect(id).toBe('w-workout-date-123');
+      expect(eqMock).toHaveBeenCalledWith('user_id', 'user-1');
+      expect(eqMock).toHaveBeenCalledWith('workout_date', '2026-09-27');
+    });
+
+    it('recovery after 23505 finds the row by workout_date even when its date is on another UTC day', async () => {
+      let selectCount = 0;
+      const mockClient: any = {
+        ['from']: vi.fn().mockImplementation((table: string) => {
+          if (table !== 'workouts') return {};
+          let eqFilters: Record<string, any> = {};
+          let gteCalled = false;
+          let lteCalled = false;
+
+          const builder: any = {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockImplementation((col: string, val: any) => {
+              eqFilters[col] = val;
+              return builder;
+            }),
+            gte: vi.fn().mockImplementation(() => {
+              gteCalled = true;
+              return builder;
+            }),
+            lte: vi.fn().mockImplementation(() => {
+              lteCalled = true;
+              return builder;
+            }),
+            limit: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockImplementation(() => {
+              selectCount++;
+              if (selectCount === 1) {
+                // First select (initial check): row not yet committed by concurrent transaction
+                return Promise.resolve({ data: null, error: null });
+              }
+              // Second select (recovery check):
+              // If lookup searches by workout_date, the row is found
+              if (eqFilters.workout_date === '2026-09-27') {
+                return Promise.resolve({ data: { id: 'w-tokyo-row' }, error: null });
+              }
+              // If lookup searches by UTC date window, the row is missed because its date is 2026-09-26T16:00Z
+              if (gteCalled || lteCalled) {
+                return Promise.resolve({ data: null, error: null });
+              }
+              return Promise.resolve({ data: null, error: null });
+            }),
+            insert: vi.fn().mockReturnValue({
+              select: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: null,
+                  error: {
+                    code: '23505',
+                    message: 'duplicate key value violates unique constraint "workouts_user_id_workout_date_key"',
+                  },
+                }),
+              }),
+            }),
+          };
+          return builder;
+        }),
+      };
+
+      const id = await getOrCreateWorkout(mockClient, 'user-1', '2026-09-27');
+      expect(id).toBe('w-tokyo-row');
+    });
+
+    it('pre-M2 fallback path still works when workout_date column does not exist', async () => {
+      let queryCount = 0;
+      let dateWindowQueryMade = false;
+
+      const mockClient: any = {
+        ['from']: vi.fn().mockImplementation((table: string) => {
+          if (table !== 'workouts') return {};
+          let eqCol: string | null = null;
+
+          const builder: any = {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockImplementation((col: string) => {
+              if (col === 'workout_date') {
+                eqCol = col;
+              }
+              return builder;
+            }),
+            gte: vi.fn().mockImplementation((col: string) => {
+              if (col === 'date') dateWindowQueryMade = true;
+              return builder;
+            }),
+            lte: vi.fn().mockImplementation((col: string) => {
+              if (col === 'date') dateWindowQueryMade = true;
+              return builder;
+            }),
+            limit: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockImplementation(() => {
+              queryCount++;
+              if (eqCol === 'workout_date') {
+                // Pre-M2 DB: column does not exist error
+                return Promise.resolve({
+                  data: null,
+                  error: {
+                    code: '42703',
+                    message: 'column workouts.workout_date does not exist',
+                  },
+                });
+              }
+              if (dateWindowQueryMade) {
+                // Fallback date-window query succeeds
+                return Promise.resolve({
+                  data: { id: 'w-pre-m2-legacy' },
+                  error: null,
+                });
+              }
+              return Promise.resolve({ data: null, error: null });
+            }),
+          };
+          return builder;
+        }),
+      };
+
+      const id = await getOrCreateWorkout(mockClient, 'user-1', '2026-09-27');
+      expect(id).toBe('w-pre-m2-legacy');
+      expect(queryCount).toBe(2);
+      expect(dateWindowQueryMade).toBe(true);
+    });
+
+    it('handles W41 two concurrent calls returning one single workout id', async () => {
+      let createdRow: { id: string; date: string; workout_date: string } | null = null;
+
+      const mockClient: any = {
+        ['from']: vi.fn().mockImplementation((table: string) => {
+          if (table !== 'workouts') return {};
+          let eqFilters: Record<string, any> = {};
+          let gteVal: string | null = null;
+          let lteVal: string | null = null;
+
+          const builder: any = {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockImplementation((col: string, val: any) => {
+              eqFilters[col] = val;
+              return builder;
+            }),
+            gte: vi.fn().mockImplementation((_col: string, val: string) => {
+              gteVal = val;
+              return builder;
+            }),
+            lte: vi.fn().mockImplementation((_col: string, val: string) => {
+              lteVal = val;
+              return builder;
+            }),
+            limit: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockImplementation(async () => {
+              await new Promise((resolve) => setTimeout(resolve, 5));
+
+              if (!createdRow) {
+                return { data: null, error: null };
+              }
+
+              // Post-M2 workout_date lookup
+              if (eqFilters.workout_date === createdRow.workout_date) {
+                return { data: { id: createdRow.id }, error: null };
+              }
+
+              // Date-window lookup: misses if date is not in the UTC day window
+              if (gteVal && lteVal) {
+                if (createdRow.date >= gteVal && createdRow.date <= lteVal) {
+                  return { data: { id: createdRow.id }, error: null };
+                }
+                return { data: null, error: null };
+              }
+
+              return { data: null, error: null };
+            }),
+            insert: vi.fn().mockImplementation((rows: any[]) => ({
+              select: vi.fn().mockReturnValue({
+                single: vi.fn().mockImplementation(async () => {
+                  await new Promise((resolve) => setTimeout(resolve, 5));
+                  if (!createdRow) {
+                    createdRow = {
+                      id: 'w-concurrent-single-id',
+                      date: '2026-09-26T16:00:00.000Z', // Tokyo time
+                      workout_date: rows[0]?.workout_date || '2026-09-27',
+                    };
+                    return { data: { id: createdRow.id }, error: null };
+                  }
+                  return {
+                    data: null,
+                    error: {
+                      code: '23505',
+                      message: 'duplicate key value violates unique constraint "workouts_user_id_workout_date_key"',
+                    },
+                  };
+                }),
+              }),
+            })),
+          };
+          return builder;
+        }),
+      };
+
+      const [id1, id2] = await Promise.all([
+        getOrCreateWorkout(mockClient, 'user-1', '2026-09-27'),
+        getOrCreateWorkout(mockClient, 'user-1', '2026-09-27'),
+      ]);
+
+      expect(id1).toBe('w-concurrent-single-id');
+      expect(id2).toBe('w-concurrent-single-id');
+      expect(id1).toBe(id2);
+    });
   });
 
   describe('insertSet (resolves by exercise_id UUID, W35)', () => {
