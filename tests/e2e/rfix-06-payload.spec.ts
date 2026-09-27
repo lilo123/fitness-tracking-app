@@ -3,14 +3,21 @@ import { test, expect } from '@playwright/test';
 test.describe('RFIX-06 Payload & Cache Key Disambiguation Verification', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test('Order A: Cold navigation directly to /workout measures <= 51,200 B and asserts limit=100 & order', async ({ page }) => {
+  // P4 (M4): /workout loads routine templates via the paged RPC get_routine_catalog
+  // (keyset cursor, server-clamped limit <= 200) instead of GET routine_templates?limit=100.
+  // The payload bound and the "no nested template_exercises embed on /workout" contract are kept.
+  test('Order A: Cold navigation directly to /workout measures <= 51,200 B via bounded get_routine_catalog page', async ({ page }) => {
+    const legacyWorkoutTplGets: string[] = [];
+    page.on('request', (req) => {
+      if (req.method() === 'GET' && req.url().includes('/rest/v1/routine_templates') && !req.url().includes('template_exercises')) {
+        legacyWorkoutTplGets.push(req.url());
+      }
+    });
     const workoutTplPromise = page.waitForResponse(
       (res) =>
-        res.url().includes('/rest/v1/routine_templates') &&
-        res.request().method() === 'GET' &&
-        res.status() === 200 &&
-        !res.url().includes('template_exercises') &&
-        res.url().includes('limit=100'),
+        res.url().includes('/rest/v1/rpc/get_routine_catalog') &&
+        res.request().method() === 'POST' &&
+        res.status() === 200,
       { timeout: 10000 }
     );
 
@@ -22,27 +29,32 @@ test.describe('RFIX-06 Payload & Cache Key Disambiguation Verification', () => {
 
     const response = await workoutTplPromise;
     const body = await response.body();
-    const url = response.url();
-    const parsedUrl = new URL(url);
+    const reqBody = response.request().postDataJSON() as { p_limit: number; p_user_id: string; p_cursor: string | null };
+    const rows = JSON.parse(body.toString()) as Array<Record<string, unknown>>;
 
     console.log(`[RFIX-06 Order A: Cold /workout]`);
-    console.log(`URL: ${url}`);
+    console.log(`URL: ${response.url()}`);
     console.log(`HTTP Status: ${response.status()}`);
-    console.log(`Limit: ${parsedUrl.searchParams.get('limit')}`);
-    console.log(`Order: ${parsedUrl.searchParams.get('order')}`);
-    console.log(`Select: ${parsedUrl.searchParams.get('select')}`);
+    console.log(`p_limit: ${reqBody.p_limit}  p_cursor: ${reqBody.p_cursor}`);
+    console.log(`Rows: ${rows.length}`);
     console.log(`Payload Bytes: ${body.length}`);
 
     expect(response.status()).toBe(200);
-    expect(parsedUrl.searchParams.get('limit')).toBe('100');
-    expect(parsedUrl.searchParams.get('order')).toBe('created_at.desc');
-    expect(parsedUrl.searchParams.get('select')).toBe('id,user_id,name,is_master,assigned_to,days_of_week,created_at');
+    expect(reqBody.p_limit).toBeGreaterThan(0);
+    expect(reqBody.p_limit).toBeLessThanOrEqual(200);
+    expect(reqBody.p_cursor).toBeNull();
+    expect(typeof reqBody.p_user_id).toBe('string');
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.length).toBeLessThanOrEqual(reqBody.p_limit);
+    expect(Object.keys(rows[0])).not.toContain('template_exercises');
 
     expect(body.length).toBeGreaterThan(0);
     expect(body.length).toBeLessThanOrEqual(51200);
+    // The RPC succeeded, so the legacy unpaged fallback query must not have been issued.
+    expect(legacyWorkoutTplGets).toEqual([]);
 
     console.log(`VERIFICATION_ORDER_A_BYTES=${body.length}`);
-    console.log(`VERIFICATION_ORDER_A_LIMIT=${parsedUrl.searchParams.get('limit')}`);
+    console.log(`VERIFICATION_ORDER_A_LIMIT=${reqBody.p_limit}`);
     console.log(`VERIFICATION_ORDER_A_STATUS=PASS`);
   });
 
@@ -107,14 +119,12 @@ test.describe('RFIX-06 Payload & Cache Key Disambiguation Verification', () => {
 
     // 3. Navigate client-side to /workout
     // Because cache keys are disambiguated, /workout MUST issue its own bounded request
-    // and cannot silently swallow or inherit the /exercises cache entry.
+    // (P4: the paged get_routine_catalog RPC) and cannot silently inherit the /exercises cache entry.
     const workoutTplPromise = page.waitForResponse(
       (res) =>
-        res.url().includes('/rest/v1/routine_templates') &&
-        res.request().method() === 'GET' &&
-        res.status() === 200 &&
-        !res.url().includes('template_exercises') &&
-        res.url().includes('limit=100'),
+        res.url().includes('/rest/v1/rpc/get_routine_catalog') &&
+        res.request().method() === 'POST' &&
+        res.status() === 200,
       { timeout: 6000 }
     );
 
@@ -124,31 +134,32 @@ test.describe('RFIX-06 Payload & Cache Key Disambiguation Verification', () => {
     const workoutRes = await workoutTplPromise;
     const workoutBody = await workoutRes.body();
     const workoutUrl = workoutRes.url();
-    const parsedWorkoutUrl = new URL(workoutUrl);
-    const workoutLimit = parsedWorkoutUrl.searchParams.get('limit');
-    const workoutOrder = parsedWorkoutUrl.searchParams.get('order');
-    const workoutSelect = parsedWorkoutUrl.searchParams.get('select');
+    const workoutReq = workoutRes.request().postDataJSON() as { p_limit: number; p_cursor: string | null };
+    const workoutLimit = workoutReq.p_limit;
+    const workoutRows = JSON.parse(workoutBody.toString()) as Array<Record<string, unknown>>;
 
     console.log(`[RFIX-06 Order B Step 2: /exercises -> /workout]`);
     console.log(`URL: ${workoutUrl}`);
     console.log(`HTTP Status: ${workoutRes.status()}`);
-    console.log(`Limit: ${workoutLimit}`);
-    console.log(`Order: ${workoutOrder}`);
+    console.log(`p_limit: ${workoutLimit}`);
+    console.log(`Rows: ${workoutRows.length}`);
     console.log(`Payload Bytes: ${workoutBody.length}`);
 
     expect(workoutRes.status()).toBe(200);
-    expect(workoutLimit).toBe('100');
-    expect(workoutOrder).toBe('created_at.desc');
-    expect(workoutSelect).toBe('id,user_id,name,is_master,assigned_to,days_of_week,created_at');
+    expect(workoutLimit).toBeGreaterThan(0);
+    expect(workoutLimit).toBeLessThanOrEqual(200);
+    expect(workoutReq.p_cursor).toBeNull();
+    expect(workoutRows.length).toBeGreaterThan(0);
+    expect(workoutRows.length).toBeLessThanOrEqual(workoutLimit);
 
     expect(workoutBody.length).toBeGreaterThan(0);
     expect(workoutBody.length).toBeLessThanOrEqual(51200);
 
     // 4 & 5. Explicitly assert the two requests are distinguishable
-    // /exercises requested nested template_exercises and /workout requested narrow projection
-    expect(exercisesSelect).not.toBe(workoutSelect);
+    // /exercises requested nested template_exercises via REST; /workout used the catalog RPC without that embed
     expect(exercisesSelect).toContain('template_exercises');
-    expect(workoutSelect).not.toContain('template_exercises');
+    expect(workoutUrl).not.toContain('template_exercises');
+    expect(Object.keys(workoutRows[0])).not.toContain('template_exercises');
 
     console.log(`VERIFICATION_ORDER_B_EXERCISES_LIMIT=${exercisesLimit}`);
     console.log(`VERIFICATION_ORDER_B_WORKOUT_LIMIT=${workoutLimit}`);
