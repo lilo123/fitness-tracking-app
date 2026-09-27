@@ -50,9 +50,19 @@ function cleanupPollutedWorkouts() {
 
 function cleanupP4Data() {
   const sql = `
+    DELETE FROM public.template_exercises
+    WHERE template_id IN (
+      SELECT id FROM public.routine_templates
+      WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io')
+        AND name LIKE 'P4 Test Routine %'
+    );
     DELETE FROM public.routine_templates
     WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io')
       AND name LIKE 'P4 Test Routine %';
+    DELETE FROM public.sets
+    WHERE exercise_id IN (SELECT id FROM public.exercises WHERE name LIKE 'Zercher%');
+    DELETE FROM public.template_exercises
+    WHERE exercise_id IN (SELECT id FROM public.exercises WHERE name LIKE 'Zercher%');
     DELETE FROM public.exercises
     WHERE name LIKE 'Zercher%';
   `;
@@ -94,7 +104,6 @@ async function getAthleteSession(): Promise<{ token: string; userId: string }> {
 }
 
 async function seedTemplatesViaREST(token: string, userId: string, count = 55) {
-  // First fetch an existing exercise to associate with templates
   const exRes = await fetch(`${SUPABASE_URL}/rest/v1/exercises?select=id&limit=1`, {
     headers: {
       apikey: SUPABASE_ANON_KEY,
@@ -128,7 +137,6 @@ async function seedTemplatesViaREST(token: string, userId: string, count = 55) {
 
   const created = await res.json();
 
-  // If sample exercise is available, add a template_exercise to template #55 so starting it has content
   const tpl55 = created.find((t: any) => t.name === 'P4 Test Routine 55');
   if (tpl55 && sampleExerciseId) {
     await fetch(`${SUPABASE_URL}/rest/v1/template_exercises`, {
@@ -150,172 +158,206 @@ async function seedTemplatesViaREST(token: string, userId: string, count = 55) {
   }
 }
 
+/**
+ * Normalizes dynamic DOM values across test runs and browsers:
+ * - UUID strings in data attributes and text
+ * - React useId generated internal ids (:r...:)
+ * - TanStack Virtualizer dynamic translateY offsets
+ * - Measured virtualizer pixel height
+ * - Collapses consecutive whitespace characters
+ */
+function normalizeHtml(html: string): string {
+  return html
+    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '[UUID]')
+    .replace(/:r[0-9a-z_-]+:/gi, ':id:')
+    .replace(/transform:\s*translateY\([^)]+\);?/gi, '')
+    .replace(/height:\s*\d+px;?/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Baseline outerHTML captured from commit 7597545 (with M4 schema applied)
+const BASELINE_LIBRARY_HTML_390 = "<div class=\"space-y-2\"><div class=\"bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-4 flex justify-between items-center text-sm font-medium\"><div><div class=\"text-zinc-100 flex items-center gap-2\"><span>Cable Lateral Raises</span><span class=\"text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20\">Master</span></div><div class=\"text-xs text-zinc-500 mt-1\">Shoulders</div></div><div class=\"flex items-center gap-1 shrink-0\"></div></div><div class=\"bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-4 flex justify-between items-center text-sm font-medium\"><div><div class=\"text-zinc-100 flex items-center gap-2\"><span>Dips</span><span class=\"text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20\">Master</span></div><div class=\"text-xs text-zinc-500 mt-1\">Chest / Triceps</div></div><div class=\"flex items-center gap-1 shrink-0\"></div></div><div class=\"bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-4 flex justify-between items-center text-sm font-medium\"><div><div class=\"text-zinc-100 flex items-center gap-2\"><span>Face Pulls</span><span class=\"text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20\">Master</span></div><div class=\"text-xs text-zinc-500 mt-1\">Shoulders</div></div><div class=\"flex items-center gap-1 shrink-0\"></div></div><div class=\"bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-4 flex justify-between items-center text-sm font-medium\"><div><div class=\"text-zinc-100 flex items-center gap-2\"><span>Incline Bench Press</span><span class=\"text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20\">Master</span></div><div class=\"text-xs text-zinc-500 mt-1\">Chest</div></div><div class=\"flex items-center gap-1 shrink-0\"></div></div><div class=\"bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-4 flex justify-between items-center text-sm font-medium\"><div><div class=\"text-zinc-100 flex items-center gap-2\"><span>Inclined Bicep Curl</span><span class=\"text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20\">Master</span></div><div class=\"text-xs text-zinc-500 mt-1\">Arms</div></div><div class=\"flex items-center gap-1 shrink-0\"></div></div><div class=\"bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-4 flex justify-between items-center text-sm font-medium\"><div><div class=\"text-zinc-100 flex items-center gap-2\"><span>Lat Pull Down</span><span class=\"text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20\">Master</span></div><div class=\"text-xs text-zinc-500 mt-1\">Back</div></div><div class=\"flex items-center gap-1 shrink-0\"></div></div><div class=\"bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-4 flex justify-between items-center text-sm font-medium\"><div><div class=\"text-zinc-100 flex items-center gap-2\"><span>Leg Curl</span><span class=\"text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20\">Master</span></div><div class=\"text-xs text-zinc-500 mt-1\">Legs</div></div><div class=\"flex items-center gap-1 shrink-0\"></div></div><div class=\"bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-4 flex justify-between items-center text-sm font-medium\"><div><div class=\"text-zinc-100 flex items-center gap-2\"><span>Leg Extension Machine</span><span class=\"text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20\">Master</span></div><div class=\"text-xs text-zinc-500 mt-1\">Legs</div></div><div class=\"flex items-center gap-1 shrink-0\"></div></div><div class=\"bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-4 flex justify-between items-center text-sm font-medium\"><div><div class=\"text-zinc-100 flex items-center gap-2\"><span>Leg Raise</span><span class=\"text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20\">Master</span></div><div class=\"text-xs text-zinc-500 mt-1\">Core</div></div><div class=\"flex items-center gap-1 shrink-0\"></div></div><div class=\"bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-4 flex justify-between items-center text-sm font-medium\"><div><div class=\"text-zinc-100 flex items-center gap-2\"><span>Overhead Tricep Cable Pull</span><span class=\"text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20\">Master</span></div><div class=\"text-xs text-zinc-500 mt-1\">Arms</div></div><div class=\"flex items-center gap-1 shrink-0\"></div></div><div class=\"bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-4 flex justify-between items-center text-sm font-medium\"><div><div class=\"text-zinc-100 flex items-center gap-2\"><span>Seated Cable Row</span><span class=\"text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20\">Master</span></div><div class=\"text-xs text-zinc-500 mt-1\">Back</div></div><div class=\"flex items-center gap-1 shrink-0\"></div></div><div class=\"bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-4 flex justify-between items-center text-sm font-medium\"><div><div class=\"text-zinc-100 flex items-center gap-2\"><span>Weighted Sit-Up</span><span class=\"text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20\">Master</span></div><div class=\"text-xs text-zinc-500 mt-1\">Core</div></div><div class=\"flex items-center gap-1 shrink-0\"></div></div></div>";
+const BASELINE_HISTORY_HTML_390 = "<div class=\"space-y-4\"><div style=\"position: relative; width: 100%; \"><div data-index=\"0\" style=\"position: absolute; top: 0px; left: 0px; width: 100%; \"><div class=\"bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-5 shadow-2xl space-y-3\"><div class=\"flex items-center justify-between border-b border-zinc-800 pb-3\"><div><h3 class=\"text-sm font-black text-white\">Push Day Benchmark</h3><div class=\"text-[11px] font-mono text-cyan-400 mt-0.5\">Sep 20</div></div><div class=\"flex items-center gap-3\"><div class=\"text-right\"><div class=\"text-xs font-mono font-bold text-amber-400\">4,440 lbs volume</div><div class=\"text-[10px] text-zinc-500 font-mono\">3 sets completed</div></div><button type=\"button\" aria-expanded=\"true\" aria-label=\"Collapse Push Day Benchmark\" data-testid=\"expand-session-btn-[UUID]\" class=\"min-w-[44px] min-h-[44px] rounded-xl bg-zinc-800/60 hover:bg-cyan-500/20 text-zinc-400 hover:text-cyan-300 flex items-center justify-center transition active:scale-95 touch-manipulation cursor-pointer\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-chevron-up w-4 h-4\" aria-hidden=\"true\"><path d=\"m18 15-6-6-6 6\"></path></svg></button></div></div><div class=\"space-y-3 pt-1\"><div class=\"bg-zinc-950 border border-zinc-800/80 rounded-2xl p-3 space-y-2\"><div class=\"flex items-center justify-between border-b border-zinc-800/60 pb-2\"><div class=\"flex items-center gap-2 min-w-0\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-dumbbell w-3.5 h-3.5 text-cyan-400 shrink-0\" aria-hidden=\"true\"><path d=\"M17.596 12.768a2 2 0 1 0 2.829-2.829l-1.768-1.767a2 2 0 0 0 2.828-2.829l-2.828-2.828a2 2 0 0 0-2.829 2.828l-1.767-1.768a2 2 0 1 0-2.829 2.829z\"></path><path d=\"m2.5 21.5 1.4-1.4\"></path><path d=\"m20.1 3.9 1.4-1.4\"></path><path d=\"M5.343 21.485a2 2 0 1 0 2.829-2.828l1.767 1.768a2 2 0 1 0 2.829-2.829l-6.364-6.364a2 2 0 1 0-2.829 2.829l1.768 1.767a2 2 0 0 0-2.828 2.829z\"></path><path d=\"m9.6 14.4 4.8-4.8\"></path></svg><span class=\"font-extrabold text-white text-xs truncate\">Incline Bench Press</span><span class=\"px-1.5 py-0.5 rounded text-[10px] font-bold bg-zinc-800/90 text-zinc-300 border border-zinc-700/60 shrink-0\">Chest</span></div><div class=\"text-[11px] font-mono font-bold text-amber-400/90 shrink-0 ml-2\">4,440 lbs</div></div><div class=\"space-y-1.5\"><div class=\"bg-zinc-900/90 border border-zinc-800/60 rounded-xl px-2.5 py-1.5 flex items-center justify-between text-xs\"><div class=\"font-mono text-[11px] text-zinc-400 font-bold\">SET 1</div><div class=\"flex items-center gap-2\"><div class=\"font-mono font-bold text-cyan-300\">185 lbs × 8 reps<span class=\"text-zinc-500 ml-1 text-[10px]\">@8.5</span></div><button type=\"button\" class=\"min-w-[44px] min-h-[44px] rounded-lg bg-zinc-800/70 hover:bg-cyan-500/20 text-zinc-400 hover:text-cyan-300 flex items-center justify-center transition active:scale-95 touch-manipulation\" title=\"Edit set\" aria-label=\"Edit set 1 of Incline Bench Press\" data-testid=\"edit-set-btn-[UUID]\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-pen w-3.5 h-3.5\" aria-hidden=\"true\"><path d=\"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z\"></path></svg></button></div></div><div class=\"bg-zinc-900/90 border border-zinc-800/60 rounded-xl px-2.5 py-1.5 flex items-center justify-between text-xs\"><div class=\"font-mono text-[11px] text-zinc-400 font-bold\">SET 2</div><div class=\"flex items-center gap-2\"><div class=\"font-mono font-bold text-cyan-300\">185 lbs × 8 reps<span class=\"text-zinc-500 ml-1 text-[10px]\">@9</span></div><button type=\"button\" class=\"min-w-[44px] min-h-[44px] rounded-lg bg-zinc-800/70 hover:bg-cyan-500/20 text-zinc-400 hover:text-cyan-300 flex items-center justify-center transition active:scale-95 touch-manipulation\" title=\"Edit set\" aria-label=\"Edit set 2 of Incline Bench Press\" data-testid=\"edit-set-btn-[UUID]\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-pen w-3.5 h-3.5\" aria-hidden=\"true\"><path d=\"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z\"></path></svg></button></div></div><div class=\"bg-zinc-900/90 border border-zinc-800/60 rounded-xl px-2.5 py-1.5 flex items-center justify-between text-xs\"><div class=\"font-mono text-[11px] text-zinc-400 font-bold\">SET 3</div><div class=\"flex items-center gap-2\"><div class=\"font-mono font-bold text-cyan-300\">185 lbs × 8 reps<span class=\"text-zinc-500 ml-1 text-[10px]\">@9.5</span></div><button type=\"button\" class=\"min-w-[44px] min-h-[44px] rounded-lg bg-zinc-800/70 hover:bg-cyan-500/20 text-zinc-400 hover:text-cyan-300 flex items-center justify-center transition active:scale-95 touch-manipulation\" title=\"Edit set\" aria-label=\"Edit set 3 of Incline Bench Press\" data-testid=\"edit-set-btn-[UUID]\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-pen w-3.5 h-3.5\" aria-hidden=\"true\"><path d=\"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z\"></path></svg></button></div></div></div></div></div></div></div></div></div>";
+
 test.describe('P4 Catalog & E2E Verification (p4-catalog)', () => {
+  test.describe.configure({ mode: 'serial' });
+
   let athleteUserId = '';
   let athleteToken = '';
 
   test.beforeAll(async () => {
     cleanupP4Data();
-    try {
-      const session = await getAthleteSession();
-      athleteUserId = session.userId;
-      athleteToken = session.token;
-      await seedTemplatesViaREST(athleteToken, athleteUserId, 55);
-    } catch (err) {
-      console.warn('[p4-catalog] beforeAll REST seeding warning:', err);
-    }
+    const session = await getAthleteSession();
+    athleteUserId = session.userId;
+    athleteToken = session.token;
+    await seedTemplatesViaREST(athleteToken, athleteUserId, 55);
   });
 
   test.afterAll(async () => {
     cleanupP4Data();
   });
 
+  // (c) Library + History DOM unchanged by P4 client code at 390px
   test('DOM-diff acceptance: Library and History DOM structure invariance at 390px', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await loginAsAthlete(page);
 
-    // 1. Verify Library (/exercises) DOM structure at 390px
+    // 1. Verify Library (/exercises) DOM structure at 390px matches 7597545 baseline
     await page.goto('/exercises');
     await page.waitForURL('**/exercises');
     await expect(page.locator('h3:has-text("Exercise Library")')).toBeVisible({ timeout: 10000 });
 
-    const libraryCards = page.locator('div.space-y-2 > div.bg-zinc-900\\/50');
+    const libraryCards = page.locator('div.space-y-2 > div[class*="bg-zinc-900/50"]');
     await expect(libraryCards.first()).toBeVisible({ timeout: 10000 });
     const libraryCount = await libraryCards.count();
     expect(libraryCount).toBeGreaterThan(0);
 
-    // Capture normalized outerHTML of the exercises list container
-    const libraryListContainer = page.locator('div.space-y-2:has(div.bg-zinc-900\\/50)').first();
+    const libraryListContainer = page.locator('h3:has-text("Exercise Library") ~ div.space-y-2').first();
     const rawLibraryHtml = await libraryListContainer.evaluate((el) => el.outerHTML);
-    const normalizedLibraryHtml = rawLibraryHtml
-      .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '[UUID]')
-      .replace(/\s+/g, ' ');
+    const normalizedLibraryHtml = normalizeHtml(rawLibraryHtml);
 
-    // Must preserve standard exercise card layout and badges
-    expect(normalizedLibraryHtml).toContain('Incline Bench Press');
-    expect(normalizedLibraryHtml).not.toContain('error');
+    expect(normalizedLibraryHtml).toBe(BASELINE_LIBRARY_HTML_390);
 
-    // 2. Verify History (/history) "By Exercise" DOM structure at 390px
+    // 2. Verify History (/history) Session list DOM structure at 390px matches 7597545 baseline
     await page.goto('/history');
     await page.waitForURL('**/history');
 
-    const byExerciseTab = page.locator('button:has-text("By Exercise"), [data-testid="tab-exercise"]').first();
-    if (await byExerciseTab.isVisible()) {
-      await byExerciseTab.click();
-      const exerciseSearch = page.locator('input[placeholder*="Search exercises"]');
-      await expect(exerciseSearch).toBeVisible({ timeout: 10000 });
+    const sessionCard = page.locator('div.rounded-3xl.p-5.shadow-2xl.space-y-3').first();
+    await expect(sessionCard).toBeVisible({ timeout: 10000 });
 
-      // History exercise cards rendered without visual breakage
-      const historyCards = page.locator('button:has-text("Incline Bench Press"), button:has-text("Cable Lateral Raises")');
-      await expect(historyCards.first()).toBeVisible({ timeout: 10000 });
-    }
+    const historyContainer = page.locator('div.space-y-4:has(div.rounded-3xl.p-5.shadow-2xl)').first();
+    const rawHistoryHtml = await historyContainer.evaluate((el) => el.outerHTML);
+    const normalizedHistoryHtml = normalizeHtml(rawHistoryHtml);
+
+    expect(normalizedHistoryHtml).toBe(BASELINE_HISTORY_HTML_390);
+
+    // 3. Verify By-Exercise view is reachable and renders exercise stats without error
+    const byExerciseTab = page.locator('button:has-text("By Exercise")');
+    await byExerciseTab.click();
+    const exerciseSearch = page.locator('input[placeholder*="Search exercise"]');
+    await expect(exerciseSearch).toBeVisible({ timeout: 10000 });
+    const historyExerciseCards = page.locator('h3:has-text("Incline Bench Press"), h3:has-text("Cable Lateral Raises")');
+    await expect(historyExerciseCards.first()).toBeVisible({ timeout: 10000 });
   });
 
+  // (a) Routine picker displays >50 templates with keyset pagination and #51+ can be started
   test('Routine picker displays >50 templates with keyset pagination and #51+ can be started', async ({ page }) => {
     await loginAsAthlete(page);
     await page.goto('/workout');
     await page.waitForURL('**/workout');
 
     // Open Routine Picker Modal
-    const chooseBtn = page.locator('button:has-text("Choose Routine")');
     const routineBtn = page.locator('[data-testid="routine-select-btn"]');
-    const trigger = chooseBtn.or(routineBtn).first();
-    await expect(trigger).toBeVisible({ timeout: 10000 });
-    await trigger.click();
+    await expect(routineBtn).toBeVisible({ timeout: 10000 });
+    await routineBtn.click();
 
     const modal = page.locator('[data-testid="routine-picker-modal"]');
     await expect(modal).toBeVisible({ timeout: 10000 });
 
-    // Keyset pagination: If M4 RPC get_routine_catalog is installed, 50 templates are shown on page 1
-    // and the "Load more routines" button is present for templates #51+.
+    // Keyset pagination: With 55 templates seeded, page 1 has 50 items.
+    // The "Load more routines" button is unconditionally present.
     const loadMoreBtn = page.locator('[data-testid="load-more-routines-btn"]');
-    const hasLoadMore = await loadMoreBtn.isVisible();
+    await expect(loadMoreBtn).toBeVisible({ timeout: 10000 });
+    await loadMoreBtn.click();
 
-    if (hasLoadMore) {
-      // Click Load more to fetch page 2 containing templates #51-55
-      await loadMoreBtn.click();
-      await page.waitForTimeout(500);
+    // Verify template #55 is rendered and selectable
+    const routine55 = page.locator('button:has-text("P4 Test Routine 55")').first();
+    await expect(routine55).toBeVisible({ timeout: 10000 });
 
-      // Verify template #55 is rendered and selectable
-      const routine55 = page.locator('button:has-text("P4 Test Routine 55")').first();
-      await expect(routine55).toBeVisible({ timeout: 10000 });
+    // Click to start template #55
+    await routine55.click();
+    await expect(modal).not.toBeVisible({ timeout: 5000 });
 
-      // Click to start template #55
-      await routine55.click();
-      await expect(modal).not.toBeVisible({ timeout: 5000 });
-
-      // Verify active routine updated to P4 Test Routine 55
-      const activeRoutineDisplay = page.locator('[data-testid="routine-select-btn"], button:has-text("P4 Test Routine 55")');
-      await expect(activeRoutineDisplay.first()).toContainText('P4 Test Routine 55');
-    } else {
-      // In fallback mode (if M4 RPC not yet installed on local DB or all loaded in 1 page)
-      const routine55 = page.locator('button:has-text("P4 Test Routine 55")').first();
-      if (await routine55.isVisible()) {
-        await routine55.click();
-        await expect(modal).not.toBeVisible({ timeout: 5000 });
-      } else {
-        // Modal cleanly displays templates without crash
-        const freeWorkout = page.locator('button:has-text("Free Workout")');
-        await expect(freeWorkout).toBeVisible();
-      }
-    }
+    // Verify active routine updated to P4 Test Routine 55
+    await expect(routineBtn).toContainText('P4 Test Routine 55');
   });
 
+  // (b) Exercise picker search, custom creation, duplicate check, alias expansion, multi-add, focus
   test('Exercise picker search, custom creation, multi-select, and duplicate prevention', async ({ page }) => {
     await loginAsAthlete(page);
     await page.goto('/workout');
     await page.waitForURL('**/workout');
 
-    // Check if open-exercise-picker-btn exists (Worker W2 ownership)
-    const openPickerBtn = page.locator('[data-testid="open-exercise-picker-btn"]');
-    const hasPicker = await openPickerBtn.isVisible({ timeout: 3000 }).catch(() => false);
+    // Switch to Free Workout to guarantee empty exercise card slate
+    const routineBtn = page.locator('[data-testid="routine-select-btn"]');
+    await routineBtn.click();
+    const modal = page.locator('[data-testid="routine-picker-modal"]');
+    await modal.locator('button:has-text("Free Workout")').click();
+    await expect(modal).not.toBeVisible({ timeout: 5000 });
 
-    if (!hasPicker) {
-      console.log('[p4-catalog] open-exercise-picker-btn not present on this branch (pending W2 integration). Skipping picker flows.');
-      test.skip(true, 'Exercise picker component pending W2 integration');
-      return;
-    }
-
+    // Open exercise picker unconditionally
+    const openPickerBtn = page.locator('[data-testid="empty-add-exercise-btn"], [data-testid="add-exercise-btn"]').first();
+    await expect(openPickerBtn).toBeVisible({ timeout: 5000 });
     await openPickerBtn.click();
-    const picker = page.locator('[data-testid="exercise-picker"]');
-    await expect(picker).toBeVisible({ timeout: 5000 });
 
-    const searchInput = page.locator('[data-testid="exercise-picker-search"]');
+    const picker = page.locator('[data-testid="exercise-picker-sheet"]');
+    await expect(picker).toBeVisible({ timeout: 10000 });
+
+    const searchInput = page.locator('[data-testid="exercise-search-input"]');
     await expect(searchInput).toBeVisible();
+
+    // 1. Create custom 'Zercher Squat' via picker Create row (since seed.sql has no Zercher)
+    await searchInput.fill('Zercher Squat');
+    const createBtn = page.locator('[data-testid="create-exercise-btn"]');
+    await expect(createBtn).toBeVisible({ timeout: 5000 });
+    await expect(createBtn).toContainText('Create “Zercher Squat”');
+    await createBtn.click();
+
+    // Wait for creation to complete (search input is cleared and Zercher Squat row appears)
+    await expect(searchInput).toHaveValue('', { timeout: 10000 });
+    const zercherRow = page.locator('[data-testid^="exercise-row-"]:has-text("Zercher Squat")').first();
+    await expect(zercherRow).toBeVisible({ timeout: 10000 });
+    await expect(zercherRow).toHaveAttribute('aria-pressed', 'true');
+
+    // 2. Duplicate prevention check: typing 'Zercher Squat' again displays duplicate message
+    await searchInput.fill('Zercher Squat');
+    const duplicateMsg = page.locator('[data-testid="create-exercise-duplicate-msg"]');
+    await expect(duplicateMsg).toBeVisible({ timeout: 5000 });
+    await expect(duplicateMsg).toContainText('already exists');
+    await expect(page.locator('[data-testid="create-exercise-btn"]')).toHaveCount(0);
+
+    // 3. Prefix search: search 'zer' finds the newly created Zercher exercise
     await searchInput.fill('zer');
+    await expect(zercherRow).toBeVisible({ timeout: 5000 });
 
-    // Check if Zercher exercise exists, else create custom Zercher Squat
-    const existingZercher = page.locator('[data-testid^="exercise-picker-row-"]:has-text("Zercher")').first();
-    const createRow = page.locator('[data-testid="exercise-picker-create-row"]');
+    // 4. Alias search: seeded 'bp' expands to 'bench press' and matches 'Incline Bench Press'
+    await searchInput.fill('bp');
+    const benchRow = page.locator('[data-testid^="exercise-row-"]:has-text("Incline Bench Press")').first();
+    await expect(benchRow).toBeVisible({ timeout: 5000 });
 
-    if (await existingZercher.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await existingZercher.click();
-    } else if (await createRow.isVisible()) {
-      await createRow.click();
-      // Test duplicate creation prevention
-      await searchInput.fill('Zercher Squat');
-      if (await createRow.isVisible()) {
-        await createRow.click();
-        const duplicateMsg = page.locator('text=/already exists|duplicate/i');
-        await expect(duplicateMsg).toBeVisible({ timeout: 3000 });
-      }
-    }
+    // 5. Multi-select 2 exercises -> 'Add 2 Exercises' -> 2 new cards and document.activeElement inside the first new card
+    await searchInput.fill('');
+    // Deselect Zercher Squat to test toggle-off behavior unconditionally
+    await zercherRow.click();
+    await expect(zercherRow).toHaveAttribute('aria-pressed', 'false');
 
-    // Multi-select 2 exercises and click Add
-    const rows = page.locator('[data-testid^="exercise-picker-row-"]');
-    const rowCount = await rows.count();
-    if (rowCount >= 2) {
-      await rows.nth(0).click();
-      await rows.nth(1).click();
+    const row1 = page.locator('[data-testid^="exercise-row-"]:has-text("Cable Lateral Raises")').first();
+    const row2 = page.locator('[data-testid^="exercise-row-"]:has-text("Face Pulls")').first();
+    await expect(row1).toBeVisible({ timeout: 5000 });
+    await expect(row2).toBeVisible({ timeout: 5000 });
+    await row1.click();
+    await expect(row1).toHaveAttribute('aria-pressed', 'true');
+    await row2.click();
+    await expect(row2).toHaveAttribute('aria-pressed', 'true');
 
-      const addBtn = page.locator('[data-testid="exercise-picker-add-btn"]');
-      await expect(addBtn).toBeVisible();
-      await addBtn.click();
-      await expect(picker).not.toBeVisible();
+    const addConfirmBtn = page.locator('[data-testid="picker-confirm-add-btn"]');
+    await expect(addConfirmBtn).toContainText('Add 2 Exercises');
+    await addConfirmBtn.click();
+    await expect(picker).not.toBeVisible({ timeout: 5000 });
 
-      // Verify focus is placed on the first new exercise card
-      const firstCard = page.locator('[data-testid="exercise-card-0"]');
-      await expect(firstCard).toBeVisible({ timeout: 5000 });
-    }
+    // Verify 2 new cards are rendered in workout
+    const card1 = page.locator('[data-card-for-exercise="Cable Lateral Raises"]');
+    const card2 = page.locator('[data-card-for-exercise="Face Pulls"]');
+    await expect(card1).toBeVisible({ timeout: 5000 });
+    await expect(card2).toBeVisible({ timeout: 5000 });
+
+    // Verify focus moved into the first new exercise card
+    await expect.poll(async () => {
+      return await page.evaluate(() => {
+        const el = document.querySelector('[data-card-for-exercise="Cable Lateral Raises"]');
+        return Boolean(el && document.activeElement && el.contains(document.activeElement));
+      });
+    }, { message: 'Focus should move inside the first new exercise card', timeout: 5000 }).toBe(true);
   });
 });

@@ -391,17 +391,15 @@ test.describe('P3b Workout Session Flows (p3b-session-flows)', () => {
       await logAnywayBtn.click();
       await expect(restHeading).not.toBeVisible();
 
-      // Routine is now Free Workout and Add Exercise is available (supporting picker flow or legacy select)
+      // Routine is now Free Workout and ExercisePicker is opened
       await expect(routineBtn).toContainText('Free Workout');
-      const openPickerBtn = page.locator('[data-testid="open-exercise-picker-btn"]');
-      const addSelect = page.locator('[data-testid="add-exercise-select"]');
-      if (await openPickerBtn.isVisible()) {
-        await expect(openPickerBtn).toBeVisible({ timeout: 5000 });
-      } else {
-        const addBtn = page.locator('[data-testid="add-exercise-btn"]');
-        await expect(addSelect).toBeVisible({ timeout: 5000 });
-        await expect(addBtn).toBeVisible({ timeout: 5000 });
-      }
+      const pickerSheet = page.locator('[data-testid="exercise-picker-sheet"]');
+      await expect(pickerSheet).toBeVisible({ timeout: 5000 });
+      // Close picker sheet to confirm empty state Add Exercise button is available
+      await page.keyboard.press('Escape');
+      await expect(pickerSheet).not.toBeVisible();
+      await expect(page.locator('[data-testid="empty-add-exercise-btn"]')).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('[data-testid="add-exercise-btn"]')).toBeVisible({ timeout: 5000 });
     } finally {
       cleanupPollutedWorkouts();
     }
@@ -422,28 +420,18 @@ test.describe('P3b Workout Session Flows (p3b-session-flows)', () => {
       await modal.locator('button:has-text("Free Workout")').click();
       await expect(modal).not.toBeVisible();
 
-      const openPickerBtn = page.locator('[data-testid="open-exercise-picker-btn"]');
-      const addSelect = page.locator('[data-testid="add-exercise-select"]');
-      if (await openPickerBtn.isVisible()) {
-        await openPickerBtn.click();
-        const picker = page.locator('[data-testid="exercise-picker"]');
-        await expect(picker).toBeVisible({ timeout: 5000 });
-        const searchInput = page.locator('[data-testid="exercise-picker-search"]');
-        if (await searchInput.isVisible()) {
-          await searchInput.fill('Weighted Sit-Up');
-        }
-        const row = page.locator('[data-testid^="exercise-picker-row-"]:has-text("Weighted Sit-Up")').first();
-        await row.click();
-        const addPickerBtn = page.locator('[data-testid="exercise-picker-add-btn"]');
-        await addPickerBtn.click();
-        await expect(picker).not.toBeVisible();
-      } else {
-        const addBtn = page.locator('[data-testid="add-exercise-btn"]');
-        await expect(addSelect).toBeVisible({ timeout: 5000 });
-        // Add "Weighted Sit-Up" (no prior sessions in seed.sql)
-        await addSelect.selectOption('Weighted Sit-Up');
-        await addBtn.click();
-      }
+      // Open ExercisePicker
+      const openAddBtn = page.locator('[data-testid="empty-add-exercise-btn"], [data-testid="add-exercise-btn"]').first();
+      await openAddBtn.click();
+      const picker = page.locator('[data-testid="exercise-picker-sheet"]');
+      await expect(picker).toBeVisible({ timeout: 5000 });
+      const row = page.locator('[data-testid^="exercise-row-"]:has-text("Weighted Sit-Up")').first();
+      await expect(row).toBeVisible({ timeout: 5000 });
+      await row.click();
+      await expect(row).toHaveAttribute('aria-pressed', 'true');
+      const addPickerBtn = page.locator('[data-testid="picker-confirm-add-btn"]');
+      await addPickerBtn.click();
+      await expect(picker).not.toBeVisible();
 
       const exerciseCard = page.locator('[data-testid="exercise-card-0"]');
       await expect(exerciseCard).toBeVisible({ timeout: 5000 });
