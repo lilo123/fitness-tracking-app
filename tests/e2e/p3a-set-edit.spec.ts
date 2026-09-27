@@ -1,4 +1,49 @@
+import { execSync } from 'child_process';
 import { test, expect } from '@playwright/test';
+
+const DB_URL =
+  process.env.DATABASE_URL ||
+  'postgresql://postgres:postgres@127.0.0.1:58822/postgres';
+
+function getPsqlCommand(): string {
+  if (process.env.DATABASE_URL) {
+    let parsed: URL;
+    try {
+      parsed = new URL(process.env.DATABASE_URL);
+    } catch {
+      return `psql "${process.env.DATABASE_URL}" -v ON_ERROR_STOP=1`;
+    }
+    if (
+      (parsed.port && parsed.port !== '58822') ||
+      (parsed.hostname && parsed.hostname !== '127.0.0.1' && parsed.hostname !== 'localhost')
+    ) {
+      return `psql -h "${parsed.hostname}" -p "${parsed.port || '5432'}" -U "${parsed.username || 'postgres'}" -d "${parsed.pathname.slice(1) || 'postgres'}" -v ON_ERROR_STOP=1`;
+    }
+  }
+  return `psql "${DB_URL}" -v ON_ERROR_STOP=1`;
+}
+
+function cleanupPollutedWorkouts() {
+  const sql = `
+    DELETE FROM public.sets
+    WHERE workout_id IN (
+      SELECT id FROM public.workouts
+      WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io')
+        AND name <> 'Push Day Benchmark'
+    );
+    DELETE FROM public.workouts
+    WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io')
+      AND name <> 'Push Day Benchmark';
+  `;
+  try {
+    const cmd = getPsqlCommand();
+    execSync(cmd, { input: sql, encoding: 'utf8' });
+  } catch (err) {
+    console.error('[p3a-set-edit] Error cleaning up polluted workouts:', err);
+    throw err;
+  }
+}
+
 
 // Captured from base 62bd8a5 (QuickLogToast.tsx) during the quick-log flow:
 // Logs "Poached Chicken Slices" (+132 kcal) from favorites.
@@ -14,9 +59,22 @@ function normalizeToast(html: string): string {
 test.describe('P3a Set Edit and Delete Workflows (p3a-set-edit)', () => {
   test.describe.configure({ mode: 'serial' });
 
+  test.beforeEach(async () => {
+    cleanupPollutedWorkouts();
+  });
+
+  test.afterEach(async () => {
+    cleanupPollutedWorkouts();
+  });
+
+  test.afterAll(async () => {
+    cleanupPollutedWorkouts();
+  });
+
   test('(2a) Workout: tapping logged row sends NO DELETE; delete -> UndoToast -> Undo cancels -> delete again -> expiry sends 1 DELETE', async ({
     page,
   }) => {
+    try {
     const deleteUrls: string[] = [];
     page.on('request', (req) => {
       if (req.method() === 'DELETE' && req.url().includes('/rest/v1/sets')) {
@@ -100,6 +158,9 @@ test.describe('P3a Set Edit and Delete Workflows (p3a-set-edit)', () => {
         intervals: [250, 500, 1000],
       })
       .toBe(1);
+    } finally {
+      cleanupPollutedWorkouts();
+    }
   });
 
   test('(2b) History (H1): open a session with 6 rows, Esc keeps 6 rows and returns focus; save 105 shows 105 with no "No sets recorded" flash', async ({
