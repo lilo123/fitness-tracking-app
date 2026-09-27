@@ -63,4 +63,32 @@ test.describe('Mobile Viewport & Ergonomics', () => {
       }
     }
   });
+
+  test("prevents horizontal scroll overflow on /history (both By Session and By Exercise)", async ({ page }) => {
+    await page.goto("/login");
+    await page.fill('input[type="email"]', "athlete@cybergym.io");
+    await page.fill('input[type="password"]', "password123");
+    await page.click('button[type="submit"]');
+    await page.waitForURL("**/workout");
+
+    // 1. Navigate to /history (By Session view)
+    await page.goto("/history");
+    await page.waitForURL("**/history");
+    await expect(page.getByRole("heading", { name: "Workout History" })).toBeVisible();
+
+    const isOverflowingSession = await page.evaluate(() => {
+      return document.documentElement.scrollWidth > window.innerWidth;
+    });
+    expect(isOverflowingSession, "No horizontal overflow on /history By Session").toBe(false);
+
+    // 2. Switch to By Exercise view
+    const exerciseTab = page.locator('[data-testid="history-subview-exercise"]');
+    await exerciseTab.click();
+    await expect(page.locator('[data-testid="all-time-stats-caption"]')).toBeVisible();
+
+    const isOverflowingExercise = await page.evaluate(() => {
+      return document.documentElement.scrollWidth > window.innerWidth;
+    });
+    expect(isOverflowingExercise, "No horizontal overflow on /history By Exercise").toBe(false);
+  });
 });

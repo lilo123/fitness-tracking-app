@@ -39,8 +39,8 @@ test.describe('RFIX-11 Error States & Retry Affordance E2E', () => {
     await page.click('button[type="submit"]');
     await page.waitForURL('**/workout');
 
-    // 2. Intercept PostgREST workouts read query with 400 Bad Request
-    await page.route('**/rest/v1/workouts*', (route) =>
+    // 2. Intercept PostgREST history read query with 400 Bad Request (M5 v2 RPC)
+    await page.route('**/rest/v1/rpc/get_history_sessions_v2*', (route) =>
       route.fulfill({
         status: 400,
         contentType: 'application/json',
@@ -55,7 +55,7 @@ test.describe('RFIX-11 Error States & Retry Affordance E2E', () => {
     await expect(page.locator('text=No workout sessions recorded yet.')).not.toBeVisible();
 
     // 4. Clear intercept, click retry, and assert recovery
-    await page.unroute('**/rest/v1/workouts*');
+    await page.unroute('**/rest/v1/rpc/get_history_sessions_v2*');
     await page.click('[data-testid="retry-history-btn"]');
     await expect(page.locator('[data-testid="history-read-error"]')).not.toBeVisible({ timeout: 10000 });
   });

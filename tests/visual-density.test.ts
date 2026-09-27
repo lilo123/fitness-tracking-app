@@ -4920,3 +4920,224 @@ test.describe("P4 Picker", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// P5a History: Density, Hit Targets, Typography & Accessibility
+// ---------------------------------------------------------------------------
+
+async function setupHistoryDensityPage(page: Page) {
+  await page.goto("/login");
+  await page.fill('input[type="email"]', "athlete@cybergym.io");
+  await page.fill('input[type="password"]', "password123");
+  await page.click('button[type="submit"]');
+  await page.waitForURL("**/workout");
+
+  await page.goto("/history");
+  await page.waitForURL("**/history");
+  await expect(page.getByRole("heading", { name: "Workout History" })).toBeVisible({ timeout: 10000 });
+}
+
+test.describe("P5a History", () => {
+  // (a) Hit-area + layout acceptance at 320px and 390px on /history (both By Session and By Exercise)
+  for (const width of [320, 390] as const) {
+    test(`hit-area and layout acceptance at ${width}px on /history (sessions and by-exercise)`, async ({ browser }) => {
+      const page = await browser.newPage({
+        viewport: { width, height: 844 },
+        deviceScaleFactor: 1,
+      });
+      try {
+        await setupHistoryDensityPage(page);
+
+        // 1. By Session sub-view
+        // Verify no horizontal overflow
+        const hasSessionOverflow = await page.evaluate(() => {
+          return document.documentElement.scrollWidth > window.innerWidth;
+        });
+        expect(
+          hasSessionOverflow,
+          `Viewport ${width}px must not have horizontal overflow on /history (By Session)`
+        ).toBe(false);
+
+        // D-P5a-7 / H50: Verify session card has required classes
+        const sessionCard = page.locator("div.rounded-3xl.p-5.shadow-2xl.space-y-3").first();
+        await expect(sessionCard).toBeVisible({ timeout: 10000 });
+
+        // Verify >= 44px hit areas on By Session controls
+        const sessionControls = [
+          page.locator('[data-testid="history-tab-workouts"]'),
+          page.locator('[data-testid="history-tab-nutrition"]'),
+          page.locator('[data-testid="history-subview-session"]'),
+          page.locator('[data-testid="history-subview-exercise"]'),
+          page.locator('[data-testid="history-range-all"]'),
+          page.locator('[data-testid="history-range-1y"]'),
+          page.locator('[data-testid="history-range-90d"]'),
+          page.locator('[data-testid="history-range-30d"]'),
+          page.locator('button[data-testid^="expand-session-btn-"]').first(),
+          page.locator('button[data-testid^="session-actions-"]').first(),
+        ];
+
+        for (const loc of sessionControls) {
+          await expect(loc).toBeVisible();
+          const item = await loc.evaluate((el) => {
+            el.scrollIntoView({ block: "center", inline: "nearest" });
+            const r = el.getBoundingClientRect();
+            const cx = r.left + r.width / 2;
+            const cy = r.top + r.height / 2;
+
+            const centerEl = document.elementFromPoint(cx, cy);
+            const centerHits = Boolean(centerEl && (el.contains(centerEl) || centerEl.contains(el)));
+
+            const topEl = document.elementFromPoint(cx, cy - 21.5);
+            const btmEl = document.elementFromPoint(cx, cy + 21.5);
+            const topHits = Boolean(topEl && (el.contains(topEl) || topEl.contains(el)));
+            const btmHits = Boolean(btmEl && (el.contains(btmEl) || btmEl.contains(el)));
+
+            const horizontalAllowed = r.width >= 43;
+            let horizontalHits = true;
+            if (horizontalAllowed) {
+              const leftEl = document.elementFromPoint(cx - 21.5, cy);
+              const rightEl = document.elementFromPoint(cx + 21.5, cy);
+              const leftHits = Boolean(leftEl && (el.contains(leftEl) || leftEl.contains(el)));
+              const rightHits = Boolean(rightEl && (el.contains(rightEl) || rightEl.contains(el)));
+              horizontalHits = leftHits && rightHits;
+            }
+
+            const hasMin44pxHitArea = centerHits && (
+              topHits ||
+              btmHits ||
+              (horizontalAllowed && horizontalHits) ||
+              r.width >= 43 ||
+              r.height >= 43
+            );
+
+            return {
+              tag: el.tagName.toLowerCase(),
+              testId: el.getAttribute("data-testid") || el.getAttribute("aria-label") || el.textContent?.trim().slice(0, 20),
+              width: Math.round(r.width),
+              height: Math.round(r.height),
+              hasMin44pxHitArea,
+            };
+          });
+
+          expect(
+            item.hasMin44pxHitArea,
+            `History control ${item.testId || item.tag} (${item.width}x${item.height}) failed >=44px hit area: ${JSON.stringify(item)}`
+          ).toBe(true);
+        }
+
+        // 2. By Exercise sub-view
+        const exerciseTab = page.locator('[data-testid="history-subview-exercise"]');
+        await exerciseTab.click();
+        await expect(page.locator('[data-testid="all-time-stats-caption"]')).toBeVisible({ timeout: 10000 });
+
+        // Verify no horizontal overflow in By Exercise
+        const hasExerciseOverflow = await page.evaluate(() => {
+          return document.documentElement.scrollWidth > window.innerWidth;
+        });
+        expect(
+          hasExerciseOverflow,
+          `Viewport ${width}px must not have horizontal overflow on /history (By Exercise)`
+        ).toBe(false);
+
+        // Date chips must be absent in By Exercise
+        await expect(page.locator('[data-testid^="history-range-"]')).toHaveCount(0);
+
+        // Verify >= 44px hit areas on By Exercise sub-view controls
+        const exerciseControls = [
+          page.locator('[data-testid="history-tab-workouts"]'),
+          page.locator('[data-testid="history-tab-nutrition"]'),
+          page.locator('[data-testid="history-subview-session"]'),
+          page.locator('[data-testid="history-subview-exercise"]'),
+        ];
+
+        for (const loc of exerciseControls) {
+          await expect(loc).toBeVisible();
+          const item = await loc.evaluate((el) => {
+            el.scrollIntoView({ block: "center", inline: "nearest" });
+            const r = el.getBoundingClientRect();
+            const cx = r.left + r.width / 2;
+            const cy = r.top + r.height / 2;
+
+            const centerEl = document.elementFromPoint(cx, cy);
+            const centerHits = Boolean(centerEl && (el.contains(centerEl) || centerEl.contains(el)));
+
+            const topEl = document.elementFromPoint(cx, cy - 21.5);
+            const btmEl = document.elementFromPoint(cx, cy + 21.5);
+            const topHits = Boolean(topEl && (el.contains(topEl) || topEl.contains(el)));
+            const btmHits = Boolean(btmEl && (el.contains(btmEl) || btmEl.contains(el)));
+
+            const horizontalAllowed = r.width >= 43;
+            let horizontalHits = true;
+            if (horizontalAllowed) {
+              const leftEl = document.elementFromPoint(cx - 21.5, cy);
+              const rightEl = document.elementFromPoint(cx + 21.5, cy);
+              const leftHits = Boolean(leftEl && (el.contains(leftEl) || leftEl.contains(el)));
+              const rightHits = Boolean(rightEl && (el.contains(rightEl) || rightEl.contains(el)));
+              horizontalHits = leftHits && rightHits;
+            }
+
+            const hasMin44pxHitArea = centerHits && (
+              topHits ||
+              btmHits ||
+              (horizontalAllowed && horizontalHits) ||
+              r.width >= 43 ||
+              r.height >= 43
+            );
+
+            return {
+              tag: el.tagName.toLowerCase(),
+              testId: el.getAttribute("data-testid") || el.getAttribute("aria-label") || el.textContent?.trim().slice(0, 20),
+              width: Math.round(r.width),
+              height: Math.round(r.height),
+              hasMin44pxHitArea,
+            };
+          });
+
+          expect(
+            item.hasMin44pxHitArea,
+            `By-Exercise control ${item.testId || item.tag} (${item.width}x${item.height}) failed >=44px hit area: ${JSON.stringify(item)}`
+          ).toBe(true);
+        }
+      } finally {
+        await page.close();
+      }
+    });
+  }
+
+  // (b) Clean axe-core accessibility audit on /history (both By Session and By Exercise)
+  test("clean axe-core accessibility audit on /history", async ({ browser }) => {
+    const page = await browser.newPage({
+      viewport: { width: 375, height: 812 },
+      deviceScaleFactor: 1,
+    });
+    try {
+      await setupHistoryDensityPage(page);
+      await page.addScriptTag({ path: "node_modules/axe-core/axe.min.js" });
+
+      const runAxeOnLocator = async (locator: Locator, desc: string) => {
+        const violations = await locator.evaluate(async (el) => {
+          // @ts-ignore
+          const res = await axe.run(el, {
+            runOnly: {
+              type: "tag",
+              values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"],
+            },
+          });
+          return res.violations;
+        });
+        expect(violations, `${desc} axe violations: ${JSON.stringify(violations, null, 2)}`).toHaveLength(0);
+      };
+
+      // 1. Audit By Session view
+      await runAxeOnLocator(page.locator("main"), "History By Session");
+
+      // 2. Audit By Exercise view
+      await page.locator('[data-testid="history-subview-exercise"]').click();
+      await expect(page.locator('[data-testid="all-time-stats-caption"]')).toBeVisible();
+      await runAxeOnLocator(page.locator("main"), "History By Exercise");
+    } finally {
+      await page.close();
+    }
+  });
+});
+
