@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { WorkoutSessionHistory } from './WorkoutSessionHistory';
-import type { HistorySession } from './useHistoryData';
+import type { HistorySession } from './useWorkoutHistory';
 
-describe('WorkoutSessionHistory (H4)', () => {
+describe('WorkoutSessionHistory (H4, H29, H43)', () => {
   const mockSessions: HistorySession[] = [
     {
       id: 'session-1',
@@ -16,24 +16,34 @@ describe('WorkoutSessionHistory (H4)', () => {
       total_volume: 2500,
       sets: [],
     },
+    {
+      id: 'session-2',
+      date: '2026-09-20T00:00:00.000Z',
+      workout_date: '2026-09-20',
+      civil_date: '2026-09-20',
+      name: 'Chest Day',
+      set_count: 4,
+      total_volume: 3200,
+      sets: [],
+    },
   ];
 
   it('H4: renders formatted civil date (Sep 15) and drops raw ISO timestamp text', () => {
     render(
       <MemoryRouter>
         <WorkoutSessionHistory
-        displayedSessions={mockSessions}
-        filteredSessionsCount={1}
-        exercises={[]}
-        timeRange="all"
-        isInspectingAthlete={false}
-        onEditSet={vi.fn()}
-        onLoadMore={vi.fn()}
-        hasMore={false}
-        isLoadingMore={false}
-        expandedSessionIds={new Set()}
-        onToggleExpand={vi.fn()}
-        loadingSessionIds={new Set()}
+          displayedSessions={mockSessions}
+          filteredSessionsCount={2}
+          exercises={[]}
+          timeRange="all"
+          isInspectingAthlete={false}
+          onEditSet={vi.fn()}
+          onLoadMore={vi.fn()}
+          hasMore={false}
+          isLoadingMore={false}
+          expandedSessionIds={new Set()}
+          onToggleExpand={vi.fn()}
+          loadingSessionIds={new Set()}
         />
       </MemoryRouter>
     );
@@ -44,5 +54,102 @@ describe('WorkoutSessionHistory (H4)', () => {
     // H4: Must NOT contain raw ISO timestamp text like "(2026-09-15T00:00:00.000Z)"
     expect(screen.queryByText(/2026-09-15T00:00:00/)).toBeNull();
     expect(screen.queryByText(/\(2026-09-15/)).toBeNull();
+  });
+
+  it('H29: renders data-civil-date on session cards', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <WorkoutSessionHistory
+          displayedSessions={mockSessions}
+          exercises={[]}
+          timeRange="all"
+          isInspectingAthlete={false}
+          onEditSet={vi.fn()}
+          onLoadMore={vi.fn()}
+        />
+      </MemoryRouter>
+    );
+
+    const card1 = container.querySelector('[data-civil-date="2026-09-15"]');
+    const card2 = container.querySelector('[data-civil-date="2026-09-20"]');
+
+    expect(card1).toBeDefined();
+    expect(card1).not.toBeNull();
+    expect(card2).toBeDefined();
+    expect(card2).not.toBeNull();
+  });
+
+  it('H29: highlights and focuses session card matching highlightDate', async () => {
+    const { container } = render(
+      <MemoryRouter>
+        <WorkoutSessionHistory
+          displayedSessions={mockSessions}
+          exercises={[]}
+          timeRange="all"
+          isInspectingAthlete={false}
+          onEditSet={vi.fn()}
+          onLoadMore={vi.fn()}
+          highlightDate="2026-09-20"
+        />
+      </MemoryRouter>
+    );
+
+    const highlightedCard = container.querySelector('[data-civil-date="2026-09-20"]') as HTMLElement;
+    expect(highlightedCard).not.toBeNull();
+    expect(highlightedCard.className).toContain('ring-2 ring-cyan-400');
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(highlightedCard);
+    });
+  });
+
+  it('H43: renders filterSummary text when filtering sessions', () => {
+    render(
+      <MemoryRouter>
+        <WorkoutSessionHistory
+          displayedSessions={[mockSessions[0]]}
+          exercises={[]}
+          timeRange="all"
+          isInspectingAthlete={false}
+          onEditSet={vi.fn()}
+          onLoadMore={vi.fn()}
+          filterSummary={{ matchCount: 1, loadedCount: 2 }}
+        />
+      </MemoryRouter>
+    );
+
+    const counter = screen.getByTestId('showing-sessions-count');
+    expect(counter.textContent).toBe('Showing 1 matches in 2 loaded sessions');
+  });
+
+  it('H43: renders empty state with Clear filters CTA when filtering produces 0 matches', () => {
+    const mockClearFilters = vi.fn();
+
+    render(
+      <MemoryRouter>
+        <WorkoutSessionHistory
+          displayedSessions={[]}
+          totalCount={2}
+          exercises={[]}
+          timeRange="all"
+          isInspectingAthlete={false}
+          onEditSet={vi.fn()}
+          onLoadMore={vi.fn()}
+          onClearFilters={mockClearFilters}
+          filterSummary={{ matchCount: 0, loadedCount: 2 }}
+        />
+      </MemoryRouter>
+    );
+
+    const counter = screen.getByTestId('showing-sessions-count');
+    expect(counter.textContent).toBe('Showing 0 matches in 2 loaded sessions');
+
+    expect(screen.getByText(/No workout sessions match your search or filters/i)).toBeDefined();
+
+    const clearBtn = screen.getByTestId('clear-filters-btn');
+    expect(clearBtn).toBeDefined();
+
+    fireEvent.click(clearBtn);
+    expect(mockClearFilters).toHaveBeenCalledTimes(1);
   });
 });

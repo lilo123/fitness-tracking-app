@@ -139,6 +139,14 @@ const SERVICED_QUERIES_REGISTRY = {
       description: 'Mutation-only insert for template creation',
     },
   ],
+  'src/components/history/HistoryCalendarSheet.test.tsx': [
+    {
+      table: 'workouts',
+      type: 'EXACT',
+      projection: 'workout_date',
+      description: 'Calendar month workout dates query',
+    },
+  ],
   'src/components/history/HistoryView.filters.test.tsx': [
     {
       table: 'exercises',

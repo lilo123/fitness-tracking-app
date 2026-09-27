@@ -37,9 +37,12 @@ export interface WorkoutSessionHistoryProps {
   isDeletingSession?: boolean;
   onClearFilters?: () => void;
   onNavigate?: (path: string) => void;
+  highlightDate?: string;
+  filterSummary?: {
+    matchCount: number;
+    loadedCount: number;
+  };
 }
-
-
 
 export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
   displayedSessions,
@@ -62,6 +65,8 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
   isDeletingSession = false,
   onClearFilters,
   onNavigate,
+  highlightDate,
+  filterSummary,
 }) => {
   const routerNavigate = useNavigate();
   const navigate = onNavigate || routerNavigate;
@@ -163,6 +168,36 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
     },
   });
 
+  // H29: Scroll to highlightDate session index and focus its card
+  React.useEffect(() => {
+    if (!highlightDate) return;
+    const targetIndex = displayedSessions.findIndex((s) => {
+      const d = s.civil_date || s.workout_date || (s.date ? normalizeDateStr(s.date) : '');
+      return d === highlightDate;
+    });
+
+    if (targetIndex !== -1) {
+      if (typeof virtualizer?.scrollToIndex === 'function') {
+        virtualizer.scrollToIndex(targetIndex, { align: 'center' });
+      }
+      const focusCard = () => {
+        const cardEl = (parentRef.current || document).querySelector(
+          `[data-civil-date="${highlightDate}"]`
+        ) as HTMLElement | null;
+        if (cardEl) {
+          cardEl.focus();
+        }
+      };
+      focusCard();
+      const rafId = requestAnimationFrame(focusCard);
+      const timer = setTimeout(focusCard, 50);
+      return () => {
+        cancelAnimationFrame(rafId);
+        clearTimeout(timer);
+      };
+    }
+  }, [highlightDate, displayedSessions, virtualizer]);
+
   const virtualItems = virtualizer.getVirtualItems();
   const isVirtual = virtualItems.length > 0;
 
@@ -175,13 +210,24 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
     );
   }
 
-  // H20 & H18: Empty state only when settled and totalCount === 0
-  if (displayedSessions.length === 0 && totalCount === 0) {
-    const isFiltered = timeRange !== 'all';
+  // H20 & H18: Empty state only when settled and totalCount === 0 OR filtering produced 0 matches
+  const isZeroMatches = displayedSessions.length === 0;
+  const isFilteringWithZeroMatches =
+    isZeroMatches && (Boolean(filterSummary) || (timeRange !== 'all' && totalCount !== 0));
+
+  if ((isZeroMatches && totalCount === 0) || isFilteringWithZeroMatches) {
+    const isFiltered = timeRange !== 'all' || Boolean(filterSummary);
     return (
       <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-8 text-center space-y-4">
+        {filterSummary && (
+          <div data-testid="showing-sessions-count" className="text-xs text-zinc-400 text-center">
+            Showing {filterSummary.matchCount} matches in {filterSummary.loadedCount} loaded sessions
+          </div>
+        )}
         <p className="text-zinc-400 text-xs">
-          {isFiltered
+          {filterSummary
+            ? 'No workout sessions match your search or filters.'
+            : isFiltered
             ? 'No workout sessions recorded in this time range.'
             : 'No workout sessions recorded yet.'}
         </p>
@@ -223,6 +269,7 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
     const sets = session.sets || [];
 
     const civilDate = session.civil_date || session.workout_date || (session.date ? normalizeDateStr(session.date) : '');
+    const isHighlighted = Boolean(highlightDate && civilDate === highlightDate);
 
     const overflowItems: OverflowMenuItem[] = [
       {
@@ -240,7 +287,11 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
 
     return (
       <Card
-        className="rounded-3xl p-5 shadow-2xl space-y-3"
+        className={`rounded-3xl p-5 shadow-2xl space-y-3 transition-colors ${
+          isHighlighted ? 'ring-2 ring-cyan-400' : ''
+        }`}
+        data-civil-date={civilDate}
+        tabIndex={-1}
       >
         <div className="flex items-center justify-between border-b border-zinc-800 pb-3 gap-2">
           {/* H21: min-w-0 flex-1 truncate session title at 320px */}
@@ -406,9 +457,11 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
         />
       )}
 
-      {/* H31: Showing N of M sessions counter */}
+      {/* H31: Showing N of M sessions counter or filter summary */}
       <div data-testid="showing-sessions-count" className="text-xs text-zinc-400 text-center">
-        {totalCount != null
+        {filterSummary
+          ? `Showing ${filterSummary.matchCount} matches in ${filterSummary.loadedCount} loaded sessions`
+          : totalCount != null
           ? `Showing ${displayedSessions.length} of ${totalCount} sessions`
           : `Showing ${displayedSessions.length} sessions`}
       </div>
