@@ -1070,7 +1070,7 @@ describe('HistoryView', () => {
       });
     });
 
-    it('opens EditSetModal on set edit button click, edits set, and submits update mutation', async () => {
+    it('opens EditSetSheet on set edit button click, edits set, and submits update mutation without flashing No sets recorded', async () => {
       renderComponent();
 
       await waitFor(() => {
@@ -1080,7 +1080,7 @@ describe('HistoryView', () => {
       fireEvent.click(screen.getByTestId('edit-set-btn-s1'));
 
       await waitFor(() => {
-        expect(screen.getByTestId('edit-set-modal')).toBeDefined();
+        expect(screen.getByTestId('edit-set-sheet')).toBeDefined();
       });
 
       const weightInput = screen.getByTestId('edit-set-weight-input');
@@ -1095,10 +1095,36 @@ describe('HistoryView', () => {
         expect(mockUpdate).toHaveBeenCalled();
         expect(mockUpdateEq).toHaveBeenCalledWith('id', 's1');
       });
+
+      expect(screen.queryByTestId('edit-set-sheet')).toBeNull();
+      expect(screen.queryByText(/no sets recorded/i)).toBeNull();
+      expect(screen.getByText(/235 lbs × 9/i)).toBeDefined();
     });
 
-    it('opens EditSetModal and deletes set when confirmed', async () => {
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
+    it('opens EditSetSheet and triggers deferred delete with UndoToast without window.confirm', async () => {
+      const confirmSpy = vi.spyOn(window, 'confirm');
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('edit-set-btn-s1')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByTestId('edit-set-btn-s1'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('delete-set-btn')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByTestId('delete-set-btn'));
+
+      expect(confirmSpy).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('edit-set-sheet')).toBeNull();
+      expect(screen.queryByTestId('edit-set-btn-s1')).toBeNull();
+      expect(screen.getByTestId('toast-undo-btn')).toBeDefined();
+      expect(mockDeleteEq).not.toHaveBeenCalled();
+    });
+
+    it('allows undoing a deferred delete, restoring the set row without executing delete mutation', async () => {
       renderComponent();
 
       await waitFor(() => {
@@ -1114,8 +1140,40 @@ describe('HistoryView', () => {
       fireEvent.click(screen.getByTestId('delete-set-btn'));
 
       await waitFor(() => {
-        expect(mockDeleteEq).toHaveBeenCalledWith('id', 's1');
+        expect(screen.getByTestId('toast-undo-btn')).toBeDefined();
       });
+
+      fireEvent.click(screen.getByTestId('toast-undo-btn'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('edit-set-btn-s1')).toBeDefined();
+      });
+      expect(mockDeleteEq).not.toHaveBeenCalled();
+    });
+
+    it('restores session rows when EditSetSheet is dismissed via Cancel or Escape without data mutation', async () => {
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('edit-set-btn-s1')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByTestId('edit-set-btn-s1'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('edit-set-sheet')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByTestId('edit-set-sheet-close'));
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('edit-set-sheet')).toBeNull();
+      });
+
+      expect(screen.getByTestId('edit-set-btn-s1')).toBeDefined();
+      expect(mockUpdate).not.toHaveBeenCalled();
+      expect(mockDeleteEq).not.toHaveBeenCalled();
+      expect(screen.queryByText(/no sets recorded/i)).toBeNull();
     });
   });
 
@@ -1333,11 +1391,11 @@ describe('HistoryView', () => {
       // Open Edit Set modal
       const editSetBtn = await screen.findByTestId('edit-set-btn-s-coach-1');
       fireEvent.click(editSetBtn);
-      expect(await screen.findByTestId('edit-set-modal')).toBeDefined();
+      expect(await screen.findByTestId('edit-set-sheet')).toBeDefined();
 
       // Now toggle inspect mode back to athlete -> edit modal must be dismissed
       fireEvent.click(screen.getByTestId('toggle-inspect-mode-btn'));
-      expect(screen.queryByTestId('edit-set-modal')).toBeNull();
+      expect(screen.queryByTestId('edit-set-sheet')).toBeNull();
 
       // Switch to personal history again
       fireEvent.click(screen.getByTestId('toggle-inspect-mode-btn'));

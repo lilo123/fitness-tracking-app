@@ -5,7 +5,9 @@ import type { WorkoutSet, NutritionLog } from '../../types/database';
 import { normalizeDateStr } from '../../utils/ghostSets';
 import { Calendar, Dumbbell, Activity, Utensils, AlertCircle, Shield, RotateCcw } from 'lucide-react';
 import { EditMealSheet } from '../nutrition/EditMealSheet';
-import { EditSetModal } from '../workout/EditSetModal';
+import { EditSetSheet } from '../sets/EditSetSheet';
+import { UndoToast } from '../common/UndoToast';
+import { useHistorySetDeferredDelete } from './useHistorySetDeferredDelete';
 import { CoachContext } from '../../context/CoachContextTypes';
 import { NutritionHistoryTimeline, type NutritionDaySummary } from './NutritionHistoryTimeline';
 import { WorkoutSessionHistory } from './WorkoutSessionHistory';
@@ -57,6 +59,8 @@ export const HistoryView: React.FC = () => {
     workoutsError, refetchWorkouts, isNutritionLogsError, nutritionLogsError,
     refetchNutritionLogs, refetchExercises,
   } = useHistoryData(targetUserId, setMutationError);
+
+
 
   const isExerciseView = historyDomain === 'workouts' && viewMode === 'exercise';
   const {
@@ -255,14 +259,22 @@ export const HistoryView: React.FC = () => {
     return sessions.filter((s) => s.date >= cutoffStr);
   }, [sessions, timeRange, effectiveTimeZone]);
 
-  const displayedSessions = filteredSessions;
-
-  const displayedSessionsWithSets = useMemo(() => {
-    return displayedSessions.map((s) => ({
-      ...s,
-      sets: sessionSetsMap[s.id] || s.sets || [],
-    }));
-  }, [displayedSessions, sessionSetsMap]);
+  const {
+    handleDeleteSetRequested,
+    handleSetSaved,
+    displayedSessionsWithSets,
+    flushDelete: flushSetDelete,
+    toastItem: setDeleteToastItem,
+  } = useHistorySetDeferredDelete({
+    targetUserId,
+    exercises,
+    sessions,
+    displayedSessions: filteredSessions,
+    sessionSetsMap,
+    setSessionSetsMap,
+    setEditingSet,
+    setMutationError,
+  });
 
   const filteredNutritionDays = useMemo(() => {
     if (timeRange === 'all') return nutritionDays;
@@ -524,22 +536,20 @@ export const HistoryView: React.FC = () => {
         timeZone={effectiveTimeZone}
       />
 
-      {/* Edit Set Modal */}
-      <EditSetModal
+      {/* Undo Toast for deferred set deletion */}
+      <UndoToast
+        toast={setDeleteToastItem}
+        onDismiss={flushSetDelete}
+      />
+
+      {/* Edit Set Sheet */}
+      <EditSetSheet
         isOpen={!!editingSet}
         set={editingSet}
         exercises={exercises}
-        onClose={() => {
-          const workoutId = editingSet?.workout_id;
-          if (workoutId) {
-            setSessionSetsMap((prev) => {
-              const next = { ...prev };
-              delete next[workoutId];
-              return next;
-            });
-          }
-          setEditingSet(null);
-        }}
+        onClose={() => setEditingSet(null)}
+        onSaved={handleSetSaved}
+        onDeleteRequested={handleDeleteSetRequested}
         targetUserId={targetUserId}
       />
     </div>

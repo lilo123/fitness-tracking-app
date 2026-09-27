@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth';
 import type { WorkoutSet, RoutineTemplate } from '../../types/database';
 import {
@@ -17,11 +18,15 @@ import { RoutinePickerModal } from './RoutinePickerModal';
 import { RestDayView } from './RestDayView';
 import { ExerciseCard } from './ExerciseCard';
 import { StatusBanner } from '../common/StatusBanner';
+import { UndoToast } from '../common/UndoToast';
+import { EditSetSheet } from '../sets/EditSetSheet';
+import { useSetDeletion } from './useSetDeletion';
+import { invalidateWorkoutDerived } from '../../lib/invalidate';
 import { isUUID } from './workoutEngineHelpers';
-
 
 export const WorkoutEngine: React.FC = () => {
   const { user, profile } = useAuth();
+  const queryClient = useQueryClient();
 
   const targetUserId =
     user?.id ||
@@ -39,6 +44,10 @@ export const WorkoutEngine: React.FC = () => {
   const [showRoutineModal, setShowRoutineModal] = useState(false);
   const [selectedExerciseToAdd, setSelectedExerciseToAdd] = useState('');
   const [mutationError, setMutationError] = useState<string | null>(null);
+
+  // Edit Set Sheet State (W3, W17)
+  const [editingSet, setEditingSet] = useState<(WorkoutSet & { workout_date?: string; workout_name?: string }) | null>(null);
+  const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
 
   // 1. Workout Session State & Stores
   const activeSession = workoutSessionStore.getActiveSession(targetUserId);
@@ -119,6 +128,18 @@ export const WorkoutEngine: React.FC = () => {
     onDraftSuccess: handleDraftSuccess,
   });
 
+  // 5. Deferred Set Deletion with Undo Toast (W3, RD-7)
+  const {
+    pendingSetId,
+    scheduleDelete,
+    toast: deleteToast,
+  } = useSetDeletion({
+    onCommitDelete: async (setId: string) => {
+      await deleteSetMutation.mutateAsync(setId);
+    },
+    timeoutMs: 6000,
+  });
+
   const handleSelectRoutine = (routineName: string, template?: RoutineTemplate) => {
     setShowRoutineModal(false);
     selectRoutineInternal(routineName, template);
@@ -135,9 +156,38 @@ export const WorkoutEngine: React.FC = () => {
     setSelectedExerciseToAdd('');
   };
 
-  const handleDeleteSet = useCallback((setId: string) => {
-    deleteSetMutation.mutate(setId);
-  }, [deleteSetMutation]);
+  const handleEditSet = useCallback((exIndex: number, rowIdx: number) => {
+    const exName = activeExercises[exIndex];
+    if (!exName) return;
+    const rawSets = getSetsForExerciseToday(exName);
+    const visibleSets = rawSets.filter((s) => s.id !== pendingSetId);
+    const targetSet = visibleSets[rowIdx];
+    if (targetSet) {
+      setEditingSet({
+        ...targetSet,
+        workout_date: workoutDate,
+        workout_name: activeRoutineName,
+      });
+      setIsEditSheetOpen(true);
+    }
+  }, [activeExercises, activeRoutineName, getSetsForExerciseToday, pendingSetId, workoutDate]);
+
+  const handleCloseEditSheet = useCallback(() => {
+    setIsEditSheetOpen(false);
+    setEditingSet(null);
+  }, []);
+
+  const handleSavedEditSet = useCallback(async (_updated: WorkoutSet) => {
+    setIsEditSheetOpen(false);
+    setEditingSet(null);
+    await invalidateWorkoutDerived(queryClient, targetUserId);
+  }, [queryClient, targetUserId]);
+
+  const handleDeleteRequested = useCallback((set: WorkoutSet) => {
+    setIsEditSheetOpen(false);
+    setEditingSet(null);
+    scheduleDelete(set);
+  }, [scheduleDelete]);
 
   const handleCommitSet = useCallback((
     exName: string,
@@ -240,7 +290,8 @@ export const WorkoutEngine: React.FC = () => {
     }[] = [];
 
     for (const exName of activeExercises) {
-      const exerciseSetsToday = getSetsForExerciseToday(exName);
+      const rawSets = getSetsForExerciseToday(exName);
+      const exerciseSetsToday = rawSets.filter((s) => s.id !== pendingSetId);
       const targetCount = targetSetCounts[exName] || 3;
       const ghostValues = computeGhostSets(exName, targetCount, userLogs, workoutDate);
 
@@ -274,14 +325,14 @@ export const WorkoutEngine: React.FC = () => {
     }
 
     if (allPendingSets.length > 0) {
-      const setsWithId = allPendingSets.map((s) => {
+      const setsWithIds = allPendingSets.map((s) => {
         const matchedEx = exercises.find(
           (e) => e.name.toLowerCase() === s.exerciseName.toLowerCase() || e.id === s.exerciseName
         );
         const exerciseId = matchedEx ? matchedEx.id : isUUID(s.exerciseName) ? s.exerciseName : undefined;
         return { ...s, exerciseId };
       });
-      batchLogSetsMutation.mutate(setsWithId);
+      batchLogSetsMutation.mutate(setsWithIds);
     }
   };
 
@@ -291,7 +342,8 @@ export const WorkoutEngine: React.FC = () => {
   const currentDayAbbr = getDayOfWeekAbbr(workoutDate);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6 pb-24 text-white">
+      {/* Header controls & stats */}
       <WorkoutHeader
         mutationError={mutationError}
         onClearMutationError={() => setMutationError(null)}
@@ -330,7 +382,6 @@ export const WorkoutEngine: React.FC = () => {
           </button>
         }
       />
-
 
       <RoutinePickerModal
         isOpen={showRoutineModal}
@@ -381,7 +432,8 @@ export const WorkoutEngine: React.FC = () => {
           ) : (
             <div className="space-y-4">
               {activeExercises.map((exName, exIndex) => {
-                const exerciseSetsToday = getSetsForExerciseToday(exName);
+                const rawSets = getSetsForExerciseToday(exName);
+                const exerciseSetsToday = rawSets.filter((s) => s.id !== pendingSetId);
                 const benchmarks = getExerciseBenchmarks(exName, userLogs, workoutDate);
                 const isExpanded = expandedExercises.has(exName);
                 const targetCount = targetSetCounts[exName] || 3;
@@ -408,7 +460,7 @@ export const WorkoutEngine: React.FC = () => {
                     onRemoveExercise={removeExercise}
                     onUpdateDraft={updateDraft}
                     onCommitSet={handleCommitSet}
-                    onDeleteSet={handleDeleteSet}
+                    onEditSet={handleEditSet}
                     onBatchLogExercise={handleBatchLogExercise}
                   />
                 );
@@ -435,9 +487,10 @@ export const WorkoutEngine: React.FC = () => {
                 ))}
               </select>
               <button
+                type="button"
                 onClick={handleAddExercise}
                 disabled={!selectedExerciseToAdd}
-                className="shrink-0 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black px-4 py-2 min-h-[44px] rounded-xl text-xs uppercase tracking-wider shadow-[0_0_12px_rgba(6,182,212,0.3)] transition-all active:scale-95 disabled:opacity-50"
+                className="shrink-0 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold px-4 py-2 min-h-[44px] rounded-xl text-xs uppercase tracking-wider shadow-[0_0_12px_rgba(6,182,212,0.3)] transition-all active:scale-95 disabled:opacity-50"
                 data-testid="add-exercise-btn"
               >
                 Add
@@ -451,7 +504,7 @@ export const WorkoutEngine: React.FC = () => {
                 type="button"
                 onClick={handleFinishWorkout}
                 disabled={batchLogSetsMutation.isPending || isWholeWorkoutCompleted}
-                className={`w-full py-3.5 px-4 rounded-2xl font-black text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 shadow-2xl ${
+                className={`w-full py-3.5 px-4 rounded-2xl font-bold text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 shadow-2xl ${
                   isWholeWorkoutCompleted
                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 cursor-default'
                     : 'bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white shadow-neon-cyan active:scale-95'
@@ -475,6 +528,25 @@ export const WorkoutEngine: React.FC = () => {
             </div>
           )}
         </>
+      )}
+
+      {/* Edit Set Sheet (W3, W17) */}
+      <EditSetSheet
+        isOpen={isEditSheetOpen}
+        set={editingSet}
+        exercises={exercises}
+        targetUserId={targetUserId}
+        onClose={handleCloseEditSheet}
+        onSaved={handleSavedEditSet}
+        onDeleteRequested={handleDeleteRequested}
+      />
+
+      {/* Deferred Delete Undo Toast (W3, RD-7) */}
+      {deleteToast && (
+        <UndoToast
+          toast={deleteToast}
+          onDismiss={() => {}}
+        />
       )}
     </div>
   );

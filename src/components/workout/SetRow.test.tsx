@@ -1,0 +1,231 @@
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { SetRow } from './SetRow';
+import type { WorkoutSet } from '../../types/database';
+import { expectNoA11yViolations } from '../../test/a11y';
+
+describe('SetRow', () => {
+  const defaultGhost = {
+    weight: 135,
+    reps: 10,
+    hintText: '135 lbs × 10',
+    isFromPrevious: true,
+  };
+
+  const loggedSet: WorkoutSet = {
+    id: 'set-1',
+    workout_id: 'workout-1',
+    exercise_id: 'bench-press',
+    set_index: 3,
+    weight: 185,
+    reps: 8,
+    set_type: 'working',
+    rpe: null,
+    created_at: new Date().toISOString(),
+  };
+
+  describe('Logged Set (W3, W7, W19)', () => {
+    it('tapping a logged row calls onEditSet and does not delete (W3)', () => {
+      const onEditSet = vi.fn();
+      const onCommitSet = vi.fn();
+      const onUpdateDraft = vi.fn();
+
+      render(
+        <SetRow
+          exName="Bench Press"
+          exIndex={0}
+          rowIdx={0}
+          setIndex={1}
+          loggedSet={loggedSet}
+          ghost={defaultGhost}
+          draftWeight=""
+          draftReps=""
+          isMutating={false}
+          onUpdateDraft={onUpdateDraft}
+          onCommitSet={onCommitSet}
+          onEditSet={onEditSet}
+        />
+      );
+
+      const loggedRow = screen.getByTestId('logged-set-row-0-0');
+      expect(loggedRow).toBeInTheDocument();
+      expect(screen.queryByTestId('delete-set-btn-0-0')).toBeNull();
+
+      fireEvent.click(loggedRow);
+      expect(onEditSet).toHaveBeenCalledTimes(1);
+      expect(onEditSet).toHaveBeenCalledWith(0, 0);
+      expect(onCommitSet).not.toHaveBeenCalled();
+    });
+
+    it('displays logged set index from loggedSet.set_index (W19)', () => {
+      render(
+        <SetRow
+          exName="Bench Press"
+          exIndex={0}
+          rowIdx={0}
+          setIndex={1}
+          loggedSet={loggedSet}
+          ghost={defaultGhost}
+          draftWeight=""
+          draftReps=""
+          isMutating={false}
+          onUpdateDraft={vi.fn()}
+          onCommitSet={vi.fn()}
+        />
+      );
+
+      // set_index is 3, even though setIndex prop is 1
+      expect(screen.getByText('3')).toBeInTheDocument();
+    });
+
+    it('formats bodyweight as BW (W7)', () => {
+      const bwLoggedSet: WorkoutSet = {
+        ...loggedSet,
+        weight: 0,
+        reps: 12,
+      };
+
+      render(
+        <SetRow
+          exName="Pull Up"
+          exIndex={0}
+          rowIdx={0}
+          setIndex={1}
+          loggedSet={bwLoggedSet}
+          ghost={{ ...defaultGhost, weight: 0 }}
+          draftWeight=""
+          draftReps=""
+          isMutating={false}
+          onUpdateDraft={vi.fn()}
+          onCommitSet={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText('BW')).toBeInTheDocument();
+      expect(screen.getByText('12')).toBeInTheDocument();
+    });
+
+    it('satisfies a11y standards on logged row', async () => {
+      const { container } = render(
+        <SetRow
+          exName="Bench Press"
+          exIndex={0}
+          rowIdx={0}
+          setIndex={1}
+          loggedSet={loggedSet}
+          ghost={defaultGhost}
+          draftWeight=""
+          draftReps=""
+          isMutating={false}
+          onUpdateDraft={vi.fn()}
+          onCommitSet={vi.fn()}
+          onEditSet={vi.fn()}
+        />
+      );
+
+      await expectNoA11yViolations(container);
+    });
+  });
+
+  describe('Pending / Draft Set (W26)', () => {
+    it('provides 16px inputs, enterKeyHint and select-on-focus (W26)', () => {
+      render(
+        <SetRow
+          exName="Bench Press"
+          exIndex={0}
+          rowIdx={0}
+          setIndex={1}
+          ghost={defaultGhost}
+          draftWeight="135"
+          draftReps="10"
+          isMutating={false}
+          onUpdateDraft={vi.fn()}
+          onCommitSet={vi.fn()}
+        />
+      );
+
+      const weightInput = screen.getByTestId('ghost-weight-0-0') as HTMLInputElement;
+      const repsInput = screen.getByTestId('ghost-reps-0-0') as HTMLInputElement;
+
+      expect(weightInput.className).toContain('text-base');
+      expect(weightInput).toHaveAttribute('enterKeyHint', 'next');
+      expect(weightInput).toHaveAttribute('inputMode', 'decimal');
+
+      expect(repsInput.className).toContain('text-base');
+      expect(repsInput).toHaveAttribute('enterKeyHint', 'done');
+      expect(repsInput).toHaveAttribute('inputMode', 'numeric');
+    });
+
+    it('navigates from weight to reps on Enter and commits on Enter in reps (W26)', () => {
+      const onCommitSet = vi.fn();
+      render(
+        <SetRow
+          exName="Bench Press"
+          exIndex={0}
+          rowIdx={0}
+          setIndex={1}
+          ghost={defaultGhost}
+          draftWeight="135"
+          draftReps="10"
+          isMutating={false}
+          onUpdateDraft={vi.fn()}
+          onCommitSet={onCommitSet}
+        />
+      );
+
+      const weightInput = screen.getByTestId('ghost-weight-0-0');
+      const repsInput = screen.getByTestId('ghost-reps-0-0');
+
+      // Enter in weight focuses reps
+      fireEvent.keyDown(weightInput, { key: 'Enter', code: 'Enter' });
+      expect(document.activeElement).toBe(repsInput);
+      expect(onCommitSet).not.toHaveBeenCalled();
+
+      // Enter in reps triggers commit
+      fireEvent.keyDown(repsInput, { key: 'Enter', code: 'Enter' });
+      expect(onCommitSet).toHaveBeenCalledTimes(1);
+      expect(onCommitSet).toHaveBeenCalledWith('Bench Press', 1, defaultGhost);
+    });
+
+    it('commits set on one-tap check button click', () => {
+      const onCommitSet = vi.fn();
+      render(
+        <SetRow
+          exName="Bench Press"
+          exIndex={0}
+          rowIdx={0}
+          setIndex={1}
+          ghost={defaultGhost}
+          draftWeight="135"
+          draftReps="10"
+          isMutating={false}
+          onUpdateDraft={vi.fn()}
+          onCommitSet={onCommitSet}
+        />
+      );
+
+      const commitBtn = screen.getByTestId('commit-set-btn-0-0');
+      fireEvent.click(commitBtn);
+      expect(onCommitSet).toHaveBeenCalledWith('Bench Press', 1, defaultGhost);
+    });
+
+    it('satisfies a11y standards on pending row', async () => {
+      const { container } = render(
+        <SetRow
+          exName="Bench Press"
+          exIndex={0}
+          rowIdx={0}
+          setIndex={1}
+          ghost={defaultGhost}
+          draftWeight=""
+          draftReps=""
+          isMutating={false}
+          onUpdateDraft={vi.fn()}
+          onCommitSet={vi.fn()}
+        />
+      );
+
+      await expectNoA11yViolations(container);
+    });
+  });
+});

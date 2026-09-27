@@ -12,15 +12,15 @@ export interface InvalidationClient {
  * Invalidates all queries derived from workout and set writes (log, batch log, edit, delete).
  *
  * Union of query keys mapped from existing mutation onSuccess handlers:
- * - 'workout_sets' (src/components/workout/EditSetModal.tsx:77, 106)
- * - 'history_sessions' (src/components/workout/EditSetModal.tsx:78, 107)
- * - 'exercise_stats' (src/components/workout/EditSetModal.tsx:79, 108)
- * - 'session_sets' (src/components/workout/EditSetModal.tsx:80, 109)
+ * - 'workout_sets' (src/components/sets/EditSetSheet.tsx:77, 106)
+ * - 'history_sessions' (src/components/sets/EditSetSheet.tsx:78, 107)
+ * - 'exercise_stats' (src/components/sets/EditSetSheet.tsx:79, 108)
+ * - 'session_sets' (src/components/sets/EditSetSheet.tsx:80, 109)
  *
  * When target userId is present, also invalidates user-scoped queries:
- * - ['workout_sets', userId] (src/components/workout/useWorkoutMutations.ts:105, 170, 187; src/components/workout/EditSetModal.tsx:82, 111)
- * - ['history_sessions', userId] (src/components/workout/EditSetModal.tsx:83, 112)
- * - ['exercise_stats', userId] (src/components/workout/EditSetModal.tsx:84, 113)
+ * - ['workout_sets', userId] (src/components/workout/useWorkoutMutations.ts:105, 170, 187; src/components/sets/EditSetSheet.tsx:82, 111)
+ * - ['history_sessions', userId] (src/components/sets/EditSetSheet.tsx:83, 112)
+ * - ['exercise_stats', userId] (src/components/sets/EditSetSheet.tsx:84, 113)
  *
  * @param queryClient - The TanStack QueryClient instance
  * @param userId - Optional target user/athlete UUID
@@ -30,13 +30,13 @@ export async function invalidateWorkoutDerived(
   userId?: string
 ): Promise<void> {
   const promises: Promise<unknown>[] = [
-    // src/components/workout/EditSetModal.tsx:77, 106
+    // src/components/sets/EditSetSheet.tsx:77, 106
     queryClient.invalidateQueries({ queryKey: queryKeys.workoutSets.all }),
-    // src/components/workout/EditSetModal.tsx:78, 107
+    // src/components/sets/EditSetSheet.tsx:78, 107
     queryClient.invalidateQueries({ queryKey: queryKeys.historySessions.all }),
-    // src/components/workout/EditSetModal.tsx:79, 108
+    // src/components/sets/EditSetSheet.tsx:79, 108
     queryClient.invalidateQueries({ queryKey: queryKeys.exerciseStats.all }),
-    // src/components/workout/EditSetModal.tsx:80, 109
+    // src/components/sets/EditSetSheet.tsx:80, 109
     queryClient.invalidateQueries({ queryKey: queryKeys.sessionSets.all }),
     // P2: workouts civil date, benchmarks, and stats v2 (W2, W20, H2, H10)
     queryClient.invalidateQueries({ queryKey: queryKeys.workouts.all }),
@@ -45,15 +45,15 @@ export async function invalidateWorkoutDerived(
   ];
 
   if (userId) {
-    // src/components/workout/useWorkoutMutations.ts:105, 170, 187; src/components/workout/EditSetModal.tsx:82, 111
+    // src/components/workout/useWorkoutMutations.ts:105, 170, 187; src/components/sets/EditSetSheet.tsx:82, 111
     promises.push(
       queryClient.invalidateQueries({ queryKey: queryKeys.workoutSets.byUser(userId) })
     );
-    // src/components/workout/EditSetModal.tsx:83, 112
+    // src/components/sets/EditSetSheet.tsx:83, 112
     promises.push(
       queryClient.invalidateQueries({ queryKey: queryKeys.historySessions.byUser(userId) })
     );
-    // src/components/workout/EditSetModal.tsx:84, 113
+    // src/components/sets/EditSetSheet.tsx:84, 113
     promises.push(
       queryClient.invalidateQueries({ queryKey: queryKeys.exerciseStats.byUser(userId) })
     );
@@ -75,7 +75,7 @@ export async function invalidateWorkoutDerived(
  * - 'workout_sets' (src/components/exercises/EditExerciseModal.tsx:105)
  *
  * When target userId is present, also invalidates user-scoped queries:
- * - ['workout_sets', userId] (src/components/workout/useWorkoutMutations.ts:105, 170, 187; src/components/workout/EditSetModal.tsx:82, 111)
+ * - ['workout_sets', userId] (src/components/workout/useWorkoutMutations.ts:105, 170, 187; src/components/sets/EditSetSheet.tsx:82, 111)
  * - ['routine_templates', userId] (src/components/exercises/ExercisesView.tsx:88; src/components/workout/RoutinePickerModal.tsx:37)
  *
  * @param queryClient - The TanStack QueryClient instance
@@ -95,7 +95,7 @@ export async function invalidateExerciseDomain(
   ];
 
   if (userId) {
-    // src/components/workout/useWorkoutMutations.ts:105, 170, 187; src/components/workout/EditSetModal.tsx:82, 111
+    // src/components/workout/useWorkoutMutations.ts:105, 170, 187; src/components/sets/EditSetSheet.tsx:82, 111
     promises.push(
       queryClient.invalidateQueries({ queryKey: queryKeys.workoutSets.byUser(userId) })
     );

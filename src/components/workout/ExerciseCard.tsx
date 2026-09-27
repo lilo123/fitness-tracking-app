@@ -1,8 +1,10 @@
 import React, { memo } from 'react';
 import type { WorkoutSet } from '../../types/database';
-import { formatShortDate } from '../../utils/ghostSets';
 import { ChevronDown, Trophy, Check, ArrowUp, ArrowDown, Trash2 } from 'lucide-react';
 import { SetRow } from './SetRow';
+import { Card } from '../common/Card';
+import { Chip } from '../common/Chip';
+import { formatSet } from '../../utils/weight';
 
 export interface ExerciseCardProps {
   exName: string;
@@ -23,8 +25,55 @@ export interface ExerciseCardProps {
   onRemoveExercise: (index: number) => void;
   onUpdateDraft: (exName: string, setIndex: number, field: 'weight' | 'reps', val: string) => void;
   onCommitSet: (exName: string, setIndex: number, ghost: any) => void;
-  onDeleteSet: (setId: string) => void;
+  onEditSet?: (exIndex: number, rowIdx: number) => void;
   onBatchLogExercise: (exName: string, targetCount: number, ghostValues: any[], setsToday: WorkoutSet[]) => void;
+}
+
+function areBenchmarksEqual(prev: any, next: any): boolean {
+  if (prev === next) return true;
+  if (!prev || !next) return false;
+
+  const prevLast = prev.lastSession;
+  const nextLast = next.lastSession;
+  if (prevLast !== nextLast) {
+    if (!prevLast || !nextLast) return false;
+    if (prevLast.date !== nextLast.date || prevLast.summaryText !== nextLast.summaryText) {
+      return false;
+    }
+  }
+
+  const prevPr = prev.pr;
+  const nextPr = next.pr;
+  if (prevPr !== nextPr) {
+    if (!prevPr || !nextPr) return false;
+    if (
+      prevPr.weight !== nextPr.weight ||
+      prevPr.reps !== nextPr.reps ||
+      prevPr.date !== nextPr.date
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function areGhostValuesEqual(prev: any[], next: any[]): boolean {
+  if (prev === next) return true;
+  if (prev.length !== next.length) return false;
+  for (let i = 0; i < prev.length; i++) {
+    const p = prev[i];
+    const n = next[i];
+    if (
+      p.weight !== n.weight ||
+      p.reps !== n.reps ||
+      p.hintText !== n.hintText ||
+      p.isFromPrevious !== n.isFromPrevious
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function areExerciseCardPropsEqual(prev: ExerciseCardProps, next: ExerciseCardProps): boolean {
@@ -43,7 +92,7 @@ function areExerciseCardPropsEqual(prev: ExerciseCardProps, next: ExerciseCardPr
     prev.onRemoveExercise !== next.onRemoveExercise ||
     prev.onUpdateDraft !== next.onUpdateDraft ||
     prev.onCommitSet !== next.onCommitSet ||
-    prev.onDeleteSet !== next.onDeleteSet ||
+    prev.onEditSet !== next.onEditSet ||
     prev.onBatchLogExercise !== next.onBatchLogExercise
   ) {
     return false;
@@ -54,13 +103,15 @@ function areExerciseCardPropsEqual(prev: ExerciseCardProps, next: ExerciseCardPr
     if (
       prev.setsToday[i].id !== next.setsToday[i].id ||
       prev.setsToday[i].weight !== next.setsToday[i].weight ||
-      prev.setsToday[i].reps !== next.setsToday[i].reps
+      prev.setsToday[i].reps !== next.setsToday[i].reps ||
+      prev.setsToday[i].set_index !== next.setsToday[i].set_index
     ) {
       return false;
     }
   }
 
-  if (prev.ghostValues.length !== next.ghostValues.length) return false;
+  if (!areBenchmarksEqual(prev.benchmarks, next.benchmarks)) return false;
+  if (!areGhostValuesEqual(prev.ghostValues, next.ghostValues)) return false;
 
   const totalRows = Math.max(next.targetCount, next.setsToday.length);
   for (let rowIdx = 0; rowIdx < totalRows; rowIdx++) {
@@ -96,7 +147,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
     onRemoveExercise,
     onUpdateDraft,
     onCommitSet,
-    onDeleteSet,
+    onEditSet,
     onBatchLogExercise,
   } = props;
 
@@ -105,28 +156,24 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
   const totalRows = Math.max(targetCount, setsToday.length);
 
   return (
-    <div
-      key={exName}
-      className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-3 shadow-lg space-y-2.5 text-white transition-all"
-      data-testid={`exercise-card-${exIndex}`}
-    >
-      {/* LINE 1: Full-Width Title & Accordion Chevron */}
-      <div
-        role="button"
-        tabIndex={0}
+    <Card testId={`exercise-card-${exIndex}`} className="space-y-2.5">
+      {/* LINE 1: Header Accordion Button */}
+      <button
+        type="button"
         aria-expanded={isExpanded}
+        aria-controls={`exercise-card-body-${exIndex}`}
         onClick={() => onToggleAccordion(exName)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
+          if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             onToggleAccordion(exName);
           }
         }}
-        className="flex items-center justify-between cursor-pointer select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 rounded-xl touch-manipulation"
+        className="w-full flex items-center justify-between cursor-pointer select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 rounded-xl touch-manipulation text-left"
         aria-label={`${exName}, ${isExpanded ? 'collapse' : 'expand'} exercise`}
       >
         <div className="flex items-center gap-2 min-w-0 pr-2">
-          <span className="w-6 h-6 rounded-lg bg-zinc-800 border border-zinc-700/80 flex items-center justify-center font-mono font-bold text-cyan-400 text-xs shrink-0">
+          <span data-testid={`exercise-index-${exIndex}`} className="w-6 h-6 rounded-lg bg-zinc-800 border border-zinc-700/80 flex items-center justify-center font-bold text-cyan-400 text-xs shrink-0 tabular-nums">
             {exIndex + 1}
           </span>
           <span className="text-white font-extrabold text-base tracking-tight leading-snug break-words">
@@ -134,89 +181,108 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
           </span>
         </div>
 
-        <div className="w-7 h-7 rounded-lg text-zinc-400 flex items-center justify-center shrink-0">
+        <div className="w-8 h-8 rounded-lg text-zinc-400 flex items-center justify-center shrink-0">
           <ChevronDown
             className={`w-4 h-4 transition-transform duration-200 ${
               isExpanded ? 'rotate-180 text-cyan-400' : ''
             }`}
+            aria-hidden="true"
           />
         </div>
+      </button>
+
+      {/* LINE 2: Chip Row (W32, W13, W15, W47) */}
+      <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+        {benchmarks.lastSession ? (
+          <Chip
+            size="sm"
+            variant="metric"
+            label={`Last: ${benchmarks.lastSession.summaryText}`}
+            className="max-w-none text-zinc-300 font-semibold tabular-nums"
+            testId={`last-chip-${exIndex}`}
+          />
+        ) : (
+          <span className="text-xs text-zinc-400 font-medium">No prior session</span>
+        )}
+
+        {benchmarks.pr && (
+          <Chip
+            size="sm"
+            variant="default"
+            icon={<Trophy className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+            label={`PR: ${formatSet(benchmarks.pr.weight, benchmarks.pr.reps)}`}
+            className="bg-amber-500/10 border-amber-500/30 text-amber-400 font-semibold tabular-nums"
+            testId={`pr-chip-${exIndex}`}
+          />
+        )}
+
+        {isCompleted ? (
+          <Chip
+            size="sm"
+            variant="default"
+            icon={<Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 stroke-[2.5]" />}
+            label={`${setsToday.length}/${targetCount} Sets`}
+            className="bg-emerald-500/15 border-emerald-500/30 text-emerald-400 font-semibold tabular-nums shadow-[0_0_10px_rgba(16,185,129,0.15)]"
+            testId={`sets-completed-chip-${exIndex}`}
+          />
+        ) : setsToday.length > 0 ? (
+          <Chip
+            size="sm"
+            variant="default"
+            label={`${setsToday.length}/${targetCount} Sets`}
+            className="bg-cyan-500/15 text-cyan-300 border-cyan-500/30 font-semibold tabular-nums"
+            testId={`sets-progress-chip-${exIndex}`}
+          />
+        ) : (
+          <Chip
+            size="sm"
+            variant="default"
+            label={`0/${targetCount} Sets`}
+            className="bg-zinc-800 border-zinc-700/80 text-zinc-400 font-semibold tabular-nums"
+            testId={`sets-zero-chip-${exIndex}`}
+          />
+        )}
       </div>
 
-      {/* LINE 2: Benchmarks + Sets status on Left, Stepper + Quick Actions on Right */}
+      {/* LINE 3: Control Row (W32, W33, STD-INT-9) */}
       <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-zinc-800/60">
-        {/* Left side: Benchmarks & Sets status */}
-        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-          {benchmarks.lastSession ? (
-            <span
-              className="inline-flex items-center text-[10px] font-mono bg-zinc-800/80 text-zinc-300 border border-zinc-700/50 px-2 py-0.5 rounded-full max-w-[140px] truncate"
-              title={`Last session (${formatShortDate(benchmarks.lastSession.date)}): ${benchmarks.lastSession.summaryText}`}
-            >
-              Last: {benchmarks.lastSession.summaryText}
-            </span>
-          ) : (
-            <span className="text-[10px] text-zinc-500 font-mono">No prior session</span>
-          )}
-
-          {benchmarks.pr && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-500/10 border border-amber-500/30 text-amber-400 px-2 py-0.5 rounded-full">
-              <Trophy className="w-3 h-3 text-amber-400 shrink-0" />
-              <span>PR: {benchmarks.pr.weight > 0 ? `${benchmarks.pr.weight}×` : 'BW×'}{benchmarks.pr.reps}</span>
-            </span>
-          )}
-
-          {isCompleted ? (
-            <span className="inline-flex items-center text-[10px] font-black bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 px-2 py-0.5 rounded-full shrink-0 shadow-[0_0_10px_rgba(16,185,129,0.15)]">
-              <Check className="w-2.5 h-2.5 mr-1" />
-              <span>{setsToday.length}/{targetCount} Sets</span>
-            </span>
-          ) : setsToday.length > 0 ? (
-            <span className="inline-flex items-center text-[10px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full shrink-0">
-              <span>{setsToday.length}/{targetCount} Sets</span>
-            </span>
-          ) : (
-            <span className="inline-flex items-center text-[10px] font-bold bg-zinc-800 border border-zinc-700/80 text-zinc-400 px-2 py-0.5 rounded-full shrink-0">
-              <span>0/{targetCount} Sets</span>
-            </span>
-          )}
+        {/* Stepper for target sets */}
+        <div className="flex items-center bg-zinc-800/90 border border-zinc-700/70 rounded-xl h-9 px-1 text-xs">
+          <button
+            type="button"
+            onClick={() => onAdjustTargetSets(exName, -1)}
+            disabled={targetCount <= Math.max(1, setsToday.length)}
+            className="relative h-9 w-7 flex items-center justify-center text-zinc-300 hover:text-white disabled:opacity-30 disabled:hover:text-zinc-300 font-bold touch-manipulation cursor-pointer before:absolute before:-inset-y-1 before:-inset-x-1.5 before:content-[''] select-none"
+            title="Decrease target sets"
+            aria-label={`Decrease target sets for ${exName}`}
+          >
+            −
+          </button>
+          <span className="font-semibold text-white px-1.5 text-xs tabular-nums select-none">
+            {targetCount}
+          </span>
+          <button
+            type="button"
+            onClick={() => onAdjustTargetSets(exName, 1)}
+            className="relative h-9 w-7 flex items-center justify-center text-zinc-300 hover:text-white font-bold touch-manipulation cursor-pointer before:absolute before:-inset-y-1 before:-inset-x-1.5 before:content-[''] select-none"
+            title="Increase target sets"
+            aria-label={`Increase target sets for ${exName}`}
+          >
+            +
+          </button>
         </div>
 
-        {/* Right side: Stepper + 1-Tap Quick Actions */}
-        <div className="flex items-center gap-1 shrink-0">
-          {/* Stepper Pill */}
-          <div className="flex items-center bg-zinc-800/90 border border-zinc-700/70 rounded-lg h-7 px-1 text-xs">
-            <button
-              type="button"
-              onClick={() => onAdjustTargetSets(exName, -1)}
-              disabled={targetCount <= Math.max(1, setsToday.length)}
-              className="relative w-5 h-5 flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-30 disabled:hover:text-zinc-400 font-bold touch-manipulation before:absolute before:-inset-2 before:content-['']"
-              title="Decrease target sets"
-              aria-label={`Decrease target sets for ${exName}`}
-            >
-              −
-            </button>
-            <span className="font-mono font-bold text-white px-1 text-[11px]">{targetCount}</span>
-            <button
-              type="button"
-              onClick={() => onAdjustTargetSets(exName, 1)}
-              className="relative w-5 h-5 flex items-center justify-center text-zinc-400 hover:text-white font-bold touch-manipulation before:absolute before:-inset-2 before:content-['']"
-              title="Increase target sets"
-              aria-label={`Increase target sets for ${exName}`}
-            >
-              +
-            </button>
-          </div>
-
-          {/* 1-Tap Quick Icons */}
+        {/* Quick actions: Reorder + Remove */}
+        <div className="flex items-center gap-1.5 shrink-0">
           {exIndex > 0 && (
             <button
               type="button"
               onClick={() => onMoveExercise(exIndex, -1)}
-              className="relative w-7 h-7 rounded-lg bg-zinc-800/60 hover:bg-zinc-700 border border-border-interactive flex items-center justify-center text-zinc-400 hover:text-cyan-400 transition touch-manipulation before:absolute before:-inset-1.5 before:content-['']"
+              className="relative h-9 w-9 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 border border-border-interactive flex items-center justify-center text-zinc-300 hover:text-cyan-400 transition touch-manipulation cursor-pointer before:absolute before:-inset-1 before:content-['']"
               title="Move up"
               aria-label={`Move ${exName} up`}
             >
-              <ArrowUp className="w-3.5 h-3.5" />
+              <ArrowUp className="w-4 h-4" />
             </button>
           )}
 
@@ -224,31 +290,31 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
             <button
               type="button"
               onClick={() => onMoveExercise(exIndex, 1)}
-              className="relative w-7 h-7 rounded-lg bg-zinc-800/60 hover:bg-zinc-700 border border-border-interactive flex items-center justify-center text-zinc-400 hover:text-cyan-400 transition touch-manipulation before:absolute before:-inset-1.5 before:content-['']"
+              className="relative h-9 w-9 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 border border-border-interactive flex items-center justify-center text-zinc-300 hover:text-cyan-400 transition touch-manipulation cursor-pointer before:absolute before:-inset-1 before:content-['']"
               title="Move down"
               aria-label={`Move ${exName} down`}
             >
-              <ArrowDown className="w-3.5 h-3.5" />
+              <ArrowDown className="w-4 h-4" />
             </button>
           )}
 
           <button
             type="button"
             onClick={() => onRemoveExercise(exIndex)}
-            className="relative w-7 h-7 rounded-lg bg-zinc-800/60 hover:bg-rose-500/20 border border-border-interactive flex items-center justify-center text-zinc-500 hover:text-rose-400 transition touch-manipulation before:absolute before:-inset-1.5 before:content-['']"
+            className="relative h-9 w-9 rounded-xl bg-zinc-800/80 hover:bg-rose-500/20 border border-border-interactive flex items-center justify-center text-zinc-400 hover:text-rose-400 transition touch-manipulation cursor-pointer before:absolute before:-inset-1 before:content-['']"
             title="Remove from workout"
             aria-label={`Remove ${exName} from workout`}
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 className="w-4 h-4" />
           </button>
         </div>
       </div>
 
       {/* Accordion Body: Sets & Ghost Placeholders */}
       {isExpanded && (
-        <div className="pt-1 space-y-1">
+        <div id={`exercise-card-body-${exIndex}`} className="pt-1 space-y-1">
           {/* 5-Column Table Header */}
-          <div className="grid grid-cols-12 gap-1 text-[10px] font-black uppercase tracking-wider text-zinc-500 px-2 pb-1 text-center">
+          <div className="grid grid-cols-12 gap-1 text-xs font-bold uppercase tracking-wider text-zinc-400 px-2 pb-1 text-center">
             <div className="col-span-2">Set</div>
             <div className="col-span-3">Previous</div>
             <div className="col-span-3">
@@ -292,29 +358,28 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
                 isMutating={isMutating}
                 onUpdateDraft={onUpdateDraft}
                 onCommitSet={onCommitSet}
-                onDeleteSet={onDeleteSet}
+                onEditSet={onEditSet}
               />
             );
           })}
 
-          {/* Batch Log Button inside accordion if unlogged sets remain */}
           {!isCompleted && (
             <div className="flex justify-end pt-1">
               <button
                 type="button"
                 onClick={() => onBatchLogExercise(exName, targetCount, ghostValues, setsToday)}
                 disabled={isBatchPending}
-                className="text-xs font-bold text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 px-3 py-1.5 rounded-full transition flex items-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-50 touch-manipulation"
+                className="min-h-[40px] px-3.5 text-xs font-bold text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 rounded-xl transition flex items-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-50 touch-manipulation cursor-pointer relative before:absolute before:-inset-y-0.5 before:-inset-x-0.5 before:content-['']"
                 data-testid={`batch-log-exercise-btn-${exIndex}`}
               >
-                <Check className="w-3.5 h-3.5 text-cyan-400 stroke-[2.5]" />
+                <Check className="w-4 h-4 text-cyan-400 stroke-[2.5]" />
                 <span>Log All ({unloggedCount})</span>
               </button>
             </div>
           )}
         </div>
       )}
-    </div>
+    </Card>
   );
 }, areExerciseCardPropsEqual);
 

@@ -151,12 +151,12 @@ describe('React Query Key Registry (src/lib/queryKeys.ts)', () => {
     });
 
     // workout_sets
-    it('matches workout_sets call sites (src/components/exercises/EditExerciseModal.tsx:105, EditSetModal.tsx:77, 82, 106, 111, useWorkoutMutations.ts:105, 170, 187, useWorkoutQueries.ts:158, useHistoryData.ts:191)', () => {
+    it('matches workout_sets call sites (src/components/exercises/EditExerciseModal.tsx:105, EditSetSheet.tsx:77, 82, 106, 111, useWorkoutMutations.ts:105, 170, 187, useWorkoutQueries.ts:158, useHistoryData.ts:191)', () => {
       const targetUserId = 'target-user-wo';
       // src/components/exercises/EditExerciseModal.tsx:105
-      // src/components/workout/EditSetModal.tsx:77, 106
+      // src/components/sets/EditSetSheet.tsx:77, 106
       expect(queryKeys.workoutSets.all).toEqual(['workout_sets']);
-      // src/components/workout/EditSetModal.tsx:82, 111
+      // src/components/sets/EditSetSheet.tsx:82, 111
       // src/components/workout/useWorkoutMutations.ts:105, 170, 187
       expect(queryKeys.workoutSets.byUser(targetUserId)).toEqual([
         'workout_sets',
@@ -183,11 +183,11 @@ describe('React Query Key Registry (src/lib/queryKeys.ts)', () => {
     });
 
     // history_sessions
-    it('matches history_sessions call sites (src/components/workout/EditSetModal.tsx:78, 83, 107, 112)', () => {
+    it('matches history_sessions call sites (src/components/sets/EditSetSheet.tsx:78, 83, 107, 112)', () => {
       const targetUserId = 'hist-user-1';
-      // src/components/workout/EditSetModal.tsx:78, 107
+      // src/components/sets/EditSetSheet.tsx:78, 107
       expect(queryKeys.historySessions.all).toEqual(['history_sessions']);
-      // src/components/workout/EditSetModal.tsx:83, 112
+      // src/components/sets/EditSetSheet.tsx:83, 112
       expect(queryKeys.historySessions.byUser(targetUserId)).toEqual([
         'history_sessions',
         'hist-user-1',
@@ -195,20 +195,20 @@ describe('React Query Key Registry (src/lib/queryKeys.ts)', () => {
     });
 
     // session_sets
-    it('matches session_sets call sites (src/components/workout/EditSetModal.tsx:80, 109, HistoryView.tsx:107)', () => {
+    it('matches session_sets call sites (src/components/sets/EditSetSheet.tsx:80, 109, HistoryView.tsx:107)', () => {
       const sessionId = 'sess-789';
-      // src/components/workout/EditSetModal.tsx:80, 109
+      // src/components/sets/EditSetSheet.tsx:80, 109
       expect(queryKeys.sessionSets.all).toEqual(['session_sets']);
       // src/components/history/HistoryView.tsx:107
       expect(queryKeys.sessionSets.bySession(sessionId)).toEqual(['session_sets', 'sess-789']);
     });
 
     // exercise_stats
-    it('matches exercise_stats call sites (src/components/workout/EditSetModal.tsx:79, 84, 108, 113, useHistoryData.ts:135)', () => {
+    it('matches exercise_stats call sites (src/components/sets/EditSetSheet.tsx:79, 84, 108, 113, useHistoryData.ts:135)', () => {
       const targetUserId = 'stat-user-1';
-      // src/components/workout/EditSetModal.tsx:79, 108
+      // src/components/sets/EditSetSheet.tsx:79, 108
       expect(queryKeys.exerciseStats.all).toEqual(['exercise_stats']);
-      // src/components/workout/EditSetModal.tsx:84, 113
+      // src/components/sets/EditSetSheet.tsx:84, 113
       // src/components/history/useHistoryData.ts:135
       expect(queryKeys.exerciseStats.byUser(targetUserId)).toEqual([
         'exercise_stats',

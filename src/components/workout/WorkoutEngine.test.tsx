@@ -1,5 +1,6 @@
+import * as setsLib from '../../lib/sets';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 
 import userEvent from '@testing-library/user-event';
 import { WorkoutEngine } from './WorkoutEngine';
@@ -1800,7 +1801,7 @@ describe('WorkoutEngine', () => {
       // Completed set checkmark and values render cleanly
       expect(screen.getByText('315')).toBeDefined();
       expect(screen.getByText('5')).toBeDefined();
-      expect(screen.getByTestId('delete-set-btn-0-0')).toBeDefined();
+      expect(screen.getByTestId('logged-set-row-0-0')).toBeDefined();
     });
 
     it('auto-heals corrupted localStorage active session containing raw UUIDs without losing drafts (Test 43)', async () => {
@@ -2711,7 +2712,7 @@ describe('WorkoutEngine', () => {
 
         // UI reflects the logged set without page reload
         await waitFor(() => {
-          expect(screen.getByTestId('delete-set-btn-0-0')).toBeDefined();
+          expect(screen.getByTestId('logged-set-row-0-0')).toBeDefined();
           expect(screen.queryByTestId('commit-set-btn-0-0')).toBeNull();
         });
       });
@@ -3189,8 +3190,180 @@ describe('WorkoutEngine', () => {
     expect(stored?.reps).toBe('5');
   });
 
+
+  describe("P3a B1: Set Deletion and EditSetSheet Host Wiring (W3, RD-7)", () => {
+    const today = "2026-09-06";
+    const workoutId = "w-p3a-1";
+    const exerciseUUID = "e1e1e1e1-0000-4000-8000-000000000001";
+
+    const setupLoggedSet = () => {
+      const setObj = {
+        id: "set-p3a-1",
+        workout_id: workoutId,
+        exercise_id: exerciseUUID,
+        set_index: 1,
+        set_type: "working",
+        weight: 225,
+        reps: 8,
+        rpe: null,
+        created_at: `${today}T10:00:00.000Z`,
+        workouts: {
+          id: workoutId,
+          date: `${today}T10:00:00.000Z`,
+          name: "Chest Day",
+        },
+        exercise: {
+          id: exerciseUUID,
+          name: "Barbell Bench Press",
+          body_part: "Chest",
+        },
+      };
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === "exercises") {
+          return createSupabaseBuilder("exercises", {
+            data: [{ id: exerciseUUID, name: "Barbell Bench Press", body_part: "Chest", is_master: true }],
+            error: null,
+          });
+        }
+        if (table === "routine_templates") {
+          return createSupabaseBuilder("routine_templates", {
+            data: [
+              {
+                id: "tmpl-1",
+                name: "Chest Day",
+                days_of_week: ["Sun"],
+                exercises: [{ id: exerciseUUID, name: "Barbell Bench Press" }],
+              },
+            ],
+            error: null,
+          });
+        }
+        if (table === "workouts") {
+          return createSupabaseBuilder("workouts", {
+            data: [
+              {
+                id: workoutId,
+                date: `${today}T10:00:00.000Z`,
+                name: "Chest Day",
+                sets: [setObj],
+              },
+            ],
+            error: null,
+          });
+        }
+        if (table === "sets") {
+          return createSupabaseBuilder("sets", {
+            data: [setObj],
+            error: null,
+          });
+        }
+        return createSupabaseBuilder(table, { data: [], error: null });
+      });
+    };
+
+    it("tapping a logged set row opens EditSetSheet (W3)", async () => {
+      setupLoggedSet();
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByText("Barbell Bench Press")).toBeDefined();
+        expect(screen.getByTestId("logged-set-row-0-0")).toBeDefined();
+      });
+
+      // Sheet is not open initially
+      expect(screen.queryByTestId("edit-set-sheet")).toBeNull();
+
+      // Tap logged set row
+      fireEvent.click(screen.getByTestId("logged-set-row-0-0"));
+
+      // Sheet opens
+      await waitFor(() => {
+        expect(screen.getByTestId("edit-set-sheet")).toBeDefined();
+      });
+    });
+
+    it("delete via sheet closes sheet, optimistically hides set, renders UndoToast, and sends exactly 1 DELETE after 6s", async () => {
+      const deleteSetSpy = vi.spyOn(setsLib, "deleteSet").mockResolvedValue(undefined as any);
+      setupLoggedSet();
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("logged-set-row-0-0")).toBeDefined();
+      });
+
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+      try {
+        // Tap logged row to open sheet
+        fireEvent.click(screen.getByTestId("logged-set-row-0-0"));
+        expect(screen.getByTestId("edit-set-sheet")).toBeDefined();
+
+        // Request delete from sheet
+        fireEvent.click(screen.getByTestId("edit-set-sheet-delete"));
+
+        // Sheet closes immediately
+        expect(screen.queryByTestId("edit-set-sheet")).toBeNull();
+
+        // Set is optimistically hidden
+        expect(screen.queryByTestId("logged-set-row-0-0")).toBeNull();
+
+        // UndoToast is visible
+        expect(screen.getByTestId("quick-log-toast")).toBeDefined();
+        expect(screen.getByTestId("toast-undo-btn")).toBeDefined();
+
+        // No DELETE before 6s
+        act(() => {
+          vi.advanceTimersByTime(5900);
+        });
+        expect(deleteSetSpy).not.toHaveBeenCalled();
+
+        // Advance to 6000ms
+        await vi.advanceTimersByTimeAsync(200);
+
+        // Exactly 1 DELETE request sent
+        expect(deleteSetSpy).toHaveBeenCalledTimes(1);
+        expect(deleteSetSpy).toHaveBeenCalledWith(expect.anything(), "set-p3a-1");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("delete via sheet then Undo restores set and sends 0 DELETE calls", async () => {
+      const deleteSetSpy = vi.spyOn(setsLib, "deleteSet").mockResolvedValue(undefined as any);
+      setupLoggedSet();
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("logged-set-row-0-0")).toBeDefined();
+      });
+
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+      try {
+        // Tap logged row and delete via sheet
+        fireEvent.click(screen.getByTestId("logged-set-row-0-0"));
+        fireEvent.click(screen.getByTestId("edit-set-sheet-delete"));
+
+        // Set is hidden, toast shown
+        expect(screen.queryByTestId("logged-set-row-0-0")).toBeNull();
+        const undoBtn = screen.getByTestId("toast-undo-btn");
+        expect(undoBtn).toBeDefined();
+
+        // Click Undo
+        act(() => {
+          fireEvent.click(undoBtn);
+        });
+
+        // Set immediately reappears
+        expect(screen.getByTestId("logged-set-row-0-0")).toBeDefined();
+
+        // Advance timers well past 6s
+        await vi.advanceTimersByTimeAsync(10000);
+
+        // Zero DELETE calls
+        expect(deleteSetSpy).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
 });
-
-
-
-
