@@ -29,8 +29,7 @@ export const ExerciseRow: React.FC<ExerciseRowProps> = ({
   return (
     <button
       type="button"
-      role="checkbox"
-      aria-checked={isSelected}
+      aria-pressed={isSelected}
       aria-disabled={isInWorkout}
       disabled={isInWorkout}
       onClick={() => onToggle(exercise)}

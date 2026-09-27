@@ -53,10 +53,7 @@ function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
 
   useEffect(() => {
-    if (delay <= 0) {
-      setDebouncedValue(value);
-      return;
-    }
+    if (delay <= 0) return;
     const handler = setTimeout(() => {
       setDebouncedValue(value);
     }, delay);
@@ -65,7 +62,7 @@ function useDebounce<T>(value: T, delay: number): T {
     };
   }, [value, delay]);
 
-  return debouncedValue;
+  return delay <= 0 ? value : debouncedValue;
 }
 
 export async function fetchExerciseCatalogPage({

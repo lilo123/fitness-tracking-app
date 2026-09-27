@@ -45,8 +45,7 @@ export const CreateExerciseRow: React.FC<CreateExerciseRowProps> = ({
 
   if (isDuplicate) {
     return (
-      <div
-        role="status"
+      <output
         aria-live="polite"
         data-testid="create-exercise-duplicate-msg"
         className="flex items-center gap-2 p-3 min-h-[44px] rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs"
@@ -55,7 +54,7 @@ export const CreateExerciseRow: React.FC<CreateExerciseRowProps> = ({
         <span className="truncate">
           An exercise named &ldquo;{trimmed}&rdquo;{equipmentLabel ? ` (${equipmentLabel})` : ''} already exists.
         </span>
-      </div>
+      </output>
     );
   }
 

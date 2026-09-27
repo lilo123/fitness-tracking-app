@@ -55,7 +55,9 @@ export const ExercisePicker: React.FC<ExercisePickerProps> = ({
   const [createError, setCreateError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
-  useEffect(() => {
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
     if (isOpen) {
       setSearchQuery('');
       setSelectedMuscleGroup(null);
@@ -63,9 +65,15 @@ export const ExercisePicker: React.FC<ExercisePickerProps> = ({
       setSelectedExercises(new Map());
       setCreateError(null);
       setIsCreating(false);
-      setTimeout(() => {
+    }
+  }
+
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
         searchInputRef.current?.focus();
       }, 50);
+      return () => clearTimeout(timer);
     }
   }, [isOpen]);
 
