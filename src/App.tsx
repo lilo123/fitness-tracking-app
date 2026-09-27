@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef, Activity } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './hooks/useAuth';
 import { CoachProvider } from './context/CoachContext';
@@ -104,6 +104,65 @@ const PublicOnlyRoute: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
 function AppLayout() {
   const { user } = useAuth();
+  const location = useLocation();
+  const onHistory = location.pathname === '/history';
+
+  // Track whether an authenticated user has visited /history
+  const [visitedUserId, setVisitedUserId] = useState<string | null>(null);
+
+  // Scroll preservation for /history
+  const historyScrollYRef = useRef<number>(0);
+  const wasOnHistoryRef = useRef(false);
+
+  useEffect(() => {
+    if (!user) {
+      setVisitedUserId(null);
+      historyScrollYRef.current = 0;
+    } else if (onHistory) {
+      setVisitedUserId(user.id);
+    } else if (visitedUserId && visitedUserId !== user.id) {
+      setVisitedUserId(null);
+      historyScrollYRef.current = 0;
+    }
+  }, [user, onHistory, visitedUserId]);
+
+  // Track scroll position while on /history (record only while onHistory)
+  useEffect(() => {
+    if (!onHistory) return;
+    const handleScroll = () => {
+      if (typeof window !== 'undefined' && window.location.pathname === '/history') {
+        historyScrollYRef.current = window.scrollY;
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [onHistory]);
+
+  // Restore scroll position after paint when returning to /history
+  useEffect(() => {
+    if (onHistory) {
+      if (!wasOnHistoryRef.current) {
+        wasOnHistoryRef.current = true;
+        const targetY = historyScrollYRef.current;
+        if (typeof requestAnimationFrame === 'function') {
+          const frameId = requestAnimationFrame(() => {
+            if (typeof window.scrollTo === 'function') {
+              window.scrollTo(0, targetY);
+            }
+          });
+          return () => cancelAnimationFrame(frameId);
+        } else if (typeof window.scrollTo === 'function') {
+          window.scrollTo(0, targetY);
+        }
+      }
+    } else {
+      wasOnHistoryRef.current = false;
+    }
+  }, [onHistory]);
+
+  const shouldMountHistory = Boolean(user && (visitedUserId === user.id || onHistory));
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-zinc-950 text-zinc-100 selection:bg-cyan-500/20 selection:text-cyan-300">
@@ -132,7 +191,7 @@ function AppLayout() {
               path="/history"
               element={
                 <ProtectedRoute>
-                  <HistoryView />
+                  {null}
                 </ProtectedRoute>
               }
             />
@@ -175,6 +234,13 @@ function AppLayout() {
             <Route path="*" element={<Navigate to="/workout" replace />} />
           </Routes>
         </React.Suspense>
+        {shouldMountHistory && (
+          <Activity mode={onHistory ? 'visible' : 'hidden'}>
+            <React.Suspense fallback={<LazyFallback />}>
+              <HistoryView />
+            </React.Suspense>
+          </Activity>
+        )}
       </main>
       <GlobalRestTimerPill />
       <BottomNav />
