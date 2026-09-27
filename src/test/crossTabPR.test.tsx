@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HistoryView } from '../components/history/HistoryView';
 import { supabase } from '../lib/supabase';
@@ -72,17 +73,19 @@ describe('Cross-Tab PR & Benchmarks (H10, RD-16, RD-20)', () => {
     });
 
     render(
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <CoachProvider>
-            <HistoryView />
-          </CoachProvider>
-        </AuthProvider>
-      </QueryClientProvider>
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <CoachProvider>
+              <HistoryView />
+            </CoachProvider>
+          </AuthProvider>
+        </QueryClientProvider>
+      </MemoryRouter>
     );
 
     // Switch to By Exercise tab
-    const byExerciseBtn = await screen.findByRole('button', { name: /by exercise/i });
+    const byExerciseBtn = await screen.findByRole('tab', { name: /by exercise/i });
     fireEvent.click(byExerciseBtn);
 
     // Initial PR: 225 lbs × 3

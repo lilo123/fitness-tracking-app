@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { FALLBACK_WINDOW } from './virtualizationConstants';
 import { WorkoutSessionHistory, type HistorySession } from './WorkoutSessionHistory';
@@ -64,27 +65,31 @@ describe('DIR-C2: List Virtualization with @tanstack/react-virtual', () => {
         id: sessionId,
         date: `2025-01-${String((sIdx % 28) + 1).padStart(2, '0')}`,
         name: `Workout #${sIdx + 1}`,
+        set_count: 5,
+        total_volume: sets.reduce((sum, s) => sum + s.weight * s.reps, 0),
         sets,
       };
     });
 
     const { container } = render(
-      <WorkoutSessionHistory
-        displayedSessions={sessions}
-        filteredSessionsCount={sessions.length}
-        exercises={mockExercises}
-        timeRange="all"
-        isInspectingAthlete={false}
-        onEditSet={vi.fn()}
-        onLoadMore={vi.fn()}
-      />
+      <MemoryRouter>
+        <WorkoutSessionHistory
+          displayedSessions={sessions}
+          filteredSessionsCount={sessions.length}
+          exercises={mockExercises}
+          timeRange="all"
+          isInspectingAthlete={false}
+          onEditSet={vi.fn()}
+          onLoadMore={vi.fn()}
+        />
+      </MemoryRouter>
     );
 
     // Count all DOM elements mounted inside the rendered container
     const allMountedNodes = container.querySelectorAll('*');
     // Without virtualization, 400 sessions × ~45 nodes each would be ~18,000 DOM nodes.
-    // With virtualization and HISTORY_OVERSCAN = 5 (H30), ~8-9 sessions are mounted (<= 800 nodes).
-    expect(allMountedNodes.length).toBeLessThanOrEqual(800);
+    // H30 overscan 5 (D-P5a-8): measured 661 nodes at rest, threshold is 661 + <=10% = 728
+    expect(allMountedNodes.length).toBeLessThanOrEqual(728);
     // Ensure the list container is present and has virtualized dimensions
     expect(container.firstChild).toBeDefined();
 
@@ -106,6 +111,8 @@ describe('DIR-C2: List Virtualization with @tanstack/react-virtual', () => {
       id: 'session-focus-test',
       date: '2026-09-14',
       name: 'Accessibility Validation Session',
+      set_count: 1,
+      total_volume: 225 * 8,
       sets: [
         {
           id: 'set-focus-1',
@@ -124,15 +131,17 @@ describe('DIR-C2: List Virtualization with @tanstack/react-virtual', () => {
     };
 
     render(
-      <WorkoutSessionHistory
-        displayedSessions={[singleSession]}
-        filteredSessionsCount={1}
-        exercises={mockExercises}
-        timeRange="all"
-        isInspectingAthlete={false}
-        onEditSet={handleEditSet}
-        onLoadMore={vi.fn()}
-      />
+      <MemoryRouter>
+        <WorkoutSessionHistory
+          displayedSessions={[singleSession]}
+          filteredSessionsCount={1}
+          exercises={mockExercises}
+          timeRange="all"
+          isInspectingAthlete={false}
+          onEditSet={handleEditSet}
+          onLoadMore={vi.fn()}
+        />
+      </MemoryRouter>
     );
 
     const editBtn = screen.getByTestId('edit-set-btn-set-focus-1');
@@ -247,6 +256,7 @@ describe('DIR-C2: List Virtualization with @tanstack/react-virtual', () => {
     );
 
     const allMountedNodes = container.querySelectorAll('*');
+    console.log('MEASURED_REST_NODES:', allMountedNodes.length);
     // Without virtualization, 60 days would mount > 3,000 DOM nodes.
     // Virtualization keeps mounted elements at rest <= 200.
     expect(allMountedNodes.length).toBeLessThanOrEqual(200);
@@ -408,6 +418,8 @@ describe('DIR-C2: List Virtualization with @tanstack/react-virtual', () => {
       id: 'session-fallback-test',
       date: '2026-09-14',
       name: 'Fallback Edge Case Session',
+      set_count: 1,
+      total_volume: 225 * 8,
       sets: [
         {
           id: 'set-fallback-1',
@@ -426,15 +438,17 @@ describe('DIR-C2: List Virtualization with @tanstack/react-virtual', () => {
     };
 
     render(
-      <WorkoutSessionHistory
-        displayedSessions={[singleSession]}
-        filteredSessionsCount={1}
-        exercises={mockExercises}
-        timeRange="all"
-        isInspectingAthlete={false}
-        onEditSet={vi.fn()}
-        onLoadMore={vi.fn()}
-      />
+      <MemoryRouter>
+        <WorkoutSessionHistory
+          displayedSessions={[singleSession]}
+          filteredSessionsCount={1}
+          exercises={mockExercises}
+          timeRange="all"
+          isInspectingAthlete={false}
+          onEditSet={vi.fn()}
+          onLoadMore={vi.fn()}
+        />
+      </MemoryRouter>
     );
 
     expect(screen.getByText('Fallback Edge Case Session')).toBeDefined();
@@ -450,6 +464,8 @@ describe('DIR-C2: List Virtualization with @tanstack/react-virtual', () => {
       id: `fallback-session-${sIdx}`,
       date: `2025-01-${String((sIdx % 28) + 1).padStart(2, '0')}`,
       name: `Workout #${sIdx + 1}`,
+      set_count: 1,
+      total_volume: 135 * 8,
       sets: [
         {
           id: `set-${sIdx}-0`,
@@ -468,20 +484,22 @@ describe('DIR-C2: List Virtualization with @tanstack/react-virtual', () => {
     }));
 
     const { container } = render(
-      <WorkoutSessionHistory
-        displayedSessions={sessions}
-        filteredSessionsCount={sessions.length}
-        exercises={mockExercises}
-        timeRange="all"
-        isInspectingAthlete={false}
-        onEditSet={vi.fn()}
-        onLoadMore={vi.fn()}
-      />
+      <MemoryRouter>
+        <WorkoutSessionHistory
+          displayedSessions={sessions}
+          filteredSessionsCount={sessions.length}
+          exercises={mockExercises}
+          timeRange="all"
+          isInspectingAthlete={false}
+          onEditSet={vi.fn()}
+          onLoadMore={vi.fn()}
+        />
+      </MemoryRouter>
     );
 
-    // Verify DOM node threshold: <= 250 DOM nodes even with 400 items (includes H45 controls)
+    // H30 overscan 5 (D-P5a-8): measured 204 nodes in fallback, threshold is 204 + <=10% = 225 (includes H45 controls)
     const allMountedNodes = container.querySelectorAll('*');
-    expect(allMountedNodes.length).toBeLessThanOrEqual(250);
+    expect(allMountedNodes.length).toBeLessThanOrEqual(225);
 
     // Verify visible affordance
     expect(screen.getByText(`Showing first ${FALLBACK_WINDOW} of 400 (virtualization disabled)`)).toBeDefined();

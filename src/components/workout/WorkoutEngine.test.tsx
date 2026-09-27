@@ -1,6 +1,7 @@
 import * as setsLib from '../../lib/sets';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 
 import userEvent from '@testing-library/user-event';
 import { WorkoutEngine } from './WorkoutEngine';
@@ -2012,15 +2013,38 @@ describe('WorkoutEngine', () => {
 
       unmount();
 
+      // Mock get_history_sessions_v2 RPC for HistoryView
+      (supabase as any).rpc = vi.fn().mockImplementation((fn: string) => {
+        if (fn === 'get_history_sessions_v2' || fn === 'get_history_sessions') {
+          return Promise.resolve({
+            data: [
+              {
+                id: workoutId,
+                date: today,
+                civil_date: today,
+                name: 'Cross-Tab Sync Workout',
+                set_count: 1,
+                total_volume: 225 * 8,
+                total_count: 1,
+              },
+            ],
+            error: null,
+          });
+        }
+        return Promise.resolve({ data: [], error: null });
+      });
+
       // Mount HistoryView with the exact same shared queryClient
       render(
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <CoachProvider>
-              <HistoryView />
-            </CoachProvider>
-          </AuthProvider>
-        </QueryClientProvider>
+        <MemoryRouter>
+          <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+              <CoachProvider>
+                <HistoryView />
+              </CoachProvider>
+            </AuthProvider>
+          </QueryClientProvider>
+        </MemoryRouter>
       );
 
       // Verify HistoryView renders the clean exercise from shared cache without lag or UUIDs
@@ -2546,7 +2570,7 @@ describe('WorkoutEngine', () => {
 
         unmount();
 
-        // Now mock workouts and sets for HistoryView
+        // Now mock workouts and sets for HistoryView (including v2 RPC)
         (supabase.from as any).mockImplementation((table: string) => {
           if (table === 'workouts') {
             return createSupabaseBuilder('workouts', {
@@ -2587,25 +2611,57 @@ describe('WorkoutEngine', () => {
           return createSupabaseBuilder(table, { data: [], error: null });
         });
 
+        (supabase as any).rpc = vi.fn().mockImplementation((fn: string) => {
+          if (fn === 'get_history_sessions_v2' || fn === 'get_history_sessions') {
+            return Promise.resolve({
+              data: [
+                {
+                  id: 'w-recent',
+                  date: ninetyDaysOldDate,
+                  civil_date: ninetyDaysOldDate,
+                  name: 'Recent Workout',
+                  set_count: 1,
+                  total_volume: 185 * 10,
+                  total_count: 2,
+                },
+                {
+                  id: 'w-old',
+                  date: oneYearOldDate,
+                  civil_date: oneYearOldDate,
+                  name: 'Ancient Workout',
+                  set_count: 1,
+                  total_volume: 135 * 12,
+                  total_count: 2,
+                },
+              ],
+              error: null,
+            });
+          }
+          return Promise.resolve({ data: [], error: null });
+        });
+
         render(
-          <QueryClientProvider client={queryClient}>
-            <AuthProvider>
-              <CoachProvider>
-                <HistoryView />
-              </CoachProvider>
-            </AuthProvider>
-          </QueryClientProvider>
+          <MemoryRouter>
+            <QueryClientProvider client={queryClient}>
+              <AuthProvider>
+                <CoachProvider>
+                  <HistoryView />
+                </CoachProvider>
+              </AuthProvider>
+            </QueryClientProvider>
+          </MemoryRouter>
         );
 
         await waitFor(() => {
-          expect(queryClient.getQueryData(['workout_sets', targetUserId, 'all'])).toBeDefined();
+          expect(queryClient.getQueryData(['workout_sets', targetUserId, 'history_v2', 'all'])).toBeDefined();
         });
 
-        const allData = queryClient.getQueryData<any[]>(['workout_sets', targetUserId, 'all']);
+        const allData = queryClient.getQueryData<any>(['workout_sets', targetUserId, 'history_v2', 'all']);
         const ninetyData = queryClient.getQueryData<any[]>(['workout_sets', targetUserId, '90d']);
 
         // Both caches coexist without collision or cross-pollution
-        expect(allData).toHaveLength(2);
+        const allSessions = allData?.pages?.flatMap((p: any) => p.sessions) ?? [];
+        expect(allSessions).toHaveLength(2);
         expect(ninetyData).toHaveLength(1);
       });
     });

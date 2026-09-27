@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useInRouterContext } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import type { WorkoutSet, Exercise } from '../../types/database';
 import { formatShortDate } from '../../utils/ghostSets';
@@ -39,11 +39,7 @@ export interface WorkoutSessionHistoryProps {
   onNavigate?: (path: string) => void;
 }
 
-const RouterNavigateBridge = React.forwardRef<((to: string) => void) | null>((_, ref) => {
-  const navigate = useNavigate();
-  React.useImperativeHandle(ref, () => navigate);
-  return null;
-});
+
 
 export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
   displayedSessions,
@@ -67,20 +63,8 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
   onClearFilters,
   onNavigate,
 }) => {
-  const inRouter = useInRouterContext();
-  const navigateRef = React.useRef<((to: string) => void) | null>(null);
-  const navigate = React.useCallback(
-    (to: string) => {
-      if (onNavigate) {
-        onNavigate(to);
-      } else if (navigateRef.current) {
-        navigateRef.current(to);
-      } else if (typeof window !== 'undefined') {
-        window.location.assign(to);
-      }
-    },
-    [onNavigate]
-  );
+  const routerNavigate = useNavigate();
+  const navigate = onNavigate || routerNavigate;
 
   const parentRef = React.useRef<HTMLDivElement>(null);
   const [scrollMargin, setScrollMargin] = React.useState(0);
@@ -196,7 +180,6 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
     const isFiltered = timeRange !== 'all';
     return (
       <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-8 text-center space-y-4">
-        {inRouter && <RouterNavigateBridge ref={navigateRef} />}
         <p className="text-zinc-400 text-xs">
           {isFiltered
             ? 'No workout sessions recorded in this time range.'
@@ -402,7 +385,6 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
 
   return (
     <div className="space-y-4">
-      {inRouter && <RouterNavigateBridge ref={navigateRef} />}
       {/* H6: Surface load-more errors in StatusBanner */}
       {loadMoreError && (
         <StatusBanner

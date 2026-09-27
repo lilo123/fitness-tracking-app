@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HistoryView } from '../components/history/HistoryView';
 import { invalidateWorkoutDerived } from '../lib/invalidate';
@@ -32,15 +33,17 @@ describe('Cross-Tab Invalidation (H2)', () => {
   it('H2: logging a set triggers invalidateWorkoutDerived and updates History without reload', async () => {
     let sessionCount = 1;
     (supabase.rpc as any).mockImplementation((fn: string) => {
-      if (fn === 'get_history_sessions') {
+      if (fn === 'get_history_sessions' || fn === 'get_history_sessions_v2') {
         return Promise.resolve({
           data: [
             {
               id: 'session-1',
               date: '2026-09-01T12:00:00Z',
+              civil_date: '2026-09-01',
               name: 'Legs',
               set_count: sessionCount,
               total_volume: 500,
+              total_count: 1,
             },
           ],
           error: null,
@@ -50,13 +53,15 @@ describe('Cross-Tab Invalidation (H2)', () => {
     });
 
     render(
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <CoachProvider>
-            <HistoryView />
-          </CoachProvider>
-        </AuthProvider>
-      </QueryClientProvider>
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <CoachProvider>
+              <HistoryView />
+            </CoachProvider>
+          </AuthProvider>
+        </QueryClientProvider>
+      </MemoryRouter>
     );
 
     await waitFor(() => {

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, renderHook, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { HistoryView } from './HistoryView';
 import { useHistoryData } from './useHistoryData';
 import { groupSessionSetsByExercise } from '../../utils/historyGrouping';
@@ -132,22 +133,24 @@ describe('HistoryView', () => {
     });
 
     (supabase.rpc as any).mockImplementation(async (fn: string, _args?: any) => {
-      if (fn === 'get_history_sessions') {
-        const prevWLen = recordedTables.length;
+      if (fn === 'get_history_sessions' || fn === 'get_history_sessions_v2') {
         const wBuilder = (supabase.from as any)('workouts');
-        if (recordedTables.length > prevWLen && recordedTables[recordedTables.length - 1] === 'workouts') {
-          recordedTables.pop();
-        }
+        wBuilder.select('id');
         const prevSLen = recordedTables.length;
         const sBuilder = (supabase.from as any)('sets');
         if (recordedTables.length > prevSLen && recordedTables[recordedTables.length - 1] === 'sets') {
           recordedTables.pop();
         }
 
+        if ((wBuilder as any)?._resolvedError) {
+          return { data: null, error: (wBuilder as any)._resolvedError };
+        }
+
         const workoutsData = (wBuilder as any)?._resolvedData || [];
         const setsData = (sBuilder as any)?._resolvedData || [];
 
-        const sessions = (Array.isArray(workoutsData) ? workoutsData : []).map((w: any) => {
+        const rawList = Array.isArray(workoutsData) ? workoutsData : [];
+        const sessions = rawList.map((w: any) => {
           const wSets = Array.isArray(setsData)
             ? setsData.filter((s: any) => !s.workout_id || s.workout_id === w.id)
             : [];
@@ -155,12 +158,16 @@ describe('HistoryView', () => {
             (sum: number, s: any) => sum + (Number(s.weight) || 0) * (Number(s.reps) || 0),
             0
           );
+          const civilDate = w.civil_date || (w.date ? String(w.date).split('T')[0] : '');
           return {
             id: w.id,
             date: w.date,
+            civil_date: civilDate,
+            workout_date: civilDate,
             name: w.name,
             set_count: wSets.length,
             total_volume: volume,
+            total_count: rawList.length,
           };
         });
         return { data: sessions, error: null };
@@ -210,13 +217,15 @@ describe('HistoryView', () => {
 
   const renderComponent = () =>
     render(
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <CoachProvider>
-            <HistoryView />
-          </CoachProvider>
-        </AuthProvider>
-      </QueryClientProvider>
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <CoachProvider>
+              <HistoryView />
+            </CoachProvider>
+          </AuthProvider>
+        </QueryClientProvider>
+      </MemoryRouter>
     );
 
   it('renders workout history view by default and allows toggling between By Session and By Exercise', async () => {
@@ -530,7 +539,7 @@ describe('HistoryView', () => {
       const banner = screen.getByTestId('history-mutation-error');
       expect(banner).toBeDefined();
       expect(within(banner).getByText('Database deletion failed')).toBeDefined();
-      const dismissBtn = within(banner).getByRole('button', { name: /✕|Dismiss/ });
+      const dismissBtn = within(banner).getByRole('button', { name: 'Dismiss' });
       expect(dismissBtn.className).toContain('min-w-[44px]');
       expect(dismissBtn.className).toContain('min-h-[44px]');
     });
@@ -1420,13 +1429,15 @@ describe('HistoryView', () => {
       });
 
       render(
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <CoachProvider>
-              <HistoryView />
-            </CoachProvider>
-          </AuthProvider>
-        </QueryClientProvider>
+        <MemoryRouter>
+          <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+              <CoachProvider>
+                <HistoryView />
+              </CoachProvider>
+            </AuthProvider>
+          </QueryClientProvider>
+        </MemoryRouter>
       );
 
       // Wait for inspection banner to appear
@@ -1585,15 +1596,17 @@ describe('HistoryView', () => {
   describe('P1-4: History Route Payload Optimization & RPC integration', () => {
     it('1. Zero-set workout produces card without crashing (set_count = 0, total_volume = 0)', async () => {
       (supabase.rpc as any).mockImplementation(async (fn: string) => {
-        if (fn === 'get_history_sessions') {
+        if (fn === 'get_history_sessions' || fn === 'get_history_sessions_v2') {
           return {
             data: [
               {
                 id: 'w-empty',
                 date: '2026-09-02',
+                civil_date: '2026-09-02',
                 name: 'Zero-set session',
                 set_count: 0,
                 total_volume: 0,
+                total_count: 1,
               },
             ],
             error: null,
@@ -1708,15 +1721,17 @@ describe('HistoryView', () => {
 
     it('4. Auto-expand budget guard stops 500-set session from expanding on cold load (HD-1)', async () => {
       (supabase.rpc as any).mockImplementation(async (fn: string) => {
-        if (fn === 'get_history_sessions') {
+        if (fn === 'get_history_sessions' || fn === 'get_history_sessions_v2') {
           return {
             data: [
               {
                 id: 'w-huge',
                 date: '2026-09-01',
+                civil_date: '2026-09-01',
                 name: 'Monster Session',
                 set_count: 500,
                 total_volume: 100000,
+                total_count: 1,
               },
             ],
             error: null,
@@ -1757,15 +1772,17 @@ describe('HistoryView', () => {
       }));
 
       (supabase.rpc as any).mockImplementation(async (fn: string) => {
-        if (fn === 'get_history_sessions') {
+        if (fn === 'get_history_sessions' || fn === 'get_history_sessions_v2') {
           return {
             data: [
               {
                 id: 'w-500',
                 date: '2026-09-01',
+                civil_date: '2026-09-01',
                 name: 'Big Workout',
                 set_count: 500,
                 total_volume: 500000,
+                total_count: 1,
               },
             ],
             error: null,
@@ -1798,15 +1815,17 @@ describe('HistoryView', () => {
     it('6. Expand fetch is cached under [\'session_sets\', workoutId]', async () => {
       let setsQueryCount = 0;
       (supabase.rpc as any).mockImplementation(async (fn: string) => {
-        if (fn === 'get_history_sessions') {
+        if (fn === 'get_history_sessions' || fn === 'get_history_sessions_v2') {
           return {
             data: [
               {
                 id: 'w-cached',
                 date: '2026-09-01',
+                civil_date: '2026-09-01',
                 name: 'Cache Test Workout',
                 set_count: 150,
                 total_volume: 15000,
+                total_count: 1,
               },
             ],
             error: null,
@@ -1866,15 +1885,17 @@ describe('HistoryView', () => {
     it("7. viewMode === 'session' issues 0 get_exercise_stats calls; switching to 'exercise' issues exactly 1", async () => {
       let exerciseStatsCalls = 0;
       (supabase.rpc as any).mockImplementation((fn: string) => {
-        if (fn === 'get_history_sessions') {
+        if (fn === 'get_history_sessions' || fn === 'get_history_sessions_v2') {
           return {
             data: [
               {
                 id: 'w-1',
                 date: '2026-09-01',
+                civil_date: '2026-09-01',
                 name: 'Test Workout',
                 set_count: 5,
                 total_volume: 1000,
+                total_count: 1,
               },
             ],
             error: null,
@@ -1918,13 +1939,15 @@ describe('HistoryView', () => {
       const fiftySessions = Array.from({ length: 50 }, (_, i) => ({
         id: `w-${i + 1}`,
         date: `2026-09-${String(50 - i).padStart(2, '0')}`,
+        civil_date: `2026-09-${String(50 - i).padStart(2, '0')}`,
         name: `Session ${i + 1}`,
         set_count: i === 0 ? 5 : 10,
         total_volume: 500,
+        total_count: 50,
       }));
 
       (supabase.rpc as any).mockImplementation((fn: string) => {
-        if (fn === 'get_history_sessions') {
+        if (fn === 'get_history_sessions' || fn === 'get_history_sessions_v2') {
           return {
             data: fiftySessions,
             error: null,

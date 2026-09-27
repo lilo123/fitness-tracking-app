@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { WorkoutSessionHistory } from './WorkoutSessionHistory';
 import type { HistorySession } from './useHistoryData';
 
@@ -19,7 +20,8 @@ describe('WorkoutSessionHistory (H4)', () => {
 
   it('H4: renders formatted civil date (Sep 15) and drops raw ISO timestamp text', () => {
     render(
-      <WorkoutSessionHistory
+      <MemoryRouter>
+        <WorkoutSessionHistory
         displayedSessions={mockSessions}
         filteredSessionsCount={1}
         exercises={[]}
@@ -32,7 +34,8 @@ describe('WorkoutSessionHistory (H4)', () => {
         expandedSessionIds={new Set()}
         onToggleExpand={vi.fn()}
         loadingSessionIds={new Set()}
-      />
+        />
+      </MemoryRouter>
     );
 
     // Formatted civil date must be displayed

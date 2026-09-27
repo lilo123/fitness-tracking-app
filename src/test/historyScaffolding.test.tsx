@@ -1,8 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router-dom')>();
+  return {
+    ...actual,
+    useNavigate: () => vi.fn(),
+  };
+});
 import { screen, waitFor } from '@testing-library/react';
 import {
   renderHistoryView,
-  setupHistoryMocks,
+  setupHistoryMocks as baseSetupHistoryMocks,
   createMockWorkoutSession,
   createMockExercise,
   createBoundarySessions,
@@ -12,6 +20,7 @@ import {
   toggleHistoryDomain,
 } from './historyScaffolding';
 import { clearMockHistory } from './supabaseBuilderMock';
+import { supabase } from '../lib/supabase';
 
 const { mockSession } = vi.hoisted(() => ({
   mockSession: {
@@ -44,6 +53,23 @@ vi.mock('../lib/supabase', () => ({
  *    actually exercise the caps and timezones. Other batches add new test files only; nobody edits
  *    HistoryView.test.tsx except B2."
  */
+function setupHistoryMocks(options?: any) {
+  baseSetupHistoryMocks(options);
+  const origRpc = (supabase as any).rpc;
+  (supabase.rpc as any).mockImplementation((fn: string, args: any) => {
+    if (fn === 'get_history_sessions_v2' || fn === 'get_history_sessions') {
+      const sessions = options?.sessions || [];
+      const rows = sessions.map((s: any) => ({
+        ...s,
+        civil_date: s.civil_date || (s.date ? String(s.date).split('T')[0] : ''),
+        total_count: sessions.length,
+      }));
+      return Promise.resolve({ data: rows, error: null });
+    }
+    return origRpc(fn, args);
+  });
+}
+
 describe('History scaffolding (H13)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
