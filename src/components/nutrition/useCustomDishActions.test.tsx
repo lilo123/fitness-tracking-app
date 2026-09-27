@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { useCustomDishActions } from './useCustomDishActions';
 import type { CustomDish, CustomDishDetail } from '../../types/database';
+import { isWithinDayBounds } from '../../utils/date';
 import { supabase } from '../../lib/supabase';
 
 vi.mock('../../lib/supabase', () => ({
@@ -283,7 +284,8 @@ describe('useCustomDishActions', () => {
 
     expect(stopPropagation).toHaveBeenCalled();
     expect(mutate).toHaveBeenCalledTimes(1);
-    expect(mutate).toHaveBeenCalledWith({
+    const payload = mutate.mock.calls[0][0];
+    expect(payload).toEqual({
       food_name: 'Greek Yogurt Cup',
       calories: 130.4,
       protein: 15.2,
@@ -293,10 +295,11 @@ describe('useCustomDishActions', () => {
       meal_type: 'Breakfast',
       serving_size: 1,
       serving_unit: 'serving',
-      logged_at: expect.stringMatching(/^2026-09-26T/),
+      logged_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/),
       logged_date: '2026-09-26',
       notes: 'Vanilla flavor',
     });
+    expect(isWithinDayBounds(payload.logged_at, '2026-09-26')).toBe(true);
 
     expect(supabase.from).toHaveBeenCalledWith('custom_dishes');
     expect(mockUpdate).toHaveBeenCalledWith({ use_count: 8 });

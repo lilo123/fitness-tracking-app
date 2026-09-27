@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../context/AuthContext';
 import { CoachProvider } from '../context/CoachContext';
 import { supabase } from '../lib/supabase';
-import { getLocalDateStr } from '../utils/date';
+import { getLocalDateStr, isWithinDayBounds, formatLocalTimestamp } from '../utils/date';
 import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory } from '../test/supabaseBuilderMock';
 
 /**
@@ -1537,6 +1537,7 @@ Total Fiber: 1 g`;
       serving_size: 1,
       serving_unit: 'plate',
       logged_at: `${todayStr}T09:00:00Z`,
+      logged_date: todayStr,
     };
 
     const mockUpdateEq = vi.fn().mockReturnValue({
@@ -1622,6 +1623,7 @@ Total Fiber: 1 g`;
       serving_size: 1,
       serving_unit: 'shake',
       logged_at: `${todayStr}T14:00:00Z`,
+      logged_date: todayStr,
     };
 
     const mockUpdateEq = vi.fn().mockReturnValue({
@@ -1678,6 +1680,7 @@ Total Fiber: 1 g`;
       serving_size: 1,
       serving_unit: 'bowl',
       logged_at: `${todayStr}T08:30:00Z`,
+      logged_date: todayStr,
     };
 
     const mockUpdate = vi.fn();
@@ -1842,6 +1845,7 @@ Total Fiber: 1 g`;
               fat: 80, // exceeds 70 default by 10
               fiber: 35, // exceeds 30 default by 5
               logged_at: `${todayStr}T12:00:00Z`,
+              logged_date: todayStr,
               meal_type: 'Lunch',
               serving_size: 1,
               serving_unit: 'serving',
@@ -1887,6 +1891,7 @@ Total Fiber: 1 g`;
               fat: 20, // 70 default - 20 = 50 remaining
               fiber: 10, // 30 default - 10 = 20 remaining
               logged_at: `${todayStr}T12:00:00Z`,
+              logged_date: todayStr,
               meal_type: 'Snack',
               serving_size: 1,
               serving_unit: 'serving',
@@ -1973,8 +1978,10 @@ Total Fiber: 1 g`;
 
       const payload = mockInsert.mock.calls[0][0][0];
       expect(payload.food_name).toBe('Grilled Salmon Bowl');
-      expect(payload.logged_at).toBe('2026-09-08T20:30:00.000Z');
-      expect(payload.logged_at.startsWith('2026-09-08')).toBe(true);
+      expect(payload.logged_date).toBe('2026-09-08');
+      expect(isWithinDayBounds(payload.logged_at, '2026-09-08')).toBe(true);
+      // Exact local 20:30 on the selected day, independent of the test's time zone.
+      expect(payload.logged_at).toBe(new Date(2026, 8, 8, 20, 30, 0).toISOString());
     } finally {
       vi.useRealTimers();
     }
@@ -2016,8 +2023,9 @@ Total Fiber: 1 g`;
 
     const payload = mockInsert.mock.calls[0][0][0];
     expect(payload.food_name).toBe('Steak & Rice');
-    expect(payload.logged_at).toMatch(/^2026-09-05T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/);
-    expect(payload.logged_at.startsWith('2026-09-05')).toBe(true);
+    expect(payload.logged_date).toBe('2026-09-05');
+    expect(isWithinDayBounds(payload.logged_at, '2026-09-05')).toBe(true);
+    expect(payload.logged_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/);
   });
 
   it('renders camera and photo gallery triggers, and attaches a photo preview with size badge', async () => {
@@ -3391,6 +3399,7 @@ Total Fiber: 1 g`;
       fat: 16,
       fiber: 1,
       logged_at: `${todayStr}T12:00:00Z`,
+      logged_date: todayStr,
       items: [
         {
           id: 'i1',
@@ -3546,7 +3555,8 @@ Total Fiber: 1 g`;
           carbs: 31.2,
           fat: 24.6,
           fiber: 3.1,
-          logged_at: `${todayStr}T12:00:00.000Z`,
+          logged_at: formatLocalTimestamp(todayStr, new Date(2026, 0, 1, 12, 0, 0)),
+          logged_date: todayStr,
           items: [
             {
               id: 'child-1',
@@ -3597,7 +3607,8 @@ Total Fiber: 1 g`;
           fiber: 4.4,
           serving_size: 1,
           serving_unit: 'medium',
-          logged_at: `${todayStr}T15:00:00.000Z`,
+          logged_at: formatLocalTimestamp(todayStr, new Date(2026, 0, 1, 15, 0, 0)),
+          logged_date: todayStr,
           items: null,
         },
       ];
@@ -3687,6 +3698,7 @@ Total Fiber: 1 g`;
                 serving_size: 1,
                 serving_unit: 'bowl',
                 logged_at: new Date().toISOString(),
+                logged_date: getLocalDateStr(),
                 created_at: new Date().toISOString(),
                 has_components: false,
               },
@@ -3714,6 +3726,7 @@ Total Fiber: 1 g`;
     });
 
     it('threads dailyTotals and targets to StagedMealCard showing Today after row', async () => {
+      const todayStr = getLocalDateStr();
       (supabase.from as any).mockImplementation((table: string) => {
         if (table === 'nutrition_logs') {
           return createSupabaseBuilder(table, {
@@ -3730,8 +3743,8 @@ Total Fiber: 1 g`;
                 fiber: 5,
                 serving_size: 1,
                 serving_unit: 'serving',
-                logged_at: new Date().toISOString(),
-                logged_date: new Date().toISOString().split('T')[0],
+                logged_at: formatLocalTimestamp(todayStr, new Date(2026, 0, 1, 8, 0, 0)),
+                logged_date: todayStr,
                 created_at: new Date().toISOString(),
                 has_components: false,
               },
