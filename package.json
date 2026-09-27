@@ -25,6 +25,7 @@
     "migrate:historical": "python3 scripts/migrate-historical-data.py",
     "check:mocks": "node scripts/check-mock-fidelity.js",
     "check:payload": "node scripts/check-payload-projections.js",
+    "check:design": "node scripts/check-design-ratchet.js",
     "verify:residue": "node scripts/verify-db-residue.js",
     "cap:sync": "npm run build && npx cap sync",
     "test:tz:la": "TZ=America/Los_Angeles vitest run",
