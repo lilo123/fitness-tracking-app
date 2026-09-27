@@ -216,7 +216,7 @@ BEGIN
 
   FOR i IN 1..151 LOOP
     v_workout_id := gen_random_uuid();
-    v_time := now() - (i || ' hours')::interval;
+    v_time := now() - (i || ' days')::interval;
 
     INSERT INTO public.workouts (id, user_id, name, date, created_at)
     VALUES (
