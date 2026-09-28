@@ -1,3 +1,4 @@
+import type { WeightUnit } from "../utils/weight";
 import type { NutritionItem } from '../utils/itemModel';
 
 export type UserRole = 'coach' | 'athlete';
@@ -18,6 +19,7 @@ export interface UserProfile {
   coach_code?: string | null;
   coach_tier?: 'free' | 'pro' | 'enterprise';
   max_athletes?: number;
+  weight_unit?: WeightUnit;
   created_at?: string;
 }
 

@@ -86,7 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const { data, error } = await (supabase
           .from('users') as any)
-          .select('id, email, username, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, is_coach_mode, coach_code, coach_tier, max_athletes, created_at, timezone')
+          .select('id, email, username, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, is_coach_mode, coach_code, coach_tier, max_athletes, created_at, timezone, weight_unit')
           .eq('id', userId)
           .single();
 
@@ -138,6 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             target_fiber: 30,
             auto_rest_timer: true,
             timezone: deviceZone || null,
+            weight_unit: 'lb',
           };
           setProfile(fallbackProfile);
           localStorage.setItem('cybergym_user', JSON.stringify(fallbackProfile));
