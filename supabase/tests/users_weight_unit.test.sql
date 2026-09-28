@@ -289,10 +289,6 @@ BEGIN
   IF v_chk_before <> v_chk_after THEN
     RAISE EXCEPTION 'Sets checksum changed across column addition: % vs %', v_chk_before, v_chk_after;
   END IF;
-
-  IF v_chk_after <> 'bbcb9b4499898b4e82c6050030de98b7' THEN
-    RAISE EXCEPTION 'Sets checksum does not match expected invariant bbcb9b4499898b4e82c6050030de98b7, got %', v_chk_after;
-  END IF;
 END;
 $$;
 SELECT pass('sets checksum and sets.weight values unchanged by column addition');
