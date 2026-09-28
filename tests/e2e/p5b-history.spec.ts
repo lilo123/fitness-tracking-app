@@ -251,6 +251,10 @@ async function loginAsP5bAthlete(page: Page) {
   await page.fill('input[type="password"]', P5B_USER_PASSWORD);
   await page.click('button[type="submit"]');
   await page.waitForURL('**/workout', { timeout: 15000 });
+  await expect(page.locator('[data-testid="workout-date-input"]')).toBeVisible({ timeout: 15000 });
+  await page.locator('[data-testid="nav-history"]').click({ force: true });
+  await page.waitForURL('**/history');
+  await expect(page.getByRole('heading', { name: 'Workout History' })).toBeVisible({ timeout: 10000 });
 }
 
 async function loginAsCoach(page: Page) {
@@ -275,12 +279,12 @@ test.describe('P5b History Suite (p5b-history)', () => {
   // (a) H8: exercise history sheet shows session groups, working sets, PR badge, and 30D filter
   test('(a) H8: exercise sheet displays session groups, 24 working sets without warmups, PR badge, and 30D range limit', async ({ page }) => {
     await loginAsP5bAthlete(page);
-    await page.goto('/history');
-    await page.waitForURL('**/history');
 
     // Switch to By Exercise view
     const exerciseTab = page.locator('[data-testid="history-subview-exercise"]');
+    await expect(exerciseTab).toBeVisible({ timeout: 10000 });
     await exerciseTab.click();
+    await expect(exerciseTab).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('[data-testid="all-time-stats-caption"]')).toBeVisible({ timeout: 10000 });
 
     // Find and open target exercise card
@@ -380,8 +384,6 @@ test.describe('P5b History Suite (p5b-history)', () => {
   // (c) H29 calendar: month grid dots, tapping older day loads page and scrolls/focuses card
   test('(c) H29 calendar: month grid dots on seeded days, tapping older day not on page 1 scrolls into view and focuses card', async ({ page }) => {
     await loginAsP5bAthlete(page);
-    await page.goto('/history');
-    await page.waitForURL('**/history');
 
     // Initial page shows 30 of 35 sessions
     const countBanner = page.locator('[data-testid="showing-sessions-count"]');
@@ -429,8 +431,6 @@ test.describe('P5b History Suite (p5b-history)', () => {
   // (d) H43: search filters sessions with match count and Clear filters restores
   test('(d) H43: By-Session search filters with match count and Clear filters restores', async ({ page }) => {
     await loginAsP5bAthlete(page);
-    await page.goto('/history');
-    await page.waitForURL('**/history');
 
     const searchInput = page.locator('[data-testid="session-search-input"]');
     const countBanner = page.locator('[data-testid="showing-sessions-count"]');
@@ -463,8 +463,6 @@ test.describe('P5b History Suite (p5b-history)', () => {
     });
 
     await loginAsP5bAthlete(page);
-    await page.goto('/history');
-    await page.waitForURL('**/history');
 
     // Switch to Nutrition tab
     const nutritionTab = page.locator('[data-testid="history-tab-nutrition"]');
@@ -520,13 +518,14 @@ test.describe('P5b History Suite (p5b-history)', () => {
   // (f) H11: nutrition window paging reaches oldest day with human date headers and full totals
   test('(f) H11: nutrition logs spanning 40 days page to oldest day with human date headers and full totals', async ({ page }) => {
     await loginAsP5bAthlete(page);
-    await page.goto('/history');
-    await page.waitForURL('**/history');
 
     const nutritionTab = page.locator('[data-testid="history-tab-nutrition"]');
+    await expect(nutritionTab).toBeVisible({ timeout: 10000 });
     await nutritionTab.click();
+    await expect(nutritionTab).toHaveAttribute('aria-selected', 'true');
 
     const loadOlderBtn = page.locator('[data-testid="load-more-nutrition-btn"]');
+    await expect(loadOlderBtn).toBeVisible({ timeout: 10000 });
     await loadOlderBtn.scrollIntoViewIfNeeded();
 
     // Day 5 is in window 1 (rendered into view)
@@ -563,8 +562,6 @@ test.describe('P5b History Suite (p5b-history)', () => {
   test('(g) 320px: no horizontal overflow in exercise sheet, calendar sheet, and nutrition timeline', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 600 });
     await loginAsP5bAthlete(page);
-    await page.goto('/history');
-    await page.waitForURL('**/history');
 
     // 1. Nutrition timeline
     const nutritionTab = page.locator('[data-testid="history-tab-nutrition"]');

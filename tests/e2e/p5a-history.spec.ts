@@ -98,6 +98,10 @@ async function loginAsP5aAthlete(page: Page) {
   await page.fill('input[type="password"]', P5A_USER_PASSWORD);
   await page.click('button[type="submit"]');
   await page.waitForURL('**/workout', { timeout: 15000 });
+  await expect(page.locator('[data-testid="workout-date-input"]')).toBeVisible({ timeout: 15000 });
+  await page.locator('[data-testid="nav-history"]').click({ force: true });
+  await page.waitForURL('**/history');
+  await expect(page.getByRole('heading', { name: 'Workout History' })).toBeVisible({ timeout: 10000 });
 }
 
 test.describe('P5a History Suite (p5a-history)', () => {
@@ -116,8 +120,6 @@ test.describe('P5a History Suite (p5a-history)', () => {
   // All shows sessions and 'Showing N of M'.
   test('(a) range chips: 30D empty state with Clear filters vs All with sessions and count', async ({ page }) => {
     await loginAsP5aAthlete(page);
-    await page.goto('/history');
-    await page.waitForURL('**/history');
 
     const countBanner = page.locator('[data-testid="showing-sessions-count"]');
     const chip30d = page.locator('[data-testid="history-range-30d"]');
@@ -147,8 +149,6 @@ test.describe('P5a History Suite (p5a-history)', () => {
   // -> same pages loaded (count cards/'Showing N of M'), expanded session still expanded, scrollY within 5px.
   test('(b) keep-alive D5: pages, expanded session, and scroll position preserved across tab switch', async ({ page }) => {
     await loginAsP5aAthlete(page);
-    await page.goto('/history');
-    await page.waitForURL('**/history');
 
     const countBanner = page.locator('[data-testid="showing-sessions-count"]');
     const loadMoreBtn = page.locator('[data-testid="load-more-sessions-btn"]');
@@ -206,8 +206,6 @@ test.describe('P5a History Suite (p5a-history)', () => {
   // 'Delete session' opens ConfirmDialog, Cancel keeps it, Confirm removes it (only on a session you created).
   test('(c) session overflow menu: Edit in Workout deep link and Delete session ConfirmDialog', async ({ page }) => {
     await loginAsP5aAthlete(page);
-    await page.goto('/history');
-    await page.waitForURL('**/history');
 
     const countBanner = page.locator('[data-testid="showing-sessions-count"]');
     await expect(countBanner).toHaveText('Showing 30 of 35 sessions', { timeout: 10000 });
@@ -218,7 +216,7 @@ test.describe('P5a History Suite (p5a-history)', () => {
     await firstMenuBtn.click();
 
     const editItem = page.locator('[data-testid^="edit-session-"]').first();
-    await expect(editItem).toBeVisible();
+    await expect(editItem).toBeVisible({ timeout: 5000 });
     await editItem.click();
 
     // Lands on /workout?date=<civil date>
@@ -232,15 +230,17 @@ test.describe('P5a History Suite (p5a-history)', () => {
     await expect(workoutDateInput).toHaveValue(expectedCivilDate!);
 
     // 2. Return to /history for 'Delete session' flow
-    await page.goto('/history');
+    await page.locator('[data-testid="nav-history"]').click({ force: true });
     await page.waitForURL('**/history');
+    await expect(page.getByRole('heading', { name: 'Workout History' })).toBeVisible({ timeout: 10000 });
     await expect(countBanner).toHaveText('Showing 30 of 35 sessions', { timeout: 10000 });
 
     const targetMenuBtn = page.locator('button[data-testid^="session-actions-"]').first();
+    await expect(targetMenuBtn).toBeVisible({ timeout: 10000 });
     await targetMenuBtn.click();
 
     const deleteItem = page.locator('[data-testid^="delete-session-"]').first();
-    await expect(deleteItem).toBeVisible();
+    await expect(deleteItem).toBeVisible({ timeout: 5000 });
     await deleteItem.click();
 
     // ConfirmDialog opens
@@ -255,6 +255,7 @@ test.describe('P5a History Suite (p5a-history)', () => {
 
     // Confirm removes the session
     await targetMenuBtn.click();
+    await expect(deleteItem).toBeVisible({ timeout: 5000 });
     await deleteItem.click();
     await expect(confirmDialog).toBeVisible({ timeout: 5000 });
 
@@ -270,8 +271,6 @@ test.describe('P5a History Suite (p5a-history)', () => {
   // role=tablist, ArrowRight moves selection.
   test('(d) tabs ARIA: role=tablist and ArrowRight moves selection on SegmentedTabs', async ({ page }) => {
     await loginAsP5aAthlete(page);
-    await page.goto('/history');
-    await page.waitForURL('**/history');
 
     // 1. History domain tabs (Workouts / Nutrition)
     const domainTablist = page.locator('[aria-label="History domain"][role="tablist"]');
@@ -319,8 +318,6 @@ test.describe('P5a History Suite (p5a-history)', () => {
   test('(e) 320px: no horizontal document overflow in both By Session and By Exercise sub-views', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 600 });
     await loginAsP5aAthlete(page);
-    await page.goto('/history');
-    await page.waitForURL('**/history');
 
     // 1. By Session sub-view
     await expect(page.locator('[data-testid="history-subview-session"]')).toHaveAttribute('aria-selected', 'true', { timeout: 10000 });
@@ -343,8 +340,6 @@ test.describe('P5a History Suite (p5a-history)', () => {
   // (f) By-Exercise shows 'All-time stats' and no date chips.
   test('(f) by-exercise sub-view shows All-time stats caption and hides date chips', async ({ page }) => {
     await loginAsP5aAthlete(page);
-    await page.goto('/history');
-    await page.waitForURL('**/history');
 
     const sessionTab = page.locator('[data-testid="history-subview-session"]');
     const exerciseTab = page.locator('[data-testid="history-subview-exercise"]');
