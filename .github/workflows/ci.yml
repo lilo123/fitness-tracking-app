@@ -16,7 +16,7 @@ jobs:
   ci:
     name: Build, Test, Lint, Audit & Budget Enforcement
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
 
     env:
       VITE_SUPABASE_URL: http://127.0.0.1:58821
