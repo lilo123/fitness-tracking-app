@@ -6,6 +6,8 @@ import { useDeferredDelete } from "../common/useDeferredDelete";
 import { invalidateWorkoutDerived } from "../../lib/invalidate";
 import type { UndoToastItem } from "../common/UndoToast";
 import type { HistorySet } from "./useHistoryData";
+import { useWeightUnit } from "../../hooks/useWeightUnit";
+import { formatSet } from "../../utils/weight";
 
 export interface UseHistorySetDeferredDeleteOptions {
   targetUserId?: string;
@@ -29,6 +31,7 @@ export function useHistorySetDeferredDelete({
   setMutationError,
 }: UseHistorySetDeferredDeleteOptions) {
   const queryClient = useQueryClient();
+  const unit = useWeightUnit();
 
   const { pending, schedule, undo, flush } = useDeferredDelete<WorkoutSet>({
     commit: async (item) => {
@@ -110,10 +113,7 @@ export function useHistorySetDeferredDelete({
     if (!pending) return null;
     const set = pending.item;
     const name = set.exercise_name || "Workout set";
-    const detail =
-      set.weight !== undefined && set.weight !== null && Number(set.weight) > 0
-        ? `${set.weight} lbs × ${set.reps}`
-        : `${set.reps} reps`;
+    const detail = formatSet(set.weight, set.reps, unit);
     return {
       verb: "Set deleted",
       subject: name,
@@ -121,7 +121,7 @@ export function useHistorySetDeferredDelete({
       onUndo: undo,
       undoAriaLabel: `Undo delete ${name}`,
     };
-  }, [pending, undo]);
+  }, [pending, undo, unit]);
 
   return {
     pendingDelete: pending,

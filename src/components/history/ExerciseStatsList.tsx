@@ -5,6 +5,8 @@ import { formatShortDate, normalizeDateStr } from '../../utils/date';
 import { normalizeSearch } from '../../utils/normalizeSearch';
 import { resolveExerciseLabel } from '../../utils/exerciseLabel';
 import { useAuth } from '../../hooks/useAuth';
+import { useWeightUnit } from '../../hooks/useWeightUnit';
+import { formatWeight } from '../../utils/weight';
 import { Tag } from '../common/Tag';
 import { ExerciseSparkline } from './ExerciseSparkline';
 import { ExerciseHistorySheet } from './ExerciseHistorySheet';
@@ -54,9 +56,9 @@ export const ExerciseStatsList: React.FC<ExerciseStatsListProps> = ({
   exerciseStats: initialStats,
   exercises = [],
   rawExerciseStats = [],
-  searchQuery,
+  searchQuery = '',
   onSearchQueryChange,
-  selectedCategory,
+  selectedCategory = 'All',
   onSelectedCategoryChange,
   isInspectingAthlete,
   onEditSet,
@@ -65,6 +67,7 @@ export const ExerciseStatsList: React.FC<ExerciseStatsListProps> = ({
   isReadOnly,
 }) => {
   const { user } = useAuth();
+  const unit = useWeightUnit();
   const effectiveUserId = userId || user?.id || '';
   const effectiveReadOnly = isReadOnly ?? isInspectingAthlete;
 
@@ -235,6 +238,7 @@ export const ExerciseStatsList: React.FC<ExerciseStatsListProps> = ({
                 width={60}
                 height={22}
                 className="text-cyan-400 shrink-0"
+                unit={unit}
               />
             )}
 
@@ -243,7 +247,7 @@ export const ExerciseStatsList: React.FC<ExerciseStatsListProps> = ({
               <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-2xl text-amber-400 text-xs font-bold shrink-0">
                 <Trophy className="w-3.5 h-3.5 shrink-0" />
                 <span>
-                  PR: {stat.maxWeight > 0 ? `${stat.maxWeight} lbs` : 'Bodyweight'} × {stat.prReps}
+                  PR: {stat.maxWeight > 0 ? formatWeight(stat.maxWeight, unit, { showUnit: true }) : 'Bodyweight'} × {stat.prReps}
                   {stat.prDate ? ` · ${formatExerciseSetDate(stat.prDate)}` : ''}
                 </span>
               </div>
@@ -267,7 +271,7 @@ export const ExerciseStatsList: React.FC<ExerciseStatsListProps> = ({
                 >
                   <span className="text-zinc-400">{formatExerciseSetDate(s.workout_date)}</span>
                   <span className="text-cyan-300 font-bold tabular-nums">
-                    {s.weight} lbs × {s.reps} reps
+                    {formatWeight(s.weight, unit, { showUnit: true })} × {s.reps} reps
                   </span>
                 </div>
               ))}

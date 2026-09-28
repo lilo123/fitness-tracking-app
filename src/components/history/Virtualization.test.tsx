@@ -29,6 +29,13 @@ vi.mock('@tanstack/react-virtual', async (importOriginal) => {
   };
 });
 
+vi.mock('../../hooks/useAuth', () => ({
+  useAuth: () => ({
+    user: { id: 'test-user-virtual' },
+    profile: { id: 'test-user-virtual', weight_unit: 'lb' },
+  }),
+}));
+
 describe('DIR-C2: List Virtualization with @tanstack/react-virtual', () => {
   beforeEach(() => {
     mockFallbackMode = false;

@@ -1,8 +1,17 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { WorkoutSessionHistory } from './WorkoutSessionHistory';
 import type { HistorySession } from './useWorkoutHistory';
+
+let mockWeightUnit: 'lb' | 'kg' = 'lb';
+
+vi.mock('../../hooks/useAuth', () => ({
+  useAuth: () => ({
+    user: { id: 'test-user-1' },
+    profile: { id: 'test-user-1', weight_unit: mockWeightUnit },
+  }),
+}));
 
 describe('WorkoutSessionHistory (H4, H29, H43)', () => {
   const mockSessions: HistorySession[] = [
@@ -27,6 +36,10 @@ describe('WorkoutSessionHistory (H4, H29, H43)', () => {
       sets: [],
     },
   ];
+
+  beforeEach(() => {
+    mockWeightUnit = 'lb';
+  });
 
   it('H4: renders formatted civil date (Sep 15) and drops raw ISO timestamp text', () => {
     render(
@@ -151,5 +164,52 @@ describe('WorkoutSessionHistory (H4, H29, H43)', () => {
 
     fireEvent.click(clearBtn);
     expect(mockClearFilters).toHaveBeenCalledTimes(1);
+  });
+
+  it('kg-mode: session card volume converted once (13500 lb -> 6,124 kg) and set row displays 102.1 kg × 5 reps', () => {
+    mockWeightUnit = 'kg';
+    const kgSession: HistorySession = {
+      id: 'session-kg',
+      date: '2026-09-25T00:00:00.000Z',
+      workout_date: '2026-09-25',
+      civil_date: '2026-09-25',
+      name: 'Heavy Bench',
+      set_count: 1,
+      total_volume: 13500,
+      sets: [
+        {
+          id: 'set-kg-1',
+          workout_id: 'session-kg',
+          exercise_id: 'ex-bench',
+          exercise_name: 'Bench Press',
+          weight: 225,
+          reps: 5,
+          set_index: 1,
+          workout_date: '2026-09-25',
+          workout_name: 'Heavy Bench',
+          set_type: 'working',
+          created_at: '2026-09-25T10:00:00Z',
+        },
+      ],
+    };
+
+    render(
+      <MemoryRouter>
+        <WorkoutSessionHistory
+          displayedSessions={[kgSession]}
+          exercises={[{ id: 'ex-bench', name: 'Bench Press', body_part: 'Chest' }]}
+          timeRange="all"
+          isInspectingAthlete={false}
+          onEditSet={vi.fn()}
+          onLoadMore={vi.fn()}
+          expandedSessionIds={new Set(['session-kg'])}
+        />
+      </MemoryRouter>
+    );
+
+    // Session volume converted once
+    expect(screen.getByText('6,124 kg')).toBeDefined();
+    // Set row formatted in kg
+    expect(screen.getByText(/102\.1 kg × 5 reps/)).toBeDefined();
   });
 });

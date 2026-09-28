@@ -9,6 +9,8 @@ import { Button } from '../common/Button';
 import { Skeleton } from '../common/Skeleton';
 import { StatusBanner } from '../common/StatusBanner';
 import { ExerciseSparkline } from './ExerciseSparkline';
+import { useWeightUnit } from '../../hooks/useWeightUnit';
+import { formatWeight } from '../../utils/weight';
 import {
   fetchExerciseHistoryPage,
   computeHistorySince,
@@ -85,6 +87,7 @@ export const ExerciseHistorySheet: React.FC<ExerciseHistorySheetProps> = ({
   onEditSet,
   testId = 'exercise-history-sheet',
 }) => {
+  const unit = useWeightUnit();
   const [range, setRange] = useState<HistoryRange>('all');
 
   const since = useMemo(() => computeHistorySince(range, timeZone), [range, timeZone]);
@@ -235,7 +238,7 @@ export const ExerciseHistorySheet: React.FC<ExerciseHistorySheetProps> = ({
             >
               <Trophy className="w-3.5 h-3.5 shrink-0" />
               <span>
-                PR: {prWeight && prWeight > 0 ? `${prWeight} lbs` : 'Bodyweight'} × {prReps ?? 0}
+                PR: {prWeight && prWeight > 0 ? formatWeight(prWeight, unit, { showUnit: true }) : 'Bodyweight'} × {prReps ?? 0}
                 {prDate ? ` · ${formatPrDate(prDate)}` : ''}
               </span>
             </div>
@@ -269,7 +272,7 @@ export const ExerciseHistorySheet: React.FC<ExerciseHistorySheetProps> = ({
                 Best Weight Trend
               </span>
               <span className="tabular-nums">
-                {trendPoints[0]} lbs → {trendPoints[trendPoints.length - 1]} lbs
+                {formatWeight(trendPoints[0], unit, { showUnit: true })} → {formatWeight(trendPoints[trendPoints.length - 1], unit, { showUnit: true })}
               </span>
             </div>
             <ExerciseSparkline
@@ -278,6 +281,7 @@ export const ExerciseHistorySheet: React.FC<ExerciseHistorySheetProps> = ({
               height={44}
               className="w-full text-cyan-400"
               testId="exercise-history-sparkline"
+              unit={unit}
             />
           </div>
         )}
@@ -351,7 +355,7 @@ export const ExerciseHistorySheet: React.FC<ExerciseHistorySheetProps> = ({
                     const isPr = prSetId !== null && currentSetId === prSetId;
 
                     const setLabel = `Set ${set.set_index > 0 ? set.set_index : sIdx + 1}`;
-                    const weightText = `${set.weight} lbs × ${set.reps}`;
+                    const weightText = `${formatWeight(set.weight, unit, { showUnit: true })} × ${set.reps}`;
 
                     if (!isReadOnly) {
                       return (

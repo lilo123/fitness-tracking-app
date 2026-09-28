@@ -1,4 +1,6 @@
 import React from 'react';
+import type { WeightUnit } from '../../utils/weight';
+import { formatWeight } from '../../utils/weight';
 
 export interface ExerciseSparklineProps {
   points: number[];
@@ -7,6 +9,7 @@ export interface ExerciseSparklineProps {
   strokeWidth?: number;
   className?: string;
   testId?: string;
+  unit?: WeightUnit;
 }
 
 export const ExerciseSparkline: React.FC<ExerciseSparklineProps> = ({
@@ -16,6 +19,7 @@ export const ExerciseSparkline: React.FC<ExerciseSparklineProps> = ({
   strokeWidth = 2,
   className = '',
   testId,
+  unit,
 }) => {
   if (!points || points.length < 2) {
     return null;
@@ -43,7 +47,9 @@ export const ExerciseSparkline: React.FC<ExerciseSparklineProps> = ({
     })
     .join(' ');
 
-  const ariaLabel = `Trend: first ${first}, last ${last} over ${points.length} sessions`;
+  const firstDisplay = unit === 'kg' ? formatWeight(first, 'kg', { showUnit: true }) : first;
+  const lastDisplay = unit === 'kg' ? formatWeight(last, 'kg', { showUnit: true }) : last;
+  const ariaLabel = `Trend: first ${firstDisplay}, last ${lastDisplay} over ${points.length} sessions`;
 
   return (
     <svg

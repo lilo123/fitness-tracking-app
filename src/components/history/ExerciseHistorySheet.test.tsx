@@ -12,10 +12,20 @@ vi.mock('../../lib/supabase', () => ({
   },
 }));
 
+let mockWeightUnit: 'lb' | 'kg' = 'lb';
+
+vi.mock('../../hooks/useAuth', () => ({
+  useAuth: () => ({
+    user: { id: 'test-user-123' },
+    profile: { id: 'test-user-123', weight_unit: mockWeightUnit },
+  }),
+}));
+
 describe('ExerciseHistorySheet', () => {
   let queryClient: QueryClient;
 
   beforeEach(() => {
+    mockWeightUnit = 'lb';
     vi.clearAllMocks();
     queryClient = new QueryClient({
       defaultOptions: {
@@ -450,5 +460,33 @@ describe('ExerciseHistorySheet', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('exercise-history-error')).toBeNull();
     });
+  });
+
+  it('9. kg-mode: displays PR summary and set rows in kg (225 lb -> 102.1 kg)', async () => {
+    mockWeightUnit = 'kg';
+    const mockRows = [
+      {
+        workout_id: 'w-sess-kg',
+        civil_date: '2026-09-20',
+        workout_name: 'Push Day Heavy',
+        set_id: 'set-kg-1',
+        set_index: 1,
+        weight: 225,
+        reps: 8,
+        rpe: 8.5,
+        created_at: '2026-09-20T10:00:00Z',
+        total_sessions: 1,
+      },
+    ];
+
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: mockRows, error: null } as any);
+
+    renderComponent({ prWeight: 225, prReps: 8 });
+
+    // PR summary displays in kg
+    expect(await screen.findByText(/PR: 102\.1 kg × 8/)).toBeDefined();
+
+    // Set row displays in kg
+    expect(await screen.findByText('102.1 kg × 8')).toBeDefined();
   });
 });

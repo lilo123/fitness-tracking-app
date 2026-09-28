@@ -11,6 +11,8 @@ import { Skeleton } from '../common/Skeleton';
 import { StatusBanner } from '../common/StatusBanner';
 import { OverflowMenu, type OverflowMenuItem } from '../common/OverflowMenu';
 import { ConfirmDialog } from '../common/ConfirmDialog';
+import { useWeightUnit } from '../../hooks/useWeightUnit';
+import { formatVolume, formatWeight, weightUnitLabel } from '../../utils/weight';
 import type { HistorySession } from './useWorkoutHistory';
 
 export type { HistorySession };
@@ -70,6 +72,7 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
 }) => {
   const routerNavigate = useNavigate();
   const navigate = onNavigate || routerNavigate;
+  const unit = useWeightUnit();
 
   const parentRef = React.useRef<HTMLDivElement>(null);
   const [scrollMargin, setScrollMargin] = React.useState(0);
@@ -304,7 +307,7 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <div className="text-right">
               <div className="text-xs font-mono font-bold text-amber-400">
-                {totalVolume > 0 ? `${totalVolume.toLocaleString()} lbs volume` : '0 lbs (BW)'}
+                {totalVolume > 0 ? formatVolume(totalVolume, unit) : `0 ${weightUnitLabel(unit)} (BW)`}
               </div>
               <div className="text-xs text-zinc-400 font-mono">
                 {setCount} sets completed
@@ -385,7 +388,7 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
                         </span>
                       </div>
                       <div className="text-xs font-mono font-bold text-amber-400/90 shrink-0 ml-2">
-                        {group.totalVolume > 0 ? `${group.totalVolume.toLocaleString()} lbs` : '0 lbs (BW)'}
+                        {group.totalVolume > 0 ? formatVolume(group.totalVolume, unit) : `0 ${weightUnitLabel(unit)} (BW)`}
                       </div>
                     </div>
 
@@ -402,7 +405,7 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
                             </div>
                             <div className="flex items-center gap-2">
                               <div className="font-mono font-bold text-cyan-300">
-                                {set.weight} lbs × {set.reps} reps
+                                {formatWeight(set.weight, unit, { showUnit: true })} × {set.reps} reps
                                 {set.rpe != null && (
                                   <span className="text-zinc-400 ml-1 text-xs">@{set.rpe}</span>
                                 )}

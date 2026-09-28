@@ -5,6 +5,8 @@ import { Search, Trophy, Edit2 } from 'lucide-react';
 import { formatShortDate, normalizeDateStr } from '../../utils/date';
 import { Tag } from '../common/Tag';
 import { FALLBACK_WINDOW } from './virtualizationConstants';
+import { useWeightUnit } from '../../hooks/useWeightUnit';
+import { formatWeight } from '../../utils/weight';
 
 const CATEGORIES = ['All', 'Chest', 'Back', 'Arms', 'Shoulders', 'Legs', 'Core'];
 
@@ -50,6 +52,7 @@ export const WorkoutExerciseHistory: React.FC<WorkoutExerciseHistoryProps> = ({
   isInspectingAthlete,
   onEditSet,
 }) => {
+  const unit = useWeightUnit();
   const parentRef = React.useRef<HTMLDivElement | null>(null);
   const [scrollMargin, setScrollMargin] = React.useState(0);
 
@@ -135,7 +138,7 @@ export const WorkoutExerciseHistory: React.FC<WorkoutExerciseHistoryProps> = ({
             <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-2xl text-amber-400 text-xs font-bold shrink-0">
               <Trophy className="w-3.5 h-3.5 shrink-0" />
               <span>
-                PR: {stat.maxWeight > 0 ? `${stat.maxWeight} lbs` : 'Bodyweight'} × {stat.prReps}
+                PR: {stat.maxWeight > 0 ? formatWeight(stat.maxWeight, unit, { showUnit: true }) : 'Bodyweight'} × {stat.prReps}
                 {stat.prDate ? ` · ${formatExerciseSetDate(stat.prDate)}` : ''}
               </span>
             </div>
@@ -159,7 +162,7 @@ export const WorkoutExerciseHistory: React.FC<WorkoutExerciseHistoryProps> = ({
                   <span className="text-zinc-400">{formatExerciseSetDate(s.workout_date)}</span>
                   <div className="flex items-center gap-2">
                     <span className="text-cyan-300 font-bold tabular-nums">
-                      {s.weight} lbs × {s.reps} reps
+                      {formatWeight(s.weight, unit, { showUnit: true })} × {s.reps} reps
                     </span>
                     {!isInspectingAthlete && (
                       <button

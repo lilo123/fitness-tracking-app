@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { StatusBanner } from '../common/StatusBanner';
 import { FALLBACK_WINDOW } from '../history/virtualizationConstants';
+import { useWeightUnit } from '../../hooks/useWeightUnit';
+import { formatVolume, formatWeight } from '../../utils/weight';
 
 export interface CoachWorkoutSet {
   id?: string;
@@ -26,7 +28,6 @@ export interface CoachWorkoutSet {
   set_index?: number | null;
   set_order?: number;
   weight?: number;
-  weight_lbs?: number;
   reps?: number;
   created_at?: string;
   exercise?: { id?: string; name: string; body_part?: string | null } | null;
@@ -106,6 +107,7 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
   error,
   onRetry,
 }) => {
+  const unit = useWeightUnit();
   const hasError = Boolean(isWorkoutsError ?? isError);
   const activeError = workoutsError ?? error;
   const handleRetry = onRetryWorkouts ?? onRetry;
@@ -241,7 +243,7 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
                         <div className="text-[10px] text-zinc-400 font-mono shrink-0">
                           {w.sets && w.sets.length > 0 ? (
                             <span>
-                              {w.sets.length} sets • {totalVol.toLocaleString()} lbs vol
+                              {w.sets.length} sets • {formatVolume(totalVol, unit)} vol
                             </span>
                           ) : (
                             <span>Logged</span>
@@ -272,7 +274,7 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
                                   </span>
                                   <div className="flex items-center gap-1.5 text-zinc-400 font-mono text-[10px] shrink-0">
                                     <span>
-                                      {g.sets.length} sets • {g.totalVolume.toLocaleString()} lbs
+                                      {g.sets.length} sets • {formatVolume(g.totalVolume, unit)}
                                     </span>
                                     <ChevronDown
                                       className={`w-3.5 h-3.5 text-cyan-400 transition-transform duration-200 ${
@@ -295,7 +297,7 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
                                           Set {s.set_index ?? s.set_order ?? sIdx + 1}
                                         </span>
                                         <span className="text-cyan-300 font-bold">
-                                          {Number(s.reps) || 0} reps × {Number(s.weight ?? s.weight_lbs ?? 0)} lbs
+                                          {Number(s.reps) || 0} reps × {formatWeight(Number(s.weight ?? 0), unit, { showUnit: true })}
                                         </span>
                                       </div>
                                     ))}
