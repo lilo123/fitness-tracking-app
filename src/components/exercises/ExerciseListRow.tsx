@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Pencil, Archive, EyeOff, RotateCcw } from 'lucide-react';
 import type { Exercise } from '../../types/database';
 import type { CatalogExercise } from '../../lib/exercises';
@@ -39,6 +39,11 @@ export const ExerciseListRow: React.FC<ExerciseListRowProps> = ({
   isActionPending = false,
 }) => {
   const [clickedAction, setClickedAction] = useState<string | null>(null);
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+  }, []);
 
   const handleAction = (type: string, fn?: (exercise: ExerciseRowItem) => void) => {
     if (isActionPending || clickedAction) return;
@@ -46,7 +51,11 @@ export const ExerciseListRow: React.FC<ExerciseListRowProps> = ({
     try {
       fn?.(ex);
     } finally {
-      setTimeout(() => setClickedAction(null), 300);
+      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+      resetTimerRef.current = setTimeout(() => {
+        resetTimerRef.current = null;
+        setClickedAction(null);
+      }, 300);
     }
   };
 
