@@ -15,9 +15,10 @@ export const WeightUnitCard: React.FC = () => {
     setLocalError(null);
     try {
       await setUnit(selectedUnit);
-    } catch (err: any) {
+    } catch (err) {
       // Catch rejection to ensure no unhandled promise rejection occurs
-      setLocalError(err?.message || 'Failed to update weight unit');
+      const msg = err instanceof Error ? err.message : (err as { message?: string })?.message || 'Failed to update weight unit';
+      setLocalError(msg);
     }
   };
 

@@ -43,7 +43,8 @@ export function useWeightUnitPreference(): UseWeightUnitPreferenceReturn {
           throw new Error('Not authenticated');
         }
 
-        const { error: updateError } = await (supabase.from('users') as any)
+        const { error: updateError } = await supabase
+          .from('users')
           .update({ weight_unit: u })
           .eq('id', user.id);
 
@@ -52,8 +53,8 @@ export function useWeightUnitPreference(): UseWeightUnitPreferenceReturn {
         }
 
         await refreshProfile();
-      } catch (err: any) {
-        const msg = err?.message || 'Failed to update weight unit';
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : (err as { message?: string })?.message || 'Failed to update weight unit';
         setError(msg);
         throw err;
       } finally {

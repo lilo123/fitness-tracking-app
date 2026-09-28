@@ -53,8 +53,8 @@ export const CUSTOM_EXERCISE_SET = new Set(
 
 /**
  * 2 phantom duplicate submissions identified during forensic audit:
- * 1. 2026-08-13 Lat Pull Down duplicate Set 1 (190 lbs x 7)
- * 2. 2026-08-24 Dips duplicate Set 3 (170 lbs x 11, logged 14s after flyes)
+ * 1. 2026-08-13 Lat Pull Down duplicate Set 1 (190 lb x 7)
+ * 2. 2026-08-24 Dips duplicate Set 3 (170 lb x 11, logged 14s after flyes)
  */
 export const PURGED_CLIENT_IDS = new Set([
   'C-1786658684370-z2ebzn',
@@ -193,7 +193,7 @@ export function assertMigrationIntegrity(metrics: PostMigrationMetrics): void {
     throw new Error(`Expected ${EXPECTED_HISTORICAL_METRICS.setsCount} sets, got ${metrics.setsCount}`);
   }
   if (Math.abs(metrics.totalVolume - EXPECTED_HISTORICAL_METRICS.totalVolume) > 0.05) {
-    throw new Error(`Expected ${EXPECTED_HISTORICAL_METRICS.totalVolume} lbs volume, got ${metrics.totalVolume}`);
+    throw new Error(`Expected ${EXPECTED_HISTORICAL_METRICS.totalVolume} lb volume, got ${metrics.totalVolume}`);
   }
   if (metrics.templatesCount !== EXPECTED_HISTORICAL_METRICS.templatesCount) {
     throw new Error(`Expected ${EXPECTED_HISTORICAL_METRICS.templatesCount} routine templates, got ${metrics.templatesCount}`);

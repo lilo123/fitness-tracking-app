@@ -403,6 +403,7 @@ export type Database = {
           target_protein: number | null
           timezone: string | null
           username: string | null
+          weight_unit: string
         }
         Insert: {
           auto_rest_timer?: boolean
@@ -421,6 +422,7 @@ export type Database = {
           target_protein?: number | null
           timezone?: string | null
           username?: string | null
+          weight_unit?: string
         }
         Update: {
           auto_rest_timer?: boolean
@@ -439,6 +441,7 @@ export type Database = {
           target_protein?: number | null
           timezone?: string | null
           username?: string | null
+          weight_unit?: string
         }
         Relationships: []
       }

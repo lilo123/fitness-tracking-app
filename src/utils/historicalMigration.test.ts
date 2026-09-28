@@ -136,7 +136,7 @@ describe('Historical Data Migration Utilities', () => {
     // Mismatched volume
     expect(() =>
       assertMigrationIntegrity({ ...validMetrics, totalVolume: 246173.2 })
-    ).toThrowError(/Expected 242973.2 lbs volume/);
+    ).toThrowError(/Expected 242973.2 lb volume/);
 
     // Mismatched workouts
     expect(() =>
