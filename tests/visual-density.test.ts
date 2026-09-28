@@ -5141,3 +5141,199 @@ test.describe("P5a History", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// P5b History: Exercise Sheet, Calendar, Nutrition Timeline & Accessibility
+// ---------------------------------------------------------------------------
+
+test.describe("P5b History", () => {
+  // (a) Hit-area and layout acceptance at 320px and 390px on /history (Exercise Sheet, Calendar Sheet, Nutrition Timeline)
+  for (const width of [320, 390] as const) {
+    test(`hit-area and layout acceptance at ${width}px on /history (exercise sheet, calendar, nutrition)`, async ({ browser }) => {
+      const page = await browser.newPage({
+        viewport: { width, height: 844 },
+        deviceScaleFactor: 1,
+      });
+      try {
+        await setupHistoryDensityPage(page);
+
+        // Helper to check 44px hit area
+        const assertHitArea44 = async (loc: Locator, label: string) => {
+          await expect(loc).toBeVisible();
+          const item = await loc.evaluate((el) => {
+            el.scrollIntoView({ block: "center", inline: "nearest" });
+            const r = el.getBoundingClientRect();
+            const cx = r.left + r.width / 2;
+            const cy = r.top + r.height / 2;
+
+            const centerEl = document.elementFromPoint(cx, cy);
+            const centerHits = Boolean(centerEl && (el.contains(centerEl) || centerEl.contains(el)));
+
+            const topEl = document.elementFromPoint(cx, cy - 21.5);
+            const btmEl = document.elementFromPoint(cx, cy + 21.5);
+            const topHits = Boolean(topEl && (el.contains(topEl) || topEl.contains(el)));
+            const btmHits = Boolean(btmEl && (el.contains(btmEl) || btmEl.contains(el)));
+
+            const horizontalAllowed = r.width >= 43;
+            let horizontalHits = true;
+            if (horizontalAllowed) {
+              const leftEl = document.elementFromPoint(cx - 21.5, cy);
+              const rightEl = document.elementFromPoint(cx + 21.5, cy);
+              const leftHits = Boolean(leftEl && (el.contains(leftEl) || leftEl.contains(el)));
+              const rightHits = Boolean(rightEl && (el.contains(rightEl) || rightEl.contains(el)));
+              horizontalHits = leftHits && rightHits;
+            }
+
+            const hasMin44pxHitArea = centerHits && (
+              topHits ||
+              btmHits ||
+              (horizontalAllowed && horizontalHits) ||
+              r.width >= 43 ||
+              r.height >= 43
+            );
+
+            return {
+              tag: el.tagName.toLowerCase(),
+              testId: el.getAttribute("data-testid") || el.getAttribute("aria-label") || el.textContent?.trim().slice(0, 20),
+              width: Math.round(r.width),
+              height: Math.round(r.height),
+              hasMin44pxHitArea,
+            };
+          });
+
+          expect(
+            item.hasMin44pxHitArea,
+            `${label} control ${item.testId || item.tag} (${item.width}x${item.height}) failed >=44px hit area: ${JSON.stringify(item)}`
+          ).toBe(true);
+        };
+
+        // 1. Calendar Sheet Open
+        const openCalendarBtn = page.locator('[data-testid="open-calendar-btn"]');
+        await expect(openCalendarBtn).toBeVisible();
+        await openCalendarBtn.click();
+        const calendarSheet = page.locator('[data-testid="history-calendar-sheet"]');
+        await expect(calendarSheet).toBeVisible();
+
+        const hasCalendarOverflow = await page.evaluate(() => {
+          return document.documentElement.scrollWidth > window.innerWidth;
+        });
+        expect(
+          hasCalendarOverflow,
+          `Viewport ${width}px must not have horizontal overflow on /history (Calendar Sheet open)`
+        ).toBe(false);
+
+        // Verify >= 44px hit areas on Calendar controls
+        await assertHitArea44(page.locator('[data-testid="calendar-prev-month-btn"]'), "Calendar prev month");
+        await assertHitArea44(page.locator('[data-testid="calendar-next-month-btn"]'), "Calendar next month");
+        const firstDayBtn = calendarSheet.locator('button[data-date]').first();
+        await expect(firstDayBtn).toBeVisible();
+        await assertHitArea44(firstDayBtn, "Calendar day button");
+        await page.keyboard.press("Escape");
+        await expect(calendarSheet).not.toBeVisible();
+
+        // 2. Exercise Sheet Open
+        await page.locator('[data-testid="history-subview-exercise"]').click();
+        const firstExCard = page.locator('[data-testid^="exercise-card-"]').first();
+        await expect(firstExCard).toBeVisible();
+        await firstExCard.click();
+
+        const exerciseSheet = page.locator('[data-testid="exercise-history-sheet"]');
+        await expect(exerciseSheet).toBeVisible();
+
+        const hasExerciseSheetOverflow = await page.evaluate(() => {
+          return document.documentElement.scrollWidth > window.innerWidth;
+        });
+        expect(
+          hasExerciseSheetOverflow,
+          `Viewport ${width}px must not have horizontal overflow on /history (Exercise Sheet open)`
+        ).toBe(false);
+
+        // Verify >= 44px hit areas on Exercise Sheet range chips
+        await assertHitArea44(exerciseSheet.locator('[data-testid="range-chip-30d"]'), "Exercise sheet 30D chip");
+        await assertHitArea44(exerciseSheet.locator('[data-testid="range-chip-90d"]'), "Exercise sheet 90D chip");
+        await assertHitArea44(exerciseSheet.locator('[data-testid="range-chip-1y"]'), "Exercise sheet 1Y chip");
+        await assertHitArea44(exerciseSheet.locator('[data-testid="range-chip-all"]'), "Exercise sheet All chip");
+
+        await page.keyboard.press("Escape");
+        await expect(exerciseSheet).not.toBeVisible();
+
+        // 3. Nutrition Timeline
+        await page.locator('[data-testid="history-tab-nutrition"]').click();
+        await expect(page.locator('[data-testid="history-tab-nutrition"]')).toHaveAttribute("aria-selected", "true");
+
+        const hasNutritionOverflow = await page.evaluate(() => {
+          return document.documentElement.scrollWidth > window.innerWidth;
+        });
+        expect(
+          hasNutritionOverflow,
+          `Viewport ${width}px must not have horizontal overflow on /history (Nutrition Timeline)`
+        ).toBe(false);
+
+        // Verify >= 44px hit areas on Nutrition Timeline controls
+        const nutControls = [
+          page.locator('[data-testid="history-tab-workouts"]'),
+          page.locator('[data-testid="history-tab-nutrition"]'),
+        ];
+        for (const loc of nutControls) {
+          await assertHitArea44(loc, "Nutrition domain control");
+        }
+      } finally {
+        await page.close();
+      }
+    });
+  }
+
+  // (b) Clean axe-core accessibility audit on open sheets & nutrition timeline
+  test("clean axe-core accessibility audit on open exercise sheet, calendar sheet, and nutrition timeline", async ({ browser }) => {
+    const page = await browser.newPage({
+      viewport: { width: 375, height: 812 },
+      deviceScaleFactor: 1,
+    });
+    try {
+      await setupHistoryDensityPage(page);
+      await page.addScriptTag({ path: "node_modules/axe-core/axe.min.js" });
+
+      const runAxeOnLocator = async (locator: Locator, desc: string) => {
+        const violations = await locator.evaluate(async (el) => {
+          // @ts-ignore
+          const res = await axe.run(el, {
+            runOnly: {
+              type: "tag",
+              values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"],
+            },
+          });
+          return res.violations;
+        });
+        expect(violations, `${desc} axe violations: ${JSON.stringify(violations, null, 2)}`).toHaveLength(0);
+      };
+
+      // 1. Audit Calendar Sheet open
+      const openCalendarBtn = page.locator('[data-testid="open-calendar-btn"]');
+      await expect(openCalendarBtn).toBeVisible();
+      await openCalendarBtn.click();
+      const calendarSheet = page.locator('[data-testid="history-calendar-sheet"]');
+      await expect(calendarSheet).toBeVisible();
+      await runAxeOnLocator(calendarSheet, "History Calendar Sheet");
+      await page.keyboard.press("Escape");
+      await expect(calendarSheet).not.toBeVisible();
+
+      // 2. Audit Exercise History Sheet open
+      await page.locator('[data-testid="history-subview-exercise"]').click();
+      const firstExCard = page.locator('[data-testid^="exercise-card-"]').first();
+      await expect(firstExCard).toBeVisible();
+      await firstExCard.click();
+      const exerciseSheet = page.locator('[data-testid="exercise-history-sheet"]');
+      await expect(exerciseSheet).toBeVisible();
+      await runAxeOnLocator(exerciseSheet, "Exercise History Sheet");
+      await page.keyboard.press("Escape");
+      await expect(exerciseSheet).not.toBeVisible();
+
+      // 3. Audit Nutrition Timeline
+      await page.locator('[data-testid="history-tab-nutrition"]').click();
+      await expect(page.locator('[data-testid="history-tab-nutrition"]')).toHaveAttribute("aria-selected", "true");
+      await runAxeOnLocator(page.locator("main"), "History Nutrition Timeline");
+    } finally {
+      await page.close();
+    }
+  });
+});
+

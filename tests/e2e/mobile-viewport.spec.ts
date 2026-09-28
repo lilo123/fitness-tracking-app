@@ -91,4 +91,60 @@ test.describe('Mobile Viewport & Ergonomics', () => {
     });
     expect(isOverflowingExercise, "No horizontal overflow on /history By Exercise").toBe(false);
   });
+
+  test("prevents horizontal scroll overflow on /history with open sheets and nutrition timeline", async ({ page }) => {
+    await page.goto("/login");
+    await page.fill('input[type="email"]', "athlete@cybergym.io");
+    await page.fill('input[type="password"]', "password123");
+    await page.click('button[type="submit"]');
+    await page.waitForURL("**/workout");
+
+    await page.goto("/history");
+    await page.waitForURL("**/history");
+    await expect(page.getByRole("heading", { name: "Workout History" })).toBeVisible();
+
+    // 1. Calendar sheet open
+    const openCalendarBtn = page.locator('[data-testid="open-calendar-btn"]');
+    await openCalendarBtn.click();
+    const calendarSheet = page.locator('[data-testid="history-calendar-sheet"]');
+    await expect(calendarSheet).toBeVisible();
+
+    const isOverflowingCalendar = await page.evaluate(() => {
+      return document.documentElement.scrollWidth > window.innerWidth;
+    });
+    expect(isOverflowingCalendar, "No horizontal overflow with Calendar sheet open").toBe(false);
+
+    await page.keyboard.press("Escape");
+    await expect(calendarSheet).not.toBeVisible();
+
+    // 2. Exercise sheet open
+    const exerciseTab = page.locator('[data-testid="history-subview-exercise"]');
+    await exerciseTab.click();
+    await expect(page.locator('[data-testid="all-time-stats-caption"]')).toBeVisible();
+
+    const exerciseCard = page.locator('[data-testid^="exercise-card-"]').first();
+    await expect(exerciseCard).toBeVisible();
+    await exerciseCard.click();
+
+    const exerciseSheet = page.locator('[data-testid="exercise-history-sheet"]');
+    await expect(exerciseSheet).toBeVisible();
+
+    const isOverflowingExerciseSheet = await page.evaluate(() => {
+      return document.documentElement.scrollWidth > window.innerWidth;
+    });
+    expect(isOverflowingExerciseSheet, "No horizontal overflow with Exercise sheet open").toBe(false);
+
+    await page.keyboard.press("Escape");
+    await expect(exerciseSheet).not.toBeVisible();
+
+    // 3. Nutrition timeline
+    const nutritionTab = page.locator('[data-testid="history-tab-nutrition"]');
+    await nutritionTab.click();
+    await expect(nutritionTab).toHaveAttribute("aria-selected", "true");
+
+    const isOverflowingNutrition = await page.evaluate(() => {
+      return document.documentElement.scrollWidth > window.innerWidth;
+    });
+    expect(isOverflowingNutrition, "No horizontal overflow on /history Nutrition timeline").toBe(false);
+  });
 });
