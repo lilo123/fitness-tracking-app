@@ -13,8 +13,8 @@ SELECT col_default_is('public', 'users', 'weight_unit', 'lb', 'users.weight_unit
 -- 2. Existing Rows Assertion
 -- ============================================================================
 SELECT is_empty(
-  'SELECT id FROM public.users WHERE weight_unit IS NULL OR weight_unit <> ''lb''',
-  'All existing users rows have weight_unit = ''lb'''
+  'SELECT id FROM public.users WHERE weight_unit IS NULL OR weight_unit NOT IN (''lb'', ''kg'')',
+  'All existing users rows have a valid weight_unit (backfill to lb is proven by the M6 post audit)'
 );
 
 -- ============================================================================
