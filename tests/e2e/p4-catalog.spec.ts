@@ -63,17 +63,17 @@ function cleanupP4Data() {
     DELETE FROM public.sets
     WHERE exercise_id IN (
       SELECT id FROM public.exercises
-      WHERE name LIKE 'Zercher%'
+      WHERE (name LIKE 'Zercher%' OR name LIKE '%Zercher Hold%')
         AND user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io')
     );
     DELETE FROM public.template_exercises
     WHERE exercise_id IN (
       SELECT id FROM public.exercises
-      WHERE name LIKE 'Zercher%'
+      WHERE (name LIKE 'Zercher%' OR name LIKE '%Zercher Hold%')
         AND user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io')
     );
     DELETE FROM public.exercises
-    WHERE name LIKE 'Zercher%'
+    WHERE (name LIKE 'Zercher%' OR name LIKE '%Zercher Hold%')
       AND user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io');
   `;
   try {
@@ -175,8 +175,8 @@ function getVisibleExercisesFromDB(): Array<{ name: string; body_part: string }>
     FROM public.exercises
     WHERE is_archived = false
       AND (is_master = true OR user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io'))
-    ORDER BY name
-    LIMIT 200;
+    ORDER BY lower(name) ASC, id ASC
+    LIMIT 50;
   `;
   const cmd = `${getPsqlCommand()} -t -A -F "|"`;
   const out = execSync(cmd, { input: sql, encoding: 'utf8' });
@@ -244,7 +244,7 @@ test.describe('P4 Catalog & E2E Verification (p4-catalog)', () => {
       const card = libraryCards.nth(i);
       const expected = visibleExercises[i];
       await expect(card.locator('div.text-zinc-100 > span').first()).toHaveText(expected.name);
-      await expect(card.locator('[data-testid="exercise-row-subtitle"]')).toHaveText(expected.body_part.replace(/\s*\/\s*/g, ' · '));
+      await expect(card.locator('[data-testid="exercise-row-subtitle"]')).toHaveText(expected.body_part);
     }
 
     // 2. Verify History (/history) renders the seeded 'Push Day Benchmark' session with its exercise names
@@ -325,21 +325,22 @@ test.describe('P4 Catalog & E2E Verification (p4-catalog)', () => {
     const searchInput = page.locator('[data-testid="exercise-search-input"]');
     await expect(searchInput).toBeVisible();
 
-    // 1. Create custom 'Zercher Squat' via picker Create row (since seed.sql has no Zercher)
-    await searchInput.fill('Zercher Squat');
+    // 1. Create custom 'A P4 Zercher Hold <timestamp>' via picker Create row
+    const customExName = `A P4 Zercher Hold ${Date.now()}`;
+    await searchInput.fill(customExName);
     const createBtn = page.locator('[data-testid="create-exercise-btn"]');
     await expect(createBtn).toBeVisible({ timeout: 5000 });
-    await expect(createBtn).toContainText('Create “Zercher Squat”');
+    await expect(createBtn).toContainText(`Create “${customExName}”`);
     await createBtn.click();
 
-    // Wait for creation to complete (search input is cleared and Zercher Squat row appears)
+    // Wait for creation to complete (search input is cleared and new row appears on page 1)
     await expect(searchInput).toHaveValue('', { timeout: 10000 });
-    const zercherRow = page.locator('[data-testid^="exercise-row-"]:has-text("Zercher Squat")').first();
+    const zercherRow = page.locator(`[data-testid^="exercise-row-"]:has-text("${customExName}")`).first();
     await expect(zercherRow).toBeVisible({ timeout: 10000 });
     await expect(zercherRow).toHaveAttribute('aria-pressed', 'true');
 
-    // 2. Duplicate prevention check: typing 'Zercher Squat' again displays duplicate message
-    await searchInput.fill('Zercher Squat');
+    // 2. Duplicate prevention check: typing custom name again displays duplicate message
+    await searchInput.fill(customExName);
     const duplicateMsg = page.locator('[data-testid="create-exercise-duplicate-msg"]');
     await expect(duplicateMsg).toBeVisible({ timeout: 5000 });
     await expect(duplicateMsg).toContainText('already exists');
@@ -355,17 +356,20 @@ test.describe('P4 Catalog & E2E Verification (p4-catalog)', () => {
     await expect(benchRow).toBeVisible({ timeout: 5000 });
 
     // 5. Multi-select 2 exercises -> 'Add 2 Exercises' -> 2 new cards and document.activeElement inside the first new card
-    await searchInput.fill('');
-    // Deselect Zercher Squat to test toggle-off behavior unconditionally
+    // Deselect custom exercise to test toggle-off behavior unconditionally
+    await searchInput.fill(customExName);
     await zercherRow.click();
     await expect(zercherRow).toHaveAttribute('aria-pressed', 'false');
 
+    await searchInput.fill('Cable Lateral');
     const row1 = page.locator('[data-testid^="exercise-row-"]:has-text("Cable Lateral Raises")').first();
-    const row2 = page.locator('[data-testid^="exercise-row-"]:has-text("Face Pulls")').first();
     await expect(row1).toBeVisible({ timeout: 5000 });
-    await expect(row2).toBeVisible({ timeout: 5000 });
     await row1.click();
     await expect(row1).toHaveAttribute('aria-pressed', 'true');
+
+    await searchInput.fill('Face Pulls');
+    const row2 = page.locator('[data-testid^="exercise-row-"]:has-text("Face Pulls")').first();
+    await expect(row2).toBeVisible({ timeout: 5000 });
     await row2.click();
     await expect(row2).toHaveAttribute('aria-pressed', 'true');
 

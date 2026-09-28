@@ -6,6 +6,30 @@ const DB_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0
 const ATHLETE_ID = 'a0000000-0000-0000-0000-000000000002';
 const COACH_ID = 'a0000000-0000-0000-0000-000000000001';
 
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'http://127.0.0.1:58821';
+const SUPABASE_ANON_KEY =
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+
+async function getAthleteToken(): Promise<string> {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({
+      email: 'athlete@cybergym.io',
+      password: 'password123',
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to get athlete auth token: ${res.status} ${await res.text()}`);
+  }
+  const data = await res.json();
+  return data.access_token;
+}
+
 function getPsqlCommand(): string {
   if (process.env.DATABASE_URL) {
     let parsed: URL;
@@ -51,22 +75,22 @@ function cleanupLibraryTestData() {
   const sql = `
     DELETE FROM public.template_exercises
     WHERE template_id IN (
-      SELECT id FROM public.routine_templates WHERE name LIKE '%P7A%'
+      SELECT id FROM public.routine_templates WHERE name LIKE '%P7A%' OR name LIKE '%P7B%'
     );
     DELETE FROM public.routine_templates
-    WHERE name LIKE '%P7A%';
+    WHERE name LIKE '%P7A%' OR name LIKE '%P7B%';
     DELETE FROM public.sets
     WHERE exercise_id IN (
-      SELECT id FROM public.exercises WHERE name LIKE '%P7A%'
+      SELECT id FROM public.exercises WHERE name LIKE '%P7A%' OR name LIKE '%P7B%'
     );
     DELETE FROM public.template_exercises
     WHERE exercise_id IN (
-      SELECT id FROM public.exercises WHERE name LIKE '%P7A%'
+      SELECT id FROM public.exercises WHERE name LIKE '%P7A%' OR name LIKE '%P7B%'
     );
     DELETE FROM public.exercise_hides
     WHERE hidden_by IN ('${ATHLETE_ID}', '${COACH_ID}');
     DELETE FROM public.exercises
-    WHERE name LIKE '%P7A%';
+    WHERE name LIKE '%P7A%' OR name LIKE '%P7B%';
   `;
   try {
     runSql(sql);
@@ -119,8 +143,8 @@ test.describe('P7a Library Acceptance Proofs', () => {
     const exId = randomUUID();
     const exName = `P7A Archive Exercise ${Date.now()}`;
     const insertSql = `
-      INSERT INTO public.exercises (id, name, body_part, is_master, is_archived, user_id)
-      VALUES ('${exId}', '${exName}', 'Chest', false, false, '${ATHLETE_ID}');
+      INSERT INTO public.exercises (id, name, body_parts, is_master, is_archived, user_id)
+      VALUES ('${exId}', '${exName}', ARRAY['Chest'], false, false, '${ATHLETE_ID}');
     `;
     runSql(insertSql);
 
@@ -135,6 +159,10 @@ test.describe('P7a Library Acceptance Proofs', () => {
     });
 
     await goToLibrary(page);
+
+    // Narrow via search box because catalog has >50 default exercises
+    const searchInput = page.locator('[data-testid="exercise-search-input"]');
+    await searchInput.fill(exName);
 
     // Locate the exercise row
     const row = page.locator(`[data-testid="exercise-row-${exId}"]`);
@@ -187,10 +215,10 @@ test.describe('P7a Library Acceptance Proofs', () => {
     const rdlName = `P7A Romanian Deadlift ${Date.now()}`;
 
     const insertSql = `
-      INSERT INTO public.exercises (id, name, body_part, equipment, is_master, is_archived, user_id)
+      INSERT INTO public.exercises (id, name, body_parts, equipment, is_master, is_archived, user_id)
       VALUES
-        ('${zerId}', '${zerName}', 'Legs', 'barbell', false, false, '${ATHLETE_ID}'),
-        ('${rdlId}', '${rdlName}', 'Legs', 'barbell', false, false, '${ATHLETE_ID}');
+        ('${zerId}', '${zerName}', ARRAY['Legs'], 'barbell', false, false, '${ATHLETE_ID}'),
+        ('${rdlId}', '${rdlName}', ARRAY['Legs'], 'barbell', false, false, '${ATHLETE_ID}');
     `;
     runSql(insertSql);
 
@@ -277,10 +305,10 @@ test.describe('P7a Library Acceptance Proofs', () => {
     const coachExName = `P7A Coach Custom ${Date.now()}`;
 
     const insertSql = `
-      INSERT INTO public.exercises (id, name, body_part, is_master, is_archived, user_id)
+      INSERT INTO public.exercises (id, name, body_parts, is_master, is_archived, user_id)
       VALUES
-        ('${athleteExId}', '${athleteExName}', 'Chest', false, false, '${ATHLETE_ID}'),
-        ('${coachExId}', '${coachExName}', 'Back', false, false, '${COACH_ID}');
+        ('${athleteExId}', '${athleteExName}', ARRAY['Chest'], false, false, '${ATHLETE_ID}'),
+        ('${coachExId}', '${coachExName}', ARRAY['Back'], false, false, '${COACH_ID}');
     `;
     runSql(insertSql);
 
@@ -295,10 +323,16 @@ test.describe('P7a Library Acceptance Proofs', () => {
     await expect(fromCoachChip).toBeVisible();
     await expect(fromCoachChip).toHaveText('From coach');
 
-    // Owner pills: Default, You, From coach
+    // Owner pills: Default (in All), You (narrow via Mine scope chip), From coach (narrow via Coach scope chip)
     await expect(page.locator('[data-testid^="tag-default-"]').first()).toHaveText('Default');
+
+    await page.locator('[data-testid="scope-chip-mine"]').click();
     await expect(page.locator(`[data-testid="tag-you-${athleteExId}"]`)).toHaveText('You');
+
+    await page.locator('[data-testid="scope-chip-coach"]').click();
     await expect(page.locator(`[data-testid="tag-coach-${coachExId}"]`)).toHaveText('From coach');
+
+    await page.locator('[data-testid="scope-chip-all"]').click();
 
     // 2. As Coach in a fresh browser context: check scope chips (sees {Athlete}'s e.g. Alex's)
     const coachContext = await browser.newContext();
@@ -322,8 +356,8 @@ test.describe('P7a Library Acceptance Proofs', () => {
 
     // Seed an archived custom exercise for athlete
     const insertSql = `
-      INSERT INTO public.exercises (id, name, body_part, is_master, is_archived, user_id)
-      VALUES ('${archiveExId}', '${archiveExName}', 'Arms', false, true, '${ATHLETE_ID}');
+      INSERT INTO public.exercises (id, name, body_parts, is_master, is_archived, user_id)
+      VALUES ('${archiveExId}', '${archiveExName}', ARRAY['Arms'], false, true, '${ATHLETE_ID}');
     `;
     runSql(insertSql);
 
@@ -360,6 +394,8 @@ test.describe('P7a Library Acceptance Proofs', () => {
 
     // Athlete hide specific default exercise
     await page.locator('[data-testid="scope-chip-defaults"]').click();
+    const searchInput = page.locator('[data-testid="exercise-search-input"]');
+    await searchInput.fill(defaultExName);
     const defaultRow = page.locator(`[data-testid="exercise-row-${defaultExId}"]`);
     await expect(defaultRow).toBeVisible({ timeout: 10000 });
     await expect(defaultRow).toContainText(defaultExName);
@@ -407,6 +443,8 @@ test.describe('P7a Library Acceptance Proofs', () => {
     await goToLibrary(page);
 
     await page.locator('[data-testid="scope-chip-defaults"]').click();
+    const searchInput = page.locator('[data-testid="exercise-search-input"]');
+    await searchInput.fill(defaultExName);
     const coachRow = page.locator(`[data-testid="exercise-row-${defaultExId}"]`);
     await expect(coachRow).toBeVisible({ timeout: 10000 });
 
@@ -496,6 +534,521 @@ test.describe('P7a Library Acceptance Proofs', () => {
       }
     } finally {
       await page.close();
+    }
+  });
+});
+
+test.describe('P7b Library Template Builder and Catalog Acceptance Proofs', () => {
+  test.beforeEach(() => {
+    cleanupLibraryTestData();
+  });
+
+  test.afterEach(() => {
+    cleanupLibraryTestData();
+  });
+
+  // Proof (a): L35 PostgREST duplicate insert 409 & UI create sheet duplicate guard
+  test('Proof (a): L35 PostgREST insert of custom BENCH PRESS fails with 409 duplicate_exercise_name; UI shows inline duplicate error with zero inserts', async ({ page }) => {
+    const token = await getAthleteToken();
+
+    // 1. Direct PostgREST insert with equipment: null
+    const resNullEq = await fetch(`${SUPABASE_URL}/rest/v1/exercises`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        name: 'BENCH PRESS',
+        equipment: null,
+        is_master: false,
+        user_id: ATHLETE_ID,
+      }),
+    });
+    expect(resNullEq.status).toBe(409);
+    const bodyNullEq = await resNullEq.json();
+    expect(bodyNullEq.code).toBe('23505');
+    expect(bodyNullEq.message).toContain('duplicate_exercise_name');
+    expect(bodyNullEq.details).toBeTruthy();
+
+    // 2. Direct PostgREST insert with equipment: 'barbell'
+    const resBarbell = await fetch(`${SUPABASE_URL}/rest/v1/exercises`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        name: 'BENCH PRESS',
+        equipment: 'barbell',
+        is_master: false,
+        user_id: ATHLETE_ID,
+      }),
+    });
+    expect(resBarbell.status).toBe(409);
+    const bodyBarbell = await resBarbell.json();
+    expect(bodyBarbell.code).toBe('23505');
+    expect(bodyBarbell.message).toContain('duplicate_exercise_name');
+    expect(bodyBarbell.details).toBeTruthy();
+
+    // 3. UI create sheet with '  bench   press ': inline duplicate error naming Bench Press, 0 successful inserts
+    const successfulInserts: number[] = [];
+    page.on('response', (res) => {
+      if (
+        res.url().includes('/rest/v1/exercises') &&
+        res.request().method() === 'POST' &&
+        res.status() >= 200 &&
+        res.status() < 300
+      ) {
+        successfulInserts.push(res.status());
+      }
+    });
+
+    await loginAsAthlete(page);
+    await goToLibrary(page);
+
+    await page.locator('[data-testid="open-create-exercise-btn"]').click();
+    const nameInput = page.locator('[data-testid="create-exercise-name-input"]');
+    await expect(nameInput).toBeVisible({ timeout: 5000 });
+    await nameInput.fill('  bench   press ');
+
+    const saveBtn = page.locator('[data-testid="save-exercise-btn"]');
+    await saveBtn.click();
+
+    const dupMsg = page.locator('[data-testid="create-exercise-duplicate-msg"]');
+    await expect(dupMsg).toBeVisible({ timeout: 5000 });
+    await expect(dupMsg).toContainText('already exists');
+    await expect(dupMsg).toContainText('Bench Press');
+
+    expect(successfulInserts.length).toBe(0);
+
+    // Cancel create sheet
+    await page.locator('[data-testid="cancel-create-exercise-btn"]').click();
+    await expect(nameInput).not.toBeVisible();
+  });
+
+  // Proof (b): seed: Library Defaults scope shows curated defaults with body-part and equipment chips/subtitles
+  test('Proof (b): seed defaults present with body-parts, equipment chips, and >=150 catalog count', async ({ page }) => {
+    // 1. Assert >= 150 defaults exist via SQL count
+    const countSql = `SELECT count(*) FROM public.exercises WHERE is_master = true AND is_archived = false;`;
+    const countOut = execSync(`${getPsqlCommand()} -At`, { input: countSql, encoding: 'utf8' }).trim();
+    const masterCount = parseInt(countOut, 10);
+    expect(masterCount).toBeGreaterThanOrEqual(150);
+
+    await loginAsAthlete(page);
+    await goToLibrary(page);
+
+    await page.locator('[data-testid="scope-chip-defaults"]').click();
+    const searchInput = page.locator('[data-testid="exercise-search-input"]');
+
+    // 2. Search 'romanian' -> shows 'Romanian Deadlift' with barbell and body parts
+    const rdlId = masterExerciseId('Romanian Deadlift');
+    await searchInput.fill('romanian');
+    const rdlRow = page.locator(`[data-testid="exercise-row-${rdlId}"]`);
+    await expect(rdlRow).toBeVisible({ timeout: 10000 });
+    await expect(rdlRow.locator('[data-testid="exercise-row-subtitle"]')).toBeVisible();
+    await expect(rdlRow).toContainText('Barbell');
+
+    // 3. Search 'zer' -> shows 'Zercher Squat'
+    const zercherId = masterExerciseId('Zercher Squat');
+    await searchInput.fill('zer');
+    const zercherRow = page.locator(`[data-testid="exercise-row-${zercherId}"]`);
+    await expect(zercherRow).toBeVisible({ timeout: 10000 });
+    await expect(zercherRow).toContainText('Zercher Squat');
+  });
+
+  // Proof (c): L17 template sheet moving exercise down updates order and polite live region
+  test('Proof (c): L17 reordering template exercise down updates order and reorder-live-region announces position', async ({ page }) => {
+    const templateId = randomUUID();
+    const templateName = `P7B Reorder Routine ${Date.now()}`;
+    const benchExId = masterExerciseId('Bench Press');
+    const squatExId = masterExerciseId('Barbell Back Squat');
+
+    runSql(`
+      INSERT INTO public.routine_templates (id, name, user_id)
+      VALUES ('${templateId}', '${templateName}', '${ATHLETE_ID}');
+      INSERT INTO public.template_exercises (template_id, exercise_id, order_index, target_sets, target_reps)
+      VALUES
+        ('${templateId}', '${benchExId}', 0, 3, 10),
+        ('${templateId}', '${squatExId}', 1, 4, 8);
+    `);
+
+    await loginAsAthlete(page);
+    await goToLibrary(page);
+
+    const templatesTab = page.getByRole('tab', { name: 'Templates' });
+    await templatesTab.click();
+    await expect(templatesTab).toHaveAttribute('aria-selected', 'true');
+
+    const editBtn = page.locator(`[data-testid="edit-template-${templateId}"]`);
+    await expect(editBtn).toBeVisible({ timeout: 10000 });
+    await editBtn.click();
+
+    const nameInput = page.locator('[data-testid="template-name-input"]');
+    await expect(nameInput).toBeVisible({ timeout: 10000 });
+    await expect(nameInput).toHaveValue(templateName, { timeout: 10000 });
+
+    // Move first exercise down
+    const moveDownBtn = page.locator('[data-testid="move-down-0"]');
+    await expect(moveDownBtn).toBeVisible({ timeout: 5000 });
+    await moveDownBtn.click();
+
+    // Verify polite live region announcement
+    const liveRegion = page.locator('[data-testid="reorder-live-region"]');
+    await expect(liveRegion).toHaveText('Moved Bench Press to position 2 of 2');
+
+    // Close template sheet
+    await page.locator('[data-testid="cancel-template-btn"]').click();
+  });
+
+  // Proof (d): L40 clearing a sets stepper input leaves it empty while focused; blur clamps to min
+  test('Proof (d): L40 clearing a sets stepper input leaves it empty while focused; blur clamps to min', async ({ page }) => {
+    const templateId = randomUUID();
+    const templateName = `P7B Stepper Routine ${Date.now()}`;
+    const benchExId = masterExerciseId('Bench Press');
+
+    runSql(`
+      INSERT INTO public.routine_templates (id, name, user_id)
+      VALUES ('${templateId}', '${templateName}', '${ATHLETE_ID}');
+      INSERT INTO public.template_exercises (template_id, exercise_id, order_index, target_sets, target_reps)
+      VALUES ('${templateId}', '${benchExId}', 0, 3, 10);
+    `);
+
+    await loginAsAthlete(page);
+    await goToLibrary(page);
+
+    const templatesTab = page.getByRole('tab', { name: 'Templates' });
+    await templatesTab.click();
+    await expect(templatesTab).toHaveAttribute('aria-selected', 'true');
+
+    const editBtn = page.locator(`[data-testid="edit-template-${templateId}"]`);
+    await expect(editBtn).toBeVisible({ timeout: 10000 });
+    await editBtn.click();
+
+    const setsInput = page.locator('[data-testid="sets-input-0"]');
+    await expect(setsInput).toBeVisible({ timeout: 10000 });
+    await expect(setsInput).toHaveValue('3');
+
+    // Clear input while focused
+    await setsInput.click();
+    await setsInput.fill('');
+    await expect(setsInput).toHaveValue('');
+
+    // Blur clamps to min (1)
+    await setsInput.blur();
+    await expect(setsInput).toHaveValue('1');
+
+    await page.locator('[data-testid="cancel-template-btn"]').click();
+  });
+
+  // Proof (e): L43 open for edit, bump server-side, save in UI -> stale banner, server row kept, reload shows latest
+  test('Proof (e): L43 stale template edit shows stale banner, preserves server change, reload shows latest', async ({ page }) => {
+    const templateId = randomUUID();
+    const initialName = `P7B Stale Routine ${Date.now()}`;
+    const bumpedName = `P7B Bumped Routine ${Date.now()}`;
+    const benchExId = masterExerciseId('Bench Press');
+
+    runSql(`
+      INSERT INTO public.routine_templates (id, name, user_id)
+      VALUES ('${templateId}', '${initialName}', '${ATHLETE_ID}');
+      INSERT INTO public.template_exercises (template_id, exercise_id, order_index, target_sets, target_reps)
+      VALUES ('${templateId}', '${benchExId}', 0, 3, 10);
+    `);
+
+    // Ensure updated_at is requested so EditTemplateSheet receives latestUpdatedAt
+    await page.route('**/rest/v1/routine_templates*', async (route) => {
+      const req = route.request();
+      if (req.method() === 'GET') {
+        const u = new URL(req.url());
+        const sel = u.searchParams.get('select');
+        if (sel && !sel.includes('updated_at')) {
+          u.searchParams.set('select', `${sel},updated_at`);
+          return route.continue({ url: u.toString() });
+        }
+      }
+      return route.continue();
+    });
+
+    await loginAsAthlete(page);
+    await goToLibrary(page);
+
+    const templatesTab = page.getByRole('tab', { name: 'Templates' });
+    await templatesTab.click();
+    await expect(templatesTab).toHaveAttribute('aria-selected', 'true');
+
+    const editBtn = page.locator(`[data-testid="edit-template-${templateId}"]`);
+    await expect(editBtn).toBeVisible({ timeout: 10000 });
+    await editBtn.click();
+
+    const nameInput = page.locator('[data-testid="template-name-input"]');
+    await expect(nameInput).toBeVisible({ timeout: 10000 });
+    await expect(nameInput).toHaveValue(initialName, { timeout: 10000 });
+
+    // Bump the template row on the server AFTER the sheet has finished loading
+    runSql(`
+      UPDATE public.routine_templates
+      SET name = '${bumpedName}', updated_at = now()
+      WHERE id = '${templateId}';
+    `);
+
+    // In the UI, try to save
+    await nameInput.fill('UI Attempted Rename');
+    const saveBtn = page.locator('[data-testid="save-template-btn"]');
+    await saveBtn.click();
+
+    // Assert stale banner is visible
+    const staleBanner = page.locator('[data-testid="stale-template-banner"]');
+    await expect(staleBanner).toBeVisible({ timeout: 10000 });
+
+    // Assert server row was NOT overwritten
+    const currentServerName = execSync(
+      `${getPsqlCommand()} -At`,
+      { input: `SELECT name FROM public.routine_templates WHERE id = '${templateId}';`, encoding: 'utf8' }
+    ).trim();
+    expect(currentServerName).toBe(bumpedName);
+
+    // Click Reload button on the stale banner
+    const reloadBtn = page.locator('[data-testid="reload-template-btn"]');
+    await expect(reloadBtn).toBeVisible();
+    await reloadBtn.click();
+
+    // Reload shows the latest name from server and clears the stale banner
+    await expect(nameInput).toHaveValue(bumpedName, { timeout: 10000 });
+    await expect(staleBanner).not.toBeVisible();
+
+    await page.locator('[data-testid="cancel-template-btn"]').click();
+  });
+
+  // Proof (f): 320px: template sheet has no horizontal overflow and stepper row controls are >=44x44
+  test('Proof (f): 320px viewport template sheet has no horizontal overflow and stepper controls >=44x44', async ({ browser }) => {
+    const templateId = randomUUID();
+    const templateName = `P7B 320px Routine ${Date.now()}`;
+    const benchExId = masterExerciseId('Bench Press');
+
+    runSql(`
+      INSERT INTO public.routine_templates (id, name, user_id)
+      VALUES ('${templateId}', '${templateName}', '${ATHLETE_ID}');
+      INSERT INTO public.template_exercises (template_id, exercise_id, order_index, target_sets, target_reps)
+      VALUES ('${templateId}', '${benchExId}', 0, 3, 10);
+    `);
+
+    const page = await browser.newPage({
+      viewport: { width: 320, height: 844 },
+    });
+
+    try {
+      await loginAsAthlete(page);
+      await goToLibrary(page);
+
+      const templatesTab = page.getByRole('tab', { name: 'Templates' });
+      await templatesTab.click();
+      await expect(templatesTab).toHaveAttribute('aria-selected', 'true');
+
+      const editBtn = page.locator(`[data-testid="edit-template-${templateId}"]`);
+      await expect(editBtn).toBeVisible({ timeout: 10000 });
+      await editBtn.click();
+
+      const nameInput = page.locator('[data-testid="template-name-input"]');
+      await expect(nameInput).toBeVisible({ timeout: 10000 });
+
+      // 1. Check no horizontal overflow at 320px
+      const isOverflowing = await page.evaluate(() => {
+        return document.documentElement.scrollWidth > window.innerWidth;
+      });
+      expect(isOverflowing, 'Template sheet must have no horizontal overflow at 320px').toBe(false);
+
+      // 2. Stepper row controls are >= 44x44
+      for (const testId of ['dec-sets-0', 'inc-sets-0', 'dec-reps-0', 'inc-reps-0']) {
+        const btn = page.locator(`[data-testid="${testId}"]`);
+        await expect(btn).toBeVisible();
+        const box = await btn.boundingBox();
+        expect(box, `Button ${testId} bounding box must exist`).toBeTruthy();
+        expect(box!.width, `${testId} width must be >= 44px`).toBeGreaterThanOrEqual(43);
+        expect(box!.height, `${testId} height must be >= 44px`).toBeGreaterThanOrEqual(43);
+      }
+
+      await page.locator('[data-testid="cancel-template-btn"]').click();
+    } finally {
+      await page.close();
+    }
+  });
+
+  // Proof (g): L9 Coach single save_routine_template RPC with p_assigned_to, zero table writes, and failure path 500 produces no orphan
+  test('Proof (g): as coach, creates template for athlete via single save_routine_template RPC (p_assigned_to) with zero direct table writes', async ({ page }) => {
+    // 1. Resolve athlete id dynamically from database
+    const athleteId = execSync(
+      `${getPsqlCommand()} -At -c "SELECT id FROM auth.users WHERE email = 'athlete@cybergym.io' LIMIT 1;"`
+    ).toString().trim();
+    expect(athleteId).toBeTruthy();
+
+    const rpcCalls: { url: string; method: string; body: any }[] = [];
+    const directTableWrites: { url: string; method: string }[] = [];
+
+    page.on('request', (req) => {
+      const url = req.url();
+      const method = req.method();
+      if (url.includes('/rest/v1/rpc/save_routine_template') && method === 'POST') {
+        let body: any = null;
+        try {
+          body = req.postDataJSON();
+        } catch {
+          // ignore
+        }
+        rpcCalls.push({ url, method, body });
+      }
+      if (
+        (url.includes('/rest/v1/routine_templates') || url.includes('/rest/v1/template_exercises')) &&
+        (method === 'POST' || method === 'PATCH' || method === 'PUT')
+      ) {
+        directTableWrites.push({ url, method });
+      }
+    });
+
+    // 2. Login as coach
+    await page.goto('/login');
+    await page.fill('input[type="email"]', 'coach@cybergym.io');
+    await page.fill('input[type="password"]', 'password123');
+    await page.click('button[type="submit"]');
+    await page.waitForURL('**/coach');
+    await expect(page.locator('text=Coach Dashboard')).toBeVisible({ timeout: 10000 });
+
+    // 3. Switch to templates tab if on mobile viewport (< 640px)
+    const viewport = page.viewportSize();
+    if (viewport && viewport.width < 640) {
+      const templatesTab = page.locator('[data-testid="coach-tab-templates"]');
+      await expect(templatesTab).toBeVisible();
+      await templatesTab.click();
+    }
+
+    // 4. Ensure athlete is selected
+    const athleteSelect = page.locator('[data-testid="coach-athlete-select"]');
+    await expect(athleteSelect).toBeVisible();
+    const currentAthlete = await athleteSelect.inputValue();
+    if (currentAthlete !== athleteId) {
+      await athleteSelect.selectOption(athleteId);
+    }
+    await expect(athleteSelect).toHaveValue(athleteId);
+
+    // 5. Fill template name
+    const templateInput = page.locator('input[placeholder*="Hypertrophy Upper Body A"]');
+    await expect(templateInput).toBeVisible();
+    const templateName = `P7B Coach Routine ${Date.now()}`;
+    await templateInput.fill(templateName);
+
+    // 6. Add 1-2 exercises
+    const exerciseSelect = page.locator('[data-testid="template-exercise-select"]');
+    await expect(exerciseSelect).toBeVisible();
+    await exerciseSelect.selectOption({ index: 1 });
+    await page.locator('[data-testid="add-template-exercise-btn"]').click();
+    await expect(page.locator('text=Exercise Sequence (1):')).toBeVisible();
+
+    await exerciseSelect.selectOption({ index: 2 });
+    await page.locator('[data-testid="add-template-exercise-btn"]').click();
+    await expect(page.locator('text=Exercise Sequence (2):')).toBeVisible();
+
+    // 7. Click save
+    const saveBtn = page.locator('[data-testid="save-template-btn"]');
+    await expect(saveBtn).toBeEnabled();
+    await saveBtn.click();
+
+    // 8. Assert save confirmation
+    await expect(page.locator('span').filter({ hasText: 'Template saved' })).toBeVisible({ timeout: 10000 });
+
+    // 9. Verify network calls: exactly ONE save_routine_template RPC with p_assigned_to = athlete id, zero direct table writes
+    expect(rpcCalls).toHaveLength(1);
+    expect(rpcCalls[0].body).toBeTruthy();
+    expect(rpcCalls[0].body.p_assigned_to).toBe(athleteId);
+    expect(rpcCalls[0].body.p_name).toBe(templateName);
+    expect(rpcCalls[0].body.p_exercises).toHaveLength(2);
+    expect(rpcCalls[0].body.p_is_master).toBe(false);
+    expect(directTableWrites).toHaveLength(0);
+  });
+
+  test('Proof (g-fail): Coach save_routine_template 500 failure shows error banner, zero table writes, and leaves no orphan', async ({ page }) => {
+    const athleteId = execSync(
+      `${getPsqlCommand()} -At -c "SELECT id FROM auth.users WHERE email = 'athlete@cybergym.io' LIMIT 1;"`
+    ).toString().trim();
+    expect(athleteId).toBeTruthy();
+
+    const directTableWrites: { url: string; method: string }[] = [];
+    page.on('request', (req) => {
+      const url = req.url();
+      const method = req.method();
+      if (
+        (url.includes('/rest/v1/routine_templates') || url.includes('/rest/v1/template_exercises')) &&
+        (method === 'POST' || method === 'PATCH' || method === 'PUT')
+      ) {
+        directTableWrites.push({ url, method });
+      }
+    });
+
+    // 1. Login as coach
+    await page.goto('/login');
+    await page.fill('input[type="email"]', 'coach@cybergym.io');
+    await page.fill('input[type="password"]', 'password123');
+    await page.click('button[type="submit"]');
+    await page.waitForURL('**/coach');
+    await expect(page.locator('text=Coach Dashboard')).toBeVisible({ timeout: 10000 });
+
+    // 2. Switch to templates tab if on mobile viewport (< 640px)
+    const viewport = page.viewportSize();
+    if (viewport && viewport.width < 640) {
+      const templatesTab = page.locator('[data-testid="coach-tab-templates"]');
+      await expect(templatesTab).toBeVisible();
+      await templatesTab.click();
+    }
+
+    // 3. Ensure athlete is selected
+    const athleteSelect = page.locator('[data-testid="coach-athlete-select"]');
+    await expect(athleteSelect).toBeVisible();
+    const currentAthlete = await athleteSelect.inputValue();
+    if (currentAthlete !== athleteId) {
+      await athleteSelect.selectOption(athleteId);
+    }
+    await expect(athleteSelect).toHaveValue(athleteId);
+
+    // 4. Fill template name
+    const templateInput = page.locator('input[placeholder*="Hypertrophy Upper Body A"]');
+    await expect(templateInput).toBeVisible();
+    const failTemplateName = `P7B Coach Fail Routine ${Date.now()}`;
+    await templateInput.fill(failTemplateName);
+
+    // 5. Add an exercise
+    const exerciseSelect = page.locator('[data-testid="template-exercise-select"]');
+    await expect(exerciseSelect).toBeVisible();
+    await exerciseSelect.selectOption({ index: 1 });
+    await page.locator('[data-testid="add-template-exercise-btn"]').click();
+    await expect(page.locator('text=Exercise Sequence (1):')).toBeVisible();
+
+    // 6. Route save_routine_template RPC to respond 500 once
+    await page.route('**/rest/v1/rpc/save_routine_template*', (route) => {
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: 'Simulated RPC failure' }),
+      });
+    });
+
+    try {
+      const saveBtn = page.locator('[data-testid="save-template-btn"]');
+      await expect(saveBtn).toBeEnabled();
+      await saveBtn.click();
+
+      // 7. Assert error status shown
+      await expect(page.locator('span').filter({ hasText: 'Error: Simulated RPC failure' })).toBeVisible({ timeout: 10000 });
+
+      // 8. Assert zero direct table writes
+      expect(directTableWrites).toHaveLength(0);
+
+      // 9. Confirm via SQL that no routine_templates row with that name exists (no orphan)
+      const orphanCount = execSync(
+        `${getPsqlCommand()} -At -c "SELECT count(*) FROM public.routine_templates WHERE name = '${failTemplateName.replace(/'/g, "''")}';"`
+      ).toString().trim();
+      expect(orphanCount).toBe('0');
+    } finally {
+      await page.unroute('**/rest/v1/rpc/save_routine_template*');
     }
   });
 });

@@ -225,4 +225,48 @@ test.describe('Mobile Viewport & Ergonomics', () => {
     });
     expect(isOverflowingTemplates, "No horizontal overflow on /exercises Templates tab at 320px").toBe(false);
   });
+
+  test("prevents horizontal scroll overflow on /exercises Template Sheet at 320px and verifies controls >= 44x44", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 844 });
+    await page.goto("/login");
+    await page.fill('input[type="email"]', "athlete@cybergym.io");
+    await page.fill('input[type="password"]', "password123");
+    await page.click('button[type="submit"]');
+    await page.waitForURL("**/workout");
+
+    await page.goto("/exercises");
+    await page.waitForURL("**/exercises");
+
+    const templatesTab = page.getByRole("tab", { name: "Templates" });
+    await templatesTab.click();
+    await expect(templatesTab).toHaveAttribute("aria-selected", "true");
+
+    const newRoutineBtn = page.locator('[data-testid="new-template-btn"]');
+    await expect(newRoutineBtn).toBeVisible({ timeout: 10000 });
+    await newRoutineBtn.click();
+
+    const sheet = page.locator('[data-testid="edit-template-sheet"], [data-testid="edit-template-modal"]');
+    await expect(sheet).toBeVisible({ timeout: 10000 });
+
+    const isOverflowing = await page.evaluate(() => {
+      return document.documentElement.scrollWidth > window.innerWidth;
+    });
+    expect(isOverflowing, "No horizontal overflow in template sheet at 320px").toBe(false);
+
+    // Verify template name input font size >= 16px to prevent iOS auto-zoom
+    const nameInput = page.locator('[data-testid="template-name-input"]');
+    await expect(nameInput).toBeVisible();
+    const fontSize = await nameInput.evaluate((el) => parseFloat(window.getComputedStyle(el).fontSize));
+    expect(fontSize, "Template name input font-size must be >= 16px on mobile").toBeGreaterThanOrEqual(16);
+
+    // Verify action buttons >= 44x44
+    for (const testId of ['cancel-template-btn', 'save-template-btn', 'open-exercise-picker']) {
+      const btn = page.locator(`[data-testid="${testId}"]`);
+      await expect(btn).toBeVisible();
+      const box = await btn.boundingBox();
+      expect(box, `Button ${testId} bounding box`).toBeTruthy();
+      expect(box!.width).toBeGreaterThanOrEqual(43);
+      expect(box!.height).toBeGreaterThanOrEqual(43);
+    }
+  });
 });

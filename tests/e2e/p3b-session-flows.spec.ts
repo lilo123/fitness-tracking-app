@@ -425,6 +425,8 @@ test.describe('P3b Workout Session Flows (p3b-session-flows)', () => {
       await openAddBtn.click();
       const picker = page.locator('[data-testid="exercise-picker-sheet"]');
       await expect(picker).toBeVisible({ timeout: 5000 });
+      const searchInput = page.locator('[data-testid="exercise-search-input"]');
+      await searchInput.fill('Weighted Sit');
       const row = page.locator('[data-testid^="exercise-row-"]:has-text("Weighted Sit-Up")').first();
       await expect(row).toBeVisible({ timeout: 5000 });
       await row.click();

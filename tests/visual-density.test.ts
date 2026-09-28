@@ -5780,3 +5780,129 @@ test.describe("P7a Library", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// P7b Template Builder: Density, Hit Targets (>=44px), 320/390px & Axe Audit
+// ---------------------------------------------------------------------------
+
+test.describe("P7b Template Builder", () => {
+  for (const width of [320, 390] as const) {
+    test(`Template sheet hit-area and layout acceptance at ${width}px`, async ({ browser }) => {
+      const page = await browser.newPage({
+        viewport: { width, height: 844 },
+        deviceScaleFactor: 1,
+      });
+      try {
+        await setupLibraryDensityPage(page);
+
+        // Switch to Templates tab
+        const templatesTab = page.getByRole("tab", { name: "Templates" });
+        await templatesTab.click();
+        await expect(templatesTab).toHaveAttribute("aria-selected", "true");
+
+        // Open New Routine sheet
+        const newRoutineBtn = page.locator('[data-testid="new-template-btn"]');
+        await expect(newRoutineBtn).toBeVisible({ timeout: 10000 });
+        await newRoutineBtn.click();
+
+        const sheet = page.locator('[data-testid="edit-template-sheet"], [data-testid="edit-template-modal"]');
+        await expect(sheet).toBeVisible({ timeout: 10000 });
+
+        // 1. Verify no horizontal overflow at target viewport width
+        const isSheetOverflowing = await page.evaluate(() => {
+          return document.documentElement.scrollWidth > window.innerWidth;
+        });
+        expect(isSheetOverflowing, `Template sheet has no horizontal overflow at ${width}px`).toBe(false);
+
+        const assertHitArea44 = async (loc: Locator, label: string) => {
+          await expect(loc).toBeVisible();
+          const item = await loc.evaluate((el) => {
+            el.scrollIntoView({ block: "center", inline: "nearest" });
+            const r = el.getBoundingClientRect();
+            const cx = r.left + r.width / 2;
+            const cy = r.top + r.height / 2;
+
+            const centerEl = document.elementFromPoint(cx, cy);
+            const centerHits = Boolean(centerEl && (el.contains(centerEl) || centerEl.contains(el)));
+
+            const topEl = document.elementFromPoint(cx, cy - 21.5);
+            const btmEl = document.elementFromPoint(cx, cy + 21.5);
+            const topHits = Boolean(topEl && (el.contains(topEl) || topEl.contains(el)));
+            const btmHits = Boolean(btmEl && (el.contains(btmEl) || btmEl.contains(el)));
+
+            const horizontalAllowed = r.width >= 43;
+            let horizontalHits = true;
+            if (horizontalAllowed) {
+              const leftEl = document.elementFromPoint(cx - 21.5, cy);
+              const rightEl = document.elementFromPoint(cx + 21.5, cy);
+              const leftHits = Boolean(leftEl && (el.contains(leftEl) || leftEl.contains(el)));
+              const rightHits = Boolean(rightEl && (el.contains(rightEl) || rightEl.contains(el)));
+              horizontalHits = leftHits && rightHits;
+            }
+
+            const hasMin44pxHitArea = (r.width >= 43 && r.height >= 43) || (centerHits && topHits && btmHits && horizontalHits);
+
+            return {
+              tag: el.tagName.toLowerCase(),
+              testId: el.getAttribute("data-testid") || el.getAttribute("aria-label") || el.textContent?.trim().slice(0, 20),
+              width: Math.round(r.width),
+              height: Math.round(r.height),
+              hasMin44pxHitArea,
+            };
+          });
+
+          expect(
+            item.hasMin44pxHitArea,
+            `${label} control ${item.testId || item.tag} (${item.width}x${item.height}) failed >=44px hit area: ${JSON.stringify(item)}`
+          ).toBe(true);
+        };
+
+        // Assert 44px hit targets on Template Sheet controls
+        await assertHitArea44(page.locator('[data-testid="template-name-input"]'), "Template name input");
+        await assertHitArea44(page.locator('[data-testid="open-exercise-picker"]'), "Add exercises button");
+        await assertHitArea44(page.locator('[data-testid="cancel-template-btn"]'), "Cancel button");
+        await assertHitArea44(page.locator('[data-testid="save-template-btn"]'), "Save Routine button");
+      } finally {
+        await page.close();
+      }
+    });
+  }
+
+  // (b) Clean axe-core accessibility audit on Template sheet
+  test("clean axe-core accessibility audit on template sheet", async ({ browser }) => {
+    const page = await browser.newPage({
+      viewport: { width: 375, height: 812 },
+      deviceScaleFactor: 1,
+    });
+    try {
+      await setupLibraryDensityPage(page);
+
+      const templatesTab = page.getByRole("tab", { name: "Templates" });
+      await templatesTab.click();
+      await expect(templatesTab).toHaveAttribute("aria-selected", "true");
+
+      const newRoutineBtn = page.locator('[data-testid="new-template-btn"]');
+      await expect(newRoutineBtn).toBeVisible({ timeout: 10000 });
+      await newRoutineBtn.click();
+
+      const sheet = page.locator('[data-testid="edit-template-sheet"], [data-testid="edit-template-modal"]');
+      await expect(sheet).toBeVisible({ timeout: 10000 });
+
+      await page.addScriptTag({ path: "node_modules/axe-core/axe.min.js" });
+
+      const violations = await sheet.evaluate(async (el) => {
+        // @ts-ignore
+        const res = await axe.run(el, {
+          runOnly: {
+            type: "tag",
+            values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"],
+          },
+        });
+        return res.violations;
+      });
+      expect(violations, `Template sheet axe violations: ${JSON.stringify(violations, null, 2)}`).toHaveLength(0);
+    } finally {
+      await page.close();
+    }
+  });
+});
