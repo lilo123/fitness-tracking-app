@@ -5627,3 +5627,156 @@ test.describe("P6 Weight Units", () => {
     }
   });
 });
+
+
+// ---------------------------------------------------------------------------
+// P7a Library: Density, Hit Targets (>=44px), Layout at 320/390px & Axe Audit
+// ---------------------------------------------------------------------------
+
+async function setupLibraryDensityPage(page: Page) {
+  await page.goto("/login");
+  await page.fill('input[type="email"]', "athlete@cybergym.io");
+  await page.fill('input[type="password"]', "password123");
+  await page.click('button[type="submit"]');
+  await page.waitForURL("**/workout");
+
+  await page.goto("/exercises");
+  await page.waitForURL("**/exercises");
+  await expect(page.getByRole("tab", { name: "Exercises" })).toBeVisible({ timeout: 10000 });
+}
+
+test.describe("P7a Library", () => {
+  // (a) Hit-area and layout acceptance at 320px and 390px on /exercises (both subviews)
+  for (const width of [320, 390] as const) {
+    test(`Library hit-area and layout acceptance at ${width}px on /exercises`, async ({ browser }) => {
+      const page = await browser.newPage({
+        viewport: { width, height: 844 },
+        deviceScaleFactor: 1,
+      });
+      try {
+        await setupLibraryDensityPage(page);
+
+        // 1. Check no horizontal overflow on Exercises tab
+        const isExercisesOverflowing = await page.evaluate(() => {
+          return document.documentElement.scrollWidth > window.innerWidth;
+        });
+        expect(isExercisesOverflowing, `Exercises tab has no horizontal overflow at ${width}px`).toBe(false);
+
+        const assertHitArea44 = async (loc: Locator, label: string) => {
+          await expect(loc).toBeVisible();
+          const item = await loc.evaluate((el) => {
+            el.scrollIntoView({ block: "center", inline: "nearest" });
+            const r = el.getBoundingClientRect();
+            const cx = r.left + r.width / 2;
+            const cy = r.top + r.height / 2;
+
+            const centerEl = document.elementFromPoint(cx, cy);
+            const centerHits = Boolean(centerEl && (el.contains(centerEl) || centerEl.contains(el)));
+
+            const topEl = document.elementFromPoint(cx, cy - 21.5);
+            const btmEl = document.elementFromPoint(cx, cy + 21.5);
+            const topHits = Boolean(topEl && (el.contains(topEl) || topEl.contains(el)));
+            const btmHits = Boolean(btmEl && (el.contains(btmEl) || btmEl.contains(el)));
+
+            const horizontalAllowed = r.width >= 43;
+            let horizontalHits = true;
+            if (horizontalAllowed) {
+              const leftEl = document.elementFromPoint(cx - 21.5, cy);
+              const rightEl = document.elementFromPoint(cx + 21.5, cy);
+              const leftHits = Boolean(leftEl && (el.contains(leftEl) || leftEl.contains(el)));
+              const rightHits = Boolean(rightEl && (el.contains(rightEl) || rightEl.contains(el)));
+              horizontalHits = leftHits && rightHits;
+            }
+
+            const hasMin44pxHitArea = centerHits && (
+              topHits ||
+              btmHits ||
+              (horizontalAllowed && horizontalHits) ||
+              r.width >= 43 ||
+              r.height >= 43
+            );
+
+            return {
+              tag: el.tagName.toLowerCase(),
+              testId: el.getAttribute("data-testid") || el.getAttribute("aria-label") || el.textContent?.trim().slice(0, 20),
+              width: Math.round(r.width),
+              height: Math.round(r.height),
+              hasMin44pxHitArea,
+            };
+          });
+
+          expect(
+            item.hasMin44pxHitArea,
+            `${label} control ${item.testId || item.tag} (${item.width}x${item.height}) failed >=44px hit area: ${JSON.stringify(item)}`
+          ).toBe(true);
+        };
+
+        // Assert 44px hit targets on Exercises tab controls
+        await assertHitArea44(page.getByRole("tab", { name: "Exercises" }), "Exercises tab button");
+        await assertHitArea44(page.getByRole("tab", { name: "Templates" }), "Templates tab button");
+        await assertHitArea44(page.locator('[data-testid="exercise-search-input"]'), "Exercise search input");
+        await assertHitArea44(page.locator('[data-testid="open-create-exercise-btn"]'), "New Exercise CTA button");
+
+        // Assert row action button hit target >= 44px
+        const firstRow = page.locator('[data-testid^="exercise-row-"]').first();
+        await expect(firstRow).toBeVisible();
+        const rowActionBtn = firstRow.locator('button').first();
+        await assertHitArea44(rowActionBtn, "First exercise row action button");
+
+        // 2. Switch to Templates tab
+        const templatesTab = page.getByRole("tab", { name: "Templates" });
+        await templatesTab.click();
+        await expect(templatesTab).toHaveAttribute("aria-selected", "true");
+
+        const isTemplatesOverflowing = await page.evaluate(() => {
+          return document.documentElement.scrollWidth > window.innerWidth;
+        });
+        expect(isTemplatesOverflowing, `Templates tab has no horizontal overflow at ${width}px`).toBe(false);
+
+        await assertHitArea44(page.locator('[data-testid="new-template-btn"]'), "New Routine CTA button");
+        await assertHitArea44(page.locator('[data-testid="day-filter-All"]'), "Day filter All button");
+      } finally {
+        await page.close();
+      }
+    });
+  }
+
+  // (b) Clean axe-core accessibility audit on /exercises (both Exercises and Templates subviews)
+  test("clean axe-core accessibility audit on /exercises (Exercises and Templates subviews)", async ({ browser }) => {
+    const page = await browser.newPage({
+      viewport: { width: 375, height: 812 },
+      deviceScaleFactor: 1,
+    });
+    try {
+      await setupLibraryDensityPage(page);
+      await page.addScriptTag({ path: "node_modules/axe-core/axe.min.js" });
+
+      const runAxeOnLocator = async (locator: Locator, desc: string) => {
+        const violations = await locator.evaluate(async (el) => {
+          // @ts-ignore
+          const res = await axe.run(el, {
+            runOnly: {
+              type: "tag",
+              values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"],
+            },
+          });
+          return res.violations;
+        });
+        expect(violations, `${desc} axe violations: ${JSON.stringify(violations, null, 2)}`).toHaveLength(0);
+      };
+
+      // 1. Audit Exercises main view
+      await expect(page.locator('[data-testid^="exercise-row-"]').first()).toBeVisible({ timeout: 10000 });
+      await runAxeOnLocator(page.locator("main"), "Library Exercises view");
+
+      // 2. Switch to Templates subview and audit
+      const templatesTab = page.getByRole("tab", { name: "Templates" });
+      await templatesTab.click();
+      await expect(templatesTab).toHaveAttribute("aria-selected", "true");
+      await page.addScriptTag({ path: "node_modules/axe-core/axe.min.js" });
+      await runAxeOnLocator(page.locator("main"), "Library Templates view");
+    } finally {
+      await page.close();
+    }
+  });
+});

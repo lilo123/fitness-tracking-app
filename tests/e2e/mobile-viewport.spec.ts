@@ -65,6 +65,7 @@ test.describe('Mobile Viewport & Ergonomics', () => {
   });
 
   test("prevents horizontal scroll overflow on /history (both By Session and By Exercise)", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 844 });
     await page.goto("/login");
     await page.fill('input[type="email"]', "athlete@cybergym.io");
     await page.fill('input[type="password"]', "password123");
@@ -186,5 +187,42 @@ test.describe('Mobile Viewport & Ergonomics', () => {
       await lbBtn.click();
       await expect(lbBtn).toHaveAttribute("aria-pressed", "true");
     }
+  });
+
+  test("prevents horizontal scroll overflow on /exercises (both Exercises and Templates) and verifies search input font size >= 16px at 320px", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 844 });
+    await page.goto("/login");
+    await page.fill('input[type="email"]', "athlete@cybergym.io");
+    await page.fill('input[type="password"]', "password123");
+    await page.click('button[type="submit"]');
+    await page.waitForURL("**/workout");
+
+    // 1. Navigate to /exercises (Exercises subview)
+    await page.goto("/exercises");
+    await page.waitForURL("**/exercises");
+    await expect(page.getByRole("tab", { name: "Exercises" })).toBeVisible();
+
+    const isOverflowingExercises = await page.evaluate(() => {
+      return document.documentElement.scrollWidth > window.innerWidth;
+    });
+    expect(isOverflowingExercises, "No horizontal overflow on /exercises Exercises tab at 320px").toBe(false);
+
+    // Verify search input font size >= 16px on mobile to prevent iOS auto-zoom
+    const searchInput = page.locator('[data-testid="exercise-search-input"]');
+    await expect(searchInput).toBeVisible();
+    const searchFontSize = await searchInput.evaluate((el) => {
+      return parseFloat(window.getComputedStyle(el).fontSize);
+    });
+    expect(searchFontSize, "Search input font-size must be >= 16px on mobile").toBeGreaterThanOrEqual(16);
+
+    // 2. Switch to Templates subview
+    const templatesTab = page.getByRole("tab", { name: "Templates" });
+    await templatesTab.click();
+    await expect(templatesTab).toHaveAttribute("aria-selected", "true");
+
+    const isOverflowingTemplates = await page.evaluate(() => {
+      return document.documentElement.scrollWidth > window.innerWidth;
+    });
+    expect(isOverflowingTemplates, "No horizontal overflow on /exercises Templates tab at 320px").toBe(false);
   });
 });
