@@ -1,55 +1,174 @@
-import React from 'react';
-import { Pencil, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Pencil, Archive, EyeOff, RotateCcw } from 'lucide-react';
 import type { Exercise } from '../../types/database';
+import type { CatalogExercise } from '../../lib/exercises';
+import { Tag } from '../common/Tag';
+import { getEquipmentLabel } from '../../constants/muscleGroups';
+
+export type ExerciseRowItem = CatalogExercise | Exercise;
 
 export interface ExerciseListRowProps {
-  exercise: Exercise;
+  exercise: ExerciseRowItem;
   currentUserId?: string | null;
-  onEdit: (exercise: Exercise) => void;
-  onDelete: (exercise: Exercise) => void;
+  isCoach?: boolean;
+  athleteFirstName?: string;
+  scope?: string;
+  onEdit?: (exercise: ExerciseRowItem) => void;
+  onArchive?: (exercise: ExerciseRowItem) => void;
+  onDelete?: (exercise: ExerciseRowItem) => void; // backwards-compatible alias for onArchive
+  onRestore?: (exercise: ExerciseRowItem) => void;
+  onHide?: (exercise: ExerciseRowItem) => void;
+  onUnhide?: (exercise: ExerciseRowItem) => void;
+  isActionPending?: boolean;
 }
 
 export const ExerciseListRow: React.FC<ExerciseListRowProps> = ({
   exercise: ex,
   currentUserId,
+  isCoach = false,
+  athleteFirstName,
   onEdit,
+  onArchive,
   onDelete,
+  onRestore,
+  onHide,
+  onUnhide,
+  isActionPending = false,
 }) => {
-  // L1: masters show no Edit/Trash for anyone (incl. coaches); only own non-master rows are editable
-  const canEditExercise = !ex.is_master && Boolean(currentUserId) && ex.user_id === currentUserId;
-  const canDelete = !ex.is_master && Boolean(currentUserId) && ex.user_id === currentUserId;
+  const [clickedAction, setClickedAction] = useState<string | null>(null);
+
+  const handleAction = (type: string, fn?: (exercise: ExerciseRowItem) => void) => {
+    if (isActionPending || clickedAction) return;
+    setClickedAction(type);
+    try {
+      fn?.(ex);
+    } finally {
+      setTimeout(() => setClickedAction(null), 300);
+    }
+  };
+
+  const isHidden = Boolean((ex as CatalogExercise).is_hidden);
+  const isArchived = Boolean(ex.is_archived);
+
+  // L1 & L4: masters show no Edit/Archive for anyone; only own non-master rows are editable/archivable
+  const isOwnRow = Boolean(currentUserId) && ex.user_id === currentUserId;
+  const canEdit = !ex.is_master && !isArchived && !isHidden && isOwnRow && Boolean(onEdit);
+  const canArchive = !ex.is_master && !isArchived && !isHidden && isOwnRow && (Boolean(onArchive) || Boolean(onDelete));
+  const canHide = ex.is_master && !isArchived && !isHidden && Boolean(currentUserId) && Boolean(onHide);
+  const canRestore = isArchived && !ex.is_master && isOwnRow && Boolean(onRestore);
+  const canUnhide = isHidden && Boolean(currentUserId) && Boolean(onUnhide);
+
+  // Owner pills: Default / You / <athlete first name> / From coach
+  let ownerPill: React.ReactNode = null;
+  if (ex.is_master) {
+    ownerPill = <Tag label="Default" tone="info" testId={`tag-default-${ex.id}`} />;
+  } else if (isOwnRow) {
+    ownerPill = <Tag label="You" tone="neutral" testId={`tag-you-${ex.id}`} />;
+  } else if (isCoach && !isOwnRow) {
+    ownerPill = <Tag label={athleteFirstName || 'Athlete'} tone="info" testId={`tag-athlete-${ex.id}`} />;
+  } else if (!isCoach && !isOwnRow) {
+    ownerPill = <Tag label="From coach" tone="info" testId={`tag-coach-${ex.id}`} />;
+  }
+
+  const equipment = 'equipment' in ex && typeof (ex as any).equipment === 'string' ? (ex as any).equipment : null;
+  const equipmentLabel = equipment ? getEquipmentLabel(equipment) : null;
 
   return (
-    <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-4 flex justify-between items-center text-sm font-medium">
-      <div>
-        <div className="text-zinc-100 flex items-center gap-2">
-          <span>{ex.name}</span>
-          {ex.is_master && (
-            <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-              Master
+    <div
+      data-testid={`exercise-row-${ex.id}`}
+      className="bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-4 flex justify-between items-center text-sm font-medium min-w-0 gap-3"
+    >
+      <div className="min-w-0 flex-1">
+        <div className="text-zinc-100 flex items-center gap-2 min-w-0 flex-wrap">
+          {/* First span contains exercise name per p4-catalog locator contract */}
+          <span className="truncate">{ex.name}</span>
+          {ownerPill}
+          {isArchived && <Tag label="Archived" tone="warning" testId={`tag-archived-${ex.id}`} />}
+          {isHidden && <Tag label="Hidden" tone="neutral" testId={`tag-hidden-${ex.id}`} />}
+        </div>
+        <div className="text-xs text-zinc-400 mt-1 flex items-center gap-1.5 flex-wrap min-w-0">
+          {ex.body_part && (
+            <div className="text-xs text-zinc-500 text-zinc-400 inline">{ex.body_part}</div>
+          )}
+          {ex.body_part && equipmentLabel && (
+            <span className="text-zinc-600" aria-hidden="true">
+              ·
             </span>
           )}
+          {equipmentLabel && <span>{equipmentLabel}</span>}
         </div>
-        {ex.body_part && <div className="text-xs text-zinc-500 mt-1">{ex.body_part}</div>}
       </div>
+
       <div className="flex items-center gap-1 shrink-0">
-        {canEditExercise && (
+        {canEdit && (
           <button
-            onClick={() => onEdit(ex)}
+            type="button"
+            onClick={() => handleAction('edit', onEdit)}
             data-testid={`edit-exercise-${ex.id}`}
-            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-cyan-400 transition touch-manipulation"
+            disabled={isActionPending || Boolean(clickedAction)}
+            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-cyan-400 transition touch-manipulation cursor-pointer disabled:opacity-50"
             title="Edit Exercise"
+            aria-label={`Edit ${ex.name}`}
           >
             <Pencil className="w-4 h-4" />
           </button>
         )}
-        {canDelete && (
+
+        {canArchive && (
           <button
-            onClick={() => onDelete(ex)}
-            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-500 hover:text-rose-400 transition touch-manipulation"
-            title="Delete"
+            type="button"
+            onClick={() => handleAction('archive', onArchive || onDelete)}
+            data-testid={`archive-exercise-${ex.id}`}
+            disabled={isActionPending || Boolean(clickedAction)}
+            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-rose-400 transition touch-manipulation cursor-pointer disabled:opacity-50"
+            title="Archive exercise"
+            aria-label={`Archive ${ex.name}`}
           >
-            <Trash2 className="w-4 h-4" />
+            <Archive className="w-4 h-4" />
+          </button>
+        )}
+
+        {canHide && (
+          <button
+            type="button"
+            onClick={() => handleAction('hide', onHide)}
+            data-testid={`hide-exercise-${ex.id}`}
+            disabled={isActionPending || Boolean(clickedAction)}
+            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-amber-400 transition touch-manipulation cursor-pointer disabled:opacity-50"
+            title="Hide exercise"
+            aria-label={`Hide ${ex.name}`}
+          >
+            <EyeOff className="w-4 h-4" />
+          </button>
+        )}
+
+        {canRestore && (
+          <button
+            type="button"
+            onClick={() => handleAction('restore', onRestore)}
+            data-testid={`restore-exercise-${ex.id}`}
+            disabled={isActionPending || Boolean(clickedAction)}
+            className="px-2.5 py-1 min-h-[44px] min-w-[44px] flex items-center justify-center gap-1 text-xs font-semibold rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition touch-manipulation cursor-pointer disabled:opacity-50"
+            title="Restore exercise"
+            aria-label={`Restore ${ex.name}`}
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Restore</span>
+          </button>
+        )}
+
+        {canUnhide && (
+          <button
+            type="button"
+            onClick={() => handleAction('unhide', onUnhide)}
+            data-testid={`unhide-exercise-${ex.id}`}
+            disabled={isActionPending || Boolean(clickedAction)}
+            className="px-2.5 py-1 min-h-[44px] min-w-[44px] flex items-center justify-center gap-1 text-xs font-semibold rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/20 transition touch-manipulation cursor-pointer disabled:opacity-50"
+            title="Unhide exercise"
+            aria-label={`Unhide ${ex.name}`}
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Unhide</span>
           </button>
         )}
       </div>

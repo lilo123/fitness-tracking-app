@@ -1,35 +1,48 @@
-import React, { useState, useEffect, useId } from 'react';
-import { X, Dumbbell, AlertCircle, Check } from 'lucide-react';
+import React, { useState, useRef, useId } from 'react';
+import { Check, AlertCircle } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { workoutSessionStore } from '../../utils/workoutSessionStore';
-import { AccessibleModal } from '../common/AccessibleModal';
-import type { Exercise } from '../../types/database';
+import { Sheet } from '../common/Sheet';
+import { Chip } from '../common/Chip';
 import { StatusBanner } from '../common/StatusBanner';
-
-
-const MUSCLE_GROUPS = [
-  'Chest',
-  'Back',
-  'Legs',
-  'Shoulders',
-  'Arms',
-  'Core',
-  'Cardio',
-  'Full Body',
-];
+import {
+  MUSCLE_GROUPS,
+  EQUIPMENT,
+  EQUIPMENT_LABELS,
+  type Equipment,
+} from '../../constants/muscleGroups';
+import {
+  fetchExerciseCatalogPage,
+  type CatalogExercise,
+  type ExerciseCatalogPage,
+} from '../../lib/exercises';
+import { queryKeys } from '../../lib/queryKeys';
+import { normalizeSearch } from '../../utils/normalizeSearch';
+import type { Exercise } from '../../types/database';
+import type { InfiniteData } from '@tanstack/react-query';
 
 export interface EditExerciseSheetProps {
   isOpen: boolean;
-  exercise: Exercise | null;
+  exercise: (Exercise & { equipment?: string | null }) | CatalogExercise | null;
   targetUserId?: string;
   onClose: () => void;
   onSuccess?: () => void;
   onSaved?: () => void;
+  onViewExisting?: (ex: { id: string; name: string; is_hidden?: boolean }) => void;
 }
 
 export type EditExerciseModalProps = EditExerciseSheetProps;
+
+interface DuplicateInfo {
+  message: string;
+  existing?: {
+    id: string;
+    name: string;
+    is_hidden?: boolean;
+  };
+}
 
 export const EditExerciseSheet: React.FC<EditExerciseSheetProps> = ({
   isOpen,
@@ -38,32 +51,42 @@ export const EditExerciseSheet: React.FC<EditExerciseSheetProps> = ({
   onClose,
   onSuccess,
   onSaved,
+  onViewExisting,
 }) => {
   const exerciseNameId = useId();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+
   const [name, setName] = useState('');
   const [selectedBodyParts, setSelectedBodyParts] = useState<string[]>([]);
+  const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [duplicateError, setDuplicateError] = useState<DuplicateInfo | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
 
-  /* oxlint-disable react/set-state-in-effect */
-  useEffect(() => {
-    if (!isOpen || !exercise) return;
-
-    setName(exercise.name || '');
-    if (exercise.body_part) {
-      setSelectedBodyParts(
-        exercise.body_part
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean)
-      );
-    } else {
-      setSelectedBodyParts([]);
+  // Synchronize state on prop change during render (no setState in useEffect)
+  const [prevExerciseKey, setPrevExerciseKey] = useState<string | null>(null);
+  const currentExerciseKey = isOpen && exercise ? `${exercise.id}:${isOpen}` : null;
+  if (currentExerciseKey !== prevExerciseKey) {
+    setPrevExerciseKey(currentExerciseKey);
+    if (isOpen && exercise) {
+      setName(exercise.name || '');
+      if (exercise.body_part) {
+        setSelectedBodyParts(
+          exercise.body_part
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        );
+      } else {
+        setSelectedBodyParts([]);
+      }
+      setSelectedEquipment(((exercise as any).equipment as Equipment) || null);
+      setError(null);
+      setDuplicateError(null);
     }
-    setError(null);
-  }, [isOpen, exercise]);
+  }
 
   if (!isOpen || !exercise) return null;
 
@@ -73,31 +96,98 @@ export const EditExerciseSheet: React.FC<EditExerciseSheetProps> = ({
     );
   };
 
-  const handleSave = async () => {
+  const handleSave = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     const trimmedName = name.trim();
     if (!trimmedName) {
       setError('Exercise name cannot be blank.');
       return;
     }
 
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     setError(null);
+    setDuplicateError(null);
 
-    const bodyPartStr = selectedBodyParts.length > 0 ? selectedBodyParts.join(', ') : null;
+    const candidateEquipment = selectedEquipment ? selectedEquipment.toLowerCase().trim() : null;
+    const isNameChanged = normalizeSearch(trimmedName) !== normalizeSearch(exercise.name);
+    const prevEq = (exercise as any).equipment
+      ? (exercise as any).equipment.toLowerCase().trim()
+      : null;
+    const isEquipmentChanged = candidateEquipment !== prevEq;
+
+    const combinedCatalog: CatalogExercise[] = [];
 
     try {
+      // Duplicate check on rename / equipment change (L35)
+      if (isNameChanged || isEquipmentChanged) {
+        const cached = queryClient.getQueriesData<InfiniteData<ExerciseCatalogPage>>({
+          queryKey: queryKeys.exerciseCatalog.all,
+        });
+        for (const [, data] of cached) {
+          if (data?.pages) {
+            for (const page of data.pages) {
+              if (page.items) {
+                combinedCatalog.push(...page.items);
+              }
+            }
+          }
+        }
+
+        if (typeof (supabase as any).rpc === 'function') {
+          try {
+            const page = await fetchExerciseCatalogPage({
+              search: trimmedName,
+              includeHidden: true,
+              limit: 50,
+            });
+            combinedCatalog.push(...page.items);
+          } catch {
+            // rpc might not be mocked
+          }
+        }
+
+        const normalizedCandidate = normalizeSearch(trimmedName);
+        const duplicate = combinedCatalog.find((ex) => {
+          if (ex.id === exercise.id) return false;
+          const exName = normalizeSearch(ex.name);
+          const exEq = ex.equipment ? ex.equipment.toLowerCase().trim() : null;
+          if (exName !== normalizedCandidate) return false;
+          return !candidateEquipment || !exEq || exEq === candidateEquipment;
+        });
+
+        if (duplicate) {
+          const ownerLabel = duplicate.is_master
+            ? 'Default'
+            : duplicate.is_hidden
+            ? 'Hidden'
+            : 'Custom';
+          setDuplicateError({
+            message: `'${duplicate.name}' already exists (${ownerLabel})`,
+            existing: { id: duplicate.id, name: duplicate.name, is_hidden: duplicate.is_hidden },
+          });
+          return; // No update happens
+        }
+      }
+
+      const bodyPartStr = selectedBodyParts.length > 0 ? selectedBodyParts.join(', ') : null;
+
       const { data, error: updErr } = await supabase
         .from('exercises')
         .update({
           name: trimmedName,
           body_part: bodyPartStr,
-        })
+          equipment: candidateEquipment,
+        } as any)
         .eq('id', exercise.id)
         .select();
 
       if (updErr) throw updErr;
       if (!data || data.length === 0) {
-        throw new Error('Exercise could not be updated. You may not have permission to modify this exercise.');
+        throw new Error(
+          'Exercise could not be updated. You may not have permission to modify this exercise.'
+        );
       }
 
       // In-place cascade sync to active workout session drafts
@@ -112,11 +202,22 @@ export const EditExerciseSheet: React.FC<EditExerciseSheetProps> = ({
       await queryClient.invalidateQueries({ queryKey: ['routine_templates'] });
       await queryClient.invalidateQueries({ queryKey: ['workout_sets'] });
       await queryClient.invalidateQueries({ queryKey: ['exercise_stats'] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.exerciseCatalog.all });
 
       if (onSuccess) onSuccess();
       if (onSaved) onSaved();
       onClose();
     } catch (err: any) {
+      if (
+        err?.code === '23505' ||
+        err?.message?.includes('duplicate') ||
+        err?.message?.includes('unique')
+      ) {
+        setDuplicateError({
+          message: `'${trimmedName}' already exists`,
+        });
+        return;
+      }
       let msg = err?.message || 'Failed to update exercise.';
       if (err?.code === '23503' || String(err?.message).includes('23503')) {
         msg = 'Cannot update exercise because other records reference it.';
@@ -125,139 +226,176 @@ export const EditExerciseSheet: React.FC<EditExerciseSheetProps> = ({
       }
       setError(msg);
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };
 
+  const isWhitespaceOnly = name.length > 0 && !name.trim();
+  const isSubmitDisabled = !name.trim() || isSubmitting;
+
   return (
-    <AccessibleModal
+    <Sheet
       isOpen={isOpen}
       onClose={onClose}
+      title="Edit Exercise"
       titleId="edit-exercise-modal-title"
-      overlayTestId="edit-exercise-modal"
-      overlayClassName="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex flex-col justify-end sm:items-center sm:justify-center animate-fade-in"
-      className="bg-zinc-900 border-t sm:border border-zinc-800 rounded-t-3xl sm:rounded-2xl max-h-[92dvh] sm:max-h-[85vh] w-full max-w-lg flex flex-col shadow-2xl overflow-hidden animate-slide-up"
+      testId="edit-exercise-modal"
+      dismissible={!isSubmitting}
     >
-      {/* Mobile Drag Handle */}
-      <div className="w-12 h-1.5 bg-zinc-700 rounded-full mx-auto my-2.5 shrink-0 sm:hidden" />
-
-      {/* Safe Area Header */}
-      <div className="px-6 py-3.5 border-b border-zinc-800/80 flex items-center justify-between shrink-0 bg-zinc-900/95 backdrop-blur-md pt-[max(env(safe-area-inset-top),0.875rem)]">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
-            <Dumbbell className="w-4 h-4" />
+      {duplicateError ? (
+        <div
+          role="alert"
+          data-testid="edit-exercise-duplicate-msg"
+          className="flex items-center justify-between gap-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />
+            <span className="truncate">{duplicateError.message}</span>
           </div>
-          <div className="min-w-0">
-            <h2 id="edit-exercise-modal-title" className="text-sm sm:text-base font-black text-white truncate">
-              Edit Exercise
-            </h2>
-            <p className="text-[11px] text-zinc-400 truncate">
-              Update exercise name and target muscle group taxonomy
-            </p>
-          </div>
-        </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close dialog"
-            className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition shrink-0 touch-manipulation"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Single Fluid Scroll Body */}
-        <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-5 space-y-5">
-          <StatusBanner
-            message={error}
-            tone="error"
-            testId="edit-exercise-error"
-            icon={<AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />}
-          />
-
-
-          {/* Exercise Name Input */}
-          <div className="space-y-1.5">
-            <label
-              htmlFor={exerciseNameId}
-              className="block text-xs font-bold text-zinc-300 uppercase tracking-wider"
+          {duplicateError.existing && (
+            <button
+              type="button"
+              data-testid={
+                duplicateError.existing.is_hidden
+                  ? 'unhide-existing-exercise-btn'
+                  : 'view-existing-exercise-btn'
+              }
+              onClick={() => {
+                onViewExisting?.(duplicateError.existing!);
+                onClose();
+              }}
+              className="shrink-0 text-xs font-bold text-cyan-400 hover:text-cyan-300 px-2 py-1 min-h-[44px] flex items-center underline touch-manipulation cursor-pointer"
             >
-              Exercise Name
-            </label>
-            <input
-              id={exerciseNameId}
-              type="text"
-              data-testid="edit-exercise-name-input"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Incline Bench Press"
-              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-3 input-text-sm font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none transition"
-            />
-            {name.length > 0 && !name.trim() && (
-              <p className="text-xs text-rose-400 mt-1" role="alert" data-testid="edit-exercise-name-whitespace-error">
-                Exercise name cannot be blank or whitespace-only.
-              </p>
-            )}
-          </div>
+              {duplicateError.existing.is_hidden ? 'Unhide' : 'View'}
+            </button>
+          )}
+        </div>
+      ) : (
+        <StatusBanner
+          message={error}
+          tone="error"
+          testId="edit-exercise-error"
+          icon={<AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />}
+        />
+      )}
 
-          {/* Target Muscle Groups Multi-select */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="block text-xs font-bold text-zinc-300 uppercase tracking-wider">
-                Target Muscle Groups <span className="text-zinc-500 font-normal">(Tap multiple)</span>
-              </span>
+      <form onSubmit={handleSave} className="space-y-4">
+        {/* Exercise Name Input */}
+        <div className="space-y-1.5">
+          <label
+            htmlFor={exerciseNameId}
+            className="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-1.5"
+          >
+            Exercise Name
+          </label>
+          <input
+            id={exerciseNameId}
+            type="text"
+            data-testid="edit-exercise-name-input"
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              setError(null);
+              setDuplicateError(null);
+            }}
+            placeholder="e.g. Incline Bench Press"
+            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-3 input-text-sm font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none transition"
+          />
+          {isWhitespaceOnly && (
+            <p
+              className="text-xs text-rose-400 mt-1"
+              role="alert"
+              data-testid="edit-exercise-name-whitespace-error"
+            >
+              Exercise name cannot be blank or whitespace-only.
+            </p>
+          )}
+        </div>
+
+        {/* Target Muscle Groups Multi-select */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="block text-xs font-bold text-zinc-300 uppercase tracking-wider">
+              Target Muscle Groups <span className="text-zinc-400 font-normal">(Tap multiple)</span>
+            </span>
+            {selectedBodyParts.length > 0 && (
               <button
                 type="button"
                 onClick={() => setSelectedBodyParts([])}
-                className="text-xs font-bold text-zinc-500 hover:text-zinc-300 transition min-h-[44px] px-2 flex items-center touch-manipulation"
+                className="text-xs font-bold text-zinc-400 hover:text-zinc-200 transition min-h-[44px] px-2 flex items-center touch-manipulation cursor-pointer"
               >
                 Clear
               </button>
-            </div>
-            <div className="flex flex-wrap gap-1.5 p-2.5 bg-zinc-950/80 border border-zinc-800/80 rounded-xl">
-              {Array.from(new Set([...MUSCLE_GROUPS, ...selectedBodyParts])).map((part) => {
-                const isSelected = selectedBodyParts.includes(part);
-                return (
-                  <button
-                    key={part}
-                    type="button"
-                    onClick={() => toggleBodyPart(part)}
-                    className={`px-3.5 py-2 min-h-[44px] flex items-center justify-center rounded-full text-xs font-bold transition touch-manipulation ${
-                      isSelected
-                        ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
-                        : 'bg-zinc-900 text-zinc-400 border border-border-interactive hover:border-zinc-700'
-                    }`}
-                  >
-                    {part}
-                  </button>
-                );
-              })}
-            </div>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-1.5 p-2.5 bg-zinc-950/80 border border-zinc-800/80 rounded-xl">
+            {Array.from(new Set([...MUSCLE_GROUPS, ...selectedBodyParts])).map((part) => (
+              <Chip
+                key={part}
+                label={part}
+                selected={selectedBodyParts.includes(part)}
+                onClick={() => toggleBodyPart(part)}
+                size="sm"
+                testId={`muscle-chip-${part.toLowerCase().replace(/\s+/g, '-')}`}
+              />
+            ))}
           </div>
         </div>
 
-        {/* Sticky Bottom Action Bar */}
-        <div className="sticky bottom-0 z-20 bg-zinc-900/95 backdrop-blur-md border-t border-zinc-800/90 px-6 py-3.5 pb-[max(env(safe-area-inset-bottom),1rem)] flex items-center justify-between gap-3 shrink-0">
+        {/* Equipment Single-Select */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="block text-xs font-bold text-zinc-300 uppercase tracking-wider">
+              Equipment <span className="text-zinc-400 font-normal">(Select one)</span>
+            </span>
+            {selectedEquipment && (
+              <button
+                type="button"
+                onClick={() => setSelectedEquipment(null)}
+                className="text-xs font-bold text-zinc-400 hover:text-zinc-200 transition min-h-[44px] px-2 flex items-center touch-manipulation cursor-pointer"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-1.5 p-2.5 bg-zinc-950/80 border border-zinc-800/80 rounded-xl">
+            {EQUIPMENT.map((eq) => (
+              <Chip
+                key={eq}
+                label={EQUIPMENT_LABELS[eq]}
+                selected={selectedEquipment === eq}
+                onClick={() => setSelectedEquipment((prev) => (prev === eq ? null : eq))}
+                size="sm"
+                testId={`equipment-chip-${eq}`}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="pt-2 flex items-center justify-between gap-3">
           <button
             type="button"
             data-testid="cancel-exercise-btn"
             onClick={onClose}
-            className="px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition active:scale-95 touch-manipulation"
+            disabled={isSubmitting}
+            className="px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition active:scale-95 touch-manipulation disabled:opacity-50 cursor-pointer"
           >
             Cancel
           </button>
           <button
-            type="button"
+            type="submit"
             data-testid="save-exercise-btn"
-            disabled={!name.trim() || isSubmitting}
-            onClick={handleSave}
-            className="px-6 py-2.5 min-h-[44px] rounded-xl text-xs font-black bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-neon-cyan transition active:scale-95 disabled:opacity-50 flex items-center gap-2 touch-manipulation"
+            disabled={isSubmitDisabled}
+            className="px-6 py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-neon-cyan transition active:scale-95 disabled:opacity-50 flex items-center gap-2 touch-manipulation cursor-pointer"
           >
             <Check className="w-4 h-4" />
             <span>{isSubmitting ? 'Saving...' : 'Save Changes'}</span>
           </button>
         </div>
-    </AccessibleModal>
+      </form>
+    </Sheet>
   );
 };
 

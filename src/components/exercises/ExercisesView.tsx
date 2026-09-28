@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { BookOpen, CalendarPlus, AlertCircle, RotateCcw } from 'lucide-react';
@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth';
 import type { Exercise, RoutineTemplate } from '../../types/database';
 import { isValidUUID } from '../workout/workoutEngineHelpers';
 import { StatusBanner } from '../common/StatusBanner';
+import { SegmentedTabs } from '../common/SegmentedTabs';
 import { ExerciseListTab } from './ExerciseListTab';
 import { TemplateListTab } from './TemplateListTab';
 
@@ -14,6 +15,11 @@ export const ExercisesView: React.FC = () => {
   const targetUserId = user?.id || '';
 
   const [activeTab, setActiveTab] = useState<'exercises' | 'templates'>('exercises');
+  const [catalogErrorState, setCatalogErrorState] = useState<{
+    isError: boolean;
+    error: unknown;
+    refetch: () => void;
+  } | null>(null);
 
   // Queries
   const {
@@ -65,11 +71,6 @@ export const ExercisesView: React.FC = () => {
         .limit(100);
       if (error) throw error;
       if (!data) return [];
-      // Deterministic precedence sort:
-      // Rank 3: Coach-assigned routines (assigned_to === targetUserId && !is_master)
-      // Rank 2: User custom routines (user_id === targetUserId && !is_master)
-      // Rank 1: Master catalog routines (is_master === true)
-      // Tie-breaker: newest created_at descending
       return (data as RoutineTemplate[]).sort((a, b) => {
         const getScore = (t: RoutineTemplate) => {
           if (t.assigned_to === targetUserId && !t.is_master) return 3;
@@ -84,36 +85,44 @@ export const ExercisesView: React.FC = () => {
     },
   });
 
-  const isReadError = activeTab === 'exercises' ? isExercisesError : isTemplatesError;
-  const readError = activeTab === 'exercises' ? exercisesError : templatesError;
+  const handleCatalogError = useCallback(
+    (isError: boolean, error: unknown, refetch: () => void) => {
+      setCatalogErrorState(isError ? { isError, error, refetch } : null);
+    },
+    []
+  );
+
+  const isReadError =
+    activeTab === 'exercises'
+      ? catalogErrorState?.isError || isExercisesError
+      : isTemplatesError;
+
+  const readError =
+    activeTab === 'exercises'
+      ? catalogErrorState?.error || exercisesError
+      : templatesError;
+
   const handleRetryExercises = () => {
     void refetchExercises();
+    if (catalogErrorState?.refetch) {
+      catalogErrorState.refetch();
+    }
     void refetchTemplates();
   };
 
   return (
     <div className="space-y-6 pb-[max(env(safe-area-inset-bottom),2rem)] animate-fade-in">
-      {/* View Tabs */}
-      <div className="flex gap-2 p-1 bg-zinc-900 rounded-xl mb-4">
-        <button
-          onClick={() => setActiveTab('exercises')}
-          className={`flex-1 py-2 min-h-[44px] text-xs font-bold rounded-lg transition-all flex flex-col items-center justify-center touch-manipulation ${
-            activeTab === 'exercises' ? 'bg-zinc-800 text-cyan-400 shadow-md' : 'text-zinc-500 hover:text-zinc-300'
-          }`}
-        >
-          <BookOpen className="w-4 h-4 mb-0.5" />
-          Library
-        </button>
-        <button
-          onClick={() => setActiveTab('templates')}
-          className={`flex-1 py-2 min-h-[44px] text-xs font-bold rounded-lg transition-all flex flex-col items-center justify-center touch-manipulation ${
-            activeTab === 'templates' ? 'bg-zinc-800 text-violet-400 shadow-md' : 'text-zinc-500 hover:text-zinc-300'
-          }`}
-        >
-          <CalendarPlus className="w-4 h-4 mb-0.5" />
-          Templates
-        </button>
-      </div>
+      {/* Sub-tabs with SegmentedTabs primitive (L14, L19) */}
+      <SegmentedTabs
+        tabs={[
+          { id: 'exercises', label: 'Exercises', icon: <BookOpen className="w-4 h-4" /> },
+          { id: 'templates', label: 'Templates', icon: <CalendarPlus className="w-4 h-4" /> },
+        ]}
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        ariaLabel="Library sections"
+        className="mb-4"
+      />
 
       {/* Read Error Banner */}
       <StatusBanner
@@ -154,6 +163,7 @@ export const ExercisesView: React.FC = () => {
           isReadError={isExercisesError}
           targetUserId={targetUserId}
           currentUserId={user?.id}
+          onCatalogError={handleCatalogError}
         />
       )}
 

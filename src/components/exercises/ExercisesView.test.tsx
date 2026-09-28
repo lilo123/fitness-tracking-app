@@ -45,7 +45,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
   const mockUpdateExercise = vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [{ id: 'ex-custom-1' }], error: null }) }) });
   const mockUpdateTemplate = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
   const mockDeleteTemplate = vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [{ id: 'tpl-1' }], error: null }) }) });
-  const mockRpc = vi.fn().mockResolvedValue({ error: null });
+  const mockRpc = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -56,12 +56,26 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     mockCoachState.isCoach = false;
     mockCoachState.selectedAthleteId = 'a0000000-0000-4000-8000-000000000123';
     mockAthleteSession.user.id = 'a0000000-0000-4000-8000-000000000123';
-    (supabase.rpc as any) = mockRpc;
 
     const sampleExercises = [
       { id: 'ex-master-1', name: 'Barbell Squat', body_part: 'Legs', is_master: true, user_id: null, is_archived: false },
       { id: 'ex-custom-1', name: 'My Athlete Curl', body_part: 'Arms', is_master: false, user_id: 'a0000000-0000-4000-8000-000000000123', is_archived: false },
     ];
+
+    mockRpc.mockImplementation((name: string) => {
+      if (name === 'get_exercise_catalog') {
+        const rows = sampleExercises.map((ex) => ({
+          ...ex,
+          body_parts: ex.body_part ? [ex.body_part] : [],
+          equipment: 'Barbell',
+          total_count: sampleExercises.length,
+          is_hidden: false,
+        }));
+        return Promise.resolve({ data: rows, error: null });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+    (supabase.rpc as any) = mockRpc;
 
     (supabase.auth.getSession as any).mockResolvedValue({ data: { session: mockAthleteSession } });
 
@@ -131,6 +145,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
   it('has accessible label association for Exercise Name', async () => {
     renderComponent();
     await screen.findByText('Barbell Squat');
+    fireEvent.click(screen.getByTestId('open-create-exercise-btn'));
     expect(screen.getByLabelText(/exercise name/i)).toBeDefined();
   });
 
@@ -139,13 +154,13 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
 
     // Both master exercise and custom exercise should appear in library
     expect(await screen.findByText('Barbell Squat')).toBeDefined();
-    expect(screen.getByText('Master')).toBeDefined();
+    expect(screen.getByText('Default')).toBeDefined();
     expect(screen.getByText('My Athlete Curl')).toBeDefined();
 
-    // Verify delete button: athlete has 1 custom exercise, so only 1 delete button should be rendered
+    // Verify archive button: athlete has 1 custom exercise, so only 1 archive button should be rendered
     await waitFor(() => {
-      const deleteButtons = screen.getAllByTitle('Delete');
-      expect(deleteButtons.length).toBe(1);
+      const archiveButtons = screen.getAllByTestId(/^archive-exercise-/);
+      expect(archiveButtons.length).toBe(1);
     });
 
     expect(getRecordedTables()).toContain('exercises');
@@ -168,11 +183,13 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
 
   it('creates custom exercise scoped to the athlete', async () => {
     renderComponent();
+    await screen.findByText('Barbell Squat');
+    fireEvent.click(screen.getByTestId('open-create-exercise-btn'));
 
     const nameInput = await screen.findByPlaceholderText('e.g. Incline Bench Press');
     fireEvent.change(nameInput, { target: { value: 'Dumbbell Hammer Curl' } });
 
-    const armsBtn = screen.getByRole('button', { name: 'Arms' });
+    const armsBtn = screen.getAllByRole('button', { name: 'Arms' })[1];
     fireEvent.click(armsBtn);
 
     const saveBtn = screen.getByRole('button', { name: 'Save to Library' });
@@ -195,7 +212,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     renderComponent();
 
     // Switch to Templates tab
-    const templatesTab = screen.getByRole('button', { name: /Templates/i });
+    const templatesTab = screen.getByRole('tab', { name: /Templates/i });
     fireEvent.click(templatesTab);
 
     // Verify saved template and day badges
@@ -207,7 +224,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
   it('opens EditTemplateModal when Edit button is clicked on user template, edits details, and saves', async () => {
     renderComponent();
 
-    const templatesTab = screen.getByRole('button', { name: /Templates/i });
+    const templatesTab = screen.getByRole('tab', { name: /Templates/i });
     fireEvent.click(templatesTab);
 
     expect(await screen.findByText('Leg Blast')).toBeDefined();
@@ -290,7 +307,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
 
     renderComponent();
 
-    const templatesTab = screen.getByRole('button', { name: /Templates/i });
+    const templatesTab = screen.getByRole('tab', { name: /Templates/i });
     fireEvent.click(templatesTab);
 
     expect(await screen.findByText('Master Hypertrophy Push')).toBeDefined();
@@ -332,7 +349,12 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
   });
 
   it('L5: template-save RPC error sends NO fallback table writes and displays error banner', async () => {
-    mockRpc.mockResolvedValueOnce({ error: { message: 'RPC save error' } });
+    mockRpc.mockImplementation((name: string) => {
+      if (name === 'save_routine_template') {
+        return Promise.resolve({ data: null, error: { message: 'RPC save error' } });
+      }
+      return Promise.resolve({ data: [], error: null });
+    });
 
     const mockDeleteTpl = vi.fn();
     const mockInsertTpl = vi.fn();
@@ -375,7 +397,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
 
     renderComponent();
 
-    const templatesTab = screen.getByRole('button', { name: /Templates/i });
+    const templatesTab = screen.getByRole('tab', { name: /Templates/i });
     fireEvent.click(templatesTab);
 
     const forkBtn = await screen.findByTestId('fork-template-tpl-master-err');
@@ -491,7 +513,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     mockCoachState.selectedAthleteId = '';
 
     const { unmount: unmountA } = renderComponent();
-    fireEvent.click(screen.getByRole('button', { name: /Templates/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /Templates/i }));
 
     expect(await screen.findByText('Master Power Clean')).toBeDefined();
     // Coach can edit master directly
@@ -514,7 +536,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     mockCoachState.selectedAthleteId = 'a0000000-0000-4000-8000-000000000123';
 
     const { unmount: unmountB } = renderComponent();
-    fireEvent.click(screen.getByRole('button', { name: /Templates/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /Templates/i }));
 
     expect(await screen.findByText('Master Power Clean')).toBeDefined();
     // Coach cannot directly edit master while impersonating an athlete
@@ -528,7 +550,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     mockCoachState.selectedAthleteId = '';
 
     renderComponent();
-    fireEvent.click(screen.getByRole('button', { name: /Templates/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /Templates/i }));
 
     expect(await screen.findByText('Master Power Clean')).toBeDefined();
     // Athlete cannot edit master
@@ -587,7 +609,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
 
     renderComponent();
 
-    const templatesTab = screen.getByRole('button', { name: /Templates/i });
+    const templatesTab = screen.getByRole('tab', { name: /Templates/i });
     fireEvent.click(templatesTab);
 
     // 1. Saved templates appear immediately at the top (list-first layout)
@@ -753,11 +775,22 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     expect(deleteAlert.textContent).toBe('');
 
     await waitFor(() => {
-      expect(screen.getAllByTitle('Delete').length).toBe(1);
+      expect(screen.getAllByTestId(/^archive-exercise-/).length).toBe(1);
     });
 
-    const deleteBtn = screen.getByTitle('Delete');
-    fireEvent.click(deleteBtn);
+    const deleteBtn = screen.getByTestId('archive-exercise-ex-custom-1');
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(deleteBtn);
+
+      // ZERO writes before 6s expiry
+      expect(mockDelete).not.toHaveBeenCalled();
+
+      // Advance 6s timer to commit deferred archive
+      await vi.advanceTimersByTimeAsync(6000);
+    } finally {
+      vi.useRealTimers();
+    }
 
     await waitFor(() => {
       // L3: archive failure never falls back to DELETE
@@ -794,8 +827,16 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     renderComponent();
     await screen.findByText('My Athlete Curl');
 
-    const deleteBtn = screen.getByTitle('Delete');
-    fireEvent.click(deleteBtn);
+    const archiveBtn = await screen.findByTestId('archive-exercise-ex-custom-1');
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(archiveBtn);
+
+      // Advance 6s timer to commit deferred archive
+      await vi.advanceTimersByTimeAsync(6000);
+    } finally {
+      vi.useRealTimers();
+    }
 
     await waitFor(() => {
       expect(screen.getByTestId('exercise-action-error')).toBeDefined();
@@ -834,7 +875,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     });
 
     renderComponent();
-    fireEvent.click(screen.getByRole('button', { name: /Templates/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /Templates/i }));
 
     await screen.findByText('Athlete Routine');
     const deleteBtn = screen.getByTestId('delete-template-tpl-user-1');
@@ -863,6 +904,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     });
 
     renderComponent();
+    fireEvent.click(await screen.findByTestId('open-create-exercise-btn'));
     await screen.findByText(/Create Custom Exercise/i);
 
     const input = screen.getByLabelText(/exercise name/i);
@@ -899,6 +941,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     });
 
     renderComponent();
+    fireEvent.click(await screen.findByTestId('open-create-exercise-btn'));
     await screen.findByText(/Create Custom Exercise/i);
 
     const input = screen.getByLabelText(/exercise name/i);
@@ -919,6 +962,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
 
   it('L12: ExercisesView disables save button and displays inline error on whitespace name', async () => {
     renderComponent();
+    fireEvent.click(await screen.findByTestId('open-create-exercise-btn'));
     await screen.findByText(/Create Custom Exercise/i);
 
     const input = screen.getByLabelText(/exercise name/i);

@@ -118,7 +118,7 @@ describe('EditExerciseSheet', () => {
       expect(dialog).toHaveAttribute('aria-labelledby', 'edit-exercise-modal-title');
 
       // 2. Focus moved into the dialog to the first focusable element
-      const firstFocusable = screen.getByRole('button', { name: /close dialog/i });
+      const firstFocusable = screen.getByRole('button', { name: /close edit exercise/i });
       expect(document.activeElement).toBe(firstFocusable);
 
       // 3. Tab wraps from last focusable to first focusable
@@ -259,5 +259,182 @@ describe('EditExerciseSheet', () => {
     });
   });
 
+
+  it("L32: pressing Enter submits the edit form", async () => {
+    const updateSpy = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        select: vi.fn().mockResolvedValue({
+          data: [{ id: "ex-1", name: "Renamed Bench Press", body_part: "Chest", equipment: null }],
+          error: null,
+        }),
+      }),
+    });
+    (supabase.from as any).mockImplementation((table: string) => {
+      const b = createSupabaseBuilder(table, { data: [], error: null });
+      b.update = updateSpy;
+      return b;
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <EditExerciseSheet {...mockProps} />
+      </QueryClientProvider>
+    );
+
+    const input = screen.getByLabelText(/exercise name/i);
+    fireEvent.change(input, { target: { value: "Renamed Bench Press" } });
+    fireEvent.submit(input.closest("form")!);
+
+    await waitFor(() => {
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Renamed Bench Press" })
+      );
+      expect(mockProps.onSuccess).toHaveBeenCalled();
+    });
+  });
+
+  it("L48: single-select equipment chips saved to exercises.equipment", async () => {
+    const updateSpy = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        select: vi.fn().mockResolvedValue({
+          data: [{ id: "ex-1", name: "Bench Press", body_part: "Chest", equipment: "barbell" }],
+          error: null,
+        }),
+      }),
+    });
+    (supabase.from as any).mockImplementation((table: string) => {
+      const b = createSupabaseBuilder(table, { data: [], error: null });
+      b.update = updateSpy;
+      return b;
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <EditExerciseSheet {...mockProps} />
+      </QueryClientProvider>
+    );
+
+    const barbellChip = screen.getByTestId("equipment-chip-barbell");
+    expect(barbellChip).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(barbellChip);
+    expect(barbellChip).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ equipment: "barbell" })
+      );
+    });
+  });
+
+  it("L35: duplicate check on rename shows duplicate message naming existing exercise and prevents update", async () => {
+    const existingExercise = {
+      id: "ex-2",
+      name: "Incline Bench Press",
+      body_part: "Chest",
+      equipment: "barbell",
+      is_master: true,
+      is_hidden: false,
+    };
+
+    // Cache preloaded catalog with existing exercise
+    queryClient.setQueryData(
+      ["exercise_catalog", "infinite", { search: "", scope: "all", includeHidden: true, limit: 50 }],
+      {
+        pages: [{ items: [existingExercise], nextCursor: null, totalCount: 1 }],
+        pageParams: [null],
+      }
+    );
+
+    const updateSpy = vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) }) });
+    (supabase.from as any).mockImplementation((table: string) => {
+      const b = createSupabaseBuilder(table, { data: [], error: null });
+      b.update = updateSpy;
+      return b;
+    });
+
+    const onViewExistingSpy = vi.fn();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <EditExerciseSheet
+          {...mockProps}
+          onViewExisting={onViewExistingSpy}
+        />
+      </QueryClientProvider>
+    );
+
+    const input = screen.getByLabelText(/exercise name/i);
+    fireEvent.change(input, { target: { value: "Incline Bench Press" } });
+
+    // Select barbell equipment
+    fireEvent.click(screen.getByTestId("equipment-chip-barbell"));
+
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => {
+      const dupAlert = screen.getByTestId("edit-exercise-duplicate-msg");
+      expect(dupAlert).toBeDefined();
+      expect(dupAlert.textContent).toContain("'Incline Bench Press' already exists (Default)");
+    });
+
+    // Update was NOT called
+    expect(updateSpy).not.toHaveBeenCalled();
+
+    // Clicking View calls onViewExisting
+    const viewBtn = screen.getByTestId("view-existing-exercise-btn");
+    expect(viewBtn).toHaveTextContent("View");
+    fireEvent.click(viewBtn);
+    expect(onViewExistingSpy).toHaveBeenCalledWith({
+      id: "ex-2",
+      name: "Incline Bench Press",
+      is_hidden: false,
+    });
+  });
+
+  it("L13: synchronous double-submit guard triggers only one DB update", async () => {
+    let resolveUpdate: (val: any) => void;
+    const updatePromise = new Promise((resolve) => {
+      resolveUpdate = resolve;
+    });
+
+    const updateSpy = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue(updatePromise),
+      }),
+    });
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      const b = createSupabaseBuilder(table, { data: [], error: null });
+      b.update = updateSpy;
+      return b;
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <EditExerciseSheet {...mockProps} />
+      </QueryClientProvider>
+    );
+
+    const input = screen.getByLabelText(/exercise name/i);
+    fireEvent.change(input, { target: { value: "Renamed Fast" } });
+
+    const saveBtn = screen.getByRole("button", { name: /save changes/i });
+    fireEvent.click(saveBtn);
+    fireEvent.click(saveBtn);
+    fireEvent.click(saveBtn);
+
+    expect(updateSpy).toHaveBeenCalledTimes(1);
+
+    resolveUpdate!({
+      data: [{ id: "ex-1", name: "Renamed Fast", body_part: "Chest" }],
+      error: null,
+    });
+
+    await waitFor(() => {
+      expect(mockProps.onSuccess).toHaveBeenCalled();
+    });
+  });
 });
 
