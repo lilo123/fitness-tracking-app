@@ -227,7 +227,7 @@ export function serializeToExportCsvFiles(bundle: ExportBundle, dateStamp: strin
               s.set_index ?? '',
               s.set_type ?? '',
               s.exercise?.name ?? s.exercise_name ?? '',
-              Array.isArray((s.exercise as any)?.body_parts) ? (s.exercise as any).body_parts.join(', ') : ((s.exercise as any)?.body_part ?? ''),
+              Array.isArray((s.exercise as any)?.body_parts) ? (s.exercise as any).body_parts.join(', ') : '',
               s.weight ?? '',
               s.reps ?? '',
               s.rpe ?? '',
@@ -373,7 +373,7 @@ export function serializeToExportCsvFiles(bundle: ExportBundle, dateStamp: strin
               r.assigned_to ?? '',
               ex.order_index ?? '',
               (ex as any).exercise?.name ?? ex.exercise_name ?? '',
-              Array.isArray((ex as any).exercise?.body_parts) ? (ex as any).exercise.body_parts.join(', ') : ((ex as any).exercise?.body_part ?? ''),
+              Array.isArray((ex as any).exercise?.body_parts) ? (ex as any).exercise.body_parts.join(', ') : '',
               ex.target_sets ?? '',
               ex.target_reps ?? '',
             ];

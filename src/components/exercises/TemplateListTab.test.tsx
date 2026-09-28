@@ -44,19 +44,19 @@ describe('TemplateListTab - W3 Features', () => {
     {
       id: 'ex-bench',
       name: 'Barbell Bench Press',
-      body_part: 'Chest',
+      body_parts: ['Chest'],
       is_archived: false,
     },
     {
       id: 'ex-incline',
       name: 'Incline Dumbbell Press',
-      body_part: 'Chest',
+      body_parts: ['Chest'],
       is_archived: true, // Archived exercise for L11 testing
     },
     {
       id: 'ex-fly',
       name: 'Cable Fly',
-      body_part: 'Chest',
+      body_parts: ['Chest'],
       is_archived: false,
     },
   ];
@@ -136,7 +136,6 @@ describe('TemplateListTab - W3 Features', () => {
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
           <TemplateListTab
-            templates={mockTemplates}
             exercises={mockExercises}
             targetUserId="user-athlete-1"
             {...props}
@@ -403,11 +402,10 @@ describe('TemplateListTab - W3 Features', () => {
       });
     });
 
-    it('ignores templates prop and displays routines returned by get_routine_catalog', async () => {
-      // Pass empty templates array via props
-      renderComponent({ templates: [] });
+    it('renders routine items and exercise count returned by get_routine_catalog', async () => {
+      renderComponent();
 
-      // Verifies it still renders routines from get_routine_catalog
+      // Verifies it renders routines from get_routine_catalog
       await screen.findByText('Chest & Triceps Push');
       expect(screen.getByText('Leg Day Blast')).toBeDefined();
     });

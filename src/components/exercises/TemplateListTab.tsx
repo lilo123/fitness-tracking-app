@@ -17,18 +17,14 @@ import { invalidateExerciseDomain } from '../../lib/invalidate';
 const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export interface TemplateListTabProps {
-  templates?: RoutineTemplate[];
   exercises: Exercise[];
-  isReadError?: boolean;
   targetUserId?: string;
   deleteTimeoutMs?: number;
   onStartRoutine?: (template: RoutineTemplate) => void;
 }
 
 export const TemplateListTab: React.FC<TemplateListTabProps> = ({
-  templates: _ignoredTemplates,
   exercises,
-  isReadError: _ignoredIsReadError,
   targetUserId: propTargetUserId,
   deleteTimeoutMs,
   onStartRoutine,

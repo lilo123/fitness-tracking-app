@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { BookOpen, CalendarPlus, AlertCircle, RotateCcw } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import type { Exercise, RoutineTemplate } from '../../types/database';
+import type { Exercise } from '../../types/database';
 import { isValidUUID } from '../workout/workoutEngineHelpers';
 import { StatusBanner } from '../common/StatusBanner';
 import { SegmentedTabs } from '../common/SegmentedTabs';
@@ -46,44 +46,7 @@ export const ExercisesView: React.FC = () => {
     },
   });
 
-  const {
-    data: templates = [],
-    isError: isTemplatesError,
-    error: templatesError,
-    refetch: refetchTemplates,
-  } = useQuery({
-    queryKey: ['routine_templates', targetUserId, 'exercises'],
-    queryFn: async () => {
-      if (!targetUserId || !isValidUUID(targetUserId)) return [];
-      const filter = [
-        'user_id.eq.' + targetUserId,
-        'is_master.eq.true',
-        'assigned_to.eq.' + targetUserId,
-      ].join(',');
-      // payload-gate: accepted-list — routine template catalog, measured 0 B on /exercises (unmeasured route)
-      const { data, error } = await supabase
-        .from('routine_templates')
-        .select(
-          'id, user_id, name, is_master, assigned_to, days_of_week, created_at, exercises:template_exercises(id, template_id, exercise_id, order_index, target_sets, target_reps, exercise:exercises(id, name, body_parts))'
-        )
-        .or(filter)
-        .order('created_at', { ascending: false })
-        .limit(100);
-      if (error) throw error;
-      if (!data) return [];
-      return (data as RoutineTemplate[]).sort((a, b) => {
-        const getScore = (t: RoutineTemplate) => {
-          if (t.assigned_to === targetUserId && !t.is_master) return 3;
-          if (t.user_id === targetUserId && !t.is_master) return 2;
-          if (t.is_master) return 1;
-          return 0;
-        };
-        const diff = getScore(b) - getScore(a);
-        if (diff !== 0) return diff;
-        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-      });
-    },
-  });
+
 
   const handleCatalogError = useCallback(
     (isError: boolean, error: unknown, refetch: () => void) => {
@@ -93,21 +56,18 @@ export const ExercisesView: React.FC = () => {
   );
 
   const isReadError =
-    activeTab === 'exercises'
-      ? catalogErrorState?.isError || isExercisesError
-      : isTemplatesError;
+    activeTab === 'exercises' && (catalogErrorState?.isError || isExercisesError);
 
   const readError =
     activeTab === 'exercises'
       ? catalogErrorState?.error || exercisesError
-      : templatesError;
+      : null;
 
   const handleRetryExercises = () => {
     void refetchExercises();
     if (catalogErrorState?.refetch) {
       catalogErrorState.refetch();
     }
-    void refetchTemplates();
   };
 
   return (
@@ -128,7 +88,7 @@ export const ExercisesView: React.FC = () => {
       <StatusBanner
         title={
           isReadError
-            ? `Failed to load ${activeTab === 'exercises' ? 'exercises' : 'routine templates'}`
+            ? 'Failed to load exercises'
             : null
         }
         message={
@@ -169,9 +129,7 @@ export const ExercisesView: React.FC = () => {
 
       {activeTab === 'templates' && (
         <TemplateListTab
-          templates={templates}
           exercises={exercises}
-          isReadError={isTemplatesError}
           targetUserId={targetUserId}
         />
       )}

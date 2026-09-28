@@ -119,8 +119,8 @@ const SERVICED_QUERIES_REGISTRY = {
     {
       table: 'routine_templates',
       type: 'EXACT',
-      projection: 'id, user_id, name, is_master, assigned_to, days_of_week, created_at, exercises:template_exercises(id, template_id, exercise_id, order_index, target_sets, target_reps, exercise:exercises(id, name, body_parts))',
-      description: 'Routine templates schedule query',
+      projection: '*, exercises:template_exercises(*, exercise:exercises(*))',
+      description: 'Routine template on-demand fetch on sheet open',
     },
     {
       table: 'users',

@@ -60,18 +60,14 @@ test.describe('RFIX-06 Payload & Cache Key Disambiguation Verification', () => {
   });
 
   /**
-   * NOTE ON REWRITE (RFIX-22a & P1-6d):
-   * Directive RFIX-22 correctly bounded the /exercises routine_templates query with limit(100).
-   * P1-6d restored full row coverage on /workout with limit(100) and narrow projection
-   * (no nested template_exercises embed on cold paint).
+   * NOTE ON REWRITE (P7b W-F / RFIX-06):
+   * /exercises now uses get_routine_catalog RPC from TemplateListTab (only when the Templates sub-tab is opened),
+   * replacing the legacy unpaged/REST routine_templates query.
    *
-   * This test proves that /workout and /exercises use distinct React Query cache keys
-   * (['routine_templates', targetUserId, 'workout'] vs ['routine_templates', targetUserId, 'exercises']).
-   * Arriving at /workout from /exercises via client-side navigation must trigger /workout's own
-   * query rather than silently reusing /exercises's cached entry.
-   *
-   * Two distinguishable requests (/exercises with template_exercises vs /workout without template_exercises)
-   * being issued across the transition proves cache-key disambiguation.
+   * This test proves that:
+   * 1. The /exercises route's routine load is the bounded get_routine_catalog page (<= 51,200 B).
+   * 2. No GET /rest/v1/routine_templates list request is made from /exercises.
+   * 3. /workout and /exercises maintain cache-key separation, refetching their respective bounded queries.
    */
   test('Order B: Client navigation /exercises -> /workout refetches bounded query <= 51,200 B and asserts projection & order', async ({ page }) => {
     // 1. Authenticate session
@@ -81,38 +77,50 @@ test.describe('RFIX-06 Payload & Cache Key Disambiguation Verification', () => {
     await page.click('button[type="submit"]');
     await page.waitForURL('**/workout');
 
-    // 2. Open /exercises with fresh client cache
-    const exercisesTplPromise = page.waitForResponse(
-      (res) =>
-        res.url().includes('/rest/v1/routine_templates') &&
-        res.request().method() === 'GET' &&
-        res.status() === 200 &&
-        res.url().includes('template_exercises') &&
-        res.url().includes('limit=100'),
-      { timeout: 10000 }
-    );
+    // 2. Open /exercises with fresh client cache and monitor requests
+    const legacyExercisesTplGets: string[] = [];
+    page.on('request', (req) => {
+      if (req.url().includes('/rest/v1/routine_templates') && req.method() === 'GET') {
+        legacyExercisesTplGets.push(req.url());
+      }
+    });
+
     await page.goto('/exercises');
     await page.waitForURL('**/exercises');
-    const exercisesRes = await exercisesTplPromise;
-    const exercisesBody = await exercisesRes.body();
-    const exercisesUrl = exercisesRes.url();
-    const parsedExercisesUrl = new URL(exercisesUrl);
-    const exercisesLimit = parsedExercisesUrl.searchParams.get('limit');
-    const exercisesOrder = parsedExercisesUrl.searchParams.get('order');
-    const exercisesSelect = parsedExercisesUrl.searchParams.get('select');
 
-    console.log(`[RFIX-06 Order B Step 1: /exercises]`);
+    // Switch to Templates sub-tab to trigger routine catalog load via get_routine_catalog RPC
+    const exercisesCatalogPromise = page.waitForResponse(
+      (res) =>
+        res.url().includes('/rest/v1/rpc/get_routine_catalog') &&
+        res.request().method() === 'POST' &&
+        res.status() === 200,
+      { timeout: 10000 }
+    );
+
+    await page.click('button[role="tab"]:has-text("Templates")');
+
+    const exercisesCatalogRes = await exercisesCatalogPromise;
+    const exercisesBody = await exercisesCatalogRes.body();
+    const exercisesUrl = exercisesCatalogRes.url();
+    const exercisesReq = exercisesCatalogRes.request().postDataJSON() as { p_limit: number; p_user_id?: string };
+    const exercisesLimit = exercisesReq.p_limit;
+    const exercisesRows = JSON.parse(exercisesBody.toString()) as Array<Record<string, unknown>>;
+
+    console.log(`[RFIX-06 Order B Step 1: /exercises Templates tab]`);
     console.log(`URL: ${exercisesUrl}`);
-    console.log(`HTTP Status: ${exercisesRes.status()}`);
-    console.log(`Limit: ${exercisesLimit}`);
-    console.log(`Order: ${exercisesOrder}`);
+    console.log(`HTTP Status: ${exercisesCatalogRes.status()}`);
+    console.log(`p_limit: ${exercisesLimit}`);
+    console.log(`Rows: ${exercisesRows.length}`);
     console.log(`Payload Bytes: ${exercisesBody.length}`);
 
-    expect(exercisesRes.status()).toBe(200);
-    expect(exercisesLimit).toBe('100');
-    expect(exercisesOrder).toBe('created_at.desc');
-    expect(exercisesSelect).toContain('template_exercises');
-    expect(exercisesBody.length).toBeGreaterThan(51200);
+    expect(exercisesCatalogRes.status()).toBe(200);
+    expect(exercisesLimit).toBe(50);
+    expect(exercisesBody.length).toBeGreaterThan(0);
+    expect(exercisesBody.length).toBeLessThanOrEqual(51200);
+    expect(exercisesRows.length).toBeGreaterThan(0);
+    expect(exercisesRows.length).toBeLessThanOrEqual(exercisesLimit);
+    // Routine catalog loaded via RPC, so no GET /rest/v1/routine_templates list request is made from /exercises
+    expect(legacyExercisesTplGets).toEqual([]);
     console.log(`VERIFICATION_ORDER_B_EXERCISES_BYTES=${exercisesBody.length}`);
 
     // Wait for bottom navigation
@@ -120,7 +128,7 @@ test.describe('RFIX-06 Payload & Cache Key Disambiguation Verification', () => {
 
     // 3. Navigate client-side to /workout
     // Because cache keys are disambiguated, /workout MUST issue its own bounded request
-    // (P4: the paged get_routine_catalog RPC) and cannot silently inherit the /exercises cache entry.
+    // (the paged get_routine_catalog RPC) and cannot silently inherit the /exercises cache entry.
     const workoutTplPromise = page.waitForResponse(
       (res) =>
         res.url().includes('/rest/v1/rpc/get_routine_catalog') &&
@@ -156,11 +164,10 @@ test.describe('RFIX-06 Payload & Cache Key Disambiguation Verification', () => {
     expect(workoutBody.length).toBeGreaterThan(0);
     expect(workoutBody.length).toBeLessThanOrEqual(51200);
 
-    // 4 & 5. Explicitly assert the two requests are distinguishable
-    // /exercises requested nested template_exercises via REST; /workout used the catalog RPC without that embed
-    expect(exercisesSelect).toContain('template_exercises');
-    expect(workoutUrl).not.toContain('template_exercises');
-    expect(Object.keys(workoutRows[0])).not.toContain('template_exercises');
+    // 4 & 5. Explicitly assert cache-key separation and request contracts
+    // /exercises loads the template catalog page with limit 50; /workout loads the routine picker catalog with limit 200 without nested exercises embed
+    expect(exercisesLimit).toBe(50);
+    expect(workoutLimit).toBe(200);
     expect(Object.keys(workoutRows[0])).not.toContain('exercises');
 
     console.log(`VERIFICATION_ORDER_B_EXERCISES_LIMIT=${exercisesLimit}`);

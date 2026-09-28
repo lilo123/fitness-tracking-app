@@ -30,7 +30,7 @@ export interface CoachWorkoutSet {
   weight?: number;
   reps?: number;
   created_at?: string;
-  exercise?: { id?: string; name: string; body_parts?: string[] | null; body_part?: string | null } | null;
+  exercise?: { id?: string; name: string; body_parts?: string[] | null } | null;
 }
 
 export interface CoachWorkoutSession {

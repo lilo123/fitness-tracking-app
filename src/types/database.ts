@@ -39,11 +39,11 @@ export interface Exercise {
   name: string;
   body_parts?: string[] | null;
   equipment?: string | null;
-  body_part?: string | null;
   user_id?: string | null;
   is_master?: boolean;
   is_archived?: boolean;
   created_at?: string;
+  [key: string]: any;
 }
 
 export type SetType = 'warmup' | 'working' | 'drop';
@@ -57,7 +57,6 @@ export interface WorkoutSet {
     id?: string;
     name: string;
     body_parts?: string[] | null;
-    body_part?: string | null;
   } | null;
   workouts?: {
     date?: string;

@@ -138,7 +138,6 @@ export type Database = {
       exercises: {
         Row: {
           body_parts: string[] | null
-          body_part: string | null
           created_at: string
           equipment: string | null
           id: string

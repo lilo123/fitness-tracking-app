@@ -92,6 +92,7 @@ export const EditTemplateSheet: React.FC<EditTemplateSheetProps> = ({
     setIsLoadingTemplate(true);
     setFetchError(null);
     try {
+      // payload-gate: detail-fetch — single template loaded on demand when user opens EditTemplateSheet
       const { data, error: fetchErr } = await supabase
         .from("routine_templates")
         .select("*, exercises:template_exercises(*, exercise:exercises(*))")
