@@ -33,6 +33,7 @@ vi.mock('../../hooks/useCoach', () => ({
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: vi.fn((table: string) => createSupabaseBuilder(table, { data: [], error: null })),
+    rpc: vi.fn(),
   },
 }));
 
@@ -112,6 +113,12 @@ describe('TemplateListTab - W3 Features', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearMockHistory();
+    (supabase.rpc as any).mockImplementation((fn: string) => {
+      if (fn === 'get_routine_catalog') {
+        return Promise.resolve({ data: mockTemplates, error: null });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
     queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -158,6 +165,11 @@ describe('TemplateListTab - W3 Features', () => {
 
       renderComponent({ deleteTimeoutMs: 6000 });
 
+      // Resolve query with fake timers
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(50);
+      });
+
       // Find the delete button for tpl-push
       const deleteBtn = screen.getByTestId('delete-template-tpl-push');
       expect(deleteBtn).toBeDefined();
@@ -200,6 +212,10 @@ describe('TemplateListTab - W3 Features', () => {
       vi.mocked(supabase.from).mockImplementation(() => ({ delete: mockDelete }));
 
       renderComponent({ deleteTimeoutMs: 6000 });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(50);
+      });
 
       const deleteBtn = screen.getByTestId('delete-template-tpl-push');
       fireEvent.click(deleteBtn);
@@ -245,6 +261,10 @@ describe('TemplateListTab - W3 Features', () => {
 
       renderComponent({ deleteTimeoutMs: 6000 });
 
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(50);
+      });
+
       const deleteBtn = screen.getByTestId('delete-template-tpl-push');
       fireEvent.click(deleteBtn);
 
@@ -264,10 +284,10 @@ describe('TemplateListTab - W3 Features', () => {
   });
 
   describe('L18 Accordion Preview & L11 Archived Pill', () => {
-    it('toggles accordion preview with aria-expanded and displays exercises with sets x reps', () => {
+    it('toggles accordion preview with aria-expanded and displays exercises with sets x reps', async () => {
       renderComponent();
 
-      const accordionBtn = screen.getByTestId('template-accordion-btn-tpl-push');
+      const accordionBtn = await screen.findByTestId('template-accordion-btn-tpl-push');
       expect(accordionBtn).toHaveAttribute('aria-expanded', 'false');
       expect(accordionBtn).toHaveAttribute('aria-controls', 'template-preview-tpl-push');
 
@@ -295,11 +315,11 @@ describe('TemplateListTab - W3 Features', () => {
       expect(screen.queryByTestId('template-preview-tpl-push')).toBeNull();
     });
 
-    it('L11: marks archived exercise in preview with an "Archived" Tag pill', () => {
+    it('L11: marks archived exercise in preview with an "Archived" Tag pill', async () => {
       renderComponent();
 
       // Expand accordion
-      const accordionBtn = screen.getByTestId('template-accordion-btn-tpl-push');
+      const accordionBtn = await screen.findByTestId('template-accordion-btn-tpl-push');
       fireEvent.click(accordionBtn);
 
       // ex-incline is archived (is_archived: true)
@@ -313,10 +333,10 @@ describe('TemplateListTab - W3 Features', () => {
   });
 
   describe('L25 "Start routine" Deep Link Navigation', () => {
-    it('clicking "Start routine" navigates to /workout?routine=${template.id}', () => {
+    it('clicking "Start routine" navigates to /workout?routine=${template.id}', async () => {
       renderComponent();
 
-      const startBtn = screen.getByTestId('start-routine-tpl-push');
+      const startBtn = await screen.findByTestId('start-routine-tpl-push');
       expect(startBtn).toBeDefined();
       expect(startBtn.textContent).toContain('Start routine');
 
@@ -326,11 +346,11 @@ describe('TemplateListTab - W3 Features', () => {
       expect(mockNavigate).toHaveBeenCalledWith('/workout?routine=tpl-push');
     });
 
-    it('calls optional onStartRoutine callback when provided', () => {
+    it('calls optional onStartRoutine callback when provided', async () => {
       const onStartRoutine = vi.fn();
       renderComponent({ onStartRoutine });
 
-      const startBtn = screen.getByTestId('start-routine-tpl-legs');
+      const startBtn = await screen.findByTestId('start-routine-tpl-legs');
       fireEvent.click(startBtn);
 
       expect(onStartRoutine).toHaveBeenCalledWith(mockTemplates[1]);
@@ -339,10 +359,10 @@ describe('TemplateListTab - W3 Features', () => {
   });
 
   describe('L15 Day Filter Toolbar Radiogroup', () => {
-    it('has role="radiogroup" and day buttons with role="radio" and aria-checked', () => {
+    it('has role="radiogroup" and day buttons with role="radio" and aria-checked', async () => {
       renderComponent();
 
-      const radiogroup = screen.getByRole('radiogroup', { name: /filter templates by day/i });
+      const radiogroup = await screen.findByRole('radiogroup', { name: /filter templates by day/i });
       expect(radiogroup).toBeDefined();
 
       const allRadio = screen.getByTestId('day-filter-All');
@@ -363,10 +383,47 @@ describe('TemplateListTab - W3 Features', () => {
       expect(screen.queryByTestId('delete-template-tpl-legs')).toBeNull();
     });
   });
+
   it('satisfies mock fidelity contracts for routine template deletion', () => {
     // WILDCARD_MUTATION_RETURN: routine_templates returns deleted row via bare .select()
     const tplBuilder = createSupabaseBuilder('routine_templates', { data: [], error: null });
     expect(tplBuilder.tableName).toBe('routine_templates');
     expect(getRecordedTables()).toContain('routine_templates');
+  });
+
+  describe('L33: get_routine_catalog integration', () => {
+    it('loads routines via get_routine_catalog RPC with targetUserId', async () => {
+      renderComponent();
+
+      await screen.findByText('Chest & Triceps Push');
+
+      expect(supabase.rpc).toHaveBeenCalledWith('get_routine_catalog', {
+        p_user_id: 'user-athlete-1',
+        p_limit: 50,
+      });
+    });
+
+    it('ignores templates prop and displays routines returned by get_routine_catalog', async () => {
+      // Pass empty templates array via props
+      renderComponent({ templates: [] });
+
+      // Verifies it still renders routines from get_routine_catalog
+      await screen.findByText('Chest & Triceps Push');
+      expect(screen.getByText('Leg Day Blast')).toBeDefined();
+    });
+
+    it('displays error banner when get_routine_catalog fails', async () => {
+      (supabase.rpc as any).mockImplementation((fn: string) => {
+        if (fn === 'get_routine_catalog') {
+          return Promise.resolve({ data: null, error: new Error('Catalog RPC failure') });
+        }
+        return Promise.resolve({ data: null, error: null });
+      });
+
+      renderComponent();
+
+      const errorElements = await screen.findAllByText(/Catalog RPC failure/);
+      expect(errorElements.length).toBeGreaterThanOrEqual(1);
+    });
   });
 });

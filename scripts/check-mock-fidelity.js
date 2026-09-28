@@ -54,7 +54,7 @@ const SERVICED_QUERIES_REGISTRY = {
     {
       table: 'exercises',
       type: 'EXACT',
-      projection: 'id, name, body_part, is_master',
+      projection: 'id, name, body_parts, is_master',
       description: 'Exercise library lookup query',
     },
     {
@@ -79,7 +79,7 @@ const SERVICED_QUERIES_REGISTRY = {
     {
       table: 'sets',
       type: 'EXACT',
-      projection: 'id, workout_id, reps, weight, set_index, exercise_id, exercise:exercises(id, name, body_part)',
+      projection: 'id, workout_id, reps, weight, set_index, exercise_id, exercise:exercises(id, name, body_parts)',
       description: 'Athlete workout sets query',
     },
     {
@@ -93,11 +93,6 @@ const SERVICED_QUERIES_REGISTRY = {
       type: 'EXACT',
       projection: 'target_calories, target_protein, target_carbs, target_fat, target_fiber',
       description: 'Selected athlete macro targets query',
-    },
-    {
-      table: 'template_exercises',
-      type: 'NO_PROJECTION_APPLIES',
-      description: 'Mutation-only template exercise updates',
     },
   ],
   'src/components/common/Header.test.tsx': [
@@ -421,6 +416,12 @@ const SERVICED_QUERIES_REGISTRY = {
     },
   ],
   'src/components/exercises/EditTemplateSheet.test.tsx': [
+    {
+      table: 'routine_templates',
+      type: 'EXACT',
+      projection: '*, exercises:template_exercises(*, exercise:exercises(*))',
+      description: 'Fetch fresh routine template details with exercises on open',
+    },
     {
       table: 'routine_templates',
       type: 'WILDCARD_MUTATION_RETURN',

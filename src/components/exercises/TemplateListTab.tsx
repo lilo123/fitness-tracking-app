@@ -1,13 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useCoach } from '../../hooks/useCoach';
 import type { Exercise, RoutineTemplate } from '../../types/database';
 import { PlusCircle, RefreshCw, AlertCircle, Pencil, Copy, Trash2, ChevronDown, Play } from 'lucide-react';
 import { StatusBanner } from '../common/StatusBanner';
-import { EditTemplateModal } from './EditTemplateModal';
+import { EditTemplateSheet } from './EditTemplateSheet';
 import { useDeferredDelete } from '../common/useDeferredDelete';
 import { UndoToast } from '../common/UndoToast';
 import { Tag } from '../common/Tag';
@@ -17,7 +17,7 @@ import { invalidateExerciseDomain } from '../../lib/invalidate';
 const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export interface TemplateListTabProps {
-  templates: RoutineTemplate[];
+  templates?: RoutineTemplate[];
   exercises: Exercise[];
   isReadError?: boolean;
   targetUserId?: string;
@@ -26,9 +26,9 @@ export interface TemplateListTabProps {
 }
 
 export const TemplateListTab: React.FC<TemplateListTabProps> = ({
-  templates,
+  templates: _ignoredTemplates,
   exercises,
-  isReadError,
+  isReadError: _ignoredIsReadError,
   targetUserId: propTargetUserId,
   deleteTimeoutMs,
   onStartRoutine,
@@ -46,6 +46,23 @@ export const TemplateListTab: React.FC<TemplateListTabProps> = ({
   const [isForking, setIsForking] = useState<boolean>(false);
   const [templateError, setTemplateError] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+
+  // L33: Load library routine list via get_routine_catalog RPC
+  const {
+    data: catalogTemplates = [],
+    isError: isCatalogError,
+    error: catalogError,
+  } = useQuery({
+    queryKey: ['routine_templates', targetUserId || 'self', 'catalog'],
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)('get_routine_catalog', {
+        p_user_id: targetUserId || undefined,
+        p_limit: 50,
+      });
+      if (error) throw error;
+      return ((data || []) as unknown) as RoutineTemplate[];
+    },
+  });
 
   const exerciseMap = useMemo(() => {
     const map = new Map<string, Exercise>();
@@ -98,7 +115,7 @@ export const TemplateListTab: React.FC<TemplateListTabProps> = ({
     }));
   };
 
-  const filteredTemplates = templates.filter((tpl) => {
+  const filteredTemplates = catalogTemplates.filter((tpl) => {
     if (selectedDayFilter === 'All') return true;
     return tpl.days_of_week && tpl.days_of_week.includes(selectedDayFilter);
   });
@@ -109,7 +126,7 @@ export const TemplateListTab: React.FC<TemplateListTabProps> = ({
     <div className="space-y-4">
       {/* Template Action Error Banner */}
       <StatusBanner
-        message={templateError}
+        message={templateError || (isCatalogError ? (catalogError as Error)?.message || 'Failed to load routine catalog' : null)}
         tone="error"
         testId="template-action-error"
         className="mb-3"
@@ -119,7 +136,7 @@ export const TemplateListTab: React.FC<TemplateListTabProps> = ({
       {/* List-first Header with + New Routine Action */}
       <div className="flex items-center justify-between gap-3">
         <h3 className="font-bold text-white text-sm flex items-center gap-2">
-          <RefreshCw className="w-4 h-4 text-violet-400" aria-hidden="true" /> Saved Templates ({templates.length})
+          <RefreshCw className="w-4 h-4 text-violet-400" aria-hidden="true" /> Saved Templates ({catalogTemplates.length})
         </h3>
         <button
           type="button"
@@ -162,9 +179,9 @@ export const TemplateListTab: React.FC<TemplateListTabProps> = ({
 
       {/* Saved Templates List */}
       <div className="space-y-2">
-        {!isReadError && visibleTemplates.length === 0 ? (
+        {!isCatalogError && visibleTemplates.length === 0 ? (
           <div className="p-8 text-center bg-zinc-900/40 border border-zinc-800/60 rounded-2xl text-xs text-zinc-400">
-            {templates.length === 0
+            {catalogTemplates.length === 0
               ? 'No routine templates found. Tap "+ New Routine" to create one.'
               : `No templates scheduled for ${selectedDayFilter}.`}
           </div>
@@ -359,8 +376,8 @@ export const TemplateListTab: React.FC<TemplateListTabProps> = ({
         onDismiss={flush}
       />
 
-      {/* Edit Template Modal */}
-      <EditTemplateModal
+      {/* Edit Template Sheet */}
+      <EditTemplateSheet
         isOpen={isTemplateModalOpen}
         template={editingTemplate}
         exercises={exercises}

@@ -1,4 +1,4 @@
-import React, { useState, useId, useRef } from "react";
+import React, { useState, useEffect, useId, useRef, useCallback } from "react";
 import type { Exercise, RoutineTemplate } from "../../types/database";
 import { resolveExerciseLabel } from "../../utils/exerciseLabel";
 import { supabase } from "../../lib/supabase";
@@ -10,6 +10,7 @@ import { Sheet } from "../common/Sheet";
 import { Button } from "../common/Button";
 import { Chip } from "../common/Chip";
 import { StatusBanner } from "../common/StatusBanner";
+import { Skeleton } from "../common/Skeleton";
 
 export interface EditableTemplateExercise {
   id?: string;
@@ -21,6 +22,24 @@ export interface EditableTemplateExercise {
 }
 
 const DAYS_OF_WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+function mapTemplateExercises(items: any[], exerciseList: Exercise[] = []): EditableTemplateExercise[] {
+  return [...items]
+    .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+    .map((item) => {
+      const matched = exerciseList.find(
+        (e) => e.id === item.exercise_id || e.name.toLowerCase() === item.exercise_id?.toLowerCase()
+      );
+      return {
+        id: item.id,
+        exercise_id: matched ? matched.id : item.exercise_id,
+        exercise_name: resolveExerciseLabel(item.exercise?.name || item.exercise_name || matched?.name || item.exercise_id),
+        body_parts: item.exercise?.body_parts || (matched as any)?.body_parts || item.body_parts || null,
+        target_sets: item.target_sets || 3,
+        target_reps: item.target_reps || 10,
+      };
+    });
+}
 
 export interface EditTemplateSheetProps {
   isOpen: boolean;
@@ -61,60 +80,60 @@ export const EditTemplateSheet: React.FC<EditTemplateSheetProps> = ({
   const [saving, setSaving] = useState(false);
   const [reorderAnnouncement, setReorderAnnouncement] = useState("");
   const [latestUpdatedAt, setLatestUpdatedAt] = useState<string | null>(null);
+  const [isLoadingTemplate, setIsLoadingTemplate] = useState<boolean>(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const exercisesRef = useRef(exercises);
+  useEffect(() => {
+    exercisesRef.current = exercises;
+  }, [exercises]);
+
+  const fetchFreshTemplate = useCallback(async (templateId: string) => {
+    setIsLoadingTemplate(true);
+    setFetchError(null);
+    try {
+      const { data, error: fetchErr } = await supabase
+        .from("routine_templates")
+        .select("*, exercises:template_exercises(*, exercise:exercises(*))")
+        .eq("id", templateId)
+        .single();
+      if (fetchErr) throw fetchErr;
+      if (data) {
+        setName(data.name || "");
+        setDays(data.days_of_week ? [...data.days_of_week] : []);
+        setLatestUpdatedAt((data as any).updated_at ?? null);
+        setTemplateExercises(data.exercises?.length ? mapTemplateExercises(data.exercises, exercisesRef.current) : []);
+        setStaleError(false);
+        setError(null);
+      }
+    } catch (err: any) {
+      setFetchError(err?.message || "Failed to load template.");
+    } finally {
+      setIsLoadingTemplate(false);
+    }
+  }, []);
 
   const [prevSyncKey, setPrevSyncKey] = useState<string>("");
-  const syncKey = `${isOpen ? "1" : "0"}-${template?.id || "new"}-${(template as any)?.updated_at || ""}-${isFork ? "1" : "0"}`;
+  const syncKey = `${isOpen ? "1" : "0"}-${template?.id || "new"}-${isFork ? "1" : "0"}`;
 
   if (prevSyncKey !== syncKey) {
     setPrevSyncKey(syncKey);
     if (isOpen) {
-      if (template) {
-        const cleanName = isFork
-          ? template.name.replace(/\s*\(Copy\)\s*$/i, "")
-          : template.name;
+      if (template?.id && !isFork) {
+        setIsLoadingTemplate(true);
+        setFetchError(null);
+      } else if (template && isFork) {
+        const cleanName = template.name.replace(/\s*\(Copy\)\s*$/i, "");
         setName(cleanName);
         setDays(template.days_of_week ? [...template.days_of_week] : []);
+        setTemplateExercises(template.exercises?.length ? mapTemplateExercises(template.exercises, exercises) : []);
         setError(null);
         setStaleError(false);
         setIsPickerOpen(false);
         setReorderAnnouncement("");
-        setLatestUpdatedAt((template as any).updated_at ?? null);
-
-        if (template.exercises && template.exercises.length > 0) {
-          const sorted = [...template.exercises].sort(
-            (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
-          );
-          const mapped: EditableTemplateExercise[] = sorted.map((item) => {
-            const matched = exercises.find(
-              (e) =>
-                e.id === item.exercise_id ||
-                e.name.toLowerCase() === item.exercise_id.toLowerCase()
-            );
-            const exName = resolveExerciseLabel(
-              (item as any).exercise?.name ||
-                (item as any).exercise_name ||
-                matched?.name ||
-                item.exercise_id
-            );
-            const bodyParts =
-              (item as any).exercise?.body_parts ||
-              (matched as any)?.body_parts ||
-              (item as any).body_parts ||
-              null;
-
-            return {
-              id: item.id,
-              exercise_id: matched ? matched.id : item.exercise_id,
-              exercise_name: exName,
-              body_parts: bodyParts,
-              target_sets: item.target_sets || 3,
-              target_reps: item.target_reps || 10,
-            };
-          });
-          setTemplateExercises(mapped);
-        } else {
-          setTemplateExercises([]);
-        }
+        setLatestUpdatedAt(null);
+        setIsLoadingTemplate(false);
+        setFetchError(null);
       } else {
         setName("");
         setDays([]);
@@ -124,10 +143,22 @@ export const EditTemplateSheet: React.FC<EditTemplateSheetProps> = ({
         setIsPickerOpen(false);
         setReorderAnnouncement("");
         setLatestUpdatedAt(null);
+        setIsLoadingTemplate(false);
+        setFetchError(null);
       }
+    } else {
+      setIsLoadingTemplate(false);
+      setFetchError(null);
     }
   }
 
+  /* oxlint-disable react/set-state-in-effect */
+  useEffect(() => {
+    if (isOpen && template?.id && !isFork) {
+      void fetchFreshTemplate(template.id);
+    }
+  }, [isOpen, template?.id, isFork, fetchFreshTemplate]);
+  /* oxlint-enable react/set-state-in-effect */
   const toggleDay = (d: string) => {
     if (saving) return;
     setDays((prev) =>
@@ -215,39 +246,8 @@ export const EditTemplateSheet: React.FC<EditTemplateSheetProps> = ({
     if (!template?.id) return;
     setIsReloading(true);
     try {
-      const { data, error: fetchErr } = await supabase
-        .from("routine_templates")
-        .select("*, exercises:template_exercises(*, exercise:exercises(*))")
-        .eq("id", template.id)
-        .single();
-      if (fetchErr) throw fetchErr;
-      if (data) {
-        setName(data.name || "");
-        setDays(data.days_of_week ? [...data.days_of_week] : []);
-        setLatestUpdatedAt((data as any).updated_at ?? null);
-        if (data.exercises && data.exercises.length > 0) {
-          const sorted = [...data.exercises].sort(
-            (a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0)
-          );
-          const mapped: EditableTemplateExercise[] = sorted.map((item: any) => ({
-            id: item.id,
-            exercise_id: item.exercise_id,
-            exercise_name: resolveExerciseLabel(
-              item.exercise?.name || item.exercise_name || item.exercise_id
-            ),
-            body_parts: item.exercise?.body_parts || null,
-            target_sets: item.target_sets || 3,
-            target_reps: item.target_reps || 10,
-          }));
-          setTemplateExercises(mapped);
-        } else {
-          setTemplateExercises([]);
-        }
-        setStaleError(false);
-        setError(null);
-      }
-    } catch (err: any) {
-      setError(err?.message || "Failed to reload template.");
+      await fetchFreshTemplate(template.id);
+      setStaleError(false);
     } finally {
       setIsReloading(false);
     }
@@ -292,11 +292,8 @@ export const EditTemplateSheet: React.FC<EditTemplateSheetProps> = ({
       rpcPayload.p_assigned_to = assignToAthleteId;
     }
 
-    if (
-      template &&
-      ("updated_at" in template || (template as any).updated_at !== undefined)
-    ) {
-      rpcPayload.p_expected_updated_at = isFork ? null : (latestUpdatedAt ?? null);
+    if (template?.id && !isFork) {
+      rpcPayload.p_expected_updated_at = latestUpdatedAt ?? null;
     }
 
     try {
@@ -359,7 +356,7 @@ export const EditTemplateSheet: React.FC<EditTemplateSheetProps> = ({
               variant="primary"
               size="md"
               testId="save-template-btn"
-              disabled={saving || !name.trim()}
+              disabled={saving || isLoadingTemplate || Boolean(fetchError) || !name.trim()}
               isLoading={saving}
               onClick={handleSave}
               leftIcon={<Check className="w-4 h-4" />}
@@ -389,7 +386,7 @@ export const EditTemplateSheet: React.FC<EditTemplateSheetProps> = ({
         </output>
 
         {/* Master Routine Info Banner (L29) */}
-        {(template?.is_master || allowMaster) && !isFork && (
+        {(template?.is_master || allowMaster) && !isFork && !isLoadingTemplate && !fetchError && (
           <StatusBanner
             tone="info"
             testId="master-routine-banner"
@@ -401,8 +398,38 @@ export const EditTemplateSheet: React.FC<EditTemplateSheetProps> = ({
           </StatusBanner>
         )}
 
+        {/* Fetch Error with Retry Button (L43) */}
+        {fetchError && (
+          <StatusBanner
+            tone="error"
+            testId="template-fetch-error-banner"
+            message={fetchError}
+            action={
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => template?.id && fetchFreshTemplate(template.id)}
+                disabled={isLoadingTemplate}
+                isLoading={isLoadingTemplate}
+                testId="retry-fetch-template-btn"
+              >
+                Retry
+              </Button>
+            }
+            className="mb-3"
+          />
+        )}
+
+        {/* Loading Skeleton while fetching fresh template (L43) */}
+        {isLoadingTemplate && (
+          <div className="space-y-4 py-2" data-testid="template-sheet-skeleton">
+            <Skeleton variant="card" count={2} />
+          </div>
+        )}
+
         {/* Stale Template Conflict Banner (L43) */}
-        {staleError && (
+        {staleError && !isLoadingTemplate && (
           <StatusBanner
             tone="error"
             testId="stale-template-banner"
@@ -413,8 +440,8 @@ export const EditTemplateSheet: React.FC<EditTemplateSheetProps> = ({
                 variant="secondary"
                 size="sm"
                 onClick={handleReload}
-                disabled={isReloading}
-                isLoading={isReloading}
+                disabled={isReloading || isLoadingTemplate}
+                isLoading={isReloading || isLoadingTemplate}
                 testId="reload-template-btn"
               >
                 Reload
@@ -426,12 +453,14 @@ export const EditTemplateSheet: React.FC<EditTemplateSheetProps> = ({
 
         {/* General Error Banner */}
         <StatusBanner
-          message={error}
+          message={!isLoadingTemplate ? error : null}
           tone="error"
           testId="template-error"
           className="mb-3"
         />
 
+        {!isLoadingTemplate && !fetchError && (
+          <>
         {/* Template Name Input */}
         <div className="space-y-1.5">
           <label
@@ -530,7 +559,10 @@ export const EditTemplateSheet: React.FC<EditTemplateSheetProps> = ({
             <span>Add Exercise to Routine</span>
           </button>
         </div>
-            {/* Shared ExercisePicker as Overlay Sheet (L28, L36) */}
+                </>
+        )}
+
+      {/* Shared ExercisePicker as Overlay Sheet (L28, L36) */}
       <ExercisePicker
         isOpen={isPickerOpen}
         onClose={handleClosePicker}
@@ -544,45 +576,18 @@ export const EditTemplateSheet: React.FC<EditTemplateSheetProps> = ({
       {isPickerOpen && (
         <div className="sr-only" data-testid="picker-compat-layer">
           {exercises?.map((ex) => (
-            <button
-              key={ex.id}
-              type="button"
-              data-testid={`add-exercise-btn-${ex.id}`}
-              onClick={() => {
-                setTemplateExercises((prev) => {
-                  const exists = prev.some(
-                    (te) =>
-                      te.exercise_id === ex.id ||
-                      te.exercise_name.toLowerCase() === ex.name.toLowerCase()
-                  );
-                  if (exists) return prev;
-                  return [
-                    ...prev,
-                    {
-                      exercise_id: ex.id,
-                      exercise_name: ex.name,
-                      body_parts: (ex as any).body_parts ?? null,
-                      target_sets: 3,
-                      target_reps: 10,
-                    },
-                  ];
-                });
-              }}
-            >
-              Add {ex.name}
-            </button>
+            <button key={ex.id} type="button" data-testid={`add-exercise-btn-${ex.id}`} onClick={() => {
+              setTemplateExercises((prev) => {
+                const exists = prev.some((te) => te.exercise_id === ex.id || te.exercise_name.toLowerCase() === ex.name.toLowerCase());
+                if (exists) return prev;
+                return [...prev, { exercise_id: ex.id, exercise_name: ex.name, body_parts: (ex as any).body_parts ?? null, target_sets: 3, target_reps: 10 }];
+              });
+            }}>Add {ex.name}</button>
           ))}
-          <button
-            type="button"
-            onClick={handleClosePicker}
-          >
-            Done
-          </button>
+          <button type="button" onClick={handleClosePicker}>Done</button>
         </div>
       )}
       </Sheet>
-
-
     </>
   );
 };

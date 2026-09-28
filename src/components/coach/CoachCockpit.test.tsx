@@ -39,8 +39,8 @@ describe('CoachCockpit', () => {
   ];
 
   const defaultExercises = [
-    { id: 'ex-1', name: 'Leg Extension Machine', body_part: 'Legs', is_master: true },
-    { id: 'ex-2', name: 'Incline Bench Press', body_part: 'Chest', is_master: true },
+    { id: 'ex-1', name: 'Leg Extension Machine', body_parts: ['Legs'], is_master: true },
+    { id: 'ex-2', name: 'Incline Bench Press', body_parts: ['Chest'], is_master: true },
   ];
 
   const defaultMock = (table: string) => {
@@ -151,7 +151,7 @@ describe('CoachCockpit', () => {
     expect(getRecordedTables()).toContain('exercises');
     expect(getRecordedSelects()).toContainEqual({
       table: 'exercises',
-      projection: 'id, name, body_part, is_master',
+      projection: 'id, name, body_parts, is_master',
     });
     expect(getRecordedTables()).toContain('workouts');
     expect(getRecordedSelects()).toContainEqual({
@@ -170,22 +170,7 @@ describe('CoachCockpit', () => {
     });
   });
 
-  it('allows adding exercises and customizing target sets and reps in template builder', async () => {
-    const mockInsert = vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({ data: { id: 'tpl-1' }, error: null }),
-      }),
-    });
-
-    (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'routine_templates' || table === 'template_exercises') {
-        const b = defaultMock(table);
-        b.insert = mockInsert;
-        return b;
-      }
-      return defaultMock(table);
-    });
-
+  it('allows adding exercises and customizing target sets and reps in template builder with single atomic RPC', async () => {
     renderComponent();
 
     // Wait for coach session and athlete to load
@@ -214,9 +199,35 @@ describe('CoachCockpit', () => {
     fireEvent.click(saveBtn);
 
     await waitFor(() => {
-      expect(mockInsert).toHaveBeenCalled();
-      // template_exercises is mutation-only (insert); NO_PROJECTION_APPLIES
-      expect(getRecordedTables()).toContain('template_exercises');
+      expect(supabase.rpc).toHaveBeenCalledWith(
+        'save_routine_template',
+        expect.objectContaining({
+          p_name: 'Hypertrophy Legs',
+          p_is_master: false,
+          p_assigned_to: 'ath-1',
+          p_exercises: [
+            {
+              exercise_id: 'ex-1',
+              order_index: 0,
+              target_sets: 4,
+              target_reps: 15,
+            },
+          ],
+        })
+      );
+    });
+  });
+
+  it('opens EditTemplateSheet with assignToAthleteId when + New Template button is clicked', async () => {
+    renderComponent();
+
+    await screen.findByText('Workout Template Builder');
+
+    const newTplBtn = screen.getByTestId('coach-open-new-template-sheet-btn');
+    fireEvent.click(newTplBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('edit-template-modal')).toBeDefined();
     });
   });
 
@@ -394,7 +405,7 @@ describe('CoachCockpit', () => {
               exercise_id: 'ex-2',
               reps: 10,
               weight: 200,
-              exercise: { id: 'ex-2', name: 'Incline Bench Press', body_part: 'Chest' },
+              exercise: { id: 'ex-2', name: 'Incline Bench Press', body_parts: ['Chest'] },
             },
           ],
           error: null,
@@ -448,7 +459,7 @@ describe('CoachCockpit', () => {
     expect(getRecordedTables()).toContain('sets');
     expect(getRecordedSelects()).toContainEqual({
       table: 'sets',
-      projection: 'id, workout_id, reps, weight, set_index, exercise_id, exercise:exercises(id, name, body_part)',
+      projection: 'id, workout_id, reps, weight, set_index, exercise_id, exercise:exercises(id, name, body_parts)',
     });
   });
 
@@ -582,7 +593,7 @@ describe('CoachCockpit', () => {
                     exercise_id: 'ex-2',
                     reps: 12,
                     weight: 225,
-                    exercise: { id: 'ex-2', name: 'Incline Bench Press', body_part: 'Chest' },
+                    exercise: { id: 'ex-2', name: 'Incline Bench Press', body_parts: ['Chest'] },
                   },
                 ],
               },
