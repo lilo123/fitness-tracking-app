@@ -42,9 +42,9 @@ describe('DIR-C2: List Virtualization with @tanstack/react-virtual', () => {
   });
 
   const mockExercises: Exercise[] = [
-    { id: 'ex-bench', name: 'Barbell Bench Press', body_part: 'Chest' },
-    { id: 'ex-squat', name: 'Barbell Back Squat', body_part: 'Legs' },
-    { id: 'ex-deadlift', name: 'Deadlift', body_part: 'Back' },
+    { id: 'ex-bench', name: 'Barbell Bench Press', body_parts: ['Chest'] },
+    { id: 'ex-squat', name: 'Barbell Back Squat', body_parts: ['Legs'] },
+    { id: 'ex-deadlift', name: 'Deadlift', body_parts: ['Back'] },
   ];
 
   it('WorkoutSessionHistory: mounts <= 200 DOM nodes at rest with a 2,000-set account (DIR-C2 Threshold)', () => {
@@ -179,7 +179,7 @@ describe('DIR-C2: List Virtualization with @tanstack/react-virtual', () => {
       exercise: {
         id: `ex-${idx}`,
         name: `Exercise Variant ${idx + 1}`,
-        body_part: idx % 2 === 0 ? 'Chest' : 'Back',
+        body_parts: [idx % 2 === 0 ? 'Chest' : 'Back'],
       },
       sets: [
         {
@@ -522,7 +522,7 @@ describe('DIR-C2: List Virtualization with @tanstack/react-virtual', () => {
   it('RFIX-15: WorkoutExerciseHistory caps non-virtual fallback at FALLBACK_WINDOW with visible affordance when virtualizer yields empty items', () => {
     mockFallbackMode = true;
     const stats: ExerciseStat[] = Array.from({ length: 400 }, (_, i) => ({
-      exercise: { id: `ex-${i}`, name: `Exercise #${i + 1}`, body_part: 'Chest' },
+      exercise: { id: `ex-${i}`, name: `Exercise #${i + 1}`, body_parts: ['Chest'] },
       sets: [],
       maxWeight: 100,
       prReps: 10,

@@ -127,7 +127,7 @@ describe('useHistoryData: 14-day window infinite query (H11, D-P5b-2)', () => {
       if (table === 'exercises') {
         return createSupabaseBuilder('exercises', {
           data: [
-            { id: 'ex-1', name: 'Bench Press', body_part: 'Chest', is_master: true },
+            { id: 'ex-1', name: 'Bench Press', body_parts: ['Chest'], is_master: true },
           ],
           error: null,
         }) as any;
@@ -193,7 +193,7 @@ describe('useHistoryData: 14-day window infinite query (H11, D-P5b-2)', () => {
     expect(getRecordedTables()).toContain('nutrition_logs');
     expect(getRecordedSelects()).toContainEqual({
       table: 'exercises',
-      projection: 'id, name, body_part, is_master',
+      projection: 'id, name, body_parts, is_master',
     });
     expect(getRecordedSelects()).toContainEqual({
       table: 'nutrition_logs',

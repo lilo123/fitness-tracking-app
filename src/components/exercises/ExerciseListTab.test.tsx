@@ -46,7 +46,6 @@ describe('ExerciseListTab', () => {
     {
       id: 'ex-1',
       name: 'Zercher Squat',
-      body_part: 'Legs',
       body_parts: ['Legs'],
       equipment: 'barbell',
       is_master: true,
@@ -58,7 +57,6 @@ describe('ExerciseListTab', () => {
     {
       id: 'ex-2',
       name: 'Romanian Deadlift',
-      body_part: 'Legs',
       body_parts: ['Legs'],
       equipment: 'barbell',
       is_master: false,
@@ -70,7 +68,6 @@ describe('ExerciseListTab', () => {
     {
       id: 'ex-3',
       name: 'Incline Dumbbell Bench Press',
-      body_part: 'Chest',
       body_parts: ['Chest'],
       equipment: 'dumbbell',
       is_master: false,

@@ -6,12 +6,12 @@ describe('supabaseBuilderMock limit and range fidelity (H28 / L37)', () => {
     const fixture = Array.from({ length: 500 }, (_, i) => ({
       id: `ex-${i}`,
       name: `Exercise ${String(i).padStart(3, '0')}`,
-      body_part: 'Chest',
+      body_parts: ['Chest'],
       is_master: true,
     }));
 
     const builder = createSupabaseBuilder('exercises', fixture);
-    const { data, error } = await builder.select('id, name, body_part, is_master').limit(200);
+    const { data, error } = await builder.select('id, name, body_parts, is_master').limit(200);
 
     expect(error).toBeNull();
     expect(data).toHaveLength(200);

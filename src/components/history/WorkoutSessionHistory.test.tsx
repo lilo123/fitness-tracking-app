@@ -197,7 +197,7 @@ describe('WorkoutSessionHistory (H4, H29, H43)', () => {
       <MemoryRouter>
         <WorkoutSessionHistory
           displayedSessions={[kgSession]}
-          exercises={[{ id: 'ex-bench', name: 'Bench Press', body_part: 'Chest' }]}
+          exercises={[{ id: 'ex-bench', name: 'Bench Press', body_parts: ['Chest'] }]}
           timeRange="all"
           isInspectingAthlete={false}
           onEditSet={vi.fn()}

@@ -10,7 +10,7 @@ import {
 } from './muscleGroups';
 
 describe('muscleGroups constants', () => {
-  it('covers all production database body_part values', () => {
+  it('covers all production database body_parts values', () => {
     const requiredProductionParts = [
       'Back',
       'Chest',

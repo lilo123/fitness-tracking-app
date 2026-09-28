@@ -190,9 +190,9 @@ def build_migration_sql(
     statements.append(f'-- 1. Insert {len(custom_exercises_to_insert)} Custom Exercises')
     for ex in custom_exercises_to_insert:
         statements.append(
-            f"INSERT INTO public.exercises (id, name, body_part, is_master, is_archived, created_at) "
-            f"VALUES ('{ex['id']}', {escape_sql_str(ex['name'])}, {escape_sql_str(ex['body_part'])}, true, false, timezone('utc'::text, now())) "
-            f"ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, body_part = EXCLUDED.body_part, is_master = EXCLUDED.is_master;"
+            f"INSERT INTO public.exercises (id, name, body_parts, is_master, is_archived, created_at) "
+            f"VALUES ('{ex['id']}', {escape_sql_str(ex['name'])}, ARRAY[{escape_sql_str(ex['body_part'])}]::text[], true, false, timezone('utc'::text, now())) "
+            f"ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, body_parts = EXCLUDED.body_parts, is_master = EXCLUDED.is_master;"
         )
     statements.append('')
 

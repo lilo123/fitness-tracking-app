@@ -127,7 +127,7 @@ export const HistoryView: React.FC = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('exercises')
-        .select('id, name, body_part, is_master')
+        .select('id, name, body_parts, is_master')
         .order('name')
         .limit(1000);
       if (error) throw error;

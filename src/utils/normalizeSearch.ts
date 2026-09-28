@@ -71,12 +71,11 @@ export function normalizeSearch(query: string | null | undefined): string {
 }
 
 /**
- * Parses body part tokens from body_part text and/or body_parts array.
+ * Parses body part tokens from body_parts array (or string).
  * Trims whitespace and splits on [,/].
  */
 export function parseBodyPartTokens(
-  bodyPart?: string | null,
-  bodyParts?: string[] | null
+  bodyParts?: string[] | string | null
 ): string[] {
   const result: string[] = [];
   const seen = new Set<string>();
@@ -90,18 +89,18 @@ export function parseBodyPartTokens(
     }
   };
 
-  if (bodyParts && Array.isArray(bodyParts)) {
-    for (const bp of bodyParts) {
-      if (typeof bp === 'string') {
-        const parts = bp.split(/[,/]/);
-        for (const p of parts) addToken(p);
+  if (bodyParts) {
+    if (Array.isArray(bodyParts)) {
+      for (const bp of bodyParts) {
+        if (typeof bp === 'string') {
+          const parts = bp.split(/[,/]/);
+          for (const p of parts) addToken(p);
+        }
       }
+    } else if (typeof bodyParts === 'string') {
+      const parts = bodyParts.split(/[,/]/);
+      for (const p of parts) addToken(p);
     }
-  }
-
-  if (bodyPart && typeof bodyPart === 'string') {
-    const parts = bodyPart.split(/[,/]/);
-    for (const p of parts) addToken(p);
   }
 
   return result;
@@ -113,7 +112,6 @@ export function parseBodyPartTokens(
 export function matchesExerciseSearch(
   exercise: {
     name: string;
-    body_part?: string | null;
     body_parts?: string[] | null;
     equipment?: string | null;
   },
@@ -132,7 +130,7 @@ export function matchesExerciseSearch(
   // 2. Muscle group filter (exact token match on body parts, split on [,/])
   if (filterMuscleGroup && filterMuscleGroup.toLowerCase() !== 'all') {
     const targetGroup = filterMuscleGroup.toLowerCase().trim();
-    const tokens = parseBodyPartTokens(exercise.body_part, exercise.body_parts).map((t) =>
+    const tokens = parseBodyPartTokens(exercise.body_parts).map((t) =>
       t.toLowerCase()
     );
     const hasGroup = tokens.some((t) => t === targetGroup);
@@ -168,7 +166,7 @@ export function matchesExerciseSearch(
   }
 
   // Also match against body parts
-  const bodyPartTokens = parseBodyPartTokens(exercise.body_part, exercise.body_parts).map(
+  const bodyPartTokens = parseBodyPartTokens(exercise.body_parts).map(
     cleanSearchText
   );
   if (

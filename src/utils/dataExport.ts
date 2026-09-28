@@ -69,7 +69,7 @@ export interface GeneratedExportFile {
 export const EXPORT_PAGE_SIZE = 250;
 
 export const WORKOUT_EXPORT_PROJECTION =
-  'id, user_id, name, date, created_at, sets(id, exercise_id, set_index, set_type, weight, reps, rpe, created_at, exercise:exercises(name, body_part))';
+  'id, user_id, name, date, created_at, sets(id, exercise_id, set_index, set_type, weight, reps, rpe, created_at, exercise:exercises(name, body_parts))';
 
 export const NUTRITION_EXPORT_PROJECTION =
   'id, user_id, food_name, meal_type, calories, protein, carbs, fat, fiber, serving_size, serving_unit, logged_at, created_at, notes, has_components, items';
@@ -78,7 +78,7 @@ export const CUSTOM_DISH_EXPORT_PROJECTION =
   'id, user_id, name, kind, calories, protein, carbs, fat, fiber, use_count, notes, created_at, items';
 
 export const ROUTINE_EXPORT_PROJECTION =
-  'id, user_id, name, is_master, assigned_to, days_of_week, created_at, exercises:template_exercises(id, exercise_id, order_index, target_sets, target_reps, exercise:exercises(name, body_part))';
+  'id, user_id, name, is_master, assigned_to, days_of_week, created_at, exercises:template_exercises(id, exercise_id, order_index, target_sets, target_reps, exercise:exercises(name, body_parts))';
 
 export function resolveDateBounds(
   preset: DateRangePreset,
@@ -227,7 +227,7 @@ export function serializeToExportCsvFiles(bundle: ExportBundle, dateStamp: strin
               s.set_index ?? '',
               s.set_type ?? '',
               s.exercise?.name ?? s.exercise_name ?? '',
-              s.exercise?.body_part ?? '',
+              Array.isArray((s.exercise as any)?.body_parts) ? (s.exercise as any).body_parts.join(', ') : ((s.exercise as any)?.body_part ?? ''),
               s.weight ?? '',
               s.reps ?? '',
               s.rpe ?? '',
@@ -373,7 +373,7 @@ export function serializeToExportCsvFiles(bundle: ExportBundle, dateStamp: strin
               r.assigned_to ?? '',
               ex.order_index ?? '',
               (ex as any).exercise?.name ?? ex.exercise_name ?? '',
-              (ex as any).exercise?.body_part ?? '',
+              Array.isArray((ex as any).exercise?.body_parts) ? (ex as any).exercise.body_parts.join(', ') : ((ex as any).exercise?.body_part ?? ''),
               ex.target_sets ?? '',
               ex.target_reps ?? '',
             ];

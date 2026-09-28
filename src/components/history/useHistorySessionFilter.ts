@@ -65,22 +65,26 @@ export function useHistorySessionFilter(
       if (isCategoryActive) {
         if (sets.length > 0) {
           const hasCategorySet = sets.some((set) => {
-            const bp =
-              (set as { body_part?: string }).body_part ||
-              set.exercise?.body_part ||
-              exercises?.find(
-                (e) =>
-                  e.id === set.exercise_id ||
-                  e.name.toLowerCase() === (set.exercise_name || '').toLowerCase()
-              )?.body_part;
+            const foundExercise = exercises?.find(
+              (e) =>
+                e.id === set.exercise_id ||
+                e.name.toLowerCase() === (set.exercise_name || '').toLowerCase()
+            );
+            const bodyParts =
+              set.exercise?.body_parts ||
+              foundExercise?.body_parts ||
+              (set as { body_parts?: string[] }).body_parts;
 
-            if (!bp) return false;
-            const tokens = parseBodyPartTokens(bp).map((t) => t.toLowerCase());
+            if (!bodyParts || bodyParts.length === 0) return false;
+            const tokens = parseBodyPartTokens(bodyParts).map((t) => t.toLowerCase());
             return (
               tokens.includes(targetCategory) ||
               tokens.includes(singularCategory) ||
-              bp.toLowerCase() === targetCategory ||
-              bp.toLowerCase().includes(singularCategory)
+              bodyParts.some(
+                (p) =>
+                  p.toLowerCase() === targetCategory ||
+                  p.toLowerCase().includes(singularCategory)
+              )
             );
           });
 

@@ -137,8 +137,10 @@ export type Database = {
       }
       exercises: {
         Row: {
+          body_parts: string[] | null
           body_part: string | null
           created_at: string
+          equipment: string | null
           id: string
           is_archived: boolean
           is_master: boolean
@@ -146,8 +148,9 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
-          body_part?: string | null
+          body_parts?: string[] | null
           created_at?: string
+          equipment?: string | null
           id?: string
           is_archived?: boolean
           is_master?: boolean
@@ -155,8 +158,9 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
-          body_part?: string | null
+          body_parts?: string[] | null
           created_at?: string
+          equipment?: string | null
           id?: string
           is_archived?: boolean
           is_master?: boolean

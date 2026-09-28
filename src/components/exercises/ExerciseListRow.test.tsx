@@ -6,7 +6,6 @@ describe('ExerciseListRow', () => {
   const masterExercise: ExerciseRowItem = {
     id: 'ex-master-1',
     name: 'Zercher Squat',
-    body_part: 'Legs',
     body_parts: ['Legs'],
     equipment: 'barbell',
     is_master: true,
@@ -18,7 +17,6 @@ describe('ExerciseListRow', () => {
   const userExercise: ExerciseRowItem = {
     id: 'ex-user-1',
     name: 'Romanian Deadlift',
-    body_part: 'Legs',
     body_parts: ['Legs'],
     equipment: 'barbell',
     is_master: false,
@@ -44,12 +42,11 @@ describe('ExerciseListRow', () => {
     expect(screen.getByText('Barbell')).toBeDefined();
   });
 
-  it('renders joined body_parts in subtitle with fallback to body_part', () => {
+  it('renders joined body_parts in subtitle', () => {
     const multiBodyPartEx: ExerciseRowItem = {
       ...masterExercise,
       body_parts: ['Chest', 'Triceps'],
-      body_part: 'Chest',
-    };
+      };
     render(
       <ExerciseListRow
         exercise={multiBodyPartEx}

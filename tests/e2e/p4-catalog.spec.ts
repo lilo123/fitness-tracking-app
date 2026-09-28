@@ -171,7 +171,7 @@ async function seedTemplatesViaREST(token: string, userId: string, count = 55) {
 
 function getVisibleExercisesFromDB(): Array<{ name: string; body_part: string }> {
   const sql = `
-    SELECT name, COALESCE(body_part, '')
+    SELECT name, COALESCE(array_to_string(body_parts, ' · '), '')
     FROM public.exercises
     WHERE is_archived = false
       AND (is_master = true OR user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io'))

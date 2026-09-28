@@ -249,7 +249,7 @@ describe('HistoryView', () => {
     expect(getRecordedTables()).toContain('exercises');
     expect(getRecordedSelects()).toContainEqual({
       table: 'exercises',
-      projection: 'id, name, body_part, is_master',
+      projection: 'id, name, body_parts, is_master',
     });
     // Preserved for check-mock-fidelity.js fidelity registry backward-compatibility:
     // 'id, workout_id, exercise_id, weight, reps, set_index, created_at, workouts(date, name), exercise:exercises(id, name, body_part)'
@@ -806,8 +806,8 @@ describe('HistoryView', () => {
   describe('Exercise Grouping & Session Separation (Bug 3)', () => {
     it('groupSessionSetsByExercise groups alternating superset sets by exercise in chronological order', () => {
       const mockExercises = [
-        { id: 'ex-row', name: 'Seated Cable Row', body_part: 'Back' },
-        { id: 'ex-situp', name: 'Sit-Up', body_part: 'Core' },
+        { id: 'ex-row', name: 'Seated Cable Row', body_parts: ['Back'] },
+        { id: 'ex-situp', name: 'Sit-Up', body_parts: ['Core'] },
       ];
 
       const supersetList = [
@@ -995,7 +995,7 @@ describe('HistoryView', () => {
       ] as any;
 
       const exercises = [
-        { id: 'ex-fly', name: 'Dumbbell Fly', body_part: 'Chest' },
+        { id: 'ex-fly', name: 'Dumbbell Fly', body_parts: ['Chest'] },
       ] as any;
 
       const groups = groupSessionSetsByExercise(testSets, exercises);
@@ -1075,7 +1075,7 @@ describe('HistoryView', () => {
         }
         if (table === 'exercises') {
           return createSupabaseBuilder('exercises', {
-            data: [{ id: 'ex-pullup', name: 'Pull-ups', body_part: 'Back' }],
+            data: [{ id: 'ex-pullup', name: 'Pull-ups', body_parts: ['Back'] }],
             error: null,
           });
         }
@@ -1647,8 +1647,8 @@ describe('HistoryView', () => {
         if (table === 'exercises') {
           return createSupabaseBuilder('exercises', {
             data: [
-              { id: 'ex-bench', name: 'Barbell Bench Press', body_part: 'Chest', is_master: true },
-              { id: 'ex-squat', name: 'Barbell Back Squat', body_part: 'Legs', is_master: true },
+              { id: 'ex-bench', name: 'Barbell Bench Press', body_parts: ['Chest'], is_master: true },
+              { id: 'ex-squat', name: 'Barbell Back Squat', body_parts: ['Legs'], is_master: true },
             ],
             error: null,
           });
@@ -1695,7 +1695,7 @@ describe('HistoryView', () => {
         if (table === 'exercises') {
           return createSupabaseBuilder('exercises', {
             data: [
-              { id: 'ex-deadlift', name: 'Deadlift', body_part: 'Back', is_master: true },
+              { id: 'ex-deadlift', name: 'Deadlift', body_parts: ['Back'], is_master: true },
             ],
             error: null,
           });
@@ -2234,7 +2234,7 @@ describe('HistoryView', () => {
       (supabase.from as any).mockImplementation((table: string) => {
         if (table === 'exercises') {
           return createSupabaseBuilder('exercises', {
-            data: [{ id: 'ex-bench', name: 'Barbell Bench Press', body_part: 'Chest' }],
+            data: [{ id: 'ex-bench', name: 'Barbell Bench Press', body_parts: ['Chest'] }],
             error: null,
           });
         }

@@ -7,9 +7,9 @@ import type { Exercise, RoutineTemplate, WorkoutSet } from '../../types/database
 describe('useWorkoutSession (W5, W24, W39, W46)', () => {
   const targetUserId = 'user-test-123';
   const mockExercises: Exercise[] = [
-    { id: 'ex-bench', name: 'Bench Press', body_part: 'Chest', is_master: true },
-    { id: 'ex-squat', name: 'Squat', body_part: 'Legs', is_master: true },
-    { id: 'ex-row', name: 'Barbell Row', body_part: 'Back', is_master: true },
+    { id: 'ex-bench', name: 'Bench Press', body_parts: ['Chest'], is_master: true },
+    { id: 'ex-squat', name: 'Squat', body_parts: ['Legs'], is_master: true },
+    { id: 'ex-row', name: 'Barbell Row', body_parts: ['Back'], is_master: true },
   ];
 
   const defaultProps = {

@@ -118,13 +118,13 @@ const SERVICED_QUERIES_REGISTRY = {
     {
       table: 'exercises',
       type: 'EXACT',
-      projection: 'id, name, body_part, is_master, is_archived, user_id, created_at',
+      projection: 'id, name, body_parts, is_master, is_archived, user_id, created_at',
       description: 'Exercise library master & custom query',
     },
     {
       table: 'routine_templates',
       type: 'EXACT',
-      projection: 'id, user_id, name, is_master, assigned_to, days_of_week, created_at, exercises:template_exercises(id, template_id, exercise_id, order_index, target_sets, target_reps, exercise:exercises(id, name, body_part))',
+      projection: 'id, user_id, name, is_master, assigned_to, days_of_week, created_at, exercises:template_exercises(id, template_id, exercise_id, order_index, target_sets, target_reps, exercise:exercises(id, name, body_parts))',
       description: 'Routine templates schedule query',
     },
     {
@@ -151,7 +151,7 @@ const SERVICED_QUERIES_REGISTRY = {
     {
       table: 'exercises',
       type: 'EXACT',
-      projection: 'id, name, body_part, is_master',
+      projection: 'id, name, body_parts, is_master',
       description: 'Exercise lookup query',
     },
     {
@@ -177,7 +177,7 @@ const SERVICED_QUERIES_REGISTRY = {
     {
       table: 'exercises',
       type: 'EXACT',
-      projection: 'id, name, body_part, is_master',
+      projection: 'id, name, body_parts, is_master',
       description: 'Exercise lookup query',
     },
     {
@@ -291,7 +291,7 @@ const SERVICED_QUERIES_REGISTRY = {
     {
       table: 'exercises',
       type: 'EXACT',
-      projection: 'id, name, body_part, is_master',
+      projection: 'id, name, body_parts, is_master',
       description: 'Exercise lookup query',
     },
     {
@@ -311,7 +311,7 @@ const SERVICED_QUERIES_REGISTRY = {
     {
       table: 'exercises',
       type: 'EXACT',
-      projection: 'id, name, body_part, is_master',
+      projection: 'id, name, body_parts, is_master',
       description: 'Exercise library lookup query',
     },
     {
@@ -373,7 +373,7 @@ const SERVICED_QUERIES_REGISTRY = {
     {
       table: 'workouts',
       type: 'EXACT',
-      projection: 'id, date, name, sets(id, reps, weight, set_index, rpe, created_at, exercise:exercises(name, body_part))',
+      projection: 'id, date, name, sets(id, reps, weight, set_index, rpe, created_at, exercise:exercises(name, body_parts))',
       projectionVar: 'WORKOUT_EXPORT_PROJECTION',
       description: 'Export workouts page fetch query',
     },
@@ -394,7 +394,7 @@ const SERVICED_QUERIES_REGISTRY = {
     {
       table: 'routine_templates',
       type: 'EXACT',
-      projection: 'id, user_id, name, days_of_week, is_master, assigned_to, template_exercises(order_index, target_sets, target_reps, exercise:exercises(name, body_part))',
+      projection: 'id, user_id, name, days_of_week, is_master, assigned_to, template_exercises(order_index, target_sets, target_reps, exercise:exercises(name, body_parts))',
       projectionVar: 'ROUTINE_EXPORT_PROJECTION',
       description: 'Export routine templates page fetch query',
     },
@@ -520,7 +520,7 @@ const SERVICED_QUERIES_REGISTRY = {
     {
       table: 'exercises',
       type: 'EXACT',
-      projection: 'id, name, body_part, is_master',
+      projection: 'id, name, body_parts, is_master',
       description: 'Exercise lookup query',
     },
     {

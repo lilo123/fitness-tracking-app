@@ -231,7 +231,7 @@ const EditSetForm: React.FC<EditSetFormProps> = ({
             )}
             {exercises.map((ex) => (
               <option key={ex.id} value={ex.id}>
-                {ex.name} {ex.body_part ? `(${ex.body_part})` : ""}
+                {ex.name} {ex.body_parts && ex.body_parts.length > 0 ? `(${ex.body_parts.join(' · ')})` : ""}
               </option>
             ))}
           </select>

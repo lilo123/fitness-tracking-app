@@ -165,7 +165,7 @@ describe('WorkoutEngine React Profiler Baseline', () => {
     expect(getRecordedTables()).toContain('exercises');
     expect(getRecordedSelects()).toContainEqual({
       table: 'exercises',
-      projection: 'id, name, body_part, is_master',
+      projection: 'id, name, body_parts, is_master',
     });
     expect(getRecordedTables()).toContain('users');
     expect(getRecordedSelects()).toContainEqual({

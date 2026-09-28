@@ -127,7 +127,7 @@ export const ExerciseStatsList: React.FC<ExerciseStatsListProps> = ({
       } else {
         const name = row.exercise_name || resolveExerciseLabel(row.exercise_id);
         stats[row.exercise_id] = {
-          exercise: { id: row.exercise_id, name, body_part: 'Other' },
+          exercise: { id: row.exercise_id, name, body_parts: ['Other'] } as any,
           sets: Array.isArray(row.recent_sets) ? row.recent_sets : [],
           maxWeight: Number(row.max_weight) || 0,
           prReps: Number(row.pr_reps) || 0,
@@ -154,8 +154,8 @@ export const ExerciseStatsList: React.FC<ExerciseStatsListProps> = ({
   // Filter stats by category and normalized search
   const filteredStats = computedStats.filter((stat) => {
     if (selectedCategory !== 'All') {
-      const bp = stat.exercise.body_part || '';
-      if (!bp.toLowerCase().includes(selectedCategory.toLowerCase())) return false;
+      const parts = stat.exercise.body_parts || [];
+      if (!parts.some((p) => p.toLowerCase().includes(selectedCategory.toLowerCase()))) return false;
     }
     if (searchQuery.trim()) {
       const normalizedQuery = normalizeSearch(searchQuery);
@@ -224,7 +224,7 @@ export const ExerciseStatsList: React.FC<ExerciseStatsListProps> = ({
             </h3>
             <div>
               <Tag
-                label={stat.exercise.body_part || 'Full Body'}
+                label={stat.exercise.body_parts?.[0] || 'Full Body'}
                 tone="info"
               />
             </div>

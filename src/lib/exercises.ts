@@ -9,7 +9,6 @@ export interface CatalogExercise {
   id: string;
   name: string;
   body_parts: string[] | null;
-  body_part: string | null;
   equipment: string | null;
   is_master: boolean;
   user_id: string | null;
@@ -217,7 +216,6 @@ export async function insertCustomExercise(
     : params.bodyParts
     ? parseBodyPartTokens(params.bodyParts)
     : [];
-  const bodyPartStr = bodyPartsArray.length > 0 ? bodyPartsArray.join(', ') : null;
 
   // 3. Resolve user_id
   let userId = params.targetUserId;
@@ -232,7 +230,6 @@ export async function insertCustomExercise(
     .insert({
       name: trimmedName,
       body_parts: bodyPartsArray.length > 0 ? bodyPartsArray : null,
-      body_part: bodyPartStr,
       equipment: candidateEquipment,
       user_id: userId || null,
       is_master: false,

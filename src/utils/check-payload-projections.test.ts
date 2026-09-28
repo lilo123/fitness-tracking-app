@@ -178,7 +178,7 @@ describe("Supabase Payload Projection Gate (Gate A / P1-0)", () => {
       "// payload-gate: accepted-list — clean site annotation test, measured 100 B on /test",
       "const { data } = await supabase",
       "  .from('exercises')",
-      "  .select('id, name, body_part');",
+      "  .select('id, name, body_parts');",
     ].join("\n");
 
     const result = analyzeSource(code);

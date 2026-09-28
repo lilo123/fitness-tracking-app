@@ -59,16 +59,16 @@ describe('normalizeSearch utility', () => {
       expect(parseBodyPartTokens('Chest, Chest / Shoulders')).toEqual(['Chest', 'Shoulders']);
     });
 
-    it('handles both body_part and body_parts array', () => {
-      const tokens = parseBodyPartTokens('Chest / Arms', ['Back', 'Arms']);
-      expect(tokens).toEqual(['Back', 'Arms', 'Chest']);
+    it('handles body_parts array and delimited strings', () => {
+      const tokens = parseBodyPartTokens(['Back', 'Arms', 'Chest / Shoulders']);
+      expect(tokens).toEqual(['Back', 'Arms', 'Chest', 'Shoulders']);
     });
   });
 
   describe('matchesExerciseSearch', () => {
     it('prefix matches "zer" to Zercher Squat (L8, H32)', () => {
-      const zercher = { name: 'Zercher Squat', body_part: 'Legs' };
-      const bench = { name: 'Bench Press', body_part: 'Chest' };
+      const zercher = { name: 'Zercher Squat', body_parts: ['Legs'] };
+      const bench = { name: 'Bench Press', body_parts: ['Chest'] };
 
       expect(matchesExerciseSearch(zercher, 'zer')).toBe(true);
       expect(matchesExerciseSearch(zercher, 'zer sq')).toBe(true);
@@ -76,28 +76,28 @@ describe('normalizeSearch utility', () => {
     });
 
     it('matches "rdl" to Romanian Deadlift via alias expansion', () => {
-      const rdl = { name: 'Romanian Deadlift', body_part: 'Legs' };
+      const rdl = { name: 'Romanian Deadlift', body_parts: ['Legs'] };
       expect(matchesExerciseSearch(rdl, 'rdl')).toBe(true);
       expect(matchesExerciseSearch(rdl, 'romanian')).toBe(true);
       expect(matchesExerciseSearch(rdl, 'deadlift')).toBe(true);
     });
 
     it('matches "ohp" to Overhead Press', () => {
-      const ohp = { name: 'Overhead Press', body_part: 'Shoulders' };
+      const ohp = { name: 'Overhead Press', body_parts: ['Shoulders'] };
       expect(matchesExerciseSearch(ohp, 'ohp')).toBe(true);
     });
 
     it('enforces token boundary on body parts (L8: Back chip does not match Lower Back)', () => {
-      const lowerBackOnly = { name: 'Hyperextensions', body_part: 'Lower Back' };
-      const backExercise = { name: 'Pull-up', body_part: 'Back' };
+      const lowerBackOnly = { name: 'Hyperextensions', body_parts: ['Lower Back'] };
+      const backExercise = { name: 'Pull-up', body_parts: ['Back'] };
 
       expect(matchesExerciseSearch(lowerBackOnly, '', 'Back')).toBe(false);
       expect(matchesExerciseSearch(backExercise, '', 'Back')).toBe(true);
     });
 
     it('filters by equipment correctly', () => {
-      const cableRow = { name: 'Seated Cable Row', equipment: 'cable', body_part: 'Back' };
-      const barbellRow = { name: 'Bent Over Row', equipment: 'barbell', body_part: 'Back' };
+      const cableRow = { name: 'Seated Cable Row', equipment: 'cable', body_parts: ['Back'] };
+      const barbellRow = { name: 'Bent Over Row', equipment: 'barbell', body_parts: ['Back'] };
 
       expect(matchesExerciseSearch(cableRow, '', null, 'cable')).toBe(true);
       expect(matchesExerciseSearch(barbellRow, '', null, 'cable')).toBe(false);

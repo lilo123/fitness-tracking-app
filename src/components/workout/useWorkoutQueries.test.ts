@@ -67,7 +67,7 @@ describe('useWorkoutQueries (P2 / W1 / W2 / W11 / W16 / W50 / L11)', () => {
       order: vi.fn().mockReturnValue({
         limit: vi.fn().mockResolvedValue({
           data: [
-            { id: 'ex-1', name: 'Active Exercise', body_part: 'Chest', is_master: true, is_archived: false },
+            { id: 'ex-1', name: 'Active Exercise', body_parts: ['Chest'], is_master: true, is_archived: false },
           ],
           error: null,
         }),
@@ -185,7 +185,7 @@ describe('useWorkoutQueries (P2 / W1 / W2 / W11 / W16 / W50 / L11)', () => {
           order: vi.fn().mockReturnValue({
             limit: vi.fn().mockResolvedValue({
               data: [
-                { id: exerciseUUID, name: 'Bench Press', body_part: 'Chest', is_master: true },
+                { id: exerciseUUID, name: 'Bench Press', body_parts: ['Chest'], is_master: true },
               ],
               error: null,
             }),
@@ -260,7 +260,7 @@ describe('useWorkoutQueries (P2 / W1 / W2 / W11 / W16 / W50 / L11)', () => {
           order: vi.fn().mockReturnValue({
             limit: vi.fn().mockResolvedValue({
               data: [
-                { id: 'ex-leg-1', name: 'Leg Curl', body_part: 'Legs', is_master: true },
+                { id: 'ex-leg-1', name: 'Leg Curl', body_parts: ['Legs'], is_master: true },
               ],
               error: null,
             }),

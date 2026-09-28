@@ -41,7 +41,7 @@ export function groupSessionSetsByExercise<T extends {
       matched ? matched.name : rawExName || rawExId,
       'Unknown Exercise'
     );
-    const bodyPart = matched?.body_part || 'Other';
+    const bodyPart = (matched?.body_parts && matched.body_parts.length > 0) ? matched.body_parts[0] : 'Other';
     const volume = (Number(set.weight) || 0) * (Number(set.reps) || 0);
 
     if (!groupMap.has(groupKey)) {

@@ -37,7 +37,7 @@ describe('Cross-Tab PR & Benchmarks (H10, RD-16, RD-20)', () => {
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'exercises') {
         return createSupabaseBuilder(table, {
-          data: [{ id: 'ex-bench', name: 'Bench Press', body_part: 'Chest', is_master: true }],
+          data: [{ id: 'ex-bench', name: 'Bench Press', body_parts: ['Chest'], is_master: true }],
           error: null,
         });
       }

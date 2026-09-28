@@ -24,7 +24,7 @@ describe('ExerciseStatsList (kg-mode & unit display)', () => {
 
   const mockExerciseStats: ExerciseStat[] = [
     {
-      exercise: { id: 'ex-bench', name: 'Barbell Bench Press', body_part: 'Chest' },
+      exercise: { id: 'ex-bench', name: 'Barbell Bench Press', body_parts: ['Chest'] },
       sets: [
         { id: 's1', weight: 225, reps: 5, workout_date: '2026-09-20' },
       ],

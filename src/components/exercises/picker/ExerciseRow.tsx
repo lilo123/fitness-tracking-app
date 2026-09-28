@@ -20,7 +20,7 @@ export const ExerciseRow: React.FC<ExerciseRowProps> = ({
   const bodyPartStr =
     exercise.body_parts && exercise.body_parts.length > 0
       ? exercise.body_parts.join(', ')
-      : exercise.body_part || '';
+      : '';
 
   const equipmentStr = getEquipmentLabel(exercise.equipment);
   const subtitleParts = [bodyPartStr, equipmentStr].filter(Boolean);

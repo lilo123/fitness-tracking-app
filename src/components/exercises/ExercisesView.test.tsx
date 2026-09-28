@@ -58,15 +58,15 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     mockAthleteSession.user.id = 'a0000000-0000-4000-8000-000000000123';
 
     const sampleExercises = [
-      { id: 'ex-master-1', name: 'Barbell Squat', body_part: 'Legs', is_master: true, user_id: null, is_archived: false },
-      { id: 'ex-custom-1', name: 'My Athlete Curl', body_part: 'Arms', is_master: false, user_id: 'a0000000-0000-4000-8000-000000000123', is_archived: false },
+      { id: 'ex-master-1', name: 'Barbell Squat', body_parts: ['Legs'], is_master: true, user_id: null, is_archived: false },
+      { id: 'ex-custom-1', name: 'My Athlete Curl', body_parts: ['Arms'], is_master: false, user_id: 'a0000000-0000-4000-8000-000000000123', is_archived: false },
     ];
 
     mockRpc.mockImplementation((name: string) => {
       if (name === 'get_exercise_catalog') {
         const rows = sampleExercises.map((ex) => ({
           ...ex,
-          body_parts: ex.body_part ? [ex.body_part] : [],
+          body_parts: ex.body_parts || [],
           equipment: 'Barbell',
           total_count: sampleExercises.length,
           is_hidden: false,
@@ -173,12 +173,12 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     expect(getRecordedTables()).toContain('exercises');
     expect(getRecordedSelects()).toContainEqual({
       table: 'exercises',
-      projection: 'id, name, body_part, is_master, is_archived, user_id, created_at',
+      projection: 'id, name, body_parts, is_master, is_archived, user_id, created_at',
     });
     expect(getRecordedTables()).toContain('routine_templates');
     expect(getRecordedSelects()).toContainEqual({
       table: 'routine_templates',
-      projection: 'id, user_id, name, is_master, assigned_to, days_of_week, created_at, exercises:template_exercises(id, template_id, exercise_id, order_index, target_sets, target_reps, exercise:exercises(id, name, body_part))',
+      projection: 'id, user_id, name, is_master, assigned_to, days_of_week, created_at, exercises:template_exercises(id, template_id, exercise_id, order_index, target_sets, target_reps, exercise:exercises(id, name, body_parts))',
     });
     expect(getRecordedTables()).toContain('users');
     expect(getRecordedSelects()).toContainEqual({
@@ -206,7 +206,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
       expect(mockInsertExercise).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'Dumbbell Hammer Curl',
-          body_part: 'Arms',
+          body_parts: ['Arms'],
           is_master: false,
           user_id: 'a0000000-0000-4000-8000-000000000123',
         }),
@@ -301,7 +301,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
       }
       if (table === 'exercises') {
         return createSupabaseBuilder('exercises', {
-          data: [{ id: 'ex-master-1', name: 'Barbell Squat', body_part: 'Legs' }],
+          data: [{ id: 'ex-master-1', name: 'Barbell Squat', body_parts: ['Legs'] }],
           error: null,
         });
       }
@@ -391,7 +391,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
       }
       if (table === 'exercises') {
         return createSupabaseBuilder('exercises', {
-          data: [{ id: 'ex-master-1', name: 'Barbell Squat', body_part: 'Legs' }],
+          data: [{ id: 'ex-master-1', name: 'Barbell Squat', body_parts: ['Legs'] }],
           error: null,
         });
       }
@@ -463,7 +463,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
       expect(mockUpdateExercise).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'Bicep Cable Curl',
-          body_part: expect.stringContaining('Arms'),
+          body_parts: expect.arrayContaining(['Arms']),
         })
       );
     });
@@ -504,7 +504,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
       }
       if (table === 'exercises') {
         return createSupabaseBuilder('exercises', {
-          data: [{ id: 'ex-master-1', name: 'Barbell Squat', body_part: 'Legs' }],
+          data: [{ id: 'ex-master-1', name: 'Barbell Squat', body_parts: ['Legs'] }],
           error: null,
         });
       }
@@ -599,8 +599,8 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
       }
       if (table === 'exercises') {
         const sampleEx = [
-          { id: 'ex-master-1', name: 'Barbell Squat', body_part: 'Legs' },
-          { id: 'ex-custom-1', name: 'My Athlete Curl', body_part: 'Arms' },
+          { id: 'ex-master-1', name: 'Barbell Squat', body_parts: ['Legs'] },
+          { id: 'ex-custom-1', name: 'My Athlete Curl', body_parts: ['Arms'] },
         ];
         return createSupabaseBuilder('exercises', {
           data: sampleEx,
@@ -751,7 +751,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === 'exercises') {
         const b = createSupabaseBuilder('exercises', {
-          data: [{ id: 'ex-custom-1', name: 'My Athlete Curl', body_part: 'Arms', is_master: false, user_id: 'a0000000-0000-4000-8000-000000000123', is_archived: false }],
+          data: [{ id: 'ex-custom-1', name: 'My Athlete Curl', body_parts: ['Arms'], is_master: false, user_id: 'a0000000-0000-4000-8000-000000000123', is_archived: false }],
           error: null,
         });
         b.update = vi.fn().mockReturnValue({
@@ -811,7 +811,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === 'exercises') {
         const b = createSupabaseBuilder('exercises', {
-          data: [{ id: 'ex-custom-1', name: 'My Athlete Curl', body_part: 'Arms', is_master: false, user_id: 'a0000000-0000-4000-8000-000000000123', is_archived: false }],
+          data: [{ id: 'ex-custom-1', name: 'My Athlete Curl', body_parts: ['Arms'], is_master: false, user_id: 'a0000000-0000-4000-8000-000000000123', is_archived: false }],
           error: null,
         });
         b.update = vi.fn().mockReturnValue({

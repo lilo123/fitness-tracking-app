@@ -2,7 +2,7 @@
  * Canonical Muscle Groups and Equipment Taxonomy (P4, L22, L48)
  *
  * Single source of truth for body parts, equipment, and category synonyms.
- * Covers all production database body_part values:
+ * Covers all production database body_parts values:
  * Back, Chest, Shoulders, Core, Legs, Arms, Biceps, Triceps.
  */
 

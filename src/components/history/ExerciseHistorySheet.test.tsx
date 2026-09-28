@@ -42,7 +42,7 @@ describe('ExerciseHistorySheet', () => {
       open: true,
       onClose: vi.fn(),
       userId: 'test-user-123',
-      exercise: { id: 'ex-bench', name: 'Barbell Bench Press', body_part: 'Chest' },
+      exercise: { id: 'ex-bench', name: 'Barbell Bench Press', body_parts: ['Chest'] },
       prDate: '2026-09-15',
       prWeight: 225,
       prReps: 8,

@@ -88,7 +88,7 @@ export const ExerciseListRow: React.FC<ExerciseListRowProps> = ({
   const bodyPartText =
     bodyParts && bodyParts.length > 0
       ? bodyParts.join(' · ')
-      : ex.body_part || null;
+      : null;
 
   return (
     <div

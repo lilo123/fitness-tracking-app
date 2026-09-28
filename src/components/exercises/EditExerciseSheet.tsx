@@ -77,13 +77,6 @@ export const EditExerciseSheet: React.FC<EditExerciseSheetProps> = ({
         : null;
       if (exBodyParts && exBodyParts.length > 0) {
         setSelectedBodyParts(exBodyParts);
-      } else if (exercise.body_part) {
-        setSelectedBodyParts(
-          exercise.body_part
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean)
-        );
       } else {
         setSelectedBodyParts([]);
       }
@@ -176,14 +169,11 @@ export const EditExerciseSheet: React.FC<EditExerciseSheetProps> = ({
         }
       }
 
-      const bodyPartStr = selectedBodyParts.length > 0 ? selectedBodyParts.join(', ') : null;
-
       const { data, error: updErr } = await supabase
         .from('exercises')
         .update({
           name: trimmedName,
           body_parts: selectedBodyParts.length > 0 ? selectedBodyParts : null,
-          body_part: bodyPartStr,
           equipment: candidateEquipment,
         } as any)
         .eq('id', exercise.id)

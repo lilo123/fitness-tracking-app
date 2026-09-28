@@ -128,7 +128,7 @@ export const WorkoutExerciseHistory: React.FC<WorkoutExerciseHistoryProps> = ({
               {stat.exercise.name}
             </h3>
             <Tag
-              label={stat.exercise.body_part || 'Full Body'}
+              label={stat.exercise.body_parts?.[0] || 'Full Body'}
               tone="info"
             />
           </div>

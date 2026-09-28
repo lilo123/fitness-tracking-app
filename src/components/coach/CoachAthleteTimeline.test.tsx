@@ -105,7 +105,7 @@ describe('CoachAthleteTimeline accessibility (NEW-15)', () => {
     mockCoachWeightUnit = 'kg';
 
     const testExercises = [
-      { id: 'ex-bench', name: 'Barbell Bench Press', body_part: 'Chest' },
+      { id: 'ex-bench', name: 'Barbell Bench Press', body_parts: ['Chest'] },
     ];
 
     const timelineDays = [
@@ -158,7 +158,7 @@ describe('CoachAthleteTimeline accessibility (NEW-15)', () => {
     mockCoachWeightUnit = 'lb';
 
     const testExercises = [
-      { id: 'ex-bench', name: 'Barbell Bench Press', body_part: 'Chest' },
+      { id: 'ex-bench', name: 'Barbell Bench Press', body_parts: ['Chest'] },
     ];
 
     const timelineDays = [

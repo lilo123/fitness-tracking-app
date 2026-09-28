@@ -32,7 +32,7 @@ export const ExercisesView: React.FC = () => {
     queryFn: async () => {
       let query = supabase
         .from('exercises')
-        .select('id, name, body_part, is_master, is_archived, user_id, created_at')
+        .select('id, name, body_parts, is_master, is_archived, user_id, created_at')
         .eq('is_archived', false);
       if (user?.id && isValidUUID(user.id)) {
         const filter = ['is_master.eq.true', 'user_id.eq.' + user.id].join(',');
@@ -64,7 +64,7 @@ export const ExercisesView: React.FC = () => {
       const { data, error } = await supabase
         .from('routine_templates')
         .select(
-          'id, user_id, name, is_master, assigned_to, days_of_week, created_at, exercises:template_exercises(id, template_id, exercise_id, order_index, target_sets, target_reps, exercise:exercises(id, name, body_part))'
+          'id, user_id, name, is_master, assigned_to, days_of_week, created_at, exercises:template_exercises(id, template_id, exercise_id, order_index, target_sets, target_reps, exercise:exercises(id, name, body_parts))'
         )
         .or(filter)
         .order('created_at', { ascending: false })

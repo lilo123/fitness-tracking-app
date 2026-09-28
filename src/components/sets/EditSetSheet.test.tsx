@@ -38,9 +38,9 @@ vi.mock("../../lib/supabase", () => ({
 }));
 
 const mockExercises: Exercise[] = [
-  { id: "ex-1", name: "Incline Bench Press", body_part: "Chest" },
-  { id: "ex-2", name: "Pull-ups", body_part: "Back" },
-  { id: "ex-3", name: "Dips", body_part: "Chest / Triceps" },
+  { id: "ex-1", name: "Incline Bench Press", body_parts: ["Chest"] },
+  { id: "ex-2", name: "Pull-ups", body_parts: ["Back"] },
+  { id: "ex-3", name: "Dips", body_parts: ["Chest", "Triceps"] },
 ];
 
 const mockSet: WorkoutSet & { workout_date?: string; workout_name?: string } = {

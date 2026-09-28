@@ -24,7 +24,7 @@ describe('EditExerciseSheet', () => {
     exercise: {
       id: 'ex-1',
       name: 'Bench Press',
-      body_part: 'Chest',
+      body_parts: ['Chest'],
       is_master: false,
     },
     onClose: vi.fn(),
@@ -220,7 +220,7 @@ describe('EditExerciseSheet', () => {
     const renamedExercise = {
       id: '00000000-0000-4000-8000-000000000099',
       name: 'Incline Dumbbell Press',
-      body_part: 'Chest',
+      body_parts: ['Chest'],
       is_master: false,
     };
 
@@ -241,7 +241,7 @@ describe('EditExerciseSheet', () => {
           exercise={{
             id: '00000000-0000-4000-8000-000000000099',
             name: 'Old Dumbbell Press',
-            body_part: 'Chest',
+            body_parts: ['Chest'],
             is_master: false,
           }}
           onClose={vi.fn()}
@@ -264,7 +264,7 @@ describe('EditExerciseSheet', () => {
     const updateSpy = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
         select: vi.fn().mockResolvedValue({
-          data: [{ id: "ex-1", name: "Renamed Bench Press", body_part: "Chest", equipment: null }],
+          data: [{ id: "ex-1", name: "Renamed Bench Press", body_parts: ["Chest"], equipment: null }],
           error: null,
         }),
       }),
@@ -297,7 +297,7 @@ describe('EditExerciseSheet', () => {
     const updateSpy = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
         select: vi.fn().mockResolvedValue({
-          data: [{ id: "ex-1", name: "Bench Press", body_part: "Chest", equipment: "barbell" }],
+          data: [{ id: "ex-1", name: "Bench Press", body_parts: ["Chest"], equipment: "barbell" }],
           error: null,
         }),
       }),
@@ -332,7 +332,7 @@ describe('EditExerciseSheet', () => {
     const existingExercise = {
       id: "ex-2",
       name: "Incline Bench Press",
-      body_part: "Chest",
+      body_parts: ["Chest"],
       equipment: "barbell",
       is_master: true,
       is_hidden: false,
@@ -428,7 +428,7 @@ describe('EditExerciseSheet', () => {
     expect(updateSpy).toHaveBeenCalledTimes(1);
 
     resolveUpdate!({
-      data: [{ id: "ex-1", name: "Renamed Fast", body_part: "Chest" }],
+      data: [{ id: "ex-1", name: "Renamed Fast", body_parts: ["Chest"] }],
       error: null,
     });
 

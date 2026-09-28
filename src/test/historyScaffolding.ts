@@ -44,7 +44,7 @@ export interface MockSet {
   rpe?: number;
   created_at: string;
   workouts?: { date: string; name: string };
-  exercise?: { id: string; name: string; body_part: string };
+  exercise?: { id: string; name: string; body_parts: string[] };
 }
 
 export interface MockExerciseStat {
@@ -58,7 +58,7 @@ export interface MockExerciseStat {
 export interface MockExercise {
   id: string;
   name: string;
-  body_part: string;
+  body_parts: string[];
   is_master?: boolean;
 }
 
@@ -66,7 +66,7 @@ export function createMockExercise(overrides: Partial<MockExercise> = {}): MockE
   return {
     id: overrides.id || `ex-${Math.random().toString(36).substring(2, 9)}`,
     name: overrides.name || 'Barbell Bench Press',
-    body_part: overrides.body_part || 'Chest',
+    body_parts: overrides.body_parts || ['Chest'],
     is_master: overrides.is_master ?? true,
   };
 }
@@ -173,9 +173,9 @@ export interface SetupHistoryOptions {
 
 export function setupHistoryMocks(options: SetupHistoryOptions = {}) {
   const exercises = options.exercises || [
-    createMockExercise({ id: 'ex-1', name: 'Barbell Bench Press', body_part: 'Chest' }),
-    createMockExercise({ id: 'ex-2', name: 'Barbell Squat', body_part: 'Legs' }),
-    createMockExercise({ id: 'ex-3', name: 'Deadlift', body_part: 'Back' }),
+    createMockExercise({ id: 'ex-1', name: 'Barbell Bench Press', body_parts: ['Chest'] }),
+    createMockExercise({ id: 'ex-2', name: 'Barbell Squat', body_parts: ['Legs'] }),
+    createMockExercise({ id: 'ex-3', name: 'Deadlift', body_parts: ['Back'] }),
   ];
   const sessions = options.sessions || [];
   const stats = options.stats || [];

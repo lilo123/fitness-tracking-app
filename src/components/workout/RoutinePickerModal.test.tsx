@@ -52,8 +52,8 @@ const mockCustomTemplates: RoutineTemplate[] = [
 ];
 
 const mockExercises: Exercise[] = [
-  { id: 'ex-1', name: 'Incline Bench Press', body_part: 'Chest' },
-  { id: 'ex-2', name: 'Pull-ups', body_part: 'Back' },
+  { id: 'ex-1', name: 'Incline Bench Press', body_parts: ['Chest'] },
+  { id: 'ex-2', name: 'Pull-ups', body_parts: ['Back'] },
 ];
 
 describe('RoutinePickerModal', () => {

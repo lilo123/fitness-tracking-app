@@ -107,7 +107,7 @@ describe('WorkoutEngine', () => {
     expect(getRecordedTables()).toContain('exercises');
     expect(getRecordedSelects()).toContainEqual({
       table: 'exercises',
-      projection: 'id, name, body_part, is_master',
+      projection: 'id, name, body_parts, is_master',
     });
     expect(getRecordedTables()).toContain('routine_templates');
     expect(getRecordedSelects()).toContainEqual({
@@ -829,8 +829,8 @@ describe('WorkoutEngine', () => {
       if (table === 'exercises') {
         return createSupabaseBuilder('exercises', {
           data: [
-            { id: 'ex-bench', name: 'Incline Bench Press', body_part: 'Chest' },
-            { id: 'ex-custom-ext', name: 'Custom Quad Destroyer', body_part: 'Legs' },
+            { id: 'ex-bench', name: 'Incline Bench Press', body_parts: ['Chest'] },
+            { id: 'ex-custom-ext', name: 'Custom Quad Destroyer', body_parts: ['Legs'] },
           ],
           error: null,
         });
@@ -1233,7 +1233,7 @@ describe('WorkoutEngine', () => {
             {
               id: "ex-lat-pull",
               name: "Lat Pull Down",
-              body_part: "Back",
+              body_parts: ["Back"],
               equipment: "cable",
               is_custom: false,
               created_by: null,
@@ -1281,7 +1281,7 @@ describe('WorkoutEngine', () => {
             {
               id: "ex-lat-pull",
               name: "Lat Pull Down",
-              body_part: "Back",
+              body_parts: ["Back"],
               equipment: "cable",
               is_custom: false,
               created_by: null,
@@ -1369,7 +1369,7 @@ describe('WorkoutEngine', () => {
             {
               id: "ex-lat-pull",
               name: "Lat Pull Down",
-              body_part: "Back",
+              body_parts: ["Back"],
               equipment: "cable",
               is_custom: false,
               created_by: null,
@@ -1795,8 +1795,8 @@ describe('WorkoutEngine', () => {
         if (table === 'exercises') {
           return createSupabaseBuilder('exercises', {
             data: [
-              { id: 'ex-bench', name: 'Incline Bench Press', body_part: 'Chest' },
-              { id: 'ex-custom-press', name: 'Personalized Heavy Press', body_part: 'Chest' },
+              { id: 'ex-bench', name: 'Incline Bench Press', body_parts: ['Chest'] },
+              { id: 'ex-custom-press', name: 'Personalized Heavy Press', body_parts: ['Chest'] },
             ],
             error: null,
           });
@@ -1863,7 +1863,7 @@ describe('WorkoutEngine', () => {
                 exercise: {
                   id: realExerciseUUID,
                   name: 'Barbell Back Squat',
-                  body_part: 'Legs',
+                  body_parts: ['Legs'],
                 },
               },
             ],
@@ -1922,7 +1922,7 @@ describe('WorkoutEngine', () => {
         if (table === 'exercises') {
           return createSupabaseBuilder('exercises', {
             data: [
-              { id: corruptedUUID, name: cleanExerciseName, body_part: 'Legs' },
+              { id: corruptedUUID, name: cleanExerciseName, body_parts: ['Legs'] },
             ],
             error: null,
           });
@@ -1989,7 +1989,7 @@ describe('WorkoutEngine', () => {
                 exercise: {
                   id: realExerciseUUID,
                   name: 'Overhead Press',
-                  body_part: 'Shoulders',
+                  body_parts: ['Shoulders'],
                 },
               },
             ],
@@ -2101,7 +2101,7 @@ describe('WorkoutEngine', () => {
         if (table === 'exercises') {
           return createSupabaseBuilder('exercises', {
             data: [
-              { id: uuidCatalog, name: 'Romanian Deadlift', body_part: 'Hamstrings' },
+              { id: uuidCatalog, name: 'Romanian Deadlift', body_parts: ['Hamstrings'] },
             ],
             error: null,
           });
@@ -2123,7 +2123,7 @@ describe('WorkoutEngine', () => {
                 exercise: {
                   id: uuidSets,
                   name: 'Cable Face Pulls',
-                  body_part: 'Shoulders',
+                  body_parts: ['Shoulders'],
                 },
               },
             ],
@@ -2411,7 +2411,7 @@ describe('WorkoutEngine', () => {
                 set_order: 1,
                 set_index: 1,
                 created_at: '2026-09-06T10:00:00Z',
-                exercise: { id: 'e0000000-0000-0000-0000-000000000001', name: 'Incline Bench Press', body_part: 'Chest' },
+                exercise: { id: 'e0000000-0000-0000-0000-000000000001', name: 'Incline Bench Press', body_parts: ['Chest'] },
               },
             ],
           },
@@ -2548,7 +2548,7 @@ describe('WorkoutEngine', () => {
                       weight: 185,
                       reps: 10,
                       created_at: `${ninetyDaysOldDate}T10:00:00Z`,
-                      exercise: { id: 'ex-1', name: 'Bench Press', body_part: 'Chest' },
+                      exercise: { id: 'ex-1', name: 'Bench Press', body_parts: ['Chest'] },
                     },
                   ],
                 },
@@ -2592,7 +2592,7 @@ describe('WorkoutEngine', () => {
                   reps: 10,
                   created_at: `${ninetyDaysOldDate}T10:00:00Z`,
                   workouts: { date: ninetyDaysOldDate, name: 'Recent Workout' },
-                  exercise: { id: 'ex-1', name: 'Bench Press', body_part: 'Chest' },
+                  exercise: { id: 'ex-1', name: 'Bench Press', body_parts: ['Chest'] },
                 },
                 {
                   id: 's-old',
@@ -2602,7 +2602,7 @@ describe('WorkoutEngine', () => {
                   reps: 12,
                   created_at: `${oneYearOldDate}T10:00:00Z`,
                   workouts: { date: oneYearOldDate, name: 'Ancient Workout' },
-                  exercise: { id: 'ex-1', name: 'Bench Press', body_part: 'Chest' },
+                  exercise: { id: 'ex-1', name: 'Bench Press', body_parts: ['Chest'] },
                 },
               ],
               error: null,
@@ -2830,7 +2830,7 @@ describe('WorkoutEngine', () => {
                 set_index: 1,
                 set_type: 'working',
                 created_at: new Date().toISOString(),
-                exercise: { id: 'e0000000-0000-0000-0000-000000000001', name: 'Incline Bench Press', body_part: 'Chest' },
+                exercise: { id: 'e0000000-0000-0000-0000-000000000001', name: 'Incline Bench Press', body_parts: ['Chest'] },
               },
             ],
           },
@@ -2883,12 +2883,12 @@ describe('WorkoutEngine', () => {
         ];
 
         const mockExercisesList = [
-          { id: 'ex-1', name: 'Barbell Bench Press', body_part: 'Chest' },
-          { id: 'ex-2', name: 'Incline Dumbbell Press', body_part: 'Chest' },
-          { id: 'ex-3', name: 'Cable Crossover', body_part: 'Chest' },
-          { id: 'ex-4', name: 'Overhead Press', body_part: 'Shoulders' },
-          { id: 'ex-5', name: 'Lateral Raise', body_part: 'Shoulders' },
-          { id: 'ex-6', name: 'Triceps Pushdown', body_part: 'Arms' },
+          { id: 'ex-1', name: 'Barbell Bench Press', body_parts: ['Chest'] },
+          { id: 'ex-2', name: 'Incline Dumbbell Press', body_parts: ['Chest'] },
+          { id: 'ex-3', name: 'Cable Crossover', body_parts: ['Chest'] },
+          { id: 'ex-4', name: 'Overhead Press', body_parts: ['Shoulders'] },
+          { id: 'ex-5', name: 'Lateral Raise', body_parts: ['Shoulders'] },
+          { id: 'ex-6', name: 'Triceps Pushdown', body_parts: ['Arms'] },
         ];
 
         const mockWorkoutsData = [
@@ -2905,7 +2905,7 @@ describe('WorkoutEngine', () => {
                 weight: 205,
                 reps: 8,
                 created_at: '2026-09-06T10:05:00.000Z',
-                exercise: { id: 'ex-1', name: 'Barbell Bench Press', body_part: 'Chest' },
+                exercise: { id: 'ex-1', name: 'Barbell Bench Press', body_parts: ['Chest'] },
               },
               {
                 id: 'set-nca-2',
@@ -2915,7 +2915,7 @@ describe('WorkoutEngine', () => {
                 weight: 75,
                 reps: 10,
                 created_at: '2026-09-06T10:10:00.000Z',
-                exercise: { id: 'ex-2', name: 'Incline Dumbbell Press', body_part: 'Chest' },
+                exercise: { id: 'ex-2', name: 'Incline Dumbbell Press', body_parts: ['Chest'] },
               },
             ],
           },
@@ -3029,8 +3029,8 @@ describe('WorkoutEngine', () => {
         };
 
         const mockExercisesList = [
-          { id: 'ex-sun-1', name: 'Deadlift', body_part: 'Back', is_master: true },
-          { id: 'ex-sun-2', name: 'Front Squat', body_part: 'Legs', is_master: true },
+          { id: 'ex-sun-1', name: 'Deadlift', body_parts: ['Back'], is_master: true },
+          { id: 'ex-sun-2', name: 'Front Squat', body_parts: ['Legs'], is_master: true },
         ];
 
         let detailQueryCount = 0;
@@ -3151,9 +3151,9 @@ describe('WorkoutEngine', () => {
         ];
 
         const mockExList = [
-          { id: 'ex-1', name: 'Bench Press', body_part: 'Chest' },
-          { id: 'ex-2', name: 'Pull-up', body_part: 'Back' },
-          { id: 'ex-3', name: 'Squat', body_part: 'Legs' },
+          { id: 'ex-1', name: 'Bench Press', body_parts: ['Chest'] },
+          { id: 'ex-2', name: 'Pull-up', body_parts: ['Back'] },
+          { id: 'ex-3', name: 'Squat', body_parts: ['Legs'] },
         ] as Exercise[];
 
         // Arm 1: Exact equality
@@ -3247,7 +3247,7 @@ describe('WorkoutEngine', () => {
           }
           if (table === 'exercises') {
             return createSupabaseBuilder('exercises', {
-              data: [{ id: 'ex-ncd-1', name: 'Lateral Raise', body_part: 'Shoulders', is_master: true }],
+              data: [{ id: 'ex-ncd-1', name: 'Lateral Raise', body_parts: ['Shoulders'], is_master: true }],
               error: null,
             });
           }
@@ -3356,14 +3356,14 @@ describe('WorkoutEngine', () => {
         exercise: {
           id: exerciseUUID,
           name: "Barbell Bench Press",
-          body_part: "Chest",
+          body_parts: ["Chest"],
         },
       };
 
       (supabase.from as any).mockImplementation((table: string) => {
         if (table === "exercises") {
           return createSupabaseBuilder("exercises", {
-            data: [{ id: exerciseUUID, name: "Barbell Bench Press", body_part: "Chest", is_master: true }],
+            data: [{ id: exerciseUUID, name: "Barbell Bench Press", body_parts: ["Chest"], is_master: true }],
             error: null,
           });
         }

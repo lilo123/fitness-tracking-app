@@ -37,7 +37,9 @@ export interface CoachAthleteLink {
 export interface Exercise {
   id: string;
   name: string;
-  body_part: string | null;
+  body_parts?: string[] | null;
+  equipment?: string | null;
+  body_part?: string | null;
   user_id?: string | null;
   is_master?: boolean;
   is_archived?: boolean;
@@ -54,6 +56,7 @@ export interface WorkoutSet {
   exercise?: {
     id?: string;
     name: string;
+    body_parts?: string[] | null;
     body_part?: string | null;
   } | null;
   workouts?: {

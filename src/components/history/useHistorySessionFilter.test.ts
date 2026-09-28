@@ -48,7 +48,7 @@ describe('useHistorySessionFilter (H43, D-P5b-6)', () => {
         exercise: {
           id: 'ex-bench',
           name: 'Barbell Bench Press',
-          body_part: 'Chest',
+          body_parts: ['Chest'],
         },
         weight: 225,
         reps: 5,
@@ -69,7 +69,7 @@ describe('useHistorySessionFilter (H43, D-P5b-6)', () => {
         exercise: {
           id: 'ex-deadlift',
           name: 'Romanian Deadlift',
-          body_part: 'Back',
+          body_parts: ['Back'],
         },
         weight: 315,
         reps: 6,
@@ -84,9 +84,9 @@ describe('useHistorySessionFilter (H43, D-P5b-6)', () => {
   };
 
   const mockExercises: Exercise[] = [
-    { id: 'ex-bench', name: 'Barbell Bench Press', body_part: 'Chest', is_master: true },
-    { id: 'ex-deadlift', name: 'Romanian Deadlift', body_part: 'Back', is_master: true },
-    { id: 'ex-squat', name: 'Barbell Back Squat', body_part: 'Legs', is_master: true },
+    { id: 'ex-bench', name: 'Barbell Bench Press', body_parts: ['Chest'], is_master: true },
+    { id: 'ex-deadlift', name: 'Romanian Deadlift', body_parts: ['Back'], is_master: true },
+    { id: 'ex-squat', name: 'Barbell Back Squat', body_parts: ['Legs'], is_master: true },
   ];
 
   it('returns all sessions when no query and category is All', () => {

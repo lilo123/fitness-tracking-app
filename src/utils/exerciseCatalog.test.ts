@@ -19,7 +19,7 @@ describe('Exercise Catalog Utilities (src/utils/exerciseCatalog.ts)', () => {
       for (const ex of newCatalog.DEFAULT_EXERCISES_LIST) {
         expect(isValidUUID(ex.id)).toBe(true);
         expect(ex.name.trim().length).toBeGreaterThan(0);
-        expect(ex.body_part.trim().length).toBeGreaterThan(0);
+        expect(ex.body_parts.length).toBeGreaterThan(0);
       }
     });
 

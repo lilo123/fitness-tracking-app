@@ -30,10 +30,10 @@ const { mockUser, mockSession } = vi.hoisted(() => {
 });
 
 const mockExercises = [
-  { id: 'ex-1', name: 'Barbell Bench Press', body_part: 'Chest', is_master: true },
-  { id: 'ex-2', name: 'Incline Dumbbell Press', body_part: 'Chest', is_master: true },
-  { id: 'ex-3', name: 'Barbell Back Squat', body_part: 'Legs', is_master: true },
-  { id: 'ex-4', name: 'Pull-Up (Café Edition)', body_part: 'Back', is_master: true },
+  { id: 'ex-1', name: 'Barbell Bench Press', body_parts: ['Chest'], is_master: true },
+  { id: 'ex-2', name: 'Incline Dumbbell Press', body_parts: ['Chest'], is_master: true },
+  { id: 'ex-3', name: 'Barbell Back Squat', body_parts: ['Legs'], is_master: true },
+  { id: 'ex-4', name: 'Pull-Up (Café Edition)', body_parts: ['Back'], is_master: true },
 ];
 
 vi.mock('../../lib/supabase', () => ({
@@ -158,7 +158,7 @@ describe('HistoryView Filters & Range Integration (H13)', () => {
       await waitFor(() => {
         expect(getRecordedSelects()).toContainEqual({
           table: 'exercises',
-          projection: 'id, name, body_part, is_master',
+          projection: 'id, name, body_parts, is_master',
         });
       });
       await waitFor(() => {

@@ -26,7 +26,7 @@ export interface ExerciseHistorySheetProps {
   exercise: {
     id: string;
     name: string;
-    body_part?: string | null;
+    body_parts?: string[] | null;
   } | null;
   prDate?: string | null;
   prWeight?: number | null;
@@ -221,7 +221,7 @@ export const ExerciseHistorySheet: React.FC<ExerciseHistorySheetProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-zinc-800/80">
           <div className="flex items-center gap-2">
             <Tag
-              label={exercise?.body_part || 'Full Body'}
+              label={exercise?.body_parts?.[0] || 'Full Body'}
               tone="info"
               testId="exercise-sheet-body-part"
             />

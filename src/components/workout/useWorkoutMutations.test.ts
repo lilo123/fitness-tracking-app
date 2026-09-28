@@ -14,7 +14,7 @@ describe('useWorkoutMutations (P2 / W4 / W20 / W35 / H2)', () => {
   const workoutDate = '2026-09-27';
   const exerciseId = '00000000-0000-0000-0000-000000000002';
   const exercises = [
-    { id: exerciseId, name: 'Bench Press', body_part: 'Chest', is_master: true },
+    { id: exerciseId, name: 'Bench Press', body_parts: ['Chest'], is_master: true },
   ];
 
   beforeEach(() => {

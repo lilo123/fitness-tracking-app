@@ -104,7 +104,7 @@ export const workoutExercisesQueryOptions = {
   queryFn: async (): Promise<Exercise[]> => {
     const { data, error } = await supabase
       .from('exercises')
-      .select('id, name, body_part, is_master')
+      .select('id, name, body_parts, is_master')
       .eq('is_archived', false)
       .order('name')
       .limit(200);
@@ -288,7 +288,7 @@ export function useWorkoutQueries(targetUserId: string, workoutDate: string) {
             const { data: setsData, error: sError } = await supabase
               .from('sets')
               .select(
-                'id, workout_id, exercise_id, weight, reps, set_index, created_at, workouts(date, name), exercise:exercises(id, name, body_part)'
+                'id, workout_id, exercise_id, weight, reps, set_index, created_at, workouts(date, name), exercise:exercises(id, name, body_parts)'
               )
               .in('workout_id', workoutIds)
               .order('created_at', { ascending: false })

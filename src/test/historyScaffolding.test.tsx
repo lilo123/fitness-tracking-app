@@ -87,7 +87,7 @@ describe('History scaffolding (H13)', () => {
       }),
     ];
     const exercises = [
-      createMockExercise({ id: 'ex-sq', name: 'Barbell Back Squat', body_part: 'Legs' }),
+      createMockExercise({ id: 'ex-sq', name: 'Barbell Back Squat', body_parts: ['Legs'] }),
     ];
 
     setupHistoryMocks({ sessions, exercises });
@@ -121,8 +121,8 @@ describe('History scaffolding (H13)', () => {
 
   it('exercises view-mode toggle and search exercise helper (searchExercisesInput)', async () => {
     const exercises = [
-      createMockExercise({ id: 'ex-1', name: 'Incline Dumbbell Press', body_part: 'Chest' }),
-      createMockExercise({ id: 'ex-2', name: 'Standing Calf Raise', body_part: 'Calves' }),
+      createMockExercise({ id: 'ex-1', name: 'Incline Dumbbell Press', body_parts: ['Chest'] }),
+      createMockExercise({ id: 'ex-2', name: 'Standing Calf Raise', body_parts: ['Calves'] }),
     ];
     setupHistoryMocks({ exercises });
     renderHistoryView();

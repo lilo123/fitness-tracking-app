@@ -163,8 +163,8 @@ describe('exerciseLabel utility', () => {
       const masterId = '11111111-1111-4111-8111-111111111111';
       const customId = '22222222-2222-4222-8222-222222222222';
       const catalog = [
-        { id: masterId, name: 'Bench Press', body_part: 'Chest', is_master: true },
-        { id: customId, name: 'Bench Press', body_part: 'Chest', is_master: false },
+        { id: masterId, name: 'Bench Press', body_parts: ['Chest'], is_master: true },
+        { id: customId, name: 'Bench Press', body_parts: ['Chest'], is_master: false },
       ] as unknown as Exercise[];
       const sets = [
         { id: 'set-1', exercise_id: masterId, weight: 100, reps: 5, set_index: 0 },
