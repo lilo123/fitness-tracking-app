@@ -5337,3 +5337,293 @@ test.describe("P5b History", () => {
   });
 });
 
+
+
+// ---------------------------------------------------------------------------
+// P6 Weight Units: Settings WeightUnitCard, kg-mode /workout and /history
+// ---------------------------------------------------------------------------
+
+async function setupSettingsDensityPage(page: Page) {
+  await page.goto("/login");
+  await page.fill('input[type="email"]', "athlete@cybergym.io");
+  await page.fill('input[type="password"]', "password123");
+  await page.click('button[type="submit"]');
+  await page.waitForURL("**/workout");
+
+  await page.goto("/settings");
+  await page.waitForURL("**/settings");
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible({ timeout: 10000 });
+}
+
+test.describe("P6 Weight Units", () => {
+  // (a) Settings WeightUnitCard: 44px hit targets and layout at 320px and 390px
+  for (const width of [320, 390] as const) {
+    test(`Settings WeightUnitCard 44px hit targets and layout at ${width}px`, async ({ browser }) => {
+      const page = await browser.newPage({
+        viewport: { width, height: 844 },
+        deviceScaleFactor: 1,
+      });
+      try {
+        await setupSettingsDensityPage(page);
+
+        const card = page.locator('fieldset[aria-label="Weight unit"]').locator('xpath=ancestor::div[contains(@class, "rounded-3xl")][1]');
+        await expect(card).toBeVisible();
+
+        const isCardOverflowing = await card.evaluate((el) => el.scrollWidth > el.clientWidth);
+        expect(isCardOverflowing, `WeightUnitCard has no horizontal overflow at ${width}px`).toBe(false);
+
+        // Check 44px hit targets on lb and kg buttons
+        const assertHitArea44 = async (loc: Locator, label: string) => {
+          await expect(loc).toBeVisible();
+          const item = await loc.evaluate((el) => {
+            el.scrollIntoView({ block: "center", inline: "nearest" });
+            const r = el.getBoundingClientRect();
+            const cx = r.left + r.width / 2;
+            const cy = r.top + r.height / 2;
+
+            const centerEl = document.elementFromPoint(cx, cy);
+            const centerHits = Boolean(centerEl && (el.contains(centerEl) || centerEl.contains(el)));
+
+            const topEl = document.elementFromPoint(cx, cy - 21.5);
+            const btmEl = document.elementFromPoint(cx, cy + 21.5);
+            const topHits = Boolean(topEl && (el.contains(topEl) || topEl.contains(el)));
+            const btmHits = Boolean(btmEl && (el.contains(btmEl) || btmEl.contains(el)));
+
+            const horizontalAllowed = r.width >= 43;
+            let horizontalHits = true;
+            if (horizontalAllowed) {
+              const leftEl = document.elementFromPoint(cx - 21.5, cy);
+              const rightEl = document.elementFromPoint(cx + 21.5, cy);
+              const leftHits = Boolean(leftEl && (el.contains(leftEl) || leftEl.contains(el)));
+              const rightHits = Boolean(rightEl && (el.contains(rightEl) || rightEl.contains(el)));
+              horizontalHits = leftHits && rightHits;
+            }
+
+            const hasMin44pxHitArea = centerHits && (
+              topHits ||
+              btmHits ||
+              (horizontalAllowed && horizontalHits) ||
+              r.width >= 43 ||
+              r.height >= 43
+            );
+
+            return {
+              tag: el.tagName.toLowerCase(),
+              testId: el.getAttribute("data-testid") || el.getAttribute("aria-label") || el.textContent?.trim().slice(0, 20),
+              width: Math.round(r.width),
+              height: Math.round(r.height),
+              hasMin44pxHitArea,
+            };
+          });
+
+          expect(
+            item.hasMin44pxHitArea,
+            `${label} control ${item.testId || item.tag} (${item.width}x${item.height}) failed >=44px hit area: ${JSON.stringify(item)}`
+          ).toBe(true);
+        };
+
+        await assertHitArea44(page.locator('[data-testid="weight-unit-lb"]'), "Weight unit lb button");
+        await assertHitArea44(page.locator('[data-testid="weight-unit-kg"]'), "Weight unit kg button");
+      } finally {
+        await page.close();
+      }
+    });
+  }
+
+  // (b) Clean axe audit on WeightUnitCard
+  test("clean axe-core accessibility audit on Settings WeightUnitCard", async ({ browser }) => {
+    const page = await browser.newPage({
+      viewport: { width: 375, height: 812 },
+      deviceScaleFactor: 1,
+    });
+    try {
+      await setupSettingsDensityPage(page);
+      await page.addScriptTag({ path: "node_modules/axe-core/axe.min.js" });
+
+      const card = page.locator('fieldset[aria-label="Weight unit"]').locator('xpath=ancestor::div[contains(@class, "rounded-3xl")][1]');
+      await expect(card).toBeVisible();
+
+      const violations = await card.evaluate(async (el) => {
+        // @ts-ignore
+        const res = await axe.run(el, {
+          runOnly: {
+            type: "tag",
+            values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"],
+          },
+        });
+        return res.violations;
+      });
+      expect(violations, `Settings WeightUnitCard axe violations: ${JSON.stringify(violations, null, 2)}`).toHaveLength(0);
+    } finally {
+      await page.close();
+    }
+  });
+
+  // (c) kg-mode /workout and /history at 320px and 390px: hit targets, layout, and axe audit
+  for (const width of [320, 390] as const) {
+    test(`kg-mode hit-area and layout acceptance at ${width}px on /workout and /history`, async ({ browser }) => {
+      const page = await browser.newPage({
+        viewport: { width, height: 844 },
+        deviceScaleFactor: 1,
+      });
+      try {
+        // Step 1: Ensure user is in kg mode
+        await setupSettingsDensityPage(page);
+        const kgBtn = page.locator('[data-testid="weight-unit-kg"]');
+        await kgBtn.click();
+        await expect(kgBtn).toHaveAttribute("aria-pressed", "true");
+
+        const assertHitArea44 = async (loc: Locator, label: string) => {
+          await expect(loc).toBeVisible();
+          const item = await loc.evaluate((el) => {
+            el.scrollIntoView({ block: "center", inline: "nearest" });
+            const r = el.getBoundingClientRect();
+            const cx = r.left + r.width / 2;
+            const cy = r.top + r.height / 2;
+
+            const centerEl = document.elementFromPoint(cx, cy);
+            const centerHits = Boolean(centerEl && (el.contains(centerEl) || centerEl.contains(el)));
+
+            const topEl = document.elementFromPoint(cx, cy - 21.5);
+            const btmEl = document.elementFromPoint(cx, cy + 21.5);
+            const topHits = Boolean(topEl && (el.contains(topEl) || topEl.contains(el)));
+            const btmHits = Boolean(btmEl && (el.contains(btmEl) || btmEl.contains(el)));
+
+            const horizontalAllowed = r.width >= 43;
+            let horizontalHits = true;
+            if (horizontalAllowed) {
+              const leftEl = document.elementFromPoint(cx - 21.5, cy);
+              const rightEl = document.elementFromPoint(cx + 21.5, cy);
+              const leftHits = Boolean(leftEl && (el.contains(leftEl) || leftEl.contains(el)));
+              const rightHits = Boolean(rightEl && (el.contains(rightEl) || rightEl.contains(el)));
+              horizontalHits = leftHits && rightHits;
+            }
+
+            const hasMin44pxHitArea = centerHits && (
+              topHits ||
+              btmHits ||
+              (horizontalAllowed && horizontalHits) ||
+              r.width >= 43 ||
+              r.height >= 43
+            );
+
+            return {
+              tag: el.tagName.toLowerCase(),
+              testId: el.getAttribute("data-testid") || el.getAttribute("aria-label") || el.textContent?.trim().slice(0, 20),
+              width: Math.round(r.width),
+              height: Math.round(r.height),
+              hasMin44pxHitArea,
+            };
+          });
+
+          expect(
+            item.hasMin44pxHitArea,
+            `${label} control ${item.testId || item.tag} (${item.width}x${item.height}) failed >=44px hit area: ${JSON.stringify(item)}`
+          ).toBe(true);
+        };
+
+        // Step 2: Check /workout in kg mode
+        await page.goto("/workout");
+        await page.waitForURL("**/workout");
+        const card = page.locator('[data-testid="exercise-card-0"]');
+        const chooseBtn = page.locator('button:has-text("Choose Routine")');
+        try {
+          await card.waitFor({ state: "visible", timeout: 5000 });
+        } catch {
+          await chooseBtn.click();
+          await page.locator('[data-testid="routine-picker-modal"] button:has-text("Workout A")').click();
+          await expect(page.locator('[data-testid="routine-picker-modal"]')).not.toBeVisible();
+          await card.waitFor({ state: "visible", timeout: 10000 });
+        }
+
+        const isWorkoutOverflowing = await page.evaluate(() => {
+          return document.documentElement.scrollWidth > window.innerWidth;
+        });
+        expect(isWorkoutOverflowing, `/workout in kg mode has no horizontal overflow at ${width}px`).toBe(false);
+        await expect(card.getByText("kg").first()).toBeVisible();
+
+        // Step 3: Check /history in kg mode
+        await page.goto("/history");
+        await page.waitForURL("**/history");
+        await expect(page.getByRole("heading", { name: "Workout History" })).toBeVisible({ timeout: 10000 });
+
+        const isHistoryOverflowing = await page.evaluate(() => {
+          return document.documentElement.scrollWidth > window.innerWidth;
+        });
+        expect(isHistoryOverflowing, `/history in kg mode has no horizontal overflow at ${width}px`).toBe(false);
+
+        await assertHitArea44(page.locator('[data-testid="history-subview-session"]'), "History subview session tab");
+        await assertHitArea44(page.locator('[data-testid="history-subview-exercise"]'), "History subview exercise tab");
+        await assertHitArea44(page.locator('[data-testid="open-calendar-btn"]'), "History open calendar button");
+      } finally {
+        // Revert the shared seed user to lb; a failure here must fail the test (never leave it in kg).
+        await page.goto("/settings");
+        await page.waitForURL("**/settings");
+        const lbBtn = page.locator('[data-testid="weight-unit-lb"]');
+        await lbBtn.click();
+        await expect(lbBtn).toHaveAttribute("aria-pressed", "true");
+        await page.close();
+      }
+    });
+  }
+
+  // (d) Clean axe audit on /workout and /history in kg mode
+  test("clean axe-core accessibility audit on /workout and /history in kg mode", async ({ browser }) => {
+    const page = await browser.newPage({
+      viewport: { width: 375, height: 812 },
+      deviceScaleFactor: 1,
+    });
+    try {
+      await setupSettingsDensityPage(page);
+      const kgBtn = page.locator('[data-testid="weight-unit-kg"]');
+      await kgBtn.click();
+      await expect(kgBtn).toHaveAttribute("aria-pressed", "true");
+
+      await page.addScriptTag({ path: "node_modules/axe-core/axe.min.js" });
+
+      const runAxeOnLocator = async (locator: Locator, desc: string) => {
+        const violations = await locator.evaluate(async (el) => {
+          // @ts-ignore
+          const res = await axe.run(el, {
+            runOnly: {
+              type: "tag",
+              values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"],
+            },
+          });
+          return res.violations;
+        });
+        expect(violations, `${desc} axe violations: ${JSON.stringify(violations, null, 2)}`).toHaveLength(0);
+      };
+
+      // 1. Audit /workout in kg mode
+      await page.goto("/workout");
+      await page.waitForURL("**/workout");
+      await page.addScriptTag({ path: "node_modules/axe-core/axe.min.js" });
+      const workoutCard = page.locator('[data-testid="exercise-card-0"]');
+      const chooseRoutineBtn = page.locator('button:has-text("Choose Routine")');
+      try {
+        await workoutCard.waitFor({ state: "visible", timeout: 5000 });
+      } catch {
+        await chooseRoutineBtn.click();
+        await page.locator('[data-testid="routine-picker-modal"] button:has-text("Workout A")').click();
+        await expect(page.locator('[data-testid="routine-picker-modal"]')).not.toBeVisible();
+      }
+      await expect(workoutCard).toBeVisible({ timeout: 10000 });
+      await runAxeOnLocator(workoutCard, "Workout Card in kg mode");
+
+      // 2. Audit /history in kg mode
+      await page.goto("/history");
+      await page.waitForURL("**/history");
+      await page.addScriptTag({ path: "node_modules/axe-core/axe.min.js" });
+      await runAxeOnLocator(page.locator("main"), "History main in kg mode");
+    } finally {
+      // Revert the shared seed user to lb; a failure here must fail the test (never leave it in kg).
+      await page.goto("/settings");
+      await page.waitForURL("**/settings");
+      const lbBtn = page.locator('[data-testid="weight-unit-lb"]');
+      await lbBtn.click();
+      await expect(lbBtn).toHaveAttribute("aria-pressed", "true");
+      await page.close();
+    }
+  });
+});

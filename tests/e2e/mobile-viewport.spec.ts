@@ -147,4 +147,44 @@ test.describe('Mobile Viewport & Ergonomics', () => {
     });
     expect(isOverflowingNutrition, "No horizontal overflow on /history Nutrition timeline").toBe(false);
   });
+
+  test("prevents horizontal scroll overflow on Settings with WeightUnitCard and /workout in kg mode", async ({ page }) => {
+    await page.goto("/login");
+    await page.fill('input[type="email"]', "athlete@cybergym.io");
+    await page.fill('input[type="password"]', "password123");
+    await page.click('button[type="submit"]');
+    await page.waitForURL("**/workout");
+
+    // 1. Navigate to /settings and verify WeightUnitCard has no horizontal overflow
+    await page.goto("/settings");
+    await page.waitForURL("**/settings");
+    const card = page.locator('fieldset[aria-label="Weight unit"]').locator('xpath=ancestor::div[contains(@class, "rounded-3xl")][1]');
+    await expect(card).toBeVisible();
+
+    const isCardOverflowing = await card.evaluate((el) => el.scrollWidth > el.clientWidth);
+    expect(isCardOverflowing, "WeightUnitCard has no horizontal overflow").toBe(false);
+
+    // Switch to kg
+    const kgBtn = page.locator('[data-testid="weight-unit-kg"]');
+    await kgBtn.click();
+    await expect(kgBtn).toHaveAttribute("aria-pressed", "true");
+
+    try {
+      // 2. Navigate to /workout in kg mode and verify no horizontal overflow
+      await page.goto("/workout");
+      await page.waitForURL("**/workout");
+
+      const isOverflowingWorkoutKg = await page.evaluate(() => {
+        return document.documentElement.scrollWidth > window.innerWidth;
+      });
+      expect(isOverflowingWorkoutKg, "No horizontal overflow on /workout in kg mode").toBe(false);
+    } finally {
+      // Revert athlete back to lb
+      await page.goto("/settings");
+      await page.waitForURL("**/settings");
+      const lbBtn = page.locator('[data-testid="weight-unit-lb"]');
+      await lbBtn.click();
+      await expect(lbBtn).toHaveAttribute("aria-pressed", "true");
+    }
+  });
 });
