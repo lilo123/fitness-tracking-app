@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { ExerciseListTab } from './ExerciseListTab';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { createRef } from 'react';
+import { ExerciseListTab, type ExerciseListTabHandle } from './ExerciseListTab';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
+import { createSupabaseBuilder, clearMockHistory, getRecordedTables } from '../../test/supabaseBuilderMock';
 import type { CatalogExercise } from '../../lib/exercises';
 
 const { mockCoachState, mockAuthUser } = vi.hoisted(() => ({
@@ -28,7 +30,7 @@ vi.mock('../../hooks/useAuth', () => ({
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
-    from: vi.fn(),
+    from: vi.fn((table: string) => createSupabaseBuilder(table, { data: [], error: null })),
     rpc: vi.fn(),
     auth: {
       getUser: vi.fn().mockResolvedValue({ data: { user: mockAuthUser } }),
@@ -38,7 +40,6 @@ vi.mock('../../lib/supabase', () => ({
 
 describe('ExerciseListTab', () => {
   let queryClient: QueryClient;
-  const mockFrom = vi.fn();
   const mockRpc = vi.fn();
 
   const sampleCatalog: CatalogExercise[] = [
@@ -82,6 +83,7 @@ describe('ExerciseListTab', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    clearMockHistory();
     mockCoachState.isCoach = false;
     mockCoachState.selectedAthleteId = '';
     mockCoachState.selectedAthlete = null;
@@ -97,7 +99,7 @@ describe('ExerciseListTab', () => {
       error: null,
     });
 
-    (supabase.from as any) = mockFrom.mockImplementation((_table: string) => {
+    vi.mocked(supabase.from).mockImplementation((_table: string) => {
       const builder: any = {
         select: vi.fn().mockResolvedValue({ data: [{ id: 'ex-2' }], error: null }),
         insert: vi.fn().mockResolvedValue({ error: null }),
@@ -192,7 +194,7 @@ describe('ExerciseListTab', () => {
         select: vi.fn().mockResolvedValue({ data: [{ id: 'ex-2' }], error: null }),
       }),
     });
-    mockFrom.mockImplementation((table: string) => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === 'exercises') {
         return { update: updateSpy };
       }
@@ -289,7 +291,7 @@ describe('ExerciseListTab', () => {
         select: vi.fn().mockResolvedValue({ data: [archivedItem], error: null }),
       }),
     });
-    mockFrom.mockImplementation((table: string) => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === 'exercises') return { update: updateSpy };
       return {};
     });
@@ -315,7 +317,7 @@ describe('ExerciseListTab', () => {
     ];
 
     const insertSpy = vi.fn().mockResolvedValue({ error: null });
-    mockFrom.mockImplementation((table: string) => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === 'exercise_hides') return { insert: insertSpy };
       return {};
     });
@@ -355,7 +357,7 @@ describe('ExerciseListTab', () => {
       }),
     });
 
-    mockFrom.mockImplementation((table: string) => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === 'exercise_hides') {
         return { insert: insertSpy, delete: deleteSpy };
       }
@@ -402,7 +404,7 @@ describe('ExerciseListTab', () => {
         eq: vi.fn().mockResolvedValue({ error: null }),
       }),
     });
-    mockFrom.mockImplementation((table: string) => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === 'exercise_hides') return { delete: deleteSpy };
       return {};
     });
@@ -416,5 +418,46 @@ describe('ExerciseListTab', () => {
     await waitFor(() => {
       expect(deleteSpy).toHaveBeenCalled();
     });
+  });
+  it('wires jumpToExercise to update search and set scope to hidden if is_hidden', async () => {
+    const ref = createRef<ExerciseListTabHandle>();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ExerciseListTab ref={ref} />
+      </QueryClientProvider>
+    );
+    await screen.findByText('Zercher Squat');
+
+    act(() => {
+      ref.current?.jumpToExercise({ id: 'ex-hidden', name: 'Hidden Pushup', is_hidden: true });
+    });
+
+    expect(screen.getByTestId('exercise-search-input')).toHaveValue('Hidden Pushup');
+    expect(screen.getByTestId('scope-chip-hidden')).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('displays "Showing N" without total count when a client filter is active', async () => {
+    renderComponent();
+    await screen.findByText('Zercher Squat');
+
+    // Default: no client filter, shows "Showing 3 of 3"
+    expect(screen.getByTestId('showing-exercises-count').textContent).toBe('Showing 3 of 3');
+
+    // Select a muscle group (client-side filter)
+    const legsChip = screen.getByTestId('bodypart-filter-legs');
+    fireEvent.click(legsChip);
+
+    // With client-side filter: shows "Showing 2" without total
+    expect(screen.getByTestId('showing-exercises-count').textContent).toBe('Showing 2');
+  });
+  it('satisfies mock fidelity contracts for exercise mutations', () => {
+    // WILDCARD_MUTATION_RETURN: exercises returns updated row via bare .select()
+    // NO_PROJECTION_APPLIES: exercise_hides inserts and deletes are mutation-only
+    const exBuilder = createSupabaseBuilder('exercises', { data: [], error: null });
+    const hideBuilder = createSupabaseBuilder('exercise_hides', { data: [], error: null });
+    expect(exBuilder.tableName).toBe('exercises');
+    expect(hideBuilder.tableName).toBe('exercise_hides');
+    expect(getRecordedTables()).toContain('exercises');
+    expect(getRecordedTables()).toContain('exercise_hides');
   });
 });

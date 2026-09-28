@@ -58,7 +58,7 @@ describe('EditExerciseSheet', () => {
   });
 
   it('mounts edit-exercise-error live region empty while idle and retains same node on error (NEW-15)', async () => {
-    (supabase.from as any).mockImplementation((table: string) =>
+    vi.mocked(supabase.from).mockImplementation((table: string) =>
       createSupabaseBuilder(table, { error: new Error('Failed to update exercise in DB') })
     );
 
@@ -140,7 +140,7 @@ describe('EditExerciseSheet', () => {
   });
 
   it('0 rows affected on update displays error and keeps input intact', async () => {
-    (supabase.from as any).mockImplementation((table: string) => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
       const b = createSupabaseBuilder(table, { data: [], error: null });
       b.update = vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
@@ -185,7 +185,7 @@ describe('EditExerciseSheet', () => {
   });
 
   it('L26: successful rename invalidates exercise_stats query cache to update History PR card title', async () => {
-    (supabase.from as any).mockImplementation((table: string) => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
       const b = createSupabaseBuilder(table, { data: [{ id: 'ex-1', name: 'Incline Bench Press' }], error: null });
       b.update = vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
@@ -224,7 +224,7 @@ describe('EditExerciseSheet', () => {
       is_master: false,
     };
 
-    (supabase.from as any).mockImplementation((table: string) => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
       const b = createSupabaseBuilder(table, { data: [renamedExercise], error: null });
       b.update = vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
@@ -269,7 +269,7 @@ describe('EditExerciseSheet', () => {
         }),
       }),
     });
-    (supabase.from as any).mockImplementation((table: string) => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
       const b = createSupabaseBuilder(table, { data: [], error: null });
       b.update = updateSpy;
       return b;
@@ -302,7 +302,7 @@ describe('EditExerciseSheet', () => {
         }),
       }),
     });
-    (supabase.from as any).mockImplementation((table: string) => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
       const b = createSupabaseBuilder(table, { data: [], error: null });
       b.update = updateSpy;
       return b;
@@ -348,7 +348,7 @@ describe('EditExerciseSheet', () => {
     );
 
     const updateSpy = vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) }) });
-    (supabase.from as any).mockImplementation((table: string) => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
       const b = createSupabaseBuilder(table, { data: [], error: null });
       b.update = updateSpy;
       return b;
@@ -405,7 +405,7 @@ describe('EditExerciseSheet', () => {
       }),
     });
 
-    (supabase.from as any).mockImplementation((table: string) => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
       const b = createSupabaseBuilder(table, { data: [], error: null });
       b.update = updateSpy;
       return b;

@@ -40,7 +40,23 @@ describe('ExerciseListRow', () => {
     expect(nameSpan.className).toContain('truncate');
 
     expect(screen.getByText('Legs')).toBeDefined();
+    expect(screen.getByTestId('exercise-row-subtitle').textContent).toBe('Legs');
     expect(screen.getByText('Barbell')).toBeDefined();
+  });
+
+  it('renders joined body_parts in subtitle with fallback to body_part', () => {
+    const multiBodyPartEx: ExerciseRowItem = {
+      ...masterExercise,
+      body_parts: ['Chest', 'Triceps'],
+      body_part: 'Chest',
+    };
+    render(
+      <ExerciseListRow
+        exercise={multiBodyPartEx}
+        currentUserId="user-123"
+      />
+    );
+    expect(screen.getByTestId('exercise-row-subtitle').textContent).toBe('Chest · Triceps');
   });
 
   it('renders Default owner pill for master exercises', () => {

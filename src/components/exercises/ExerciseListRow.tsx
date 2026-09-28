@@ -72,6 +72,11 @@ export const ExerciseListRow: React.FC<ExerciseListRowProps> = ({
 
   const equipment = 'equipment' in ex && typeof (ex as any).equipment === 'string' ? (ex as any).equipment : null;
   const equipmentLabel = equipment ? getEquipmentLabel(equipment) : null;
+  const bodyParts = 'body_parts' in ex && Array.isArray(ex.body_parts) ? (ex.body_parts as string[]) : null;
+  const bodyPartText =
+    bodyParts && bodyParts.length > 0
+      ? bodyParts.join(' · ')
+      : ex.body_part || null;
 
   return (
     <div
@@ -87,10 +92,12 @@ export const ExerciseListRow: React.FC<ExerciseListRowProps> = ({
           {isHidden && <Tag label="Hidden" tone="neutral" testId={`tag-hidden-${ex.id}`} />}
         </div>
         <div className="text-xs text-zinc-400 mt-1 flex items-center gap-1.5 flex-wrap min-w-0">
-          {ex.body_part && (
-            <div className="text-xs text-zinc-500 text-zinc-400 inline">{ex.body_part}</div>
+          {bodyPartText && (
+            <div data-testid="exercise-row-subtitle" className="text-xs text-zinc-400 inline">
+              {bodyPartText}
+            </div>
           )}
-          {ex.body_part && equipmentLabel && (
+          {bodyPartText && equipmentLabel && (
             <span className="text-zinc-600" aria-hidden="true">
               ·
             </span>

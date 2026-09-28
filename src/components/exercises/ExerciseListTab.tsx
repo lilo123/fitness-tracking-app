@@ -65,26 +65,26 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
 
     useEffect(() => { onCatalogError?.(isError, catalogError, () => void refetchCatalog()); }, [isError, catalogError, onCatalogError, refetchCatalog]);
 
-    useImperativeHandle(ref, () => ({
-      jumpToExercise: (ex) => { setSearch(ex.name); if (ex.is_hidden) setSelectedScope('hidden'); },
-      setSearch, setScope: setSelectedScope,
-    }));
+    const jumpToExercise = (ex: { id?: string; name: string; is_hidden?: boolean }) => {
+      setIsCreateOpen(false); setEditingExercise(null); setSearch(ex.name);
+      if (ex.is_hidden) setSelectedScope('hidden');
+    };
+    useImperativeHandle(ref, () => ({ jumpToExercise, setSearch, setScope: setSelectedScope }));
 
-    const { pending: pendingArchive, schedule: scheduleArchive, undo: undoArchive, flush: flushArchive } =
-      useDeferredDelete<ExerciseRowItem>({
-        durationMs: 6000,
-        commit: async (item) => {
-          const { data, error } = await supabase.from('exercises').update({ is_archived: true }).eq('id', item.id).select();
-          if (error) throw error;
-          if (!data || data.length === 0) throw new Error('Exercise could not be archived. You may not have permission to modify this exercise.');
-          await invalidateExerciseDomain(queryClient, currentUserId || undefined);
-        },
-        onError: (err: any) => {
-          let msg = err?.message || 'Failed to archive exercise';
-          if (err?.code === '23503' || String(err?.message).includes('23503')) msg = 'Cannot archive exercise because other records reference it.';
-          setArchiveError(msg);
-        },
-      });
+    const { pending: pendingArchive, schedule: scheduleArchive, undo: undoArchive, flush: flushArchive } = useDeferredDelete<ExerciseRowItem>({
+      durationMs: 6000,
+      commit: async (item) => {
+        const { data, error } = await supabase.from('exercises').update({ is_archived: true }).eq('id', item.id).select();
+        if (error) throw error;
+        if (!data || data.length === 0) throw new Error('Exercise could not be archived. You may not have permission to modify this exercise.');
+        await invalidateExerciseDomain(queryClient, currentUserId || undefined);
+      },
+      onError: (err: any) => {
+        setArchiveError(err?.code === '23503' || String(err?.message).includes('23503')
+          ? 'Cannot archive exercise because other records reference it.'
+          : (err?.message || 'Failed to archive exercise'));
+      },
+    });
 
     const executeCoachHide = async () => {
       if (!hideConfirmTarget) return;
@@ -154,19 +154,20 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
     if (search && !catalogData) displayedItems = displayedItems.filter((ex) => matchesExerciseSearch(ex, search, null, null));
 
     const athleteChipLabel = selectedAthlete ? `${selectedAthlete.name.split(' ')[0]}'s` : 'Athletes';
-    const scopeOptions = isCoach
-      ? [{ scope: 'all', label: 'All' }, { scope: 'defaults', label: 'Defaults' }, { scope: 'mine', label: 'Mine' },
-         { scope: 'athlete', label: athleteChipLabel }, { scope: 'archived', label: 'Archived' }, { scope: 'hidden', label: 'Hidden' }]
-      : [{ scope: 'all', label: 'All' }, { scope: 'defaults', label: 'Defaults' }, { scope: 'mine', label: 'Mine' },
-         { scope: 'coach', label: 'From coach' }, { scope: 'archived', label: 'Archived' }, { scope: 'hidden', label: 'Hidden' }];
+    const scopeOptions = [
+      { scope: 'all', label: 'All' }, { scope: 'defaults', label: 'Defaults' }, { scope: 'mine', label: 'Mine' },
+      isCoach ? { scope: 'athlete', label: athleteChipLabel } : { scope: 'coach', label: 'From coach' },
+      { scope: 'archived', label: 'Archived' }, { scope: 'hidden', label: 'Hidden' },
+    ];
 
     const athleteCount = athletes?.length ?? 0;
     const coachHideConsequence = athleteCount === 0 ? `Hide '${hideConfirmTarget?.name}' for you? It stays in History.`
       : athleteCount === 1 ? `Hide '${hideConfirmTarget?.name}' for you and your 1 athlete? It stays in History.`
       : `Hide '${hideConfirmTarget?.name}' for you and your ${athleteCount} athletes? It stays in History.`;
 
+    const hasClientFilter = selectedMuscleGroup !== 'all' || (selectedScope === 'athlete' && Boolean(selectedAthleteId));
     const totalCount = catalogData?.pages?.[0]?.totalCount != null ? Number(catalogData.pages[0].totalCount) : displayedItems.length;
-    const countText = selectedScope === 'athlete' && selectedAthleteId ? `Showing ${displayedItems.length}` : `Showing ${displayedItems.length} of ${totalCount}`;
+    const countText = hasClientFilter ? `Showing ${displayedItems.length}` : `Showing ${displayedItems.length} of ${totalCount}`;
 
     return (
       <div className="space-y-4">
@@ -232,7 +233,7 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
         <CreateExerciseSheet
           open={isCreateOpen} onClose={() => setIsCreateOpen(false)}
           onCreated={() => { setIsCreateOpen(false); void invalidateExerciseDomain(queryClient, currentUserId || undefined); }}
-          onError={setCreateExerciseError}
+          onError={setCreateExerciseError} onViewExisting={jumpToExercise}
         />
 
         {isPending && !catalogData && !propExercises && (
@@ -272,19 +273,18 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
         <EditExerciseSheet
           isOpen={Boolean(editingExercise)} exercise={editingExercise as Exercise} targetUserId={targetUserId}
           onClose={() => setEditingExercise(null)} onSuccess={() => { void queryClient.invalidateQueries({ queryKey: queryKeys.exercises.all }); }}
+          onViewExisting={jumpToExercise}
         />
 
         <ConfirmDialog
           isOpen={Boolean(hideConfirmTarget)} onConfirm={() => void executeCoachHide()} onCancel={() => setHideConfirmTarget(null)}
           title="Hide Exercise" consequence={coachHideConsequence} confirmLabel="Hide" cancelLabel="Cancel"
-          isDestructive isLoading={isHidePending} testId="coach-hide-confirm-dialog"
-        />
+          isDestructive isLoading={isHidePending} testId="coach-hide-confirm-dialog" />
 
         {pendingArchive && (
           <UndoToast
             toast={{ verb: 'Archived', subject: pendingArchive.label, detail: 'Exercise archived', onUndo: undoArchive, undoAriaLabel: `Undo archive ${pendingArchive.label}` }}
-            onDismiss={flushArchive} durationMs={6000} testId="undo-toast" undoBtnTestId="toast-undo-btn"
-          />
+            onDismiss={flushArchive} durationMs={6000} testId="undo-toast" undoBtnTestId="toast-undo-btn" />
         )}
 
         {hiddenToast && !pendingArchive && (

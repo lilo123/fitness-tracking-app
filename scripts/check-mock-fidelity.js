@@ -413,7 +413,7 @@ const SERVICED_QUERIES_REGISTRY = {
       description: 'Routine templates picker query',
     },
   ],
-  'src/components/exercises/EditExerciseModal.test.tsx': [
+  'src/components/exercises/EditExerciseSheet.test.tsx': [
     {
       table: 'exercises',
       type: 'NO_PROJECTION_APPLIES',
@@ -430,6 +430,25 @@ const SERVICED_QUERIES_REGISTRY = {
       table: 'template_exercises',
       type: 'NO_PROJECTION_APPLIES',
       description: 'Mutation-only template exercise updates',
+    },
+  ],
+  'src/components/exercises/ExerciseListTab.test.tsx': [
+    {
+      table: 'exercises',
+      type: 'WILDCARD_MUTATION_RETURN',
+      description: 'Bare .select() post-mutation row return on exercise archive or restore',
+    },
+    {
+      table: 'exercise_hides',
+      type: 'NO_PROJECTION_APPLIES',
+      description: 'Mutation-only insert and delete on exercise hides',
+    },
+  ],
+  'src/components/exercises/TemplateListTab.test.tsx': [
+    {
+      table: 'routine_templates',
+      type: 'WILDCARD_MUTATION_RETURN',
+      description: 'Bare .select() post-delete row return on routine template deletion',
     },
   ],
   'src/components/settings/CoachSettingsCard.test.tsx': [

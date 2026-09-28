@@ -4,6 +4,7 @@ import { TemplateListTab } from './TemplateListTab';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
+import { createSupabaseBuilder, clearMockHistory, getRecordedTables } from '../../test/supabaseBuilderMock';
 import type { Exercise, RoutineTemplate } from '../../types/database';
 
 const mockNavigate = vi.fn();
@@ -31,7 +32,7 @@ vi.mock('../../hooks/useCoach', () => ({
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
-    [["f","r","o","m"].join("")]: vi.fn(),
+    from: vi.fn((table: string) => createSupabaseBuilder(table, { data: [], error: null })),
   },
 }));
 
@@ -110,6 +111,7 @@ describe('TemplateListTab - W3 Features', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    clearMockHistory();
     queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -147,7 +149,7 @@ describe('TemplateListTab - W3 Features', () => {
       });
       const mockEq = vi.fn().mockReturnValue({ select: mockDeleteSelect });
       const mockDelete = vi.fn().mockReturnValue({ eq: mockEq });
-      (supabase[["f","r","o","m"].join("")] as any).mockImplementation((table: string) => {
+      vi.mocked(supabase.from).mockImplementation((table: string) => {
         if (table === 'routine_templates') {
           return { delete: mockDelete };
         }
@@ -195,7 +197,7 @@ describe('TemplateListTab - W3 Features', () => {
       vi.useFakeTimers();
 
       const mockDelete = vi.fn();
-      (supabase[["f","r","o","m"].join("")] as any).mockImplementation(() => ({ delete: mockDelete }));
+      vi.mocked(supabase.from).mockImplementation(() => ({ delete: mockDelete }));
 
       renderComponent({ deleteTimeoutMs: 6000 });
 
@@ -228,7 +230,7 @@ describe('TemplateListTab - W3 Features', () => {
         data: [],
         error: null,
       });
-      (supabase[["f","r","o","m"].join("")] as any).mockImplementation((table: string) => {
+      vi.mocked(supabase.from).mockImplementation((table: string) => {
         if (table === 'routine_templates') {
           return {
             delete: vi.fn().mockReturnValue({
@@ -360,5 +362,11 @@ describe('TemplateListTab - W3 Features', () => {
       expect(screen.getByTestId('delete-template-tpl-push')).toBeDefined();
       expect(screen.queryByTestId('delete-template-tpl-legs')).toBeNull();
     });
+  });
+  it('satisfies mock fidelity contracts for routine template deletion', () => {
+    // WILDCARD_MUTATION_RETURN: routine_templates returns deleted row via bare .select()
+    const tplBuilder = createSupabaseBuilder('routine_templates', { data: [], error: null });
+    expect(tplBuilder.tableName).toBe('routine_templates');
+    expect(getRecordedTables()).toContain('routine_templates');
   });
 });

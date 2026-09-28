@@ -40,7 +40,7 @@ vi.mock('../../lib/supabase', () => ({
 
 describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
   let queryClient: QueryClient;
-  const mockInsertExercise = vi.fn().mockResolvedValue({ error: null });
+  const mockInsertExercise = vi.fn();
   const mockInsertTemplate = vi.fn();
   const mockUpdateExercise = vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [{ id: 'ex-custom-1' }], error: null }) }) });
   const mockUpdateTemplate = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
@@ -79,10 +79,17 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
 
     (supabase.auth.getSession as any).mockResolvedValue({ data: { session: mockAthleteSession } });
 
-    (supabase.from as any).mockImplementation((table: string) => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === 'exercises') {
         const b = createSupabaseBuilder('exercises', { data: sampleExercises, error: null });
-        b.insert = mockInsertExercise;
+        b.insert = mockInsertExercise.mockReturnValue({
+          select: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({
+              data: { id: 'new-ex-id', name: 'Dumbbell Hammer Curl' },
+              error: null,
+            }),
+          }),
+        });
         b.update = mockUpdateExercise;
         return b;
       }
@@ -196,15 +203,14 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     fireEvent.click(saveBtn);
 
     await waitFor(() => {
-      expect(mockInsertExercise).toHaveBeenCalledWith([
+      expect(mockInsertExercise).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'Dumbbell Hammer Curl',
           body_part: 'Arms',
           is_master: false,
-          is_archived: false,
           user_id: 'a0000000-0000-4000-8000-000000000123',
         }),
-      ]);
+      );
     });
   });
 
@@ -275,7 +281,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
 
   it('renders Duplicate & Customize button for master routines and allows forking into a personal template', async () => {
     // Add master template to mock
-    (supabase.from as any).mockImplementation((table: string) => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === 'routine_templates') {
         const b = createSupabaseBuilder('routine_templates', {
           data: [
@@ -359,7 +365,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     const mockDeleteTpl = vi.fn();
     const mockInsertTpl = vi.fn();
 
-    (supabase.from as any).mockImplementation((table: string) => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === 'routine_templates') {
         const b = createSupabaseBuilder('routine_templates', {
           data: [
@@ -486,7 +492,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
       exercises: [{ id: 'te-m1', exercise_id: 'ex-master-1', target_sets: 4, target_reps: 6 }],
     };
 
-    (supabase.from as any).mockImplementation((table: string) => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === 'routine_templates') {
         const b = createSupabaseBuilder('routine_templates', {
           data: [masterTpl],
@@ -584,7 +590,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
       exercises: [{ id: 'te-2', exercise_id: 'ex-custom-1', target_sets: 4, target_reps: 8 }],
     };
 
-    (supabase.from as any).mockImplementation((table: string) => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === 'routine_templates') {
         return createSupabaseBuilder('routine_templates', {
           data: [mondayTemplate, fridayTemplate],
@@ -696,7 +702,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     mockAthleteSession.user.id = "malformed-id',is_master.eq.true";
 
     const mockOr = vi.fn();
-    (supabase.from as any).mockImplementation((table: string) => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
       const b = createSupabaseBuilder(table, { data: [], error: null });
       b.or = mockOr;
       return b;
@@ -711,7 +717,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
   });
 
   it('mounts exercises-read-error live region empty while idle and retains same node on error (NEW-15)', async () => {
-    (supabase.from as any).mockImplementation((table: string) => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === 'exercises') {
         return createSupabaseBuilder('exercises', {
           resolver: () => ({ data: null, error: new Error('Failed to fetch exercises') }),
@@ -742,7 +748,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
   it('mounts deleteError live region empty while idle and updates on delete failure (NEW-15)', async () => {
     mockCoachState.isCoach = true;
     const mockDelete = vi.fn();
-    (supabase.from as any).mockImplementation((table: string) => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === 'exercises') {
         const b = createSupabaseBuilder('exercises', {
           data: [{ id: 'ex-custom-1', name: 'My Athlete Curl', body_part: 'Arms', is_master: false, user_id: 'a0000000-0000-4000-8000-000000000123', is_archived: false }],
@@ -802,7 +808,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
   });
 
   it('0-row writes: exercise archive with 0 rows affected throws and displays StatusBanner error', async () => {
-    (supabase.from as any).mockImplementation((table: string) => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === 'exercises') {
         const b = createSupabaseBuilder('exercises', {
           data: [{ id: 'ex-custom-1', name: 'My Athlete Curl', body_part: 'Arms', is_master: false, user_id: 'a0000000-0000-4000-8000-000000000123', is_archived: false }],
@@ -845,7 +851,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
   });
 
   it('0-row writes: template delete with 0 rows affected displays StatusBanner error', async () => {
-    (supabase.from as any).mockImplementation((table: string) => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === 'routine_templates') {
         const b = createSupabaseBuilder('routine_templates', {
           data: [{
@@ -888,10 +894,14 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
   });
 
   it('L6: create-exercise error shows StatusBanner and keeps form input', async () => {
-    (supabase.from as any).mockImplementation((table: string) => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === 'exercises') {
         const b = createSupabaseBuilder('exercises', { data: [], error: null });
-        b.insert = vi.fn().mockResolvedValue({ data: null, error: { message: 'Insert failed: RLS denied' } });
+        b.insert = vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({ data: null, error: { message: 'Insert failed: RLS denied' } }),
+          }),
+        });
         return b;
       }
       if (table === 'users') {
@@ -924,8 +934,15 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     mockCoachState.isCoach = true;
     mockCoachState.selectedAthleteId = '';
 
-    const mockInsert = vi.fn().mockResolvedValue({ error: null });
-    (supabase.from as any).mockImplementation((table: string) => {
+    const mockInsert = vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({
+          data: { id: 'new-ex-id', name: 'Coach Personal Lift' },
+          error: null,
+        }),
+      }),
+    });
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === 'exercises') {
         const b = createSupabaseBuilder('exercises', { data: [], error: null });
         b.insert = mockInsert;
@@ -950,13 +967,13 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     fireEvent.click(screen.getByRole('button', { name: /Save to Library/i }));
 
     await waitFor(() => {
-      expect(mockInsert).toHaveBeenCalledWith([
+      expect(mockInsert).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'Coach Personal Lift',
           user_id: 'a0000000-0000-4000-8000-000000000123',
           is_master: false,
         }),
-      ]);
+      );
     });
   });
 

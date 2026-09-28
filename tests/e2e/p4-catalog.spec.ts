@@ -244,7 +244,7 @@ test.describe('P4 Catalog & E2E Verification (p4-catalog)', () => {
       const card = libraryCards.nth(i);
       const expected = visibleExercises[i];
       await expect(card.locator('div.text-zinc-100 > span').first()).toHaveText(expected.name);
-      await expect(card.locator('div.text-xs.text-zinc-500')).toHaveText(expected.body_part);
+      await expect(card.locator('[data-testid="exercise-row-subtitle"]')).toHaveText(expected.body_part.replace(/\s*\/\s*/g, ' · '));
     }
 
     // 2. Verify History (/history) renders the seeded 'Push Day Benchmark' session with its exercise names
