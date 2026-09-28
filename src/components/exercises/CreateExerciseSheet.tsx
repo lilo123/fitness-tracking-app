@@ -120,7 +120,7 @@ export const CreateExerciseSheet: React.FC<CreateExerciseSheetProps> = ({
       }
 
       // Fetch on-demand via RPC if available
-      if (typeof (supabase as any).rpc === 'function') {
+      if (typeof (supabase as { rpc?: unknown }).rpc === 'function') {
         try {
           const page = await fetchExerciseCatalogPage({
             search: trimmedName,

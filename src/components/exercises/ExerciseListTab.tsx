@@ -41,7 +41,7 @@ export function resolveExerciseJump(ex: { id?: string; name: string; is_hidden?:
 }
 
 export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTabProps>(
-  ({ exercises: propExercises, targetUserId: propTargetUserId, currentUserId: propCurrentUserId, onCatalogError }, ref) => {
+  ({ exercises: propExercises, isReadError, targetUserId: propTargetUserId, currentUserId: propCurrentUserId, onCatalogError }, ref) => {
     const { user } = useAuth();
     const { isCoach, selectedAthleteId, selectedAthlete, athletes = [] } = useCoach();
     const queryClient = useQueryClient();
@@ -108,9 +108,14 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
         setHiddenToast({
           verb: 'Hidden', subject: ex.name, detail: 'Hidden for you',
           onUndo: async () => {
-            await (supabase.from as any)('exercise_hides').delete().eq('exercise_id', ex.id).eq('hidden_by', currentUserId);
-            await invalidateExerciseDomain(queryClient, currentUserId || undefined);
-            setHiddenToast(null);
+            try {
+              const { error: delErr } = await (supabase.from as any)('exercise_hides').delete().eq('exercise_id', ex.id).eq('hidden_by', currentUserId);
+              if (delErr) throw delErr;
+              await invalidateExerciseDomain(queryClient, currentUserId || undefined);
+              setHiddenToast(null);
+            } catch (err: any) {
+              setHideError(err?.message || 'Failed to unhide exercise');
+            }
           },
           undoAriaLabel: `Undo hide ${ex.name}`,
         });
@@ -240,14 +245,14 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
           <Skeleton count={6} variant="row" ariaLabel="Loading exercise catalog..." testId="exercises-skeleton" />
         )}
 
-        {isError && !catalogData && (
+        {(isError || isReadError) && !catalogData && (
           <StatusBanner
             title="Failed to load exercises" message={catalogError instanceof Error ? catalogError.message : 'Unable to load exercises.'} tone="error"
             action={<Button variant="secondary" size="sm" leftIcon={<RotateCcw className="w-4 h-4" />} onClick={() => void refetchCatalog()} testId="retry-exercises-btn">Retry</Button>}
           />
         )}
 
-        {(isSuccess || catalogData || propExercises) && displayedItems.length === 0 && (
+        {!isReadError && !isError && (isSuccess || catalogData || propExercises) && displayedItems.length === 0 && (
           <div className="p-8 text-center bg-zinc-900/40 border border-zinc-800/60 rounded-2xl text-xs text-zinc-400 space-y-2">
             <p>No exercises found in your library.</p>
             {(search || selectedScope !== 'all' || selectedEquipment !== 'all' || selectedMuscleGroup !== 'all') && (
@@ -260,7 +265,7 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
           {displayedItems.map((ex) => (
             <ExerciseListRow
               key={ex.id} exercise={ex} currentUserId={currentUserId} isCoach={isCoach}
-              athleteFirstName={athletes?.find((a) => a.id === ex.user_id)?.name.split(' ')[0]} scope={selectedScope}
+              athleteFirstName={athletes?.find((a) => a.id === ex.user_id)?.name.split(' ')[0]}
               onEdit={setEditingExercise} onArchive={(item) => scheduleArchive(item, item.name)} onDelete={(item) => scheduleArchive(item, item.name)} onRestore={handleRestore}
               onHide={(item) => (isCoach ? setHideConfirmTarget(item) : void handleAthleteHide(item))} onUnhide={handleUnhide}
             />

@@ -137,7 +137,7 @@ export const ExercisesView: React.FC = () => {
               ? readError.message
               : typeof readError === 'string'
               ? readError
-              : (readError as any)?.message || 'Unable to load exercise data. Please try again.'
+              : (readError as { message?: string })?.message || 'Unable to load exercise data. Please try again.'
             : null
         }
         tone="error"

@@ -5,14 +5,17 @@ import type { CatalogExercise } from '../../lib/exercises';
 import { Tag } from '../common/Tag';
 import { getEquipmentLabel } from '../../constants/muscleGroups';
 
-export type ExerciseRowItem = CatalogExercise | Exercise;
+export type ExerciseRowItem = CatalogExercise | (Exercise & {
+  equipment?: string | null;
+  body_parts?: string[] | null;
+  is_hidden?: boolean;
+});
 
 export interface ExerciseListRowProps {
   exercise: ExerciseRowItem;
   currentUserId?: string | null;
   isCoach?: boolean;
   athleteFirstName?: string;
-  scope?: string;
   onEdit?: (exercise: ExerciseRowItem) => void;
   onArchive?: (exercise: ExerciseRowItem) => void;
   onDelete?: (exercise: ExerciseRowItem) => void; // backwards-compatible alias for onArchive
@@ -47,7 +50,7 @@ export const ExerciseListRow: React.FC<ExerciseListRowProps> = ({
     }
   };
 
-  const isHidden = Boolean((ex as CatalogExercise).is_hidden);
+  const isHidden = Boolean(ex.is_hidden);
   const isArchived = Boolean(ex.is_archived);
 
   // L1 & L4: masters show no Edit/Archive for anyone; only own non-master rows are editable/archivable
@@ -70,9 +73,9 @@ export const ExerciseListRow: React.FC<ExerciseListRowProps> = ({
     ownerPill = <Tag label="From coach" tone="info" testId={`tag-coach-${ex.id}`} />;
   }
 
-  const equipment = 'equipment' in ex && typeof (ex as any).equipment === 'string' ? (ex as any).equipment : null;
+  const equipment = ex.equipment && typeof ex.equipment === 'string' ? ex.equipment : null;
   const equipmentLabel = equipment ? getEquipmentLabel(equipment) : null;
-  const bodyParts = 'body_parts' in ex && Array.isArray(ex.body_parts) ? (ex.body_parts as string[]) : null;
+  const bodyParts = ex.body_parts && Array.isArray(ex.body_parts) ? ex.body_parts : null;
   const bodyPartText =
     bodyParts && bodyParts.length > 0
       ? bodyParts.join(' · ')

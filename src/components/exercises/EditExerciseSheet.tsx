@@ -72,7 +72,12 @@ export const EditExerciseSheet: React.FC<EditExerciseSheetProps> = ({
     setPrevExerciseKey(currentExerciseKey);
     if (isOpen && exercise) {
       setName(exercise.name || '');
-      if (exercise.body_part) {
+      const exBodyParts = ('body_parts' in exercise && Array.isArray((exercise as CatalogExercise).body_parts))
+        ? (exercise as CatalogExercise).body_parts
+        : null;
+      if (exBodyParts && exBodyParts.length > 0) {
+        setSelectedBodyParts(exBodyParts);
+      } else if (exercise.body_part) {
         setSelectedBodyParts(
           exercise.body_part
             .split(',')
@@ -82,7 +87,7 @@ export const EditExerciseSheet: React.FC<EditExerciseSheetProps> = ({
       } else {
         setSelectedBodyParts([]);
       }
-      setSelectedEquipment(((exercise as any).equipment as Equipment) || null);
+      setSelectedEquipment((exercise.equipment as Equipment) || null);
       setError(null);
       setDuplicateError(null);
     }
@@ -112,8 +117,8 @@ export const EditExerciseSheet: React.FC<EditExerciseSheetProps> = ({
 
     const candidateEquipment = selectedEquipment ? selectedEquipment.toLowerCase().trim() : null;
     const isNameChanged = normalizeSearch(trimmedName) !== normalizeSearch(exercise.name);
-    const prevEq = (exercise as any).equipment
-      ? (exercise as any).equipment.toLowerCase().trim()
+    const prevEq = exercise.equipment
+      ? exercise.equipment.toLowerCase().trim()
       : null;
     const isEquipmentChanged = candidateEquipment !== prevEq;
 
@@ -135,7 +140,7 @@ export const EditExerciseSheet: React.FC<EditExerciseSheetProps> = ({
           }
         }
 
-        if (typeof (supabase as any).rpc === 'function') {
+        if (typeof (supabase as { rpc?: unknown }).rpc === 'function') {
           try {
             const page = await fetchExerciseCatalogPage({
               search: trimmedName,
@@ -177,6 +182,7 @@ export const EditExerciseSheet: React.FC<EditExerciseSheetProps> = ({
         .from('exercises')
         .update({
           name: trimmedName,
+          body_parts: selectedBodyParts.length > 0 ? selectedBodyParts : null,
           body_part: bodyPartStr,
           equipment: candidateEquipment,
         } as any)

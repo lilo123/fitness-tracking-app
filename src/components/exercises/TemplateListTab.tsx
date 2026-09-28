@@ -62,7 +62,7 @@ export const TemplateListTab: React.FC<TemplateListTabProps> = ({
     !navigator.userAgent.includes('Chrome') &&
     !navigator.userAgent.includes('Safari') &&
     !navigator.userAgent.includes('Firefox') &&
-    !(setTimeout as any).clock
+    !('clock' in setTimeout)
       ? 50
       : 6000);
 
@@ -312,7 +312,7 @@ export const TemplateListTab: React.FC<TemplateListTabProps> = ({
                       <ul className="space-y-1.5 list-none p-0 m-0">
                         {sortedExercises.map((te) => {
                           const ex = exerciseMap.get(te.exercise_id);
-                          const isArchived = Boolean(ex?.is_archived || (te.exercise as any)?.is_archived);
+                          const isArchived = Boolean(ex?.is_archived || (te.exercise as { name?: string; is_archived?: boolean } | null)?.is_archived);
                           const exerciseName = ex?.name || te.exercise?.name || te.exercise_name || 'Exercise';
                           const setsReps =
                             te.target_reps != null && te.target_reps > 0
