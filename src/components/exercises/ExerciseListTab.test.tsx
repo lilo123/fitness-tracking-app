@@ -141,6 +141,17 @@ describe('ExerciseListTab', () => {
     expect(skeleton.getAttribute('aria-busy')).toBe('true');
   });
 
+  it('L10: displays skeleton with aria-busy while pending even when propExercises is []', async () => {
+    mockRpc.mockReturnValueOnce(new Promise(() => {}));
+
+    renderComponent({ exercises: [] });
+
+    const skeleton = screen.getByTestId('exercises-skeleton');
+    expect(skeleton).toBeDefined();
+    expect(skeleton.getAttribute('aria-busy')).toBe('true');
+    expect(screen.queryByText(/No exercises found in your library/i)).toBeNull();
+  });
+
   it('L10: shows "Showing N of M" count on catalog load', async () => {
     renderComponent();
     expect(await screen.findByText('Zercher Squat')).toBeDefined();
@@ -380,7 +391,9 @@ describe('ExerciseListTab', () => {
     });
 
     // Undo toast appears
-    expect(screen.getByTestId('toast-dish-text').textContent).toContain('Zercher Squat');
+    await waitFor(() => {
+      expect(screen.getByTestId('toast-dish-text').textContent).toContain('Zercher Squat');
+    });
 
     // Click Undo on toast
     const undoBtn = screen.getByTestId('toast-undo-btn');

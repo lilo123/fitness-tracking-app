@@ -34,6 +34,19 @@ function runSql(sql: string): string {
   }
 }
 
+// Default (master) exercise ids are generated per database (v2_expansion migration), so a
+// fresh CI seed has different ids than the local DB: always resolve them by name.
+function masterExerciseId(name: string): string {
+  const out = execSync(`${getPsqlCommand()} -At`, {
+    input: `SELECT id FROM public.exercises WHERE is_master = true AND name = '${name.replace(/'/g, "''")}' ORDER BY id LIMIT 1;`,
+    encoding: 'utf8',
+  }).trim();
+  if (!/^[0-9a-f-]{36}$/.test(out)) {
+    throw new Error(`[library.spec.ts] master exercise '${name}' not found (got '${out}')`);
+  }
+  return out;
+}
+
 function cleanupLibraryTestData() {
   const sql = `
     DELETE FROM public.template_exercises
@@ -93,6 +106,10 @@ test.describe('P7a Library Acceptance Proofs', () => {
   });
 
   test.afterEach(() => {
+    cleanupLibraryTestData();
+  });
+
+  test.afterAll(() => {
     cleanupLibraryTestData();
   });
 
@@ -217,14 +234,17 @@ test.describe('P7a Library Acceptance Proofs', () => {
     await expect(skeleton).toBeVisible({ timeout: 5000 });
     await expect(skeleton).toHaveAttribute('aria-busy', 'true');
 
-    // Empty state must NOT be visible while loading
+    // Empty state and exercise rows must NOT be visible while loading
     await expect(page.getByText('No exercises found in your library.')).not.toBeVisible();
+    await expect(page.locator('[data-testid^="exercise-row-"]').first()).not.toBeVisible();
 
     // Release the RPC
     fulfillRpc!();
 
-    // After success, skeleton is replaced by catalog content or empty state
+    // After success, skeleton is replaced by catalog content (not empty state)
     await expect(skeleton).not.toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-testid^="exercise-row-"]').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('No exercises found in your library.')).not.toBeVisible();
   });
 
   test('Proof 3b: 500 error shows error + Retry and NOT the empty state', async ({ page }) => {
@@ -312,26 +332,40 @@ test.describe('P7a Library Acceptance Proofs', () => {
 
     // Switch to Archived scope and restore
     await page.locator('[data-testid="scope-chip-archived"]').click();
-    const restoreBtn = page.locator(`[data-testid="restore-exercise-${archiveExId}"]`);
-    await expect(restoreBtn).toBeVisible({ timeout: 10000 });
+    const row = page.locator(`[data-testid="exercise-row-${archiveExId}"]`);
+    await expect(row).toBeVisible({ timeout: 10000 });
+    await expect(row).toContainText(archiveExName);
     await expect(page.locator(`[data-testid="tag-archived-${archiveExId}"]`)).toBeVisible();
 
+    const restoreBtn = page.locator(`[data-testid="restore-exercise-${archiveExId}"]`);
+    await expect(restoreBtn).toBeVisible();
     await restoreBtn.click();
+
+    // Row leaves Archived scope
+    await expect(row).not.toBeVisible({ timeout: 5000 });
+
     // After restore, switch to Mine scope and verify exercise is now active/restored
     await page.locator('[data-testid="scope-chip-mine"]').click();
-    await expect(page.locator(`[data-testid="exercise-row-${archiveExId}"]`)).toBeVisible({ timeout: 10000 });
+    await expect(row).toBeVisible({ timeout: 10000 });
     await expect(page.locator(`[data-testid="tag-archived-${archiveExId}"]`)).not.toBeVisible();
   });
 
   // Proof 5b: (5) Hidden filter + Unhide
   test('Proof 5b: hidden filter and unhide default exercise', async ({ page }) => {
+    const defaultExId = masterExerciseId('Cable Lateral Raises');
+    const defaultExName = 'Cable Lateral Raises';
+
     await loginAsAthlete(page);
     await goToLibrary(page);
 
-    // Athlete hide default exercise
+    // Athlete hide specific default exercise
     await page.locator('[data-testid="scope-chip-defaults"]').click();
-    const hideBtn = page.locator('[data-testid^="hide-exercise-"]').first();
-    await expect(hideBtn).toBeVisible({ timeout: 10000 });
+    const defaultRow = page.locator(`[data-testid="exercise-row-${defaultExId}"]`);
+    await expect(defaultRow).toBeVisible({ timeout: 10000 });
+    await expect(defaultRow).toContainText(defaultExName);
+
+    const hideBtn = page.locator(`[data-testid="hide-exercise-${defaultExId}"]`);
+    await expect(hideBtn).toBeVisible();
 
     const hidePromise = page.waitForRequest(
       (req) => req.url().includes('/rest/v1/exercise_hides') && req.method() === 'POST'
@@ -339,11 +373,16 @@ test.describe('P7a Library Acceptance Proofs', () => {
     await hideBtn.click();
     await hidePromise;
 
+    // Row leaves Defaults scope
+    await expect(defaultRow).not.toBeVisible({ timeout: 5000 });
+
     // Switch to Hidden scope
     await page.locator('[data-testid="scope-chip-hidden"]').click();
-    const unhideBtn = page.locator('[data-testid^="unhide-exercise-"]').first();
+    await expect(defaultRow).toBeVisible({ timeout: 10000 });
+    await expect(page.locator(`[data-testid="tag-hidden-${defaultExId}"]`)).toBeVisible();
+
+    const unhideBtn = page.locator(`[data-testid="unhide-exercise-${defaultExId}"]`);
     await expect(unhideBtn).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('[data-testid^="tag-hidden-"]').first()).toBeVisible();
 
     const unhidePromise = page.waitForRequest(
       (req) => req.url().includes('/rest/v1/exercise_hides') && req.method() === 'DELETE'
@@ -352,27 +391,40 @@ test.describe('P7a Library Acceptance Proofs', () => {
     await unhidePromise;
 
     // The unhidden exercise row must leave the Hidden scope without requiring manual page reload
-    await expect(unhideBtn).not.toBeVisible({ timeout: 5000 });
+    await expect(defaultRow).not.toBeVisible({ timeout: 5000 });
+
+    // Switch back to Defaults scope and assert row is restored
+    await page.locator('[data-testid="scope-chip-defaults"]').click();
+    await expect(defaultRow).toBeVisible({ timeout: 10000 });
   });
 
   // Proof 5c: (5) coach hiding a default opens a dialog whose text names the athlete count
   test('Proof 5c: coach hiding a default opens dialog naming athlete count', async ({ page }) => {
+    const defaultExId = masterExerciseId('Face Pulls');
+    const defaultExName = 'Face Pulls';
+
     await loginAsCoach(page);
     await goToLibrary(page);
 
-    const coachHideBtn = page.locator('[data-testid^="hide-exercise-"]').first();
+    await page.locator('[data-testid="scope-chip-defaults"]').click();
+    const coachRow = page.locator(`[data-testid="exercise-row-${defaultExId}"]`);
+    await expect(coachRow).toBeVisible({ timeout: 10000 });
+
+    const coachHideBtn = page.locator(`[data-testid="hide-exercise-${defaultExId}"]`);
     await expect(coachHideBtn).toBeVisible({ timeout: 10000 });
     await coachHideBtn.click();
 
     const dialog = page.locator('[data-testid="coach-hide-confirm-dialog"]');
     await expect(dialog).toBeVisible({ timeout: 10000 });
-    // Dialog text must name the athlete count (coach has 1 linked athlete: "for you and your 1 athlete")
+    // Dialog text must name the exercise and athlete count (coach has 1 linked athlete: "for you and your 1 athlete")
+    await expect(dialog).toContainText(defaultExName);
     await expect(dialog).toContainText('1 athlete');
 
     // Cancel dialog so local state remains clean
     const cancelBtn = dialog.getByRole('button', { name: 'Cancel' });
     await cancelBtn.click();
     await expect(dialog).not.toBeVisible();
+    await expect(coachRow).toBeVisible();
   });
 
   // Proof 6: (6) 'Start routine' on a template you created -> URL /workout?routine=<id>

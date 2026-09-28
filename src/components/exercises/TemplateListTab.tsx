@@ -149,10 +149,10 @@ export const TemplateListTab: React.FC<TemplateListTabProps> = ({
             {...{ role: "radio", "aria-checked": selectedDayFilter === d }}
             data-testid={`day-filter-${d}`}
             onClick={() => setSelectedDayFilter(d)}
-            className={`px-3.5 py-2 min-h-[44px] flex items-center justify-center rounded-xl text-xs font-bold transition shrink-0 touch-manipulation cursor-pointer ${
+            className={`px-3.5 py-2 min-h-[44px] flex items-center justify-center rounded-xl text-xs font-bold transition shrink-0 touch-manipulation cursor-pointer border ${
               selectedDayFilter === d
-                ? 'bg-violet-500 text-white shadow-neon-violet'
-                : 'bg-zinc-900 border border-border-interactive text-zinc-400 hover:text-white'
+                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.15)]'
+                : 'bg-zinc-900 border-border-interactive text-zinc-400 hover:text-white'
             }`}
           >
             {d}

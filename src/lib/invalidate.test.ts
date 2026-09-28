@@ -55,16 +55,17 @@ describe('Cache Invalidation Helpers (src/lib/invalidate.ts)', () => {
   });
 
   describe('invalidateExerciseDomain', () => {
-    it('invalidates the 3 base exercise domain keys when userId is omitted', async () => {
+    it('invalidates the 4 base exercise domain keys when userId is omitted', async () => {
       const { client, invalidatedKeys } = createMockQueryClient();
 
       await invalidateExerciseDomain(client);
 
-      expect(client.invalidateQueries).toHaveBeenCalledTimes(3);
+      expect(client.invalidateQueries).toHaveBeenCalledTimes(4);
       expect(invalidatedKeys).toEqual([
         ['exercises'],
         ['routine_templates'],
         ['workout_sets'],
+        ['exercise_catalog'],
       ]);
     });
 
@@ -74,11 +75,12 @@ describe('Cache Invalidation Helpers (src/lib/invalidate.ts)', () => {
 
       await invalidateExerciseDomain(client, testUserId);
 
-      expect(client.invalidateQueries).toHaveBeenCalledTimes(5);
+      expect(client.invalidateQueries).toHaveBeenCalledTimes(6);
       expect(invalidatedKeys).toEqual([
         ['exercises'],
         ['routine_templates'],
         ['workout_sets'],
+        ['exercise_catalog'],
         ['workout_sets', testUserId],
         ['routine_templates', testUserId],
       ]);

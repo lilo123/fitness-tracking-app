@@ -241,7 +241,7 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
           onError={setCreateExerciseError} onViewExisting={jumpToExercise}
         />
 
-        {isPending && !catalogData && !propExercises && (
+        {isPending && !catalogData && (
           <Skeleton count={6} variant="row" ariaLabel="Loading exercise catalog..." testId="exercises-skeleton" />
         )}
 
@@ -252,7 +252,7 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
           />
         )}
 
-        {!isReadError && !isError && (isSuccess || catalogData || propExercises) && displayedItems.length === 0 && (
+        {!isReadError && !isError && isSuccess && displayedItems.length === 0 && (
           <div className="p-8 text-center bg-zinc-900/40 border border-zinc-800/60 rounded-2xl text-xs text-zinc-400 space-y-2">
             <p>No exercises found in your library.</p>
             {(search || selectedScope !== 'all' || selectedEquipment !== 'all' || selectedMuscleGroup !== 'all') && (
@@ -261,7 +261,8 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
           </div>
         )}
 
-        <div className="space-y-2">
+        {(!isPending || catalogData) && (
+          <div className="space-y-2">
           {displayedItems.map((ex) => (
             <ExerciseListRow
               key={ex.id} exercise={ex} currentUserId={currentUserId} isCoach={isCoach}
@@ -270,7 +271,8 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
               onHide={(item) => (isCoach ? setHideConfirmTarget(item) : void handleAthleteHide(item))} onUnhide={handleUnhide}
             />
           ))}
-        </div>
+          </div>
+        )}
 
         <div ref={sentinelRef} className="h-4 w-full" aria-hidden="true" />
         {isFetchingNextPage && <Skeleton count={2} variant="row" ariaLabel="Loading more exercises..." />}

@@ -92,6 +92,8 @@ export async function invalidateExerciseDomain(
     queryClient.invalidateQueries({ queryKey: queryKeys.routineTemplates.all }),
     // src/components/exercises/EditExerciseModal.tsx:105
     queryClient.invalidateQueries({ queryKey: queryKeys.workoutSets.all }),
+    // src/components/exercises/ExerciseListTab.tsx: catalog search and filtering RPC
+    queryClient.invalidateQueries({ queryKey: queryKeys.exerciseCatalog.all }),
   ];
 
   if (userId) {
