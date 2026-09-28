@@ -255,6 +255,46 @@ describe('dataExport utilities', () => {
       expect(parsed.data.nutrition_logs).toHaveLength(1);
       expect(parsed.data.custom_dishes).toBeUndefined();
     });
+
+    it('includes weight_unit in profile section and keeps sets weight as canonical lb number', () => {
+      const bundleWithProfile: ExportBundle = {
+        ...mockBundle,
+        filters: { ...mockBundle.filters, domains: ['workouts', 'profile'] },
+        data: {
+          ...mockBundle.data,
+          profile: {
+            id: 'usr-1',
+            username: 'alex_runner',
+            weight_unit: 'kg',
+          },
+          workouts: [
+            {
+              id: 'w-1',
+              user_id: 'usr-1',
+              name: 'Leg Day',
+              date: '2026-09-20',
+              sets: [
+                {
+                  id: 's-1',
+                  workout_id: 'w-1',
+                  exercise_id: 'ex-1',
+                  set_index: 0,
+                  set_type: 'working',
+                  weight: 225,
+                  reps: 5,
+                },
+              ],
+            },
+          ],
+        },
+      };
+
+      const file = serializeToExportJson(bundleWithProfile);
+      const parsed = JSON.parse(file.content);
+      expect(parsed.data.profile.weight_unit).toBe('kg');
+      expect(parsed.data.workouts[0].sets[0].weight).toBe(225);
+      expect(typeof parsed.data.workouts[0].sets[0].weight).toBe('number');
+    });
   });
 
   describe('serializeToExportCsvFiles', () => {
@@ -285,6 +325,7 @@ describe('dataExport utilities', () => {
           target_fat: 70,
           target_fiber: 35,
           auto_rest_timer: true,
+          weight_unit: 'lb',
         },
         workouts: [
           {
@@ -437,9 +478,9 @@ describe('dataExport utilities', () => {
       const profileFile = files.find((f) => f.filename === 'cybergym-profile-2026-09-23.csv')!;
       expect(profileFile).toBeDefined();
       expect(profileFile.content).toContain(
-        'user_id,username,email,role,target_calories,target_protein_g,target_carbs_g,target_fat_g,target_fiber_g,auto_rest_timer'
+        'user_id,username,email,role,target_calories,target_protein_g,target_carbs_g,target_fat_g,target_fiber_g,auto_rest_timer,weight_unit'
       );
-      expect(profileFile.content).toContain('usr-1,alex_runner,alex@example.com,athlete,2400,180,250,70,35,true');
+      expect(profileFile.content).toContain('usr-1,alex_runner,alex@example.com,athlete,2400,180,250,70,35,true,lb');
     });
 
     it('only generates csv files for requested domains in filters.domains', () => {
@@ -453,6 +494,65 @@ describe('dataExport utilities', () => {
       const files = serializeToExportCsvFiles(partialBundle, '2026-09-23');
       expect(files).toHaveLength(1);
       expect(files[0].filename).toBe('cybergym-workouts-2026-09-23.csv');
+    });
+
+    it('exports profile CSV with weight_unit and preserves canonical lb weight column in workouts CSV', () => {
+      const bundle: ExportBundle = {
+        ...mockBundle,
+        filters: { preset: 'all', start_date: null, end_date: null, domains: ['workouts', 'profile'] },
+        data: {
+          profile: {
+            id: 'usr-1',
+            username: 'alex_runner',
+            email: 'alex@example.com',
+            role: 'athlete',
+            target_calories: 2400,
+            target_protein: 180,
+            target_carbs: 250,
+            target_fat: 70,
+            target_fiber: 35,
+            auto_rest_timer: true,
+            weight_unit: 'kg',
+          },
+          workouts: [
+            {
+              id: 'w-1',
+              user_id: 'usr-1',
+              name: 'Push Day',
+              date: '2026-09-21',
+              sets: [
+                {
+                  id: 'set-1',
+                  workout_id: 'w-1',
+                  exercise_id: 'ex-1',
+                  exercise: { name: 'Bench Press', body_part: 'Chest' },
+                  set_index: 0,
+                  set_type: 'working',
+                  weight: 225,
+                  reps: 5,
+                  rpe: 8.5,
+                  created_at: '2026-09-21T10:05:00Z',
+                },
+              ],
+            },
+          ],
+        },
+      };
+
+      const files = serializeToExportCsvFiles(bundle, '2026-09-28');
+      const profileCsv = files.find((f) => f.filename === 'cybergym-profile-2026-09-28.csv')!;
+      expect(profileCsv).toBeDefined();
+      expect(profileCsv.content).toContain(
+        'user_id,username,email,role,target_calories,target_protein_g,target_carbs_g,target_fat_g,target_fiber_g,auto_rest_timer,weight_unit'
+      );
+      expect(profileCsv.content).toContain('usr-1,alex_runner,alex@example.com,athlete,2400,180,250,70,35,true,kg');
+
+      const workoutsCsv = files.find((f) => f.filename === 'cybergym-workouts-2026-09-28.csv')!;
+      expect(workoutsCsv).toBeDefined();
+      expect(workoutsCsv.content).toContain(
+        'workout_id,workout_date,workout_name,set_index,set_type,exercise_name,body_part,weight,reps,rpe,set_created_at'
+      );
+      expect(workoutsCsv.content).toContain('w-1,2026-09-21,Push Day,0,working,Bench Press,Chest,225,5,8.5,2026-09-21T10:05:00Z');
     });
   });
 
@@ -699,7 +799,7 @@ describe('dataExport utilities', () => {
       });
       expect(recorded).toContainEqual({
         table: 'users',
-        projection: 'id, username, email, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, timezone',
+        projection: 'id, username, email, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, timezone, weight_unit',
       });
     });
   });

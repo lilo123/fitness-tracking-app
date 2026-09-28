@@ -12,6 +12,7 @@ import { CoachSettingsCard } from './CoachSettingsCard';
 import { MyCoachCard } from './MyCoachCard';
 import { MacroGoalsCard } from './MacroGoalsCard';
 import { DataExportCard } from './DataExportCard';
+import { WeightUnitCard } from './WeightUnitCard';
 
 interface SettingsFormProps {
   profile: UserProfile | null;
@@ -220,6 +221,9 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Weight Unit Preference */}
+      <WeightUnitCard />
 
       {/* Target Macros Form */}
       <MacroGoalsCard

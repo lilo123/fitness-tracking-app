@@ -401,7 +401,7 @@ const SERVICED_QUERIES_REGISTRY = {
     {
       table: 'users',
       type: 'EXACT',
-      projection: 'id, username, email, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, timezone',
+      projection: 'id, username, email, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, timezone, weight_unit',
       description: 'Export user profile fetch query',
     },
   ],

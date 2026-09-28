@@ -430,5 +430,16 @@ describe('SettingsView', () => {
     expect(screen.getByTestId('export-format-json')).toBeDefined();
     expect(screen.getByTestId('export-format-csv')).toBeDefined();
   });
+
+  it('renders WeightUnitCard with Weight unit heading and options', async () => {
+    renderComponent();
+    await screen.findByDisplayValue('Coach Duy');
+    expect(screen.getByRole('heading', { name: 'Weight unit' })).toBeDefined();
+    expect(
+      screen.getByText('Weights are stored in pounds; this changes how they are shown and entered.')
+    ).toBeDefined();
+    expect(screen.getByTestId('weight-unit-lb')).toBeDefined();
+    expect(screen.getByTestId('weight-unit-kg')).toBeDefined();
+  });
 });
 
