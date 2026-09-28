@@ -49,14 +49,14 @@ BEGIN
   END IF;
 
   SELECT equipment INTO v_unmatched_eq FROM public.exercises WHERE name = 'Face Pulls';
-  IF v_unmatched_eq IS NOT NULL THEN
-    RAISE EXCEPTION 'Face Pulls equipment expected NULL, got %', v_unmatched_eq;
+  IF v_unmatched_eq <> 'cable' THEN
+    RAISE EXCEPTION 'Face Pulls equipment expected cable, got %', v_unmatched_eq;
   END IF;
 END;
 $$;
 SELECT pass('Dips (slash row) backfilled body_parts = {Chest, Triceps} while body_part is unchanged');
 SELECT pass('Cable Lateral Raises backfilled equipment = cable, Leg Extension Machine = machine');
-SELECT pass('Unmatched master exercises retain equipment IS NULL');
+SELECT pass('Face Pulls equipment backfilled to cable by M8');
 
 -- ============================================================================
 -- 3. Trigger Sync & Unrelated UPDATE Invariance (RP-3)
@@ -253,7 +253,7 @@ BEGIN
   VALUES ('Stranger Secret Curl', ARRAY['Arms'], 'dumbbell', false, v_stranger)
   RETURNING id INTO v_stranger_ex;
 
-  SELECT id INTO v_master_id FROM public.exercises WHERE name = 'Dips';
+  SELECT id INTO v_master_id FROM public.exercises WHERE name = 'Dragon Flag';
 
   -- 1. Search tests (as athlete)
   PERFORM set_config('role', 'authenticated', true);
@@ -295,36 +295,36 @@ BEGIN
   END IF;
 
   -- 4. Multi-coach hide acceptance:
-  -- Coach hides Dips
+  -- Coach hides Dragon Flag
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_coach || '"}', true);
   INSERT INTO public.exercise_hides (hidden_by, exercise_id) VALUES (v_coach, v_master_id);
 
-  -- Coach queries: Dips is absent when p_include_hidden = false
-  SELECT count(*) INTO v_seen FROM public.get_exercise_catalog(p_search => 'Dips', p_include_hidden => false);
+  -- Coach queries: Dragon Flag is absent when p_include_hidden = false
+  SELECT count(*) INTO v_seen FROM public.get_exercise_catalog(p_search => 'Dragon Flag', p_include_hidden => false);
   IF v_seen <> 0 THEN
-    RAISE EXCEPTION 'Coach sees hidden default Dips when include_hidden = false';
+    RAISE EXCEPTION 'Coach sees hidden default Dragon Flag when include_hidden = false';
   END IF;
 
-  -- Athlete queries: Dips is absent when p_include_hidden = false
+  -- Athlete queries: Dragon Flag is absent when p_include_hidden = false
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_ath || '"}', true);
-  SELECT count(*) INTO v_seen FROM public.get_exercise_catalog(p_search => 'Dips', p_include_hidden => false);
+  SELECT count(*) INTO v_seen FROM public.get_exercise_catalog(p_search => 'Dragon Flag', p_include_hidden => false);
   IF v_seen <> 0 THEN
-    RAISE EXCEPTION 'Linked athlete sees coach-hidden default Dips when include_hidden = false';
+    RAISE EXCEPTION 'Linked athlete sees coach-hidden default Dragon Flag when include_hidden = false';
   END IF;
 
-  -- Unlinked stranger queries: Dips IS PRESENT!
+  -- Unlinked stranger queries: Dragon Flag IS PRESENT!
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_stranger || '"}', true);
-  SELECT count(*) INTO v_seen FROM public.get_exercise_catalog(p_search => 'Dips', p_include_hidden => false);
+  SELECT count(*) INTO v_seen FROM public.get_exercise_catalog(p_search => 'Dragon Flag', p_include_hidden => false);
   IF v_seen <> 1 THEN
-    RAISE EXCEPTION 'Unlinked stranger cannot see Dips (saw %)', v_seen;
+    RAISE EXCEPTION 'Unlinked stranger cannot see Dragon Flag (saw %)', v_seen;
   END IF;
 
-  -- Athlete queries with p_include_hidden = true: Dips is present with is_hidden = true
+  -- Athlete queries with p_include_hidden = true: Dragon Flag is present with is_hidden = true
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_ath || '"}', true);
-  SELECT is_hidden INTO v_rec FROM public.get_exercise_catalog(p_search => 'Dips', p_include_hidden => true);
+  SELECT is_hidden INTO v_rec FROM public.get_exercise_catalog(p_search => 'Dragon Flag', p_include_hidden => true);
   IF v_rec.is_hidden IS NOT TRUE THEN
-    RAISE EXCEPTION 'Athlete did not see is_hidden = true on Dips';
+    RAISE EXCEPTION 'Athlete did not see is_hidden = true on Dragon Flag';
   END IF;
 
   -- 5. Coach sees no strangers customs (acceptance)

@@ -43,8 +43,8 @@ BEGIN
 
   -- Exercises: pick a master exercise name (e.g. 'Incline Bench Press') and create a custom exercise with same name
   SELECT id INTO v_ex_master FROM public.exercises WHERE is_master = true LIMIT 1;
-  INSERT INTO public.exercises (id, user_id, name, is_master)
-  VALUES (v_ex_custom, v_athlete, (SELECT name FROM public.exercises WHERE id = v_ex_master), false);
+  INSERT INTO public.exercises (id, user_id, name, equipment, is_master)
+  VALUES (v_ex_custom, v_athlete, (SELECT name FROM public.exercises WHERE id = v_ex_master), 'dumbbell', false);
 
   -- Workouts for athlete:
   -- Old workout: 200 days ago (2026-03-01). >90-day gap!
