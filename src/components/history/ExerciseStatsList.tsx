@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import type { Exercise, WorkoutSet } from '../../types/database';
 import { Search, Trophy } from 'lucide-react';
 import { formatShortDate, normalizeDateStr } from '../../utils/date';
@@ -70,6 +70,26 @@ export const ExerciseStatsList: React.FC<ExerciseStatsListProps> = ({
 
   const [showUnlogged, setShowUnlogged] = useState(false);
   const [selectedStatForSheet, setSelectedStatForSheet] = useState<ExerciseStat | null>(null);
+  const lastOpenedCardIdRef = useRef<string | null>(null);
+
+  const handleCardClick = (stat: ExerciseStat, idx: number) => {
+    const cardId = stat.exercise.id || stat.exercise.name || String(idx);
+    lastOpenedCardIdRef.current = cardId;
+    setSelectedStatForSheet(stat);
+  };
+
+  const handleSheetClose = useCallback(() => {
+    setSelectedStatForSheet(null);
+    const cardId = lastOpenedCardIdRef.current;
+    if (cardId) {
+      requestAnimationFrame(() => {
+        const btn = document.querySelector(
+          `[data-testid="exercise-card-${cardId}"]`
+        ) as HTMLElement | null;
+        btn?.focus();
+      });
+    }
+  }, []);
 
   // Group by exercise for workouts using RPC + catalog merge
   const computedStats = useMemo<ExerciseStat[]>(() => {
@@ -180,11 +200,11 @@ export const ExerciseStatsList: React.FC<ExerciseStatsListProps> = ({
         type="button"
         key={stat.exercise.id || stat.exercise.name || idx}
         aria-haspopup="dialog"
-        onClick={() => setSelectedStatForSheet(stat)}
+        onClick={() => handleCardClick(stat, idx)}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            setSelectedStatForSheet(stat);
+            handleCardClick(stat, idx);
           }
         }}
         className="w-full text-left bg-zinc-900/90 border border-zinc-800/80 hover:border-zinc-700/80 rounded-3xl p-5 shadow-2xl space-y-3 cursor-pointer transition focus:outline-none focus:ring-2 focus:ring-cyan-500/50 touch-manipulation block"
@@ -336,7 +356,7 @@ export const ExerciseStatsList: React.FC<ExerciseStatsListProps> = ({
       {/* Exercise History Drill-Down Sheet (H8) */}
       <ExerciseHistorySheet
         open={Boolean(selectedStatForSheet)}
-        onClose={() => setSelectedStatForSheet(null)}
+        onClose={handleSheetClose}
         userId={effectiveUserId}
         exercise={selectedStatForSheet ? selectedStatForSheet.exercise : null}
         prDate={selectedStatForSheet?.prDate}
@@ -344,7 +364,7 @@ export const ExerciseStatsList: React.FC<ExerciseStatsListProps> = ({
         prReps={selectedStatForSheet?.prReps}
         isReadOnly={effectiveReadOnly}
         timeZone={timeZone}
-        onEditSet={onEditSet}
+        onEditSet={effectiveReadOnly ? undefined : onEditSet}
       />
     </div>
   );

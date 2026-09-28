@@ -46,9 +46,9 @@ export function useHistorySessionSets({
       });
       const session = sessions.find((s) => s.id === sessionId);
       const enrichedSets: HistorySet[] = sets.map((s) => {
-        let exName = s.exercise_name || (s as any).exercise?.name;
+        let exName = s.exercise_name || (s as { exercise?: { name?: string } }).exercise?.name;
         if (!exName && s.exercise_id && targetUserId) {
-          const ninetySets = queryClient.getQueryData<any[]>(['workout_sets', targetUserId, '90d']);
+          const ninetySets = queryClient.getQueryData<Array<{ id?: string; exercise_id?: string; exercise_name?: string }>>(['workout_sets', targetUserId, '90d']);
           const cached = ninetySets?.find((c) => c.exercise_id === s.exercise_id || c.id === s.id);
           if (cached?.exercise_name) {
             exName = cached.exercise_name;

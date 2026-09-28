@@ -28,8 +28,6 @@ export function useHistoryMealDeferredDelete({
       if (!item?.id) return;
       const { error } = await supabase.from('nutrition_logs').delete().eq('id', item.id);
       if (error) {
-        const msg = error.message || 'Failed to delete meal log.';
-        setMutationError(msg);
         throw error;
       }
       deleteCachedLogItems(item.id);

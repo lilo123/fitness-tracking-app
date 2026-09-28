@@ -66,6 +66,15 @@ export function useHistoryCalendarJump({
     pagesLoadedRef.current = 0;
   }, [targetUserId]);
 
+  // H29: Clear highlight after use so the ring indicator does not persist indefinitely
+  useEffect(() => {
+    if (!highlightDate) return;
+    const timer = setTimeout(() => {
+      setHighlightDate(undefined);
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [highlightDate]);
+
   const handleSelectDate = useCallback(
     (civilDate: string) => {
       setTimeRange('all');

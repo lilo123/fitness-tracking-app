@@ -167,6 +167,43 @@ export const ExerciseHistorySheet: React.FC<ExerciseHistorySheetProps> = ({
     });
   }, [sessionGroups]);
 
+  // RD-4: Exact PR set determination with tie-breaking (more reps then earliest date, then earliest set)
+  const prSetId = useMemo(() => {
+    if (prWeight == null || prWeight <= 0 || prReps == null || prReps <= 0) return null;
+    const matches: Array<{
+      setId: string;
+      civilDate: string;
+      setIndex: number;
+      createdAt: string;
+    }> = [];
+
+    for (const group of sessionGroups) {
+      if (prDate && group.civil_date !== prDate) continue;
+      for (let i = 0; i < group.sets.length; i++) {
+        const s = group.sets[i];
+        if (s.weight === prWeight && s.reps === prReps) {
+          matches.push({
+            setId: s.set_id || `${group.workout_id}-${i}`,
+            civilDate: group.civil_date,
+            setIndex: s.set_index > 0 ? s.set_index : i + 1,
+            createdAt: s.created_at || '',
+          });
+        }
+      }
+    }
+
+    if (matches.length === 0) return null;
+
+    matches.sort((a, b) => {
+      const dateCmp = a.civilDate.localeCompare(b.civilDate);
+      if (dateCmp !== 0) return dateCmp;
+      if (a.setIndex !== b.setIndex) return a.setIndex - b.setIndex;
+      return a.createdAt.localeCompare(b.createdAt);
+    });
+
+    return matches[0].setId;
+  }, [sessionGroups, prWeight, prReps, prDate]);
+
   const hasPrInfo = (prWeight != null && prWeight > 0) || (prReps != null && prReps > 0);
 
   return (
@@ -310,12 +347,8 @@ export const ExerciseHistorySheet: React.FC<ExerciseHistorySheetProps> = ({
                 {/* Set Rows */}
                 <div className="space-y-1.5">
                   {group.sets.map((set, sIdx) => {
-                    const isPr =
-                      prWeight != null &&
-                      prReps != null &&
-                      set.weight === prWeight &&
-                      set.reps === prReps &&
-                      (!prDate || group.civil_date === prDate);
+                    const currentSetId = set.set_id || `${group.workout_id}-${sIdx}`;
+                    const isPr = prSetId !== null && currentSetId === prSetId;
 
                     const setLabel = `Set ${set.set_index > 0 ? set.set_index : sIdx + 1}`;
                     const weightText = `${set.weight} lbs × ${set.reps}`;

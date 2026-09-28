@@ -193,7 +193,7 @@ export const HistoryView: React.FC = () => {
     isNutritionLogsError,
     nutritionLogsError,
     refetchNutritionLogs,
-  } = useHistoryData(targetUserId, setMutationError);
+  } = useHistoryData(targetUserId, setMutationError, effectiveTimeZone);
 
   // Nutrition Deferred Delete hook (RD-7, H27, D-P5b-3)
   const {

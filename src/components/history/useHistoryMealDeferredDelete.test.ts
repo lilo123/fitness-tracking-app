@@ -243,7 +243,8 @@ describe('useHistoryMealDeferredDelete (RD-7 contract)', () => {
       result.current.flushDelete();
     });
 
-    // Error reported
+    // Error reported exactly once (no duplicate invocation between commit and onError)
+    expect(setMutationError).toHaveBeenCalledTimes(1);
     expect(setMutationError).toHaveBeenCalledWith('Database connection failed');
 
     // Row restored: pending cleared
@@ -283,5 +284,90 @@ describe('useHistoryMealDeferredDelete (RD-7 contract)', () => {
 
     expect(deleteCachedLogItems).toHaveBeenCalledWith(mockMeal.id);
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['nutrition_logs', targetUserId] });
+  });
+
+  it('no double commit when both isActive->false and unmount happen', async () => {
+    let active = true;
+    const { result, rerender, unmount } = renderHook(
+      () =>
+        useHistoryMealDeferredDelete({
+          targetUserId,
+          setMutationError,
+          isActive: active,
+          meals: [mockMeal],
+        }),
+      { wrapper }
+    );
+
+    act(() => {
+      result.current.handleDeleteMealRequested(mockMeal);
+    });
+
+    expect(mockDeleteFn).toHaveBeenCalledTimes(0);
+
+    // Route leave occurs: isActive becomes false
+    active = false;
+    await act(async () => {
+      rerender();
+    });
+
+    expect(mockDeleteFn).toHaveBeenCalledTimes(1);
+    expect(mockDeleteFn).toHaveBeenCalledWith(mockMeal.id);
+
+    // Component subsequently unmounts
+    await act(async () => {
+      unmount();
+    });
+
+    // Exactly 1 DELETE committed total: no double commit
+    expect(mockDeleteFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('two quick deletes: first is committed immediately when second is scheduled (no lost delete)', async () => {
+    const secondMeal: NutritionLog = {
+      ...mockMeal,
+      id: 'meal-test-2',
+      food_name: 'Greek Yogurt Bowl',
+      calories: 220,
+    };
+
+    const { result } = renderHook(
+      () =>
+        useHistoryMealDeferredDelete({
+          targetUserId,
+          setMutationError,
+          isActive: true,
+          meals: [mockMeal, secondMeal],
+        }),
+      { wrapper }
+    );
+
+    // 1. Delete first meal
+    act(() => {
+      result.current.handleDeleteMealRequested(mockMeal);
+    });
+    expect(result.current.pendingDeleteMealId).toBe(mockMeal.id);
+    expect(mockDeleteFn).toHaveBeenCalledTimes(0);
+
+    // 2. Immediately delete second meal before first expires
+    await act(async () => {
+      result.current.handleDeleteMealRequested(secondMeal);
+    });
+
+    // First meal must be flushed/committed immediately on scheduling second
+    expect(mockDeleteFn).toHaveBeenCalledTimes(1);
+    expect(mockDeleteFn).toHaveBeenLastCalledWith(mockMeal.id);
+
+    // Second meal is now pending
+    expect(result.current.pendingDeleteMealId).toBe(secondMeal.id);
+
+    // 3. Let second meal expire
+    await act(async () => {
+      vi.advanceTimersByTime(6000);
+    });
+
+    // Both meals committed; exactly 2 DELETEs, 0 lost
+    expect(mockDeleteFn).toHaveBeenCalledTimes(2);
+    expect(mockDeleteFn).toHaveBeenLastCalledWith(secondMeal.id);
   });
 });

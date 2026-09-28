@@ -10,7 +10,7 @@ import {
   deleteCachedLogItems,
   rehydrateLogWithCachedItems,
 } from '../nutrition/useNutritionData';
-import { getLocalDateStr } from '../../utils/date';
+import { getLocalDateStr, normalizeDateStr } from '../../utils/date';
 
 export {
   fetchSessionSets,
@@ -30,7 +30,7 @@ export function addDaysCivil(dateStr: string, days: number): string {
   return `${year}-${month}-${day}`;
 }
 
-export function useHistoryData(targetUserId: string, onMutationError?: (msg: string) => void) {
+export function useHistoryData(targetUserId: string, onMutationError?: (msg: string) => void, timeZone?: string) {
   const queryClient = useQueryClient();
 
   // Fetch exercises
@@ -65,12 +65,15 @@ export function useHistoryData(targetUserId: string, onMutationError?: (msg: str
     hasNextPage: hasMoreNutrition,
     refetch: refetchNutritionLogs,
   } = useInfiniteQuery({
-    queryKey: ['nutrition_logs', targetUserId, 'history_window'],
+    queryKey: timeZone
+      ? ['nutrition_logs', targetUserId, 'history_window', timeZone]
+      : ['nutrition_logs', targetUserId, 'history_window'],
     enabled: Boolean(targetUserId),
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) => {
       if (!targetUserId) return { logs: [], nextCursor: undefined };
-      const windowEnd = pageParam || getLocalDateStr();
+      const todayInUserTz = timeZone ? (normalizeDateStr(new Date(), timeZone) || getLocalDateStr()) : getLocalDateStr();
+      const windowEnd = pageParam || todayInUserTz;
       const windowStart = addDaysCivil(windowEnd, -13);
 
       const { data, error } = await supabase

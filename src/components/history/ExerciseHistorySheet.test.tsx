@@ -154,6 +154,54 @@ describe('ExerciseHistorySheet', () => {
     expect(prBadges[0].textContent).toContain('PR');
   });
 
+  it('2b. RD-4 tie-breaking: ties broken by more reps then earliest date then earliest set', async () => {
+    const mockRows = [
+      {
+        workout_id: 'w-early',
+        civil_date: '2026-09-10',
+        workout_name: 'Earlier Push',
+        set_id: 'set-tie-1',
+        set_index: 1,
+        weight: 225,
+        reps: 8,
+        rpe: 9,
+        created_at: '2026-09-10T10:00:00Z',
+        total_sessions: 2,
+      },
+      {
+        workout_id: 'w-late',
+        civil_date: '2026-09-15',
+        workout_name: 'Later Push',
+        set_id: 'set-tie-2',
+        set_index: 1,
+        weight: 225,
+        reps: 8,
+        rpe: 9,
+        created_at: '2026-09-15T10:00:00Z',
+        total_sessions: 2,
+      },
+    ];
+
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: mockRows, error: null } as any);
+
+    renderComponent({
+      prDate: null,
+      prWeight: 225,
+      prReps: 8,
+    });
+
+    expect(await screen.findByText('Earlier Push')).toBeDefined();
+
+    const prBadges = screen.getAllByTestId('pr-badge');
+    expect(prBadges.length).toBe(1);
+
+    const earlySetEl = screen.getByTestId('exercise-history-set-set-tie-1');
+    expect(earlySetEl.querySelector('[data-testid="pr-badge"]')).not.toBeNull();
+
+    const lateSetEl = screen.getByTestId('exercise-history-set-set-tie-2');
+    expect(lateSetEl.querySelector('[data-testid="pr-badge"]')).toBeNull();
+  });
+
   it('3. pages by session cursor (p_before = oldest loaded civil_date) on "Load older" click', async () => {
     const user = userEvent.setup();
 

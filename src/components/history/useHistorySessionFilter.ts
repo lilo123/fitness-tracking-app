@@ -66,7 +66,7 @@ export function useHistorySessionFilter(
         if (sets.length > 0) {
           const hasCategorySet = sets.some((set) => {
             const bp =
-              (set as any).body_part ||
+              (set as { body_part?: string }).body_part ||
               set.exercise?.body_part ||
               exercises?.find(
                 (e) =>
