@@ -21,16 +21,19 @@ export class DuplicateExerciseError extends Error {
   readonly code = 'DUPLICATE_EXERCISE' as const;
   readonly exerciseName?: string;
   readonly equipment?: string | null;
+  readonly existingId?: string;
 
   constructor(
     message = 'An exercise with this name and equipment already exists.',
     exerciseName?: string,
-    equipment?: string | null
+    equipment?: string | null,
+    existingId?: string
   ) {
     super(message);
     this.name = 'DuplicateExerciseError';
     this.exerciseName = exerciseName;
     this.equipment = equipment;
+    this.existingId = existingId;
   }
 }
 
@@ -240,13 +243,17 @@ export async function insertCustomExercise(
   if (error) {
     if (
       error.code === '23505' ||
+      (error as any).status === 409 ||
+      error.message === 'duplicate_exercise_name' ||
       error.message?.includes('duplicate') ||
       error.message?.includes('unique')
     ) {
+      const existingId = (error as any).details || (error as any).detail;
       throw new DuplicateExerciseError(
         `An exercise named "${trimmedName}" already exists.`,
         trimmedName,
-        candidateEquipment
+        candidateEquipment,
+        typeof existingId === 'string' && existingId.length > 0 ? existingId : undefined
       );
     }
     throw error;

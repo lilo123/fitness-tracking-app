@@ -436,5 +436,56 @@ describe('EditExerciseSheet', () => {
       expect(mockProps.onSuccess).toHaveBeenCalled();
     });
   });
-});
 
+  it("L35: DB 23505 duplicate_exercise_name with DETAIL maps to inline duplicate alert with existing exercise link", async () => {
+    const updateSpy = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        select: vi.fn().mockResolvedValue({
+          data: null,
+          error: {
+            code: "23505",
+            message: "duplicate_exercise_name",
+            details: "ex-existing-99",
+          },
+        }),
+      }),
+    });
+
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
+      const b = createSupabaseBuilder(table, { data: [], error: null });
+      b.update = updateSpy;
+      return b;
+    });
+
+    const onViewExistingSpy = vi.fn();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <EditExerciseSheet
+          {...mockProps}
+          onViewExisting={onViewExistingSpy}
+        />
+      </QueryClientProvider>
+    );
+
+    const input = screen.getByLabelText(/exercise name/i);
+    fireEvent.change(input, { target: { value: "Bench Press" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => {
+      const dupAlert = screen.getByTestId("edit-exercise-duplicate-msg");
+      expect(dupAlert).toBeDefined();
+      expect(dupAlert.textContent).toContain("'Bench Press' already exists");
+    });
+
+    const viewBtn = screen.getByTestId("view-existing-exercise-btn");
+    expect(viewBtn).toBeDefined();
+    fireEvent.click(viewBtn);
+    expect(onViewExistingSpy).toHaveBeenCalledWith({
+      id: "ex-existing-99",
+      name: "Bench Press",
+    });
+  });
+
+});

@@ -78,6 +78,7 @@ export const EditTemplateSheet: React.FC<EditTemplateSheetProps> = ({
   const [staleError, setStaleError] = useState(false);
   const [isReloading, setIsReloading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const isSavingRef = useRef(false);
   const [reorderAnnouncement, setReorderAnnouncement] = useState("");
   const [latestUpdatedAt, setLatestUpdatedAt] = useState<string | null>(null);
   const [isLoadingTemplate, setIsLoadingTemplate] = useState<boolean>(false);
@@ -182,13 +183,15 @@ export const EditTemplateSheet: React.FC<EditTemplateSheetProps> = ({
   };
 
   const removeExercise = (index: number) => {
-    if (saving) return;
+    if (saving || isSavingRef.current) return;
+    const item = templateExercises[index];
     setTemplateExercises((prev) => prev.filter((_, i) => i !== index));
+    if (item) setReorderAnnouncement(`Removed ${item.exercise_name} from routine`);
   };
 
   const updateSets = (index: number, val: number) => {
-    if (saving) return;
-    const clamped = Math.max(1, Math.min(20, isNaN(val) ? 1 : val));
+    if (saving || isSavingRef.current) return;
+    const clamped = Math.max(1, Math.min(20, isNaN(val) || !val ? 1 : val));
     setTemplateExercises((prev) =>
       prev.map((item, i) =>
         i === index ? { ...item, target_sets: clamped } : item
@@ -197,8 +200,8 @@ export const EditTemplateSheet: React.FC<EditTemplateSheetProps> = ({
   };
 
   const updateReps = (index: number, val: number) => {
-    if (saving) return;
-    const clamped = Math.max(1, Math.min(100, isNaN(val) ? 1 : val));
+    if (saving || isSavingRef.current) return;
+    const clamped = Math.max(1, Math.min(100, isNaN(val) || !val ? 1 : val));
     setTemplateExercises((prev) =>
       prev.map((item, i) =>
         i === index ? { ...item, target_reps: clamped } : item
@@ -221,23 +224,15 @@ export const EditTemplateSheet: React.FC<EditTemplateSheetProps> = ({
   const handleAddFromPicker = (selected: CatalogExercise[]) => {
     setTemplateExercises((prev) => {
       const copy = [...prev];
+      const newlyAdded: string[] = [];
       for (const ex of selected) {
-        if (
-          !copy.some(
-            (te) =>
-              te.exercise_id === ex.id ||
-              te.exercise_name.toLowerCase() === ex.name.toLowerCase()
-          )
-        ) {
-          copy.push({
-            exercise_id: ex.id,
-            exercise_name: ex.name,
-            body_parts: ex.body_parts,
-            target_sets: 3,
-            target_reps: 10,
-          });
+        if (!copy.some((te) => te.exercise_id === ex.id || te.exercise_name.toLowerCase() === ex.name.toLowerCase())) {
+          copy.push({ exercise_id: ex.id, exercise_name: ex.name, body_parts: ex.body_parts, target_sets: 3, target_reps: 10 });
+          newlyAdded.push(ex.name);
         }
       }
+      if (newlyAdded.length === 1) setReorderAnnouncement(`Added ${newlyAdded[0]} to routine`);
+      else if (newlyAdded.length > 1) setReorderAnnouncement(`Added ${newlyAdded.length} exercises to routine`);
       return copy;
     });
     handleClosePicker();
@@ -255,7 +250,7 @@ export const EditTemplateSheet: React.FC<EditTemplateSheetProps> = ({
   };
 
   const handleSave = async () => {
-    if (saving) return;
+    if (saving || isSavingRef.current) return;
     if (!name.trim()) {
       setError("Template name is required.");
       return;
@@ -265,6 +260,7 @@ export const EditTemplateSheet: React.FC<EditTemplateSheetProps> = ({
       return;
     }
 
+    isSavingRef.current = true;
     setSaving(true);
     setError(null);
     setStaleError(false);
@@ -275,8 +271,8 @@ export const EditTemplateSheet: React.FC<EditTemplateSheetProps> = ({
 
     const exercisePayload = templateExercises.map((e, idx) => ({
       exercise_id: e.exercise_id,
-      target_sets: e.target_sets,
-      target_reps: e.target_reps,
+      target_sets: Math.max(1, Math.min(20, isNaN(Number(e.target_sets)) || !e.target_sets ? 1 : Number(e.target_sets))),
+      target_reps: Math.max(1, Math.min(100, isNaN(Number(e.target_reps)) || !e.target_reps ? 1 : Number(e.target_reps))),
       order_index: idx,
     }));
 
@@ -321,6 +317,7 @@ export const EditTemplateSheet: React.FC<EditTemplateSheetProps> = ({
         setError(err?.message || "Failed to save template. Please try again.");
       }
     } finally {
+      isSavingRef.current = false;
       setSaving(false);
     }
   };
@@ -581,6 +578,7 @@ export const EditTemplateSheet: React.FC<EditTemplateSheetProps> = ({
               setTemplateExercises((prev) => {
                 const exists = prev.some((te) => te.exercise_id === ex.id || te.exercise_name.toLowerCase() === ex.name.toLowerCase());
                 if (exists) return prev;
+                setReorderAnnouncement(`Added ${ex.name} to routine`);
                 return [...prev, { exercise_id: ex.id, exercise_name: ex.name, body_parts: (ex as any).body_parts ?? null, target_sets: 3, target_reps: 10 }];
               });
             }}>Add {ex.name}</button>

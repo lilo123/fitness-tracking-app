@@ -887,4 +887,76 @@ describe("EditTemplateSheet", () => {
       expect(screen.getByTestId("template-name-input")).toBeDefined();
     });
   });
+
+  it("L17: polite live region announces remove and add to routine", async () => {
+    const tpl: RoutineTemplate = {
+      id: "tpl-1",
+      user_id: "user-1",
+      name: "Push Day",
+      is_master: false,
+      days_of_week: ["Mon"],
+      assigned_to: null,
+      exercises: [
+        { id: "te-1", template_id: "tpl-1", exercise_id: "ex-1", order_index: 0, target_sets: 3, target_reps: 10 },
+      ],
+    };
+
+    await renderSheetAndWait(
+      <EditTemplateSheet
+        {...mockProps}
+        template={tpl}
+        exercises={[
+          { id: "ex-1", name: "Bench Press", body_part: "Chest", is_master: true, user_id: null, is_archived: false },
+          { id: "ex-2", name: "Incline Dumbbell Press", body_part: "Chest", is_master: true, user_id: null, is_archived: false },
+        ]}
+      />
+    );
+
+    const liveRegion = screen.getByTestId("reorder-live-region");
+
+    // Remove exercise
+    const removeBtn = screen.getByTestId("remove-exercise-0");
+    fireEvent.click(removeBtn);
+    expect(liveRegion.textContent).toBe("Removed Bench Press from routine");
+
+    // Add exercise via picker trigger
+    const addTrigger = screen.getByTestId("open-exercise-picker");
+    fireEvent.click(addTrigger);
+    const addCompatBtn = screen.getByTestId("add-exercise-btn-ex-2");
+    fireEvent.click(addCompatBtn);
+    expect(liveRegion.textContent).toBe("Added Incline Dumbbell Press to routine");
+  });
+
+  it("L13: double-submit guard calls save_routine_template only once on rapid multiple clicks", async () => {
+    let resolveRpc: (val: any) => void;
+    const rpcPromise = new Promise((resolve) => {
+      resolveRpc = resolve;
+    });
+
+    const mockRpc = vi.fn().mockReturnValue(rpcPromise);
+    (supabase.rpc as any) = mockRpc;
+
+    await renderSheetAndWait(
+      <EditTemplateSheet
+        {...mockProps}
+        template={{
+          ...mockTemplate,
+          exercises: [
+            { id: "te-1", template_id: "tpl-1", exercise_id: "ex-1", order_index: 0, target_sets: 3, target_reps: 10 },
+          ],
+        }}
+        exercises={[{ id: "ex-1", name: "Squat", body_part: "Legs", is_master: true, user_id: null, is_archived: false }]}
+      />
+    );
+
+    const saveBtn = screen.getByTestId("save-template-btn");
+    fireEvent.click(saveBtn);
+    fireEvent.click(saveBtn);
+    fireEvent.click(saveBtn);
+
+    expect(mockRpc).toHaveBeenCalledTimes(1);
+
+    resolveRpc!({ data: { success: true, template_id: "tpl-1" }, error: null });
+  });
+
 });

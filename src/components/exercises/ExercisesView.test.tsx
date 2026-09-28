@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../../context/AuthContext';
 import { CoachProvider } from '../../context/CoachContext';
 import { supabase } from '../../lib/supabase';
-import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory } from '../../test/supabaseBuilderMock';
+import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory, SupabaseQueryBuilderMock } from '../../test/supabaseBuilderMock';
 import { workoutSessionStore } from '../../utils/workoutSessionStore';
 
 const { mockAthleteSession, mockCoachState } = vi.hoisted(() => ({
@@ -123,7 +123,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
       }
       if (table === 'routine_templates') {
         const b = createSupabaseBuilder('routine_templates', {
-          resolver: (builder) => {
+          resolver: (builder: SupabaseQueryBuilderMock) => {
             const idFilter = builder.filters.find((f: any) => f.column === 'id');
             if (idFilter) {
               const matched = currentTemplates.filter((t) => t.id === idFilter.value);
@@ -409,7 +409,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === 'routine_templates') {
         const b = createSupabaseBuilder('routine_templates', {
-          resolver: (builder) => {
+          resolver: (builder: SupabaseQueryBuilderMock) => {
             const idFilter = builder.filters.find((f: any) => f.column === 'id');
             if (idFilter) {
               const matched = currentTemplates.filter((t) => t.id === idFilter.value);
@@ -895,7 +895,7 @@ describe('ExercisesView - Exercise Isolation & Schedule Days', () => {
     vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === 'routine_templates') {
         const b = createSupabaseBuilder('routine_templates', {
-          resolver: (builder) => {
+          resolver: (builder: SupabaseQueryBuilderMock) => {
             const idFilter = builder.filters.find((f: any) => f.column === 'id');
             if (idFilter) {
               const matched = currentTemplates.filter((t) => t.id === idFilter.value);

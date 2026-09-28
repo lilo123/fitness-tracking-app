@@ -206,11 +206,30 @@ export const EditExerciseSheet: React.FC<EditExerciseSheetProps> = ({
     } catch (err: any) {
       if (
         err?.code === '23505' ||
+        err?.status === 409 ||
+        err?.message === 'duplicate_exercise_name' ||
         err?.message?.includes('duplicate') ||
         err?.message?.includes('unique')
       ) {
+        const detailId = err?.details || err?.detail;
+        const normalizedCandidate = normalizeSearch(trimmedName);
+        const existing = combinedCatalog.find(
+          (ex) => (detailId && ex.id === detailId) || normalizeSearch(ex.name) === normalizedCandidate
+        );
+        const ownerLabel = existing?.is_master
+          ? 'Default'
+          : existing?.is_hidden
+          ? 'Hidden'
+          : 'Custom';
         setDuplicateError({
-          message: `'${trimmedName}' already exists`,
+          message: existing
+            ? `'${existing.name}' already exists (${ownerLabel})`
+            : `'${trimmedName}' already exists`,
+          existing: existing
+            ? { id: existing.id, name: existing.name, is_hidden: existing.is_hidden }
+            : typeof detailId === 'string' && detailId.length > 0
+            ? { id: detailId, name: trimmedName }
+            : undefined,
         });
         return;
       }

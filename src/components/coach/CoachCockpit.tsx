@@ -17,6 +17,7 @@ import { groupTimelineDays, resolveAthleteTimeZone, getTimelineDaysAgoStr } from
 import { nutritionRowLimitForRange } from '../../utils/coachQueryBounds';
 import { resolveExerciseLabel } from '../../utils/exerciseLabel';
 import { invalidateExerciseDomain } from '../../lib/invalidate';
+import { queryKeys } from '../../lib/queryKeys';
 
 const SETS_PAGE_LIMIT = 500;
 
@@ -253,6 +254,7 @@ export const CoachCockpit: React.FC = () => {
       setStatus('Template saved');
       void invalidateExerciseDomain(queryClient, user?.id);
       queryClient.invalidateQueries({ queryKey: ['routine_templates'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.routineCatalog.all });
       setTemplateName('');
       setSelectedExercises([]);
     },
@@ -367,7 +369,7 @@ export const CoachCockpit: React.FC = () => {
           <div className="flex items-center justify-between border-b border-zinc-800 pb-3 min-w-0">
             <div className="flex items-center gap-2 min-w-0">
               <Layers className="w-4 h-4 text-cyan-400 shrink-0" />
-              <h3 className="text-sm font-black text-white uppercase tracking-wider truncate">Workout Template Builder</h3>
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider truncate">Workout Template Builder</h3>
             </div>
             <button
               type="button"
@@ -381,7 +383,7 @@ export const CoachCockpit: React.FC = () => {
 
           <div className="space-y-3">
             <div>
-              <label htmlFor={templateNameId} className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Template Name</label>
+              <label htmlFor={templateNameId} className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Template Name</label>
               <input
                 id={templateNameId}
                 type="text"
@@ -431,17 +433,17 @@ export const CoachCockpit: React.FC = () => {
             {/* Added Exercises List */}
             {selectedExercises.length > 0 && (
               <div className="space-y-2 pt-2">
-                <span className="text-[10px] font-extrabold uppercase text-zinc-500 tracking-wider block">
+                <span className="text-xs font-bold uppercase text-zinc-400 tracking-wider block">
                   Exercise Sequence ({selectedExercises.length}):
                 </span>
                 {selectedExercises.map((ex, idx) => (
                   <div key={idx} className="bg-zinc-950 border border-zinc-800/80 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 min-w-0">
                     <div className="flex items-center gap-2 min-w-0 flex-1 truncate">
-                      <span className="w-5 h-5 rounded-md bg-zinc-800 text-cyan-400 text-xs font-mono font-bold flex items-center justify-center shrink-0">{idx + 1}</span>
+                      <span className="w-5 h-5 rounded-md bg-zinc-800 text-cyan-400 text-xs font-bold flex items-center justify-center shrink-0">{idx + 1}</span>
                       <span className="text-xs font-bold text-white truncate min-w-0 flex-1">{ex.exerciseName}</span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
-                      <div className="flex items-center gap-1.5 text-xs text-zinc-400 font-mono">
+                      <div className="flex items-center gap-1.5 text-xs text-zinc-400">
                         <div className="flex items-center gap-1">
                           <input
                             type="number"
@@ -454,7 +456,7 @@ export const CoachCockpit: React.FC = () => {
                             title="Target Sets"
                             data-testid={`template-target-sets-${idx}`}
                           />
-                          <span className="text-[10px] shrink-0">sets</span>
+                          <span className="text-xs shrink-0 text-zinc-400">sets</span>
                         </div>
                         <span className="shrink-0">×</span>
                         <div className="flex items-center gap-1">
@@ -469,13 +471,13 @@ export const CoachCockpit: React.FC = () => {
                             title="Target Reps"
                             data-testid={`template-target-reps-${idx}`}
                           />
-                          <span className="text-[10px] shrink-0">reps</span>
+                          <span className="text-xs shrink-0 text-zinc-400">reps</span>
                         </div>
                       </div>
                       <button
                         type="button"
                         onClick={() => removeExerciseFromTemplate(idx)}
-                        className="text-zinc-500 hover:text-rose-400 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center touch-manipulation shrink-0"
+                        className="text-zinc-400 hover:text-rose-400 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center touch-manipulation shrink-0"
                         title="Remove exercise"
                         data-testid={`template-remove-ex-${idx}`}
                       >
@@ -491,7 +493,7 @@ export const CoachCockpit: React.FC = () => {
               type="button"
               onClick={() => createTemplateMutation.mutate()}
               disabled={createTemplateMutation.isPending || !templateName.trim() || selectedExercises.length === 0}
-              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black py-3 min-h-[44px] rounded-xl uppercase tracking-wider text-xs shadow-neon-cyan active:scale-95 transition disabled:opacity-50"
+              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-3 min-h-[44px] rounded-xl uppercase tracking-wider text-xs shadow-neon-cyan active:scale-95 transition disabled:opacity-50"
               data-testid="save-template-btn"
             >
               {createTemplateMutation.isPending ? 'Saving Template...' : 'Save Template'}
@@ -508,14 +510,14 @@ export const CoachCockpit: React.FC = () => {
         {/* Existing Routine Templates */}
         <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-4 sm:p-5 shadow-2xl space-y-3 min-w-0">
           <div className="flex items-center justify-between border-b border-zinc-800 pb-3 min-w-0">
-            <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2 min-w-0">
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 min-w-0">
               <Layers className="w-4 h-4 text-cyan-400 shrink-0" />
               <span className="truncate">Workout Templates ({templates.length})</span>
             </h3>
           </div>
 
           {isTemplatesError ? null : templates.length === 0 ? (
-            <div className="p-4 text-center text-zinc-500 text-xs">No workout templates created yet. Use the builder above to create one.</div>
+            <div className="p-4 text-center text-zinc-400 text-xs">No workout templates created yet. Use the builder above to create one.</div>
           ) : (
             <div className="space-y-2">
               {templates.map((tpl) => (
@@ -523,9 +525,9 @@ export const CoachCockpit: React.FC = () => {
                   <div className="min-w-0 flex-1">
                     <div className="font-extrabold text-white text-xs flex items-center gap-2 min-w-0">
                       <span className="truncate">{tpl.name}</span>
-                      {tpl.is_master && <span className="bg-cyan-500/20 text-cyan-300 text-[10px] px-1.5 py-0.5 rounded font-mono shrink-0">Master</span>}
+                      {tpl.is_master && <span className="bg-cyan-500/20 text-cyan-300 text-xs px-1.5 py-0.5 rounded font-bold shrink-0">Master</span>}
                     </div>
-                    {tpl.exercises && <div className="text-[11px] text-zinc-400 font-mono mt-0.5 truncate">{tpl.exercises.length} exercises configured</div>}
+                    {tpl.exercises && <div className="text-xs text-zinc-400 mt-0.5 truncate">{tpl.exercises.length} exercises configured</div>}
                   </div>
                   <button
                     type="button"

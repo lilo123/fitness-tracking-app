@@ -791,6 +791,40 @@ describe('CoachCockpit', () => {
     const retryBtn = screen.queryByTestId('retry-coach-btn');
     expect(retryBtn).toBeNull();
   });
+
+  it('L9: coach single rpc zero inserts on template save', async () => {
+    const insertSpy = vi.fn();
+    (supabase.from as any).mockImplementation((table: string) => {
+      const b = defaultMock(table);
+      b.insert = insertSpy;
+      return b;
+    });
+
+    renderComponent();
+    await screen.findByText('Workout Template Builder');
+
+    fireEvent.change(screen.getByPlaceholderText('e.g. Hypertrophy Upper Body A'), {
+      target: { value: 'Zero Inserts Routine' },
+    });
+    const addSelect = await screen.findByTestId('template-exercise-select');
+    fireEvent.change(addSelect, { target: { value: 'Leg Extension Machine' } });
+    fireEvent.click(screen.getByTestId('add-template-exercise-btn'));
+    await screen.findByText('Leg Extension Machine');
+
+    insertSpy.mockClear();
+    vi.mocked(supabase.rpc).mockClear();
+
+    fireEvent.click(screen.getByTestId('save-template-btn'));
+
+    await waitFor(() => {
+      expect(supabase.rpc).toHaveBeenCalledWith(
+        'save_routine_template',
+        expect.objectContaining({ p_name: 'Zero Inserts Routine' })
+      );
+    });
+
+    expect(vi.mocked(supabase.rpc).mock.calls.filter((c) => c[0] === 'save_routine_template')).toHaveLength(1);
+    expect(insertSpy).not.toHaveBeenCalled();
+  });
+
 });
-
-

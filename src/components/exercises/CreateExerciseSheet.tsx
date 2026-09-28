@@ -161,6 +161,7 @@ export const CreateExerciseSheet: React.FC<CreateExerciseSheetProps> = ({
         const normalizedCandidate = normalizeSearch(trimmedName);
         const candidateEq = selectedEquipment ? selectedEquipment.toLowerCase().trim() : null;
         const existing = combinedCatalog.find((ex) => {
+          if (err.existingId && ex.id === err.existingId) return true;
           const exName = normalizeSearch(ex.name);
           const exEq = ex.equipment ? ex.equipment.toLowerCase().trim() : null;
           if (exName !== normalizedCandidate) return false;
@@ -180,6 +181,8 @@ export const CreateExerciseSheet: React.FC<CreateExerciseSheetProps> = ({
           message: msg,
           existing: existing
             ? { id: existing.id, name: existing.name, is_hidden: existing.is_hidden }
+            : err.existingId
+            ? { id: err.existingId, name: trimmedName }
             : undefined,
         });
         return;
