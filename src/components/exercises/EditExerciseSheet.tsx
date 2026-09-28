@@ -20,20 +20,24 @@ const MUSCLE_GROUPS = [
   'Full Body',
 ];
 
-interface EditExerciseModalProps {
+export interface EditExerciseSheetProps {
   isOpen: boolean;
   exercise: Exercise | null;
   targetUserId?: string;
   onClose: () => void;
   onSuccess?: () => void;
+  onSaved?: () => void;
 }
 
-export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
+export type EditExerciseModalProps = EditExerciseSheetProps;
+
+export const EditExerciseSheet: React.FC<EditExerciseSheetProps> = ({
   isOpen,
   exercise,
   targetUserId,
   onClose,
   onSuccess,
+  onSaved,
 }) => {
   const exerciseNameId = useId();
   const { user } = useAuth();
@@ -110,6 +114,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
       await queryClient.invalidateQueries({ queryKey: ['exercise_stats'] });
 
       if (onSuccess) onSuccess();
+      if (onSaved) onSaved();
       onClose();
     } catch (err: any) {
       let msg = err?.message || 'Failed to update exercise.';
@@ -255,3 +260,6 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
     </AccessibleModal>
   );
 };
+
+export const EditExerciseModal = EditExerciseSheet;
+export default EditExerciseSheet;

@@ -1,60 +1,19 @@
-import React, { useState, useId } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
+import { BookOpen, CalendarPlus, AlertCircle, RotateCcw } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { useCoach } from '../../hooks/useCoach';
 import type { Exercise, RoutineTemplate } from '../../types/database';
-import {
-  PlusCircle,
-  BookOpen,
-  CalendarPlus,
-  Trash2,
-  RefreshCw,
-  AlertCircle,
-  Pencil,
-  Copy,
-  RotateCcw,
-} from 'lucide-react';
-import { EditTemplateModal } from './EditTemplateModal';
-import { EditExerciseModal } from './EditExerciseModal';
 import { isValidUUID } from '../workout/workoutEngineHelpers';
 import { StatusBanner } from '../common/StatusBanner';
-
-
-const MUSCLE_TAXONOMY = {
-  "Chest": ["chest", "pecs", "pectoral", "upper chest", "lower chest"],
-  "Back": ["back", "lats", "latissimus", "traps", "rhomboids", "lower back", "erectors", "upper back"],
-  "Arms": ["arms", "biceps", "triceps", "forearms", "bicep", "tricep", "forearm", "brachialis"],
-  "Shoulders": ["shoulders", "delts", "deltoids", "front delt", "side delt", "rear delt", "rotator cuff"],
-  "Legs": ["legs", "quads", "quadriceps", "hamstrings", "glutes", "calves", "adductors", "abductors", "hamstring", "calf"],
-  "Core": ["core", "abs", "abdominals", "obliques", "serratus"],
-  "Cardio": ["cardio", "hiit", "aerobic", "running", "rowing", "cycling"]
-};
-const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+import { ExerciseListTab } from './ExerciseListTab';
+import { TemplateListTab } from './TemplateListTab';
 
 export const ExercisesView: React.FC = () => {
-  const customExerciseNameId = useId();
   const { user } = useAuth();
-  const { selectedAthleteId, isCoach } = useCoach();
-  const queryClient = useQueryClient();
-
   const targetUserId = user?.id || '';
 
   const [activeTab, setActiveTab] = useState<'exercises' | 'templates'>('exercises');
-
-  // Exercise Form State
-  const [exerciseName, setExerciseName] = useState('');
-  const [selectedBodyParts, setSelectedBodyParts] = useState<string[]>([]);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [createExerciseError, setCreateExerciseError] = useState<string | null>(null);
-  const [templateError, setTemplateError] = useState<string | null>(null);
-  const [editingExercise, setEditingExercise] = useState<Exercise | null>(null);
-
-  // Template Management State
-  const [selectedDayFilter, setSelectedDayFilter] = useState<string>('All');
-  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState<boolean>(false);
-  const [editingTemplate, setEditingTemplate] = useState<RoutineTemplate | null>(null);
-  const [isForking, setIsForking] = useState<boolean>(false);
 
   // Queries
   const {
@@ -132,109 +91,6 @@ export const ExercisesView: React.FC = () => {
     void refetchTemplates();
   };
 
-  // Mutations
-  const createExerciseMutation = useMutation({
-    mutationFn: async () => {
-      setCreateExerciseError(null);
-      const trimmedName = exerciseName.trim();
-      if (!trimmedName) {
-        throw new Error('Exercise name cannot be blank or whitespace-only.');
-      }
-      const bodyPartStr = selectedBodyParts.length > 0 ? selectedBodyParts.join(', ') : null;
-      // L7: A coach with 0 athletes creates a personal row (user_id = user.id, is_master = false)
-      const { error } = await supabase.from('exercises').insert([
-        {
-          name: trimmedName,
-          body_part: bodyPartStr,
-          user_id: user?.id,
-          is_master: false,
-          is_archived: false,
-        }
-      ]);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['exercises'] });
-      setExerciseName('');
-      setSelectedBodyParts([]);
-      setCreateExerciseError(null);
-    },
-    onError: (err: any) => {
-      let msg = err?.message || 'Failed to create exercise';
-      if (err?.code === '23514' || String(err?.message).includes('23514')) {
-        msg = 'Exercise name cannot be blank or whitespace-only.';
-      }
-      setCreateExerciseError(msg);
-    },
-  });
-
-  const deleteExerciseMutation = useMutation({
-    mutationFn: async (ex: Exercise) => {
-      setDeleteError(null);
-      // L3: a failed archive never falls back to a DELETE
-      // 0-row update: PostgREST returns no error on 0 rows under RLS; use .select() and treat [] as failure
-      const { data, error } = await supabase
-        .from('exercises')
-        .update({ is_archived: true })
-        .eq('id', ex.id)
-        .select();
-
-      if (error) throw error;
-      if (!data || data.length === 0) {
-        throw new Error('Exercise could not be archived. You may not have permission to modify this exercise.');
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['exercises'] });
-      queryClient.invalidateQueries({ queryKey: ['routine_templates'] });
-    },
-    onError: (err: any) => {
-      let msg = err?.message || 'Failed to archive exercise';
-      if (err?.code === '23503' || String(err?.message).includes('23503')) {
-        msg = 'Cannot archive exercise because other records reference it.';
-      }
-      setDeleteError(msg);
-    },
-  });
-
-  const deleteTemplateMutation = useMutation({
-    mutationFn: async (id: string) => {
-      setTemplateError(null);
-      // 0-row delete: use .select() and treat [] as failure
-      const { data, error } = await supabase
-        .from('routine_templates')
-        .delete()
-        .eq('id', id)
-        .select();
-      if (error) throw error;
-      if (!data || data.length === 0) {
-        throw new Error('Routine template could not be deleted. You may not have permission to modify this template.');
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['routine_templates'] });
-      setTemplateError(null);
-    },
-    onError: (err: any) => {
-      let msg = err?.message || 'Failed to delete routine template';
-      if (err?.code === '23503' || String(err?.message).includes('23503')) {
-        msg = 'Cannot delete routine template because other records reference it.';
-      }
-      setTemplateError(msg);
-    },
-  });
-
-  const toggleBodyPart = (part: string) => {
-    setSelectedBodyParts(prev => 
-      prev.includes(part) ? prev.filter(p => p !== part) : [...prev, part]
-    );
-  };
-
-  const filteredTemplates = templates.filter((tpl) => {
-    if (selectedDayFilter === 'All') return true;
-    return tpl.days_of_week && tpl.days_of_week.includes(selectedDayFilter);
-  });
-
   return (
     <div className="space-y-6 pb-[max(env(safe-area-inset-bottom),2rem)] animate-fade-in">
       {/* View Tabs */}
@@ -258,7 +114,7 @@ export const ExercisesView: React.FC = () => {
           Templates
         </button>
       </div>
- 
+
       {/* Read Error Banner */}
       <StatusBanner
         title={
@@ -292,307 +148,25 @@ export const ExercisesView: React.FC = () => {
         }
       />
 
-
       {activeTab === 'exercises' && (
-        <div className="space-y-6">
-          <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5 shadow-xl text-sm">
-            <h2 className="text-base font-black border-b border-zinc-800 pb-3 mb-4 text-white flex items-center gap-2">
-              <PlusCircle className="w-5 h-5 text-cyan-400" /> Create Custom Exercise
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <label
-                  htmlFor={customExerciseNameId}
-                  className="block text-xs font-bold text-zinc-400 mb-1.5 uppercase tracking-wider"
-                >
-                  Exercise Name
-                </label>
-                <input
-                  id={customExerciseNameId}
-                  type="text"
-                  value={exerciseName}
-                  onChange={(e) => setExerciseName(e.target.value)}
-                  className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-3 text-base sm:text-sm font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none"
-                  placeholder="e.g. Incline Bench Press"
-                />
-                {exerciseName.length > 0 && !exerciseName.trim() && (
-                  <p className="text-xs text-rose-400 mt-1" role="alert" data-testid="exercise-name-whitespace-error">
-                    Exercise name cannot be blank or whitespace-only.
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="block text-xs font-bold text-zinc-400 uppercase tracking-wider">
-                    Target Muscle Groups <span className="text-zinc-500 font-normal">(Tap multiple)</span>
-                  </span>
-                  <button type="button" onClick={() => setSelectedBodyParts([])} className="text-xs font-bold text-zinc-500 hover:text-zinc-300 transition min-h-[44px] px-2 flex items-center touch-manipulation">Clear</button>
-                </div>
-                <div className="flex flex-wrap gap-1.5 p-2 bg-zinc-950/80 border border-zinc-800/80 rounded-xl">
-                  {Object.keys(MUSCLE_TAXONOMY).map(part => (
-                    <button
-                      key={part}
-                      onClick={() => toggleBodyPart(part)}
-                      className={`px-3.5 py-2 min-h-[44px] flex items-center justify-center rounded-full text-xs font-bold transition touch-manipulation ${selectedBodyParts.includes(part) ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' : 'bg-zinc-900 text-zinc-400 border border-border-interactive'}`}
-                    >
-                      {part}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <button
-                disabled={!exerciseName.trim() || createExerciseMutation.isPending}
-                onClick={() => createExerciseMutation.mutate()}
-                className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black py-3 min-h-[44px] rounded-xl disabled:opacity-50 touch-manipulation"
-              >
-                Save to Library
-              </button>
-            </div>
-          </div>
-          
-          <div>
-            <h3 className="font-black text-white text-base mb-3 flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-cyan-400" /> Exercise Library ({exercises.length})
-            </h3>
-            {/* Exercise Action Error Banner (Create/Archive) */}
-            <StatusBanner
-              message={deleteError || createExerciseError}
-              tone="error"
-              testId="exercise-action-error"
-              className="mb-3"
-              icon={<AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />}
-            />
-
-            <div className="space-y-2">
-              {!isReadError && exercises.length === 0 && (
-                <div className="p-8 text-center bg-zinc-900/40 border border-zinc-800/60 rounded-2xl text-xs text-zinc-500">
-                  No exercises found in your library.
-                </div>
-              )}
-              {exercises.map((ex) => {
-                // L1: masters show no Edit/Trash for anyone (incl. coaches); only own non-master rows are editable
-                const canEditExercise = !ex.is_master && Boolean(user?.id) && ex.user_id === user?.id;
-                const canDelete = !ex.is_master && Boolean(user?.id) && ex.user_id === user?.id;
-                return (
-                  <div key={ex.id} className="bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-4 flex justify-between items-center text-sm font-medium">
-                    <div>
-                      <div className="text-zinc-100 flex items-center gap-2">
-                        <span>{ex.name}</span>
-                        {ex.is_master && (
-                          <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                            Master
-                          </span>
-                        )}
-                      </div>
-                      {ex.body_part && <div className="text-xs text-zinc-500 mt-1">{ex.body_part}</div>}
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      {canEditExercise && (
-                        <button
-                          onClick={() => setEditingExercise(ex)}
-                          data-testid={`edit-exercise-${ex.id}`}
-                          className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-cyan-400 transition touch-manipulation"
-                          title="Edit Exercise"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                      )}
-                      {canDelete && (
-                        <button
-                          onClick={() => deleteExerciseMutation.mutate(ex)}
-                          className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-500 hover:text-rose-400 transition touch-manipulation"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+        <ExerciseListTab
+          exercises={exercises}
+          isReadError={isExercisesError}
+          targetUserId={targetUserId}
+          currentUserId={user?.id}
+        />
       )}
 
       {activeTab === 'templates' && (
-        <div className="space-y-4">
-          {/* Template Action Error Banner */}
-          <StatusBanner
-            message={templateError}
-            tone="error"
-            testId="template-action-error"
-            className="mb-3"
-            icon={<AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />}
-          />
-
-          {/* List-first Header with + New Routine Action */}
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="font-black text-white text-base flex items-center gap-2">
-              <RefreshCw className="w-5 h-5 text-violet-400" /> Saved Templates ({templates.length})
-            </h3>
-            <button
-              type="button"
-              data-testid="new-template-btn"
-              onClick={() => {
-                setEditingTemplate(null);
-                setIsForking(false);
-                setIsTemplateModalOpen(true);
-              }}
-              className="px-4 py-2 min-h-[44px] bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-400 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-neon-violet transition active:scale-95 flex items-center gap-1.5 touch-manipulation"
-            >
-              <PlusCircle className="w-4 h-4" />
-              <span>+ New Routine</span>
-            </button>
-          </div>
-
-          {/* Day Filter Toolbar */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-            {['All', ...DAYS_OF_WEEK].map((d) => (
-              <button
-                key={d}
-                type="button"
-                data-testid={`day-filter-${d}`}
-                onClick={() => setSelectedDayFilter(d)}
-                className={`px-3.5 py-2 min-h-[44px] flex items-center justify-center rounded-xl text-xs font-bold transition shrink-0 touch-manipulation ${
-                  selectedDayFilter === d
-                    ? 'bg-violet-500 text-white shadow-neon-violet'
-                    : 'bg-zinc-900 border border-border-interactive text-zinc-400 hover:text-white'
-                }`}
-              >
-                {d}
-              </button>
-            ))}
-          </div>
-
-          {/* Saved Templates List */}
-          <div className="space-y-2">
-            {!isReadError && filteredTemplates.length === 0 ? (
-              <div className="p-8 text-center bg-zinc-900/40 border border-zinc-800/60 rounded-2xl text-xs text-zinc-500">
-                {templates.length === 0
-                  ? 'No routine templates found. Tap "+ New Routine" to create one.'
-                  : `No templates scheduled for ${selectedDayFilter}.`}
-              </div>
-            ) : (
-              filteredTemplates.map((tpl) => {
-                const isMaster = Boolean(tpl.is_master);
-                const isOwner = tpl.user_id === (selectedAthleteId || user?.id);
-                const canEdit = (!isMaster && (isOwner || isCoach)) || (isMaster && isCoach && !selectedAthleteId);
-                const canCustomize = (isMaster && (!isCoach || Boolean(selectedAthleteId))) || (!isMaster && !isOwner && !isCoach);
-                const canDelete = (!isMaster && (isOwner || isCoach)) || (isMaster && isCoach && !selectedAthleteId);
-
-                return (
-                  <div
-                    key={tpl.id}
-                    className="bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-4 flex justify-between items-center text-sm font-medium gap-3"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-zinc-100 font-bold truncate">{tpl.name}</span>
-                        {tpl.is_master && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 bg-cyan-500/20 text-cyan-300 rounded border border-cyan-500/30">
-                            Master
-                          </span>
-                        )}
-                        {tpl.assigned_to && tpl.assigned_to === user?.id && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 bg-amber-500/20 text-amber-300 rounded border border-amber-500/30">
-                            Assigned
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-zinc-500">{tpl.exercises?.length || 0} exercises</span>
-                        {tpl.days_of_week && tpl.days_of_week.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {tpl.days_of_week.map((d) => (
-                              <span
-                                key={d}
-                                className="text-[10px] font-bold px-1.5 py-0.5 bg-violet-500/20 text-violet-300 rounded border border-violet-500/30"
-                              >
-                                {d}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1 shrink-0">
-                      {canEdit && (
-                        <button
-                          onClick={() => {
-                            setEditingTemplate(tpl);
-                            setIsForking(false);
-                            setIsTemplateModalOpen(true);
-                          }}
-                          data-testid={`edit-template-${tpl.id}`}
-                          className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-violet-400 transition touch-manipulation"
-                          title="Edit Template"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                      )}
-                      {canCustomize && (
-                        <button
-                          onClick={() => {
-                            setEditingTemplate(tpl);
-                            setIsForking(true);
-                            setIsTemplateModalOpen(true);
-                          }}
-                          data-testid={`fork-template-${tpl.id}`}
-                          className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-cyan-400 transition touch-manipulation"
-                          title="Duplicate & Customize"
-                        >
-                          <Copy className="w-4 h-4" />
-                        </button>
-                      )}
-                      {canDelete && (
-                        <button
-                          onClick={() => deleteTemplateMutation.mutate(tpl.id)}
-                          data-testid={`delete-template-${tpl.id}`}
-                          className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-500 hover:text-rose-400 transition touch-manipulation"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
+        <TemplateListTab
+          templates={templates}
+          exercises={exercises}
+          isReadError={isTemplatesError}
+          targetUserId={targetUserId}
+        />
       )}
-
-      {/* Edit Exercise Modal */}
-      <EditExerciseModal
-        isOpen={Boolean(editingExercise)}
-        exercise={editingExercise}
-        targetUserId={targetUserId}
-        onClose={() => setEditingExercise(null)}
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ['exercises'] });
-        }}
-      />
-
-      {/* Edit Template Modal */}
-      <EditTemplateModal
-        isOpen={isTemplateModalOpen}
-        template={editingTemplate}
-        exercises={exercises}
-        targetUserId={targetUserId}
-        isFork={isForking}
-        onClose={() => {
-          setIsTemplateModalOpen(false);
-          setEditingTemplate(null);
-        }}
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ['routine_templates'] });
-        }}
-      />
     </div>
   );
 };
+
+export default ExercisesView;

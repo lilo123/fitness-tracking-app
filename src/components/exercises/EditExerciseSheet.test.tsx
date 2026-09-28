@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { describe, it, expect, vi , beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { EditExerciseModal } from './EditExerciseModal';
+import { EditExerciseSheet } from './EditExerciseSheet';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { expectNoA11yViolationsForRules } from '../../test/a11y';
 import { supabase } from '../../lib/supabase';
@@ -17,7 +17,7 @@ vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 'user-1' } }),
 }));
 
-describe('EditExerciseModal', () => {
+describe('EditExerciseSheet', () => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const mockProps = {
     isOpen: true,
@@ -34,7 +34,7 @@ describe('EditExerciseModal', () => {
   it('has accessible label association for Exercise Name and uses input-text-sm (NEW-18)', () => {
     render(
       <QueryClientProvider client={queryClient}>
-        <EditExerciseModal {...mockProps} />
+        <EditExerciseSheet {...mockProps} />
       </QueryClientProvider>
     );
     const input = screen.getByLabelText(/exercise name/i);
@@ -46,7 +46,7 @@ describe('EditExerciseModal', () => {
   it('has no a11y label violations', async () => {
     const { container } = render(
       <QueryClientProvider client={queryClient}>
-        <EditExerciseModal {...mockProps} />
+        <EditExerciseSheet {...mockProps} />
       </QueryClientProvider>
     );
     await expectNoA11yViolationsForRules(container, ['label']);
@@ -64,7 +64,7 @@ describe('EditExerciseModal', () => {
 
     const { container } = render(
       <QueryClientProvider client={queryClient}>
-        <EditExerciseModal {...mockProps} />
+        <EditExerciseSheet {...mockProps} />
       </QueryClientProvider>
     );
 
@@ -97,7 +97,7 @@ describe('EditExerciseModal', () => {
             <button data-testid="opener-btn" onClick={() => setOpen(true)}>
               Open
             </button>
-            <EditExerciseModal
+            <EditExerciseSheet
               {...mockProps}
               isOpen={open}
               onClose={() => setOpen(false)}
@@ -152,7 +152,7 @@ describe('EditExerciseModal', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <EditExerciseModal {...mockProps} />
+        <EditExerciseSheet {...mockProps} />
       </QueryClientProvider>
     );
 
@@ -172,7 +172,7 @@ describe('EditExerciseModal', () => {
   it('L12: disables save button and displays inline error on whitespace name', () => {
     render(
       <QueryClientProvider client={queryClient}>
-        <EditExerciseModal {...mockProps} />
+        <EditExerciseSheet {...mockProps} />
       </QueryClientProvider>
     );
 
@@ -199,7 +199,7 @@ describe('EditExerciseModal', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <EditExerciseModal {...mockProps} />
+        <EditExerciseSheet {...mockProps} />
       </QueryClientProvider>
     );
 
@@ -236,7 +236,7 @@ describe('EditExerciseModal', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <EditExerciseModal
+        <EditExerciseSheet
           isOpen={true}
           exercise={{
             id: '00000000-0000-4000-8000-000000000099',
