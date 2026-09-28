@@ -22,20 +22,15 @@ SELECT has_function('public', 'get_routine_catalog', ARRAY['uuid', 'text', 'inte
 DO $$
 DECLARE
   v_dips_parts text[];
-  v_dips_part text;
   v_cable_eq text;
   v_mach_eq text;
   v_unmatched_eq text;
 BEGIN
-  SELECT body_parts, body_part INTO v_dips_parts, v_dips_part
+  SELECT body_parts INTO v_dips_parts
   FROM public.exercises WHERE name = 'Dips';
 
   IF v_dips_parts IS DISTINCT FROM ARRAY['Chest', 'Triceps'] THEN
     RAISE EXCEPTION 'Dips body_parts expected {Chest,Triceps}, got %', v_dips_parts;
-  END IF;
-
-  IF v_dips_part <> 'Chest / Triceps' THEN
-    RAISE EXCEPTION 'Dips body_part mutated! Expected "Chest / Triceps", got %', v_dips_part;
   END IF;
 
   SELECT equipment INTO v_cable_eq FROM public.exercises WHERE name = 'Cable Lateral Raises';
@@ -54,77 +49,97 @@ BEGIN
   END IF;
 END;
 $$;
-SELECT pass('Dips (slash row) backfilled body_parts = {Chest, Triceps} while body_part is unchanged');
+SELECT pass('Dips (slash row) retains body_parts = {Chest, Triceps} post-M9');
 SELECT pass('Cable Lateral Raises backfilled equipment = cable, Leg Extension Machine = machine');
 SELECT pass('Face Pulls equipment backfilled to cable by M8');
 
 -- ============================================================================
--- 3. Trigger Sync & Unrelated UPDATE Invariance (RP-3)
+-- 3. Post-M9 Contract: Absence of body_part, Non-Empty body_parts, Catalog Output & Direct Writes
 -- ============================================================================
+-- 3.1 exercises.body_part column is absent post-M9
+SELECT hasnt_column('public', 'exercises', 'body_part', 'exercises.body_part column is absent post-M9');
+
+-- 3.2 exercises.body_parts is present and non-empty for all exercise rows
+DO $$
+DECLARE
+  v_invalid_count int;
+BEGIN
+  SELECT count(*) INTO v_invalid_count
+  FROM public.exercises
+  WHERE body_parts IS NULL OR cardinality(body_parts) = 0;
+  IF v_invalid_count > 0 THEN
+    RAISE EXCEPTION 'Found % exercise rows with NULL or empty body_parts', v_invalid_count;
+  END IF;
+END;
+$$;
+SELECT pass('exercises.body_parts is present and non-empty for all exercise rows');
+
+-- 3.3 get_exercise_catalog returns body_parts array
+DO $$
+DECLARE
+  v_rec record;
+BEGIN
+  SELECT body_parts INTO v_rec FROM public.get_exercise_catalog(p_limit => 1);
+  IF v_rec.body_parts IS NULL OR cardinality(v_rec.body_parts) = 0 THEN
+    RAISE EXCEPTION 'get_exercise_catalog returned NULL or empty body_parts';
+  END IF;
+END;
+$$;
+SELECT pass('get_exercise_catalog returns body_parts array');
+
+-- 3.4 get_exercise_catalog has no body_part output column
+DO $$
+DECLARE
+  v_body_part_out_count int;
+BEGIN
+  SELECT count(*) INTO v_body_part_out_count
+  FROM information_schema.parameters
+  WHERE specific_schema = 'public'
+    AND specific_name LIKE 'get_exercise_catalog%'
+    AND parameter_mode = 'OUT'
+    AND parameter_name = 'body_part';
+  IF v_body_part_out_count <> 0 THEN
+    RAISE EXCEPTION 'get_exercise_catalog still exposes body_part output column (% found)', v_body_part_out_count;
+  END IF;
+END;
+$$;
+SELECT pass('get_exercise_catalog has no body_part output column');
+
+-- 3.5 Inserting and updating exercises with body_parts directly works; unrelated update preserves body_parts
 DO $$
 DECLARE
   v_user uuid := gen_random_uuid();
   v_ex1 uuid;
-  v_ex2 uuid;
-  v_ex3 uuid;
   v_rec record;
 BEGIN
-  INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (v_user, 'trg_test@test.com', '{"role":"athlete"}'::jsonb);
+  INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (v_user, 'post_m9_test@test.com', '{"role":"athlete"}'::jsonb);
 
-  -- 1. Insert with body_part only (comma and slash)
-  INSERT INTO public.exercises (name, body_part, is_master, user_id)
-  VALUES ('Trigger Test 1', 'Back, Biceps / Core', false, v_user)
+  -- Insert with body_parts works
+  INSERT INTO public.exercises (name, body_parts, is_master, user_id)
+  VALUES ('Post-M9 Insert Test', ARRAY['Back', 'Biceps', 'Core'], false, v_user)
   RETURNING id INTO v_ex1;
 
-  SELECT body_parts, body_part INTO v_rec FROM public.exercises WHERE id = v_ex1;
+  SELECT body_parts INTO v_rec FROM public.exercises WHERE id = v_ex1;
   IF v_rec.body_parts IS DISTINCT FROM ARRAY['Back', 'Biceps', 'Core'] THEN
-    RAISE EXCEPTION 'Trigger insert body_part failed: expected {Back,Biceps,Core}, got %', v_rec.body_parts;
+    RAISE EXCEPTION 'Insert body_parts failed: expected {Back,Biceps,Core}, got %', v_rec.body_parts;
   END IF;
 
-  -- 2. Insert with body_parts only
-  INSERT INTO public.exercises (name, body_parts, is_master, user_id)
-  VALUES ('Trigger Test 2', ARRAY['Chest', 'Triceps'], false, v_user)
-  RETURNING id INTO v_ex2;
-
-  SELECT body_parts, body_part INTO v_rec FROM public.exercises WHERE id = v_ex2;
-  IF v_rec.body_part <> 'Chest, Triceps' THEN
-    RAISE EXCEPTION 'Trigger insert body_parts failed: expected "Chest, Triceps", got %', v_rec.body_part;
-  END IF;
-
-  -- 3. Update body_part resyncs body_parts
-  UPDATE public.exercises SET body_part = 'Shoulders, Arms' WHERE id = v_ex1;
-  SELECT body_parts INTO v_rec.body_parts FROM public.exercises WHERE id = v_ex1;
+  -- Update body_parts directly works
+  UPDATE public.exercises SET body_parts = ARRAY['Shoulders', 'Arms'] WHERE id = v_ex1;
+  SELECT body_parts INTO v_rec FROM public.exercises WHERE id = v_ex1;
   IF v_rec.body_parts IS DISTINCT FROM ARRAY['Shoulders', 'Arms'] THEN
-    RAISE EXCEPTION 'Trigger update body_part failed: expected {Shoulders,Arms}, got %', v_rec.body_parts;
+    RAISE EXCEPTION 'Update body_parts failed: expected {Shoulders,Arms}, got %', v_rec.body_parts;
   END IF;
 
-  -- 4. Update body_parts resyncs body_part
-  UPDATE public.exercises SET body_parts = ARRAY['Legs', 'Abs'] WHERE id = v_ex2;
-  SELECT body_part INTO v_rec.body_part FROM public.exercises WHERE id = v_ex2;
-  IF v_rec.body_part <> 'Legs, Abs' THEN
-    RAISE EXCEPTION 'Trigger update body_parts failed: expected "Legs, Abs", got %', v_rec.body_part;
-  END IF;
-
-  -- 5. Unrelated UPDATE (name) must NEVER rewrite body_part or body_parts
-  INSERT INTO public.exercises (name, body_part, is_master, user_id)
-  VALUES ('Trigger Test 3', 'Chest / Triceps', false, v_user)
-  RETURNING id INTO v_ex3;
-
-  UPDATE public.exercises SET name = 'Trigger Test 3 Renamed' WHERE id = v_ex3;
-  SELECT body_part, body_parts INTO v_rec FROM public.exercises WHERE id = v_ex3;
-  IF v_rec.body_part <> 'Chest / Triceps' THEN
-    RAISE EXCEPTION 'Unrelated update mutated body_part! Expected "Chest / Triceps", got %', v_rec.body_part;
-  END IF;
-  IF v_rec.body_parts IS DISTINCT FROM ARRAY['Chest', 'Triceps'] THEN
-    RAISE EXCEPTION 'Unrelated update mutated body_parts! Expected {Chest,Triceps}, got %', v_rec.body_parts;
+  -- Unrelated UPDATE (name) preserves body_parts
+  UPDATE public.exercises SET name = 'Post-M9 Insert Test Renamed' WHERE id = v_ex1;
+  SELECT body_parts INTO v_rec FROM public.exercises WHERE id = v_ex1;
+  IF v_rec.body_parts IS DISTINCT FROM ARRAY['Shoulders', 'Arms'] THEN
+    RAISE EXCEPTION 'Unrelated update mutated body_parts! Expected {Shoulders,Arms}, got %', v_rec.body_parts;
   END IF;
 END;
 $$;
-SELECT pass('Writing body_part only on INSERT populates body_parts');
-SELECT pass('Writing body_parts only on INSERT populates body_part (comma joined)');
-SELECT pass('Updating body_part resyncs body_parts');
-SELECT pass('Updating body_parts resyncs body_part');
-SELECT pass('Unrelated UPDATE (e.g. name change) does NOT rewrite body_part or body_parts');
+SELECT pass('Inserting and updating with body_parts works; unrelated update preserves body_parts');
 
 -- ============================================================================
 -- 4. Exercise Hides Table + RLS (RD-3, L47)
@@ -143,8 +158,8 @@ BEGIN
 
   SELECT id INTO v_master_id FROM public.exercises WHERE is_master = true LIMIT 1;
 
-  INSERT INTO public.exercises (name, body_part, is_master, user_id)
-  VALUES ('Custom For Hide Test', 'Arms', false, v_user_a)
+  INSERT INTO public.exercises (name, body_parts, is_master, user_id)
+  VALUES ('Custom For Hide Test', ARRAY['Arms'], false, v_user_a)
   RETURNING id INTO v_custom_id;
 
   -- Test 1: User A inserts hide on master exercise -> SUCCESS

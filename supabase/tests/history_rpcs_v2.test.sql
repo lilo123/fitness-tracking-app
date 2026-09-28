@@ -272,10 +272,10 @@ BEGIN
   VALUES (v_coach_id, v_ath_id, 'active');
 
   -- Exercises
-  INSERT INTO public.exercises (id, name, body_part, is_master, user_id)
+  INSERT INTO public.exercises (id, name, body_parts, is_master, user_id)
   VALUES
-    (v_ex_id, 'Bench Press M5 Test', 'Chest', true, NULL),
-    (v_other_ex_id, 'Squat M5 Test', 'Legs', true, NULL);
+    (v_ex_id, 'Bench Press M5 Test', ARRAY['Chest'], true, NULL),
+    (v_other_ex_id, 'Squat M5 Test', ARRAY['Legs'], true, NULL);
 
   -- Session W1: 2 working sets (100x5, 100x5 -> 1000 vol), 1 warmup (50x10), 1 drop (60x8)
   INSERT INTO public.workouts (id, user_id, name, date, workout_date)

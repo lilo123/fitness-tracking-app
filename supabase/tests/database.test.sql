@@ -73,7 +73,7 @@ BEGIN
   -- Get an exercise
   SELECT id INTO v_ex_id FROM public.exercises WHERE is_master = true LIMIT 1;
   IF v_ex_id IS NULL THEN
-    INSERT INTO public.exercises (name, body_part, is_master) VALUES ('Test Bench Press', 'Chest', true) RETURNING id INTO v_ex_id;
+    INSERT INTO public.exercises (name, body_parts, is_master) VALUES ('Test Bench Press', ARRAY['Chest'], true) RETURNING id INTO v_ex_id;
   END IF;
 
   -- Create workout

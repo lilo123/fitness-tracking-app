@@ -18,8 +18,8 @@ BEGIN
   PERFORM public.link_to_coach('CYBER-EXRLS1');
 
   PERFORM set_config('role', 'postgres', true);
-  INSERT INTO public.exercises (name, body_part, is_master, user_id)
-  VALUES ('Athlete Custom Zercher Carry', 'Legs', false, v_ath_id)
+  INSERT INTO public.exercises (name, body_parts, is_master, user_id)
+  VALUES ('Athlete Custom Zercher Carry', ARRAY['Legs'], false, v_ath_id)
   RETURNING id INTO v_ex_id;
 
   IF EXISTS (SELECT 1 FROM public.users WHERE id = v_coach_id AND role = 'coach') THEN
@@ -58,8 +58,8 @@ BEGIN
   PERFORM public.link_to_coach('CYBER-EXRLS2');
 
   PERFORM set_config('role', 'postgres', true);
-  INSERT INTO public.exercises (name, body_part, is_master, user_id)
-  VALUES ('Coach Prescribed Landmine Press', 'Shoulders', false, v_coach_id)
+  INSERT INTO public.exercises (name, body_parts, is_master, user_id)
+  VALUES ('Coach Prescribed Landmine Press', ARRAY['Shoulders'], false, v_coach_id)
   RETURNING id INTO v_ex_id;
 
   PERFORM set_config('role', 'authenticated', true);
@@ -97,10 +97,10 @@ BEGIN
   PERFORM public.link_to_coach('CYBER-EXRLS3');
 
   PERFORM set_config('role', 'postgres', true);
-  INSERT INTO public.exercises (name, body_part, is_master, user_id)
-  VALUES ('Athlete Private Movement', 'Back', false, v_ath_id) RETURNING id INTO v_ath_ex_id;
-  INSERT INTO public.exercises (name, body_part, is_master, user_id)
-  VALUES ('Coach Private Movement', 'Chest', false, v_coach_id) RETURNING id INTO v_coach_ex_id;
+  INSERT INTO public.exercises (name, body_parts, is_master, user_id)
+  VALUES ('Athlete Private Movement', ARRAY['Back'], false, v_ath_id) RETURNING id INTO v_ath_ex_id;
+  INSERT INTO public.exercises (name, body_parts, is_master, user_id)
+  VALUES ('Coach Private Movement', ARRAY['Chest'], false, v_coach_id) RETURNING id INTO v_coach_ex_id;
 
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_stranger_id || '"}', true);
@@ -200,8 +200,8 @@ DECLARE
 BEGIN
   INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (v_ath_id, 'own_ath@test.com', '{"role":"athlete"}'::jsonb);
   PERFORM set_config('role', 'postgres', true);
-  INSERT INTO public.exercises (name, body_part, is_master, user_id)
-  VALUES ('My Own Custom Movement', 'Arms', false, v_ath_id) RETURNING id INTO v_ex_id;
+  INSERT INTO public.exercises (name, body_parts, is_master, user_id)
+  VALUES ('My Own Custom Movement', ARRAY['Arms'], false, v_ath_id) RETURNING id INTO v_ex_id;
 
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_ath_id || '"}', true);
@@ -229,8 +229,8 @@ BEGIN
   INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (v_ath_id, 'unlinked_ath@test.com', '{"role":"athlete"}'::jsonb);
 
   PERFORM set_config('role', 'postgres', true);
-  INSERT INTO public.exercises (name, body_part, is_master, user_id)
-  VALUES ('Unlinked Athlete Exercise', 'Chest', false, v_ath_id) RETURNING id INTO v_ath_ex_id;
+  INSERT INTO public.exercises (name, body_parts, is_master, user_id)
+  VALUES ('Unlinked Athlete Exercise', ARRAY['Chest'], false, v_ath_id) RETURNING id INTO v_ath_ex_id;
 
   -- The unlinked platform coach queries
   PERFORM set_config('role', 'authenticated', true);
@@ -265,8 +265,8 @@ BEGIN
   INSERT INTO public.coach_athlete_links (coach_id, athlete_id, status, disconnected_at)
   VALUES (v_coach_id, v_ath_id, 'disconnected', now()) RETURNING id INTO v_link_id;
 
-  INSERT INTO public.exercises (name, body_part, is_master, user_id)
-  VALUES ('Ended Link Custom Exercise', 'Legs', false, v_ath_id) RETURNING id INTO v_ath_ex_id;
+  INSERT INTO public.exercises (name, body_parts, is_master, user_id)
+  VALUES ('Ended Link Custom Exercise', ARRAY['Legs'], false, v_ath_id) RETURNING id INTO v_ath_ex_id;
 
   -- The disconnected coach queries
   PERFORM set_config('role', 'authenticated', true);
@@ -327,8 +327,8 @@ BEGIN
   INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (v_ath_id, 'ath_target@test.com', '{"role":"athlete"}'::jsonb);
 
   PERFORM set_config('role', 'postgres', true);
-  INSERT INTO public.exercises (name, body_part, is_master, user_id)
-  VALUES ('Athlete Inviolable Custom', 'Shoulders', false, v_ath_id) RETURNING id INTO v_ath_ex_id;
+  INSERT INTO public.exercises (name, body_parts, is_master, user_id)
+  VALUES ('Athlete Inviolable Custom', ARRAY['Shoulders'], false, v_ath_id) RETURNING id INTO v_ath_ex_id;
 
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_coach_id || '"}', true);
@@ -390,8 +390,8 @@ BEGIN
   INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (v_ath_id, 'ath_target_del@test.com', '{"role":"athlete"}'::jsonb);
 
   PERFORM set_config('role', 'postgres', true);
-  INSERT INTO public.exercises (name, body_part, is_master, user_id)
-  VALUES ('Athlete Exercise To Delete', 'Back', false, v_ath_id) RETURNING id INTO v_ath_ex_id;
+  INSERT INTO public.exercises (name, body_parts, is_master, user_id)
+  VALUES ('Athlete Exercise To Delete', ARRAY['Back'], false, v_ath_id) RETURNING id INTO v_ath_ex_id;
 
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_coach_id || '"}', true);
@@ -423,8 +423,8 @@ BEGIN
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_ath_id || '"}', true);
 
   BEGIN
-    INSERT INTO public.exercises (name, body_part, is_master, user_id)
-    VALUES ('Illegal Master Attempt', 'Chest', true, v_ath_id);
+    INSERT INTO public.exercises (name, body_parts, is_master, user_id)
+    VALUES ('Illegal Master Attempt', ARRAY['Chest'], true, v_ath_id);
   EXCEPTION WHEN insufficient_privilege OR check_violation THEN
     v_failed := true;
   END;
@@ -450,8 +450,8 @@ DECLARE
 BEGIN
   INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (v_ath_id, 'ath_master_upd@test.com', '{"role":"athlete"}'::jsonb);
   PERFORM set_config('role', 'postgres', true);
-  INSERT INTO public.exercises (name, body_part, is_master, user_id)
-  VALUES ('Legit Custom Exercise', 'Legs', false, v_ath_id) RETURNING id INTO v_ex_id;
+  INSERT INTO public.exercises (name, body_parts, is_master, user_id)
+  VALUES ('Legit Custom Exercise', ARRAY['Legs'], false, v_ath_id) RETURNING id INTO v_ex_id;
 
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_ath_id || '"}', true);
@@ -483,8 +483,8 @@ DECLARE
 BEGIN
   INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (v_ath_id, 'ath_no_del@test.com', '{"role":"athlete"}'::jsonb);
   PERFORM set_config('role', 'postgres', true);
-  INSERT INTO public.exercises (name, body_part, is_master, user_id)
-  VALUES ('Undeletable Custom Exercise', 'Arms', false, v_ath_id) RETURNING id INTO v_ex_id;
+  INSERT INTO public.exercises (name, body_parts, is_master, user_id)
+  VALUES ('Undeletable Custom Exercise', ARRAY['Arms'], false, v_ath_id) RETURNING id INTO v_ex_id;
 
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_ath_id || '"}', true);
@@ -519,23 +519,23 @@ BEGIN
 
   -- Test blank insert
   BEGIN
-    INSERT INTO public.exercises (name, body_part, is_master, user_id)
-    VALUES ('', 'Chest', false, v_ath_id);
+    INSERT INTO public.exercises (name, body_parts, is_master, user_id)
+    VALUES ('', ARRAY['Chest'], false, v_ath_id);
   EXCEPTION WHEN check_violation THEN
     v_blank_ins_failed := true;
   END;
 
   -- Test whitespace-only insert
   BEGIN
-    INSERT INTO public.exercises (name, body_part, is_master, user_id)
-    VALUES ('   ', 'Chest', false, v_ath_id);
+    INSERT INTO public.exercises (name, body_parts, is_master, user_id)
+    VALUES ('   ', ARRAY['Chest'], false, v_ath_id);
   EXCEPTION WHEN check_violation THEN
     v_space_ins_failed := true;
   END;
 
   -- Insert a valid exercise then test whitespace update
-  INSERT INTO public.exercises (name, body_part, is_master, user_id)
-  VALUES ('Valid Name', 'Chest', false, v_ath_id) RETURNING id INTO v_ex_id;
+  INSERT INTO public.exercises (name, body_parts, is_master, user_id)
+  VALUES ('Valid Name', ARRAY['Chest'], false, v_ath_id) RETURNING id INTO v_ex_id;
 
   BEGIN
     UPDATE public.exercises SET name = '   ' WHERE id = v_ex_id;
@@ -568,8 +568,8 @@ BEGIN
   PERFORM set_config('role', 'postgres', true);
   PERFORM set_config('request.jwt.claims', '', true);
 
-  INSERT INTO public.exercises (name, body_part, is_master, user_id)
-  VALUES ('Referenced By Template', 'Back', false, v_user_id) RETURNING id INTO v_ex_id;
+  INSERT INTO public.exercises (name, body_parts, is_master, user_id)
+  VALUES ('Referenced By Template', ARRAY['Back'], false, v_user_id) RETURNING id INTO v_ex_id;
 
   INSERT INTO public.routine_templates (user_id, name)
   VALUES (v_user_id, 'Template Referencing Exercise') RETURNING id INTO v_tpl_id;
