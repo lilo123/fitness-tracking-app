@@ -232,10 +232,9 @@ test.describe('P3a Set Edit and Delete Workflows (p3a-set-edit)', () => {
 
     const expandBtn = page.locator('[data-testid="expand-session-btn-mock-session-6"]');
     await expect(expandBtn).toBeVisible({ timeout: 10000 });
-    const isExpanded = (await expandBtn.getAttribute('aria-expanded')) === 'true';
-    if (!isExpanded) {
-      await expandBtn.click();
-    }
+    // HD-1 auto-expands the first sessions within the 100-set budget, so this 6-set session opens by itself.
+    // Do not click: a click racing the (microtask-deferred) auto-expand would collapse it again.
+    await expect(expandBtn).toHaveAttribute('aria-expanded', 'true', { timeout: 10000 });
 
     const editBtns = page.locator('[data-testid^="edit-set-btn-"]');
     await expect(editBtns.first()).toBeVisible({ timeout: 10000 });
