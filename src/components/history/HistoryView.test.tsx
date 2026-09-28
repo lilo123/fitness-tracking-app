@@ -2,7 +2,7 @@ import React from 'react';
 import * as workoutHistoryModule from './useWorkoutHistory';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, renderHook, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { HistoryView } from './HistoryView';
 import { useHistoryData } from './useHistoryData';
 import { groupSessionSetsByExercise } from '../../utils/historyGrouping';
@@ -222,7 +222,7 @@ describe('HistoryView', () => {
 
   const renderComponent = () =>
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={['/history']}>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <CoachProvider>
@@ -1448,7 +1448,7 @@ describe('HistoryView', () => {
       });
 
       render(
-        <MemoryRouter>
+        <MemoryRouter initialEntries={['/history']}>
           <QueryClientProvider client={queryClient}>
             <AuthProvider>
               <CoachProvider>
@@ -2150,7 +2150,29 @@ describe('HistoryView', () => {
     });
 
     it('meal delete in History is deferred (0 DELETE before 6 s, Undo -> 0 DELETE, leaving /history flushes 1 DELETE)', async () => {
-      const { unmount } = renderComponent();
+      const TestNavigator = () => {
+        const navigate = useNavigate();
+        return (
+          <>
+            <button data-testid="leave-history-btn" type="button" onClick={() => navigate('/workout')}>
+              Leave
+            </button>
+            <HistoryView />
+          </>
+        );
+      };
+
+      render(
+        <MemoryRouter initialEntries={['/history']}>
+          <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+              <CoachProvider>
+                <TestNavigator />
+              </CoachProvider>
+            </AuthProvider>
+          </QueryClientProvider>
+        </MemoryRouter>
+      );
 
       fireEvent.click(screen.getByTestId('history-tab-nutrition'));
 
@@ -2180,8 +2202,8 @@ describe('HistoryView', () => {
         openMealAction('log-1', 'delete');
         expect(mockDeleteEq).not.toHaveBeenCalled();
 
-        // Leaving /history (unmount) flushes exactly 1 DELETE
-        unmount();
+        // Leaving /history flushes exactly 1 DELETE via route navigation
+        fireEvent.click(screen.getByTestId('leave-history-btn'));
         expect(mockDeleteEq).toHaveBeenCalledTimes(1);
         expect(mockDeleteEq).toHaveBeenCalledWith('id', 'log-1');
       } finally {

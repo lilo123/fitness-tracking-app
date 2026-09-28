@@ -176,10 +176,9 @@ export const ExerciseStatsList: React.FC<ExerciseStatsListProps> = ({
     const sparklinePoints = getSparklinePoints(stat);
 
     return (
-      <div
+      <button
+        type="button"
         key={stat.exercise.id || stat.exercise.name || idx}
-        role="button"
-        tabIndex={0}
         aria-haspopup="dialog"
         onClick={() => setSelectedStatForSheet(stat)}
         onKeyDown={(e) => {
@@ -188,7 +187,7 @@ export const ExerciseStatsList: React.FC<ExerciseStatsListProps> = ({
             setSelectedStatForSheet(stat);
           }
         }}
-        className="w-full text-left bg-zinc-900/90 border border-zinc-800/80 hover:border-zinc-700/80 rounded-3xl p-5 shadow-2xl space-y-3 cursor-pointer transition focus:outline-none focus:ring-2 focus:ring-cyan-500/50 touch-manipulation"
+        className="w-full text-left bg-zinc-900/90 border border-zinc-800/80 hover:border-zinc-700/80 rounded-3xl p-5 shadow-2xl space-y-3 cursor-pointer transition focus:outline-none focus:ring-2 focus:ring-cyan-500/50 touch-manipulation block"
         data-testid={`exercise-card-${stat.exercise.id || stat.exercise.name || idx}`}
       >
         <div className="flex items-center justify-between border-b border-zinc-800 pb-3 gap-2">
@@ -255,7 +254,7 @@ export const ExerciseStatsList: React.FC<ExerciseStatsListProps> = ({
             </div>
           </div>
         )}
-      </div>
+      </button>
     );
   };
 

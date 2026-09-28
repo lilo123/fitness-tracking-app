@@ -2036,7 +2036,7 @@ describe('WorkoutEngine', () => {
 
       // Mount HistoryView with the exact same shared queryClient
       render(
-        <MemoryRouter>
+        <MemoryRouter initialEntries={['/history']}>
           <QueryClientProvider client={queryClient}>
             <AuthProvider>
               <CoachProvider>
@@ -2641,7 +2641,7 @@ describe('WorkoutEngine', () => {
         });
 
         render(
-          <MemoryRouter>
+          <MemoryRouter initialEntries={['/history']}>
             <QueryClientProvider client={queryClient}>
               <AuthProvider>
                 <CoachProvider>

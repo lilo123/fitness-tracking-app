@@ -53,7 +53,7 @@ describe('Cross-Tab Invalidation (H2)', () => {
     });
 
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={['/history']}>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <CoachProvider>

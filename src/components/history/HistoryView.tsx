@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, UNSAFE_LocationContext } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import type { WorkoutSet, NutritionLog, Exercise } from '../../types/database';
 import { AlertCircle, Shield, RotateCcw } from 'lucide-react';
@@ -34,8 +34,7 @@ import { normalizeDateStr } from '../../utils/ghostSets';
 export const HistoryView: React.FC = () => {
   const { user, isCoachMode } = useAuth();
   const navigate = useNavigate();
-  const locationContext = React.useContext(UNSAFE_LocationContext);
-  const locationPathname = locationContext?.location?.pathname ?? '/history';
+  const location = useLocation();
   const coachCtx = React.useContext(CoachContext);
   const selectedAthleteId = coachCtx?.selectedAthleteId || '';
   const selectedAthlete = coachCtx?.selectedAthlete || null;
@@ -205,7 +204,7 @@ export const HistoryView: React.FC = () => {
   } = useHistoryMealDeferredDelete({
     targetUserId,
     setMutationError,
-    isActive: locationPathname === '/history',
+    isActive: location.pathname === '/history',
     meals: nutritionLogs,
   });
 

@@ -141,7 +141,7 @@ describe('HistoryView Filters & Range Integration (H13)', () => {
 
   const renderComponent = () =>
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={['/history']}>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <CoachProvider>

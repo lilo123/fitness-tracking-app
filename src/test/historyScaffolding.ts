@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../context/AuthContext';
 import { CoachProvider } from '../context/CoachContext';
+import { MemoryRouter } from 'react-router-dom';
 import { HistoryView } from '../components/history/HistoryView';
 import { supabase } from '../lib/supabase';
 import { createSupabaseBuilder } from './supabaseBuilderMock';
@@ -251,7 +252,11 @@ export function renderHistoryView(customQueryClient?: QueryClient) {
         React.createElement(
           CoachProvider,
           null,
-          React.createElement(HistoryView, null)
+          React.createElement(
+            MemoryRouter,
+            { initialEntries: ['/history'] },
+            React.createElement(HistoryView, null)
+          )
         )
       )
     )

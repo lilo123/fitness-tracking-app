@@ -73,7 +73,7 @@ describe('Cross-Tab PR & Benchmarks (H10, RD-16, RD-20)', () => {
     });
 
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={['/history']}>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <CoachProvider>
