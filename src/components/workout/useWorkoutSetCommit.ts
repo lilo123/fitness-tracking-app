@@ -3,6 +3,8 @@ import type { Exercise, WorkoutSet } from '../../types/database';
 import type { UseMutationResult } from '@tanstack/react-query';
 import type { SetDraftInput } from '../../utils/workoutSessionStore';
 import { isUUID } from './workoutEngineHelpers';
+import { useWeightUnit } from '../../hooks/useWeightUnit';
+import { resolveWeightInput, type WeightUnit } from '../../utils/weight';
 
 export interface UseWorkoutSetCommitOptions {
   exercises: Exercise[];
@@ -11,6 +13,7 @@ export interface UseWorkoutSetCommitOptions {
   logSetMutation: UseMutationResult<any, any, any, any>;
   batchLogSetsMutation: UseMutationResult<any, any, any, any>;
   setMutationError: (err: string | null) => void;
+  unit?: WeightUnit;
 }
 
 export function useWorkoutSetCommit({
@@ -20,7 +23,11 @@ export function useWorkoutSetCommit({
   logSetMutation,
   batchLogSetsMutation,
   setMutationError,
+  unit: propUnit,
 }: UseWorkoutSetCommitOptions) {
+  const contextUnit = useWeightUnit();
+  const unit = propUnit ?? contextUnit;
+
   const handleCommitSet = useCallback((
     exName: string,
     setIndex: number,
@@ -29,9 +36,10 @@ export function useWorkoutSetCommit({
     const draftKey = `${exName}_${setIndex}`;
     const draft = inputDraftsRef.current?.[draftKey];
 
+    const originalLb = typeof ghostValues.weight === 'number' ? ghostValues.weight : null;
     const hasDraftWeight = draft?.weight !== undefined && draft.weight.trim() !== '';
     const weightVal = hasDraftWeight
-      ? Number(draft.weight)
+      ? (resolveWeightInput(draft.weight, unit, originalLb) ?? NaN)
       : typeof ghostValues.weight === 'number'
       ? ghostValues.weight
       : NaN;
@@ -60,7 +68,7 @@ export function useWorkoutSetCommit({
       reps: repsVal,
       setIndex,
     });
-  }, [exercises, logSetMutation, inputDraftsRef, setMutationError]);
+  }, [exercises, logSetMutation, inputDraftsRef, setMutationError, unit]);
 
   const handleBatchLogExercise = useCallback((
     exName: string,
@@ -81,8 +89,10 @@ export function useWorkoutSetCommit({
       const draftKey = `${exName}_${setIndex}`;
       const draft = inputDraftsRef.current?.[draftKey];
 
-      const weightVal = draft?.weight !== undefined && draft.weight.trim() !== ''
-        ? Number(draft.weight)
+      const originalLb = typeof ghost.weight === 'number' ? ghost.weight : null;
+      const hasDraftWeight = draft?.weight !== undefined && draft.weight.trim() !== '';
+      const weightVal = hasDraftWeight
+        ? (resolveWeightInput(draft.weight, unit, originalLb) ?? NaN)
         : typeof ghost.weight === 'number'
         ? ghost.weight
         : NaN;
@@ -111,7 +121,7 @@ export function useWorkoutSetCommit({
       const setsWithId = unloggedSets.map((s) => ({ ...s, exerciseId }));
       batchLogSetsMutation.mutate(setsWithId);
     }
-  }, [batchLogSetsMutation, exercises, inputDraftsRef, targetRepCountsRef]);
+  }, [batchLogSetsMutation, exercises, inputDraftsRef, targetRepCountsRef, unit]);
 
   return {
     handleCommitSet,

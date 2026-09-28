@@ -5,6 +5,25 @@ import { EditSetSheet } from "./EditSetSheet";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Exercise, WorkoutSet } from "../../types/database";
 import { expectNoA11yViolations } from "../../test/a11y";
+import { AuthContext, type AuthContextType } from "../../context/AuthContextTypes";
+
+const createAuthContextValue = (weightUnit: 'lb' | 'kg' = 'lb'): AuthContextType => ({
+  user: { id: 'user-789' } as any,
+  profile: { id: 'user-789', weight_unit: weightUnit } as any,
+  role: 'athlete',
+  viewMode: 'athlete',
+  isCoachMode: false,
+  loading: false,
+  signIn: vi.fn(),
+  signUp: vi.fn(),
+  signOut: vi.fn(),
+  updateProfile: vi.fn(),
+  switchRole: vi.fn(),
+  refreshProfile: vi.fn(),
+  resendConfirmation: vi.fn(),
+  requestPasswordReset: vi.fn(),
+  resetPassword: vi.fn(),
+});
 
 const mockUpdateEq = vi.fn();
 const mockUpdate = vi.fn();
@@ -97,49 +116,58 @@ describe("EditSetSheet", () => {
     });
   });
 
-  const renderSheet = (props: Partial<Parameters<typeof EditSetSheet>[0]> = {}) => {
+  const renderSheet = (
+    props: Partial<Parameters<typeof EditSetSheet>[0]> = {},
+    weightUnit: 'lb' | 'kg' = 'lb'
+  ) => {
     return render(
-      <QueryClientProvider client={queryClient}>
-        <EditSetSheet
-          isOpen={true}
-          set={mockSet}
-          exercises={mockExercises}
-          onClose={onClose}
-          onSaved={onSaved}
-          onDeleteRequested={onDeleteRequested}
-          targetUserId="user-789"
-          {...props}
-        />
-      </QueryClientProvider>
+      <AuthContext.Provider value={createAuthContextValue(weightUnit)}>
+        <QueryClientProvider client={queryClient}>
+          <EditSetSheet
+            isOpen={true}
+            set={mockSet}
+            exercises={mockExercises}
+            onClose={onClose}
+            onSaved={onSaved}
+            onDeleteRequested={onDeleteRequested}
+            targetUserId="user-789"
+            {...props}
+          />
+        </QueryClientProvider>
+      </AuthContext.Provider>
     );
   };
 
   it("does not render when isOpen is false or set is null", () => {
     const { rerender } = render(
-      <QueryClientProvider client={queryClient}>
-        <EditSetSheet
-          isOpen={false}
-          set={mockSet}
-          exercises={mockExercises}
-          onClose={onClose}
-          onSaved={onSaved}
-          onDeleteRequested={onDeleteRequested}
-        />
-      </QueryClientProvider>
+      <AuthContext.Provider value={createAuthContextValue('lb')}>
+        <QueryClientProvider client={queryClient}>
+          <EditSetSheet
+            isOpen={false}
+            set={mockSet}
+            exercises={mockExercises}
+            onClose={onClose}
+            onSaved={onSaved}
+            onDeleteRequested={onDeleteRequested}
+          />
+        </QueryClientProvider>
+      </AuthContext.Provider>
     );
     expect(screen.queryByTestId("edit-set-sheet")).toBeNull();
 
     rerender(
-      <QueryClientProvider client={queryClient}>
-        <EditSetSheet
-          isOpen={true}
-          set={null}
-          exercises={mockExercises}
-          onClose={onClose}
-          onSaved={onSaved}
-          onDeleteRequested={onDeleteRequested}
-        />
-      </QueryClientProvider>
+      <AuthContext.Provider value={createAuthContextValue('lb')}>
+        <QueryClientProvider client={queryClient}>
+          <EditSetSheet
+            isOpen={true}
+            set={null}
+            exercises={mockExercises}
+            onClose={onClose}
+            onSaved={onSaved}
+            onDeleteRequested={onDeleteRequested}
+          />
+        </QueryClientProvider>
+      </AuthContext.Provider>
     );
     expect(screen.queryByTestId("edit-set-sheet")).toBeNull();
   });
@@ -426,17 +454,19 @@ describe("EditSetSheet", () => {
     };
 
     rerender(
-      <QueryClientProvider client={queryClient}>
-        <EditSetSheet
-          isOpen={true}
-          set={set2}
-          exercises={mockExercises}
-          onClose={onClose}
-          onSaved={onSaved}
-          onDeleteRequested={onDeleteRequested}
-          targetUserId="user-789"
-        />
-      </QueryClientProvider>
+      <AuthContext.Provider value={createAuthContextValue('lb')}>
+        <QueryClientProvider client={queryClient}>
+          <EditSetSheet
+            isOpen={true}
+            set={set2}
+            exercises={mockExercises}
+            onClose={onClose}
+            onSaved={onSaved}
+            onDeleteRequested={onDeleteRequested}
+            targetUserId="user-789"
+          />
+        </QueryClientProvider>
+      </AuthContext.Provider>
     );
 
     const updatedWeightInput = screen.getByTestId("edit-set-weight-input") as HTMLInputElement;
@@ -471,5 +501,47 @@ describe("EditSetSheet", () => {
   it("passes axe accessibility checks without violations (STD-A11Y-4)", async () => {
     const { container } = renderSheet();
     await expectNoA11yViolations(container);
+  });
+
+  it("renders weight in kg and preserves original lb if weight is untouched", async () => {
+    const set225 = { ...mockSet, weight: 225 };
+    renderSheet({ set: set225 }, "kg");
+
+    expect(screen.getByText("Weight (kg)")).toBeInTheDocument();
+    const weightInput = screen.getByTestId("edit-set-weight-input") as HTMLInputElement;
+    expect(weightInput.value).toBe("102.1");
+
+    // If user changes reps without changing weight, original 225 lb is preserved (D-P6-4)
+    const repsInput = screen.getByTestId("edit-set-reps-input");
+    fireEvent.change(repsInput, { target: { value: "10" } });
+
+    fireEvent.click(screen.getByTestId("save-set-btn"));
+
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          weight: 225,
+          reps: 10,
+        })
+      );
+    });
+  });
+
+  it("converts kg weight input to lb on save", async () => {
+    const set225 = { ...mockSet, weight: 225 };
+    renderSheet({ set: set225 }, "kg");
+
+    const weightInput = screen.getByTestId("edit-set-weight-input") as HTMLInputElement;
+    // User enters 100 kg, resolves to 100 * 2.20462262185 = ~220.462 lb
+    fireEvent.change(weightInput, { target: { value: "100" } });
+    fireEvent.click(screen.getByTestId("save-set-btn"));
+
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          weight: expect.closeTo(220.462, 2),
+        })
+      );
+    });
   });
 });

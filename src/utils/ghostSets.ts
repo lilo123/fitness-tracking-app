@@ -1,4 +1,4 @@
-import { formatSet } from "./weight";
+import { formatSet, formatWeight, type WeightUnit } from './weight';
 import type { WorkoutSet, GhostSetValues, ExerciseBenchmarks } from '../types/database';
 import {
   normalizeDateStr,
@@ -25,7 +25,8 @@ export function computeGhostSets(
   exerciseId: string,
   targetSetCount: number,
   allSets: (WorkoutSet & { workout_date?: string; date?: string })[],
-  currentDateStr?: string
+  currentDateStr?: string,
+  unit: WeightUnit = 'lb'
 ): GhostSetValues[] {
   const normCurrentDate = currentDateStr ? normalizeDateStr(currentDateStr) : '';
 
@@ -75,7 +76,7 @@ export function computeGhostSets(
       results.push({
         weight: prev.weight,
         reps: prev.reps,
-        hintText: `${prev.weight} lbs × ${prev.reps}`,
+        hintText: `${formatWeight(prev.weight, unit, { showUnit: true })} × ${prev.reps}`,
         isFromPrevious: true,
       });
     } else if (candidateSets.length > 0) {
@@ -84,7 +85,7 @@ export function computeGhostSets(
       results.push({
         weight: lastAvailable.weight,
         reps: lastAvailable.reps,
-        hintText: `${lastAvailable.weight} lbs × ${lastAvailable.reps}`,
+        hintText: `${formatWeight(lastAvailable.weight, unit, { showUnit: true })} × ${lastAvailable.reps}`,
         isFromPrevious: true,
       });
     } else {
@@ -103,7 +104,8 @@ export function computeGhostSets(
 export function getExerciseBenchmarks(
   exerciseId: string,
   allSets: (WorkoutSet & { workout_date?: string; date?: string })[],
-  currentDateStr?: string
+  currentDateStr?: string,
+  unit: WeightUnit = 'lb'
 ): ExerciseBenchmarks {
   const normCurrentDate = currentDateStr ? normalizeDateStr(currentDateStr) : '';
 
@@ -150,7 +152,7 @@ export function getExerciseBenchmarks(
       .filter((s) => normalizeDateStr(s.workout_date || s.date || s.created_at) === lastDate)
       .sort((a, b) => (a.set_index || 0) - (b.set_index || 0));
 
-    const summaryText = sessionSets.map((s) => formatSet(s.weight, s.reps)).join(', ');
+    const summaryText = sessionSets.map((s) => formatSet(s.weight, s.reps, unit)).join(', ');
     lastSession = {
       date: lastDate,
       summaryText,

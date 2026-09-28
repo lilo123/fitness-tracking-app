@@ -1,12 +1,14 @@
 import { useDeferredDelete } from '../common/useDeferredDelete';
 import type { UndoToastItem } from '../common/UndoToast';
 import type { WorkoutSet } from '../../types/database';
-import { formatSet } from '../../utils/weight';
+import { formatSet, type WeightUnit } from '../../utils/weight';
+import { useWeightUnit } from '../../hooks/useWeightUnit';
 
 export interface UseSetDeletionOptions {
   onCommitDelete: (setId: string) => Promise<void> | void;
   timeoutMs?: number;
   onError?: (error: unknown, set: WorkoutSet) => void;
+  unit?: WeightUnit;
 }
 
 export interface UseSetDeletionReturn {
@@ -23,7 +25,10 @@ export function useSetDeletion({
   onCommitDelete,
   timeoutMs = 6000,
   onError,
+  unit: propUnit,
 }: UseSetDeletionOptions): UseSetDeletionReturn {
+  const contextUnit = useWeightUnit();
+  const unit = propUnit ?? contextUnit;
   const { pending, schedule, undo, flush } = useDeferredDelete<WorkoutSet>({
     commit: async (set) => {
       if (set.id) {
@@ -45,7 +50,7 @@ export function useSetDeletion({
     ? {
         verb: 'Set deleted',
         subject: `Set ${pendingSet.set_index ?? ''}`.trim(),
-        detail: formatSet(pendingSet.weight, pendingSet.reps),
+        detail: formatSet(pendingSet.weight, pendingSet.reps, unit),
         onUndo: undo,
         undoAriaLabel: `Undo delete set ${pendingSet.set_index ?? ''}`.trim(),
       }

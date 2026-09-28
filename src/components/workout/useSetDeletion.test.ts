@@ -1,7 +1,32 @@
+import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSetDeletion } from './useSetDeletion';
 import type { WorkoutSet } from '../../types/database';
+import { AuthContext, type AuthContextType } from '../../context/AuthContextTypes';
+
+const createAuthContextValue = (weightUnit: 'lb' | 'kg' = 'lb'): AuthContextType => ({
+  user: { id: 'user-789' } as any,
+  profile: { id: 'user-789', weight_unit: weightUnit } as any,
+  role: 'athlete',
+  viewMode: 'athlete',
+  isCoachMode: false,
+  loading: false,
+  signIn: vi.fn(),
+  signUp: vi.fn(),
+  signOut: vi.fn(),
+  updateProfile: vi.fn(),
+  switchRole: vi.fn(),
+  refreshProfile: vi.fn(),
+  resendConfirmation: vi.fn(),
+  requestPasswordReset: vi.fn(),
+  resetPassword: vi.fn(),
+});
+
+const createWrapper = (weightUnit: 'lb' | 'kg' = 'lb') => {
+  return ({ children }: { children: React.ReactNode }) =>
+    React.createElement(AuthContext.Provider, { value: createAuthContextValue(weightUnit) }, children);
+};
 
 describe('useSetDeletion', () => {
   beforeEach(() => {
@@ -26,7 +51,9 @@ describe('useSetDeletion', () => {
 
   it('starts with no pending delete', () => {
     const onCommitDelete = vi.fn();
-    const { result } = renderHook(() => useSetDeletion({ onCommitDelete }));
+    const { result } = renderHook(() => useSetDeletion({ onCommitDelete }), {
+      wrapper: createWrapper('lb'),
+    });
 
     expect(result.current.pendingSet).toBeNull();
     expect(result.current.pendingSetId).toBeNull();
@@ -36,7 +63,10 @@ describe('useSetDeletion', () => {
 
   it('schedules delete and sets toast metadata', () => {
     const onCommitDelete = vi.fn();
-    const { result } = renderHook(() => useSetDeletion({ onCommitDelete, timeoutMs: 6000 }));
+    const { result } = renderHook(
+      () => useSetDeletion({ onCommitDelete, timeoutMs: 6000 }),
+      { wrapper: createWrapper('lb') }
+    );
 
     act(() => {
       result.current.scheduleDelete(mockSet);
@@ -57,7 +87,10 @@ describe('useSetDeletion', () => {
 
   it('commits exactly once on 6s expiry', () => {
     const onCommitDelete = vi.fn();
-    const { result } = renderHook(() => useSetDeletion({ onCommitDelete, timeoutMs: 6000 }));
+    const { result } = renderHook(
+      () => useSetDeletion({ onCommitDelete, timeoutMs: 6000 }),
+      { wrapper: createWrapper('lb') }
+    );
 
     act(() => {
       result.current.scheduleDelete(mockSet);
@@ -83,7 +116,10 @@ describe('useSetDeletion', () => {
 
   it('cancels deletion on undo and does not commit', () => {
     const onCommitDelete = vi.fn();
-    const { result } = renderHook(() => useSetDeletion({ onCommitDelete, timeoutMs: 6000 }));
+    const { result } = renderHook(
+      () => useSetDeletion({ onCommitDelete, timeoutMs: 6000 }),
+      { wrapper: createWrapper('lb') }
+    );
 
     act(() => {
       result.current.scheduleDelete(mockSet);
@@ -106,7 +142,10 @@ describe('useSetDeletion', () => {
 
   it('triggers undo via toast.onUndo', () => {
     const onCommitDelete = vi.fn();
-    const { result } = renderHook(() => useSetDeletion({ onCommitDelete, timeoutMs: 6000 }));
+    const { result } = renderHook(
+      () => useSetDeletion({ onCommitDelete, timeoutMs: 6000 }),
+      { wrapper: createWrapper('lb') }
+    );
 
     act(() => {
       result.current.scheduleDelete(mockSet);
@@ -127,7 +166,10 @@ describe('useSetDeletion', () => {
 
   it('flushes pending delete immediately on flushDelete', () => {
     const onCommitDelete = vi.fn();
-    const { result } = renderHook(() => useSetDeletion({ onCommitDelete, timeoutMs: 6000 }));
+    const { result } = renderHook(
+      () => useSetDeletion({ onCommitDelete, timeoutMs: 6000 }),
+      { wrapper: createWrapper('lb') }
+    );
 
     act(() => {
       result.current.scheduleDelete(mockSet);
@@ -140,5 +182,30 @@ describe('useSetDeletion', () => {
     expect(onCommitDelete).toHaveBeenCalledTimes(1);
     expect(onCommitDelete).toHaveBeenCalledWith('set-123');
     expect(result.current.isPending).toBe(false);
+  });
+
+  it('formats toast detail in kg when user preference is kg', () => {
+    const onCommitDelete = vi.fn();
+    const set225: WorkoutSet = {
+      ...mockSet,
+      weight: 225,
+      reps: 5,
+    };
+    const { result } = renderHook(
+      () => useSetDeletion({ onCommitDelete, timeoutMs: 6000 }),
+      { wrapper: createWrapper('kg') }
+    );
+
+    act(() => {
+      result.current.scheduleDelete(set225);
+    });
+
+    expect(result.current.toast).toEqual({
+      verb: 'Set deleted',
+      subject: 'Set 2',
+      detail: '102.1×5',
+      onUndo: expect.any(Function),
+      undoAriaLabel: 'Undo delete set 2',
+    });
   });
 });

@@ -5,6 +5,8 @@ import type { SetDraftInput } from '../../utils/workoutSessionStore';
 import { computeGhostSets } from '../../utils/ghostSets';
 import { isUUID } from './workoutEngineHelpers';
 import type { PendingReviewSet } from './FinishReviewSheet';
+import { useWeightUnit } from '../../hooks/useWeightUnit';
+import { resolveWeightInput, type WeightUnit } from '../../utils/weight';
 
 export interface UseWorkoutFinishReviewOptions {
   activeExercises: string[];
@@ -18,6 +20,7 @@ export interface UseWorkoutFinishReviewOptions {
   workoutDate: string;
   exercises: Exercise[];
   batchLogSetsMutation: UseMutationResult<any, any, any, any>;
+  unit?: WeightUnit;
 }
 
 export function useWorkoutFinishReview({
@@ -32,7 +35,10 @@ export function useWorkoutFinishReview({
   workoutDate,
   exercises,
   batchLogSetsMutation,
+  unit: propUnit,
 }: UseWorkoutFinishReviewOptions) {
+  const contextUnit = useWeightUnit();
+  const unit = propUnit ?? contextUnit;
   const [isFinishReviewOpen, setIsFinishReviewOpen] = useState(false);
   const [pendingReviewSets, setPendingReviewSets] = useState<PendingReviewSet[]>([]);
 
@@ -45,7 +51,7 @@ export function useWorkoutFinishReview({
         (s) => s.id !== pendingSetId && (!s.id || !pendingDeletedSetIds.has(s.id))
       );
       const targetCount = targetSetCounts[exName] || 3;
-      const ghostValues = computeGhostSets(exName, targetCount, userLogs, workoutDate);
+      const ghostValues = computeGhostSets(exName, targetCount, userLogs, workoutDate, unit);
 
       for (let rowIdx = exerciseSetsToday.length; rowIdx < targetCount; rowIdx++) {
         const setIndex = rowIdx + 1;
@@ -53,12 +59,13 @@ export function useWorkoutFinishReview({
         const draftKey = `${exName}_${setIndex}`;
         const draft = inputDraftsRef.current?.[draftKey];
 
-        const weightVal =
-          draft?.weight !== undefined && draft.weight.trim() !== ''
-            ? Number(draft.weight)
-            : typeof ghost.weight === 'number'
-            ? ghost.weight
-            : NaN;
+        const originalLb = typeof ghost.weight === 'number' ? ghost.weight : null;
+        const hasDraftWeight = draft?.weight !== undefined && draft.weight.trim() !== '';
+        const weightVal = hasDraftWeight
+          ? (resolveWeightInput(draft.weight, unit, originalLb) ?? NaN)
+          : typeof ghost.weight === 'number'
+          ? ghost.weight
+          : NaN;
 
         const repsVal =
           draft?.reps !== undefined && draft.reps.trim() !== ''
@@ -94,6 +101,7 @@ export function useWorkoutFinishReview({
     inputDraftsRef,
     userLogs,
     workoutDate,
+    unit,
   ]);
 
   const handleConfirmFinishWithSets = useCallback(

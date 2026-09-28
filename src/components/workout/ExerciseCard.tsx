@@ -4,7 +4,8 @@ import { ChevronDown, Trophy, Check, ArrowUp, ArrowDown, Trash2 } from 'lucide-r
 import { SetRow } from './SetRow';
 import { Card } from '../common/Card';
 import { Chip } from '../common/Chip';
-import { formatSet } from '../../utils/weight';
+import { formatSet, weightUnitLabel, toDisplayWeight } from '../../utils/weight';
+import { useWeightUnit } from '../../hooks/useWeightUnit';
 
 export interface ExerciseCardProps {
   exName: string;
@@ -151,6 +152,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
     onBatchLogExercise,
   } = props;
 
+  const unit = useWeightUnit();
   const isCompleted = setsToday.length >= targetCount;
   const unloggedCount = Math.max(0, targetCount - setsToday.length);
   const totalRows = Math.max(targetCount, setsToday.length);
@@ -210,7 +212,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
             size="sm"
             variant="default"
             icon={<Trophy className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
-            label={`PR: ${formatSet(benchmarks.pr.weight, benchmarks.pr.reps)}`}
+            label={`PR: ${formatSet(benchmarks.pr.weight, benchmarks.pr.reps, unit)}`}
             className="bg-amber-500/10 border-amber-500/30 text-amber-400 font-semibold tabular-nums"
             testId={`pr-chip-${exIndex}`}
           />
@@ -319,7 +321,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
             <div className="col-span-3">Previous</div>
             <div className="col-span-3">
               <span className="sr-only">Weight</span>
-              <span aria-hidden="true">Lbs</span>
+              <span aria-hidden="true" className="capitalize">{weightUnitLabel(unit)}</span>
             </div>
             <div className="col-span-2">Reps</div>
             <div className="col-span-2 text-right pr-1">
@@ -340,7 +342,10 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
 
             const draftKey = `${exName}_${setIndex}`;
             const draft = inputDrafts[draftKey];
-            const draftWeight = draft?.weight !== undefined ? draft.weight : ghost.weight.toString();
+            const ghostWeightStr = typeof ghost.weight === 'number'
+              ? String(toDisplayWeight(ghost.weight, unit))
+              : '';
+            const draftWeight = draft?.weight !== undefined ? draft.weight : ghostWeightStr;
             const draftReps = draft?.reps !== undefined ? draft.reps : ghost.reps.toString();
 
             return (
@@ -356,6 +361,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
                 draftReps={draftReps}
                 targetRepCount={targetRepCount}
                 isMutating={isMutating}
+                unit={unit}
                 onUpdateDraft={onUpdateDraft}
                 onCommitSet={onCommitSet}
                 onEditSet={onEditSet}

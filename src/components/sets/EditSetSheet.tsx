@@ -8,6 +8,8 @@ import { Sheet } from "../common/Sheet";
 import { Button } from "../common/Button";
 import { StatusBanner } from "../common/StatusBanner";
 import { invalidateWorkoutDerived } from "../../lib/invalidate";
+import { weightUnitLabel, toDisplayWeight, resolveWeightInput } from "../../utils/weight";
+import { useWeightUnit } from "../../hooks/useWeightUnit";
 
 export interface EditSetSheetProps {
   isOpen: boolean;
@@ -46,6 +48,7 @@ const EditSetForm: React.FC<EditSetFormProps> = ({
   testId = "edit-set-sheet",
 }) => {
   const queryClient = useQueryClient();
+  const unit = useWeightUnit();
 
   const initialExerciseId = (() => {
     const directMatch = exercises.find((e) => e.id === set.exercise_id);
@@ -56,7 +59,7 @@ const EditSetForm: React.FC<EditSetFormProps> = ({
     return nameMatch ? nameMatch.id : set.exercise_id || (exercises[0]?.id ?? "");
   })();
 
-  const initialWeight = set.weight !== undefined && set.weight !== null ? String(set.weight) : "";
+  const initialWeight = set.weight !== undefined && set.weight !== null ? String(toDisplayWeight(set.weight, unit)) : "";
   const initialReps = set.reps !== undefined && set.reps !== null ? String(set.reps) : "";
   const initialRpe = set.rpe !== undefined && set.rpe !== null ? String(set.rpe) : "";
   const initialSetType: SetType = set.set_type || "working";
@@ -141,8 +144,8 @@ const EditSetForm: React.FC<EditSetFormProps> = ({
       return;
     }
 
-    const weightVal = Number(weight.trim());
-    if (!Number.isFinite(weightVal) || weightVal < 0) {
+    const resolvedWeight = resolveWeightInput(weight, unit, set.weight);
+    if (resolvedWeight === null || !Number.isFinite(resolvedWeight) || resolvedWeight < 0) {
       setErrorMessage("Weight must be 0 or greater (0 for bodyweight).");
       return;
     }
@@ -176,7 +179,7 @@ const EditSetForm: React.FC<EditSetFormProps> = ({
     updateMutation.mutate({
       id: set.id,
       exercise_id: selectedExerciseId,
-      weight: weightVal,
+      weight: resolvedWeight,
       reps: repsVal,
       rpe: rpeVal,
       set_type: setType,
@@ -265,7 +268,7 @@ const EditSetForm: React.FC<EditSetFormProps> = ({
               htmlFor="edit-set-weight"
               className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5"
             >
-              Weight (lbs)
+              Weight ({weightUnitLabel(unit)})
             </label>
             <input
               id="edit-set-weight"

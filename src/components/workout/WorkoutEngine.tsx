@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { useWeightUnit } from '../../hooks/useWeightUnit';
 import type { RoutineTemplate } from '../../types/database';
 import {
   computeGhostSets,
@@ -35,6 +36,7 @@ import type { CatalogExercise } from '../../lib/exercises';
 
 export const WorkoutEngine: React.FC = () => {
   const { user, profile } = useAuth();
+  const unit = useWeightUnit();
 
   const targetUserId =
     user?.id ||
@@ -417,10 +419,10 @@ export const WorkoutEngine: React.FC = () => {
                 const exerciseSetsToday = rawSets.filter(
                   (s) => s.id !== pendingSetId && (!s.id || !pendingDeletedSetIds.has(s.id))
                 );
-                const benchmarks = getExerciseBenchmarks(exName, userLogs, workoutDate);
+                const benchmarks = getExerciseBenchmarks(exName, userLogs, workoutDate, unit);
                 const isExpanded = expandedExercises.has(exName);
                 const targetCount = targetSetCounts[exName] || 3;
-                const ghostValues = computeGhostSets(exName, targetCount, userLogs, workoutDate);
+                const ghostValues = computeGhostSets(exName, targetCount, userLogs, workoutDate, unit);
 
                 return (
                   <div key={exName} data-card-for-exercise={exName}>

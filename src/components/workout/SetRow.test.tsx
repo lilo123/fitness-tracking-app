@@ -3,6 +3,33 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { SetRow } from './SetRow';
 import type { WorkoutSet } from '../../types/database';
 import { expectNoA11yViolations } from '../../test/a11y';
+import { AuthContext, type AuthContextType } from '../../context/AuthContextTypes';
+
+const createAuthContextValue = (weightUnit: 'lb' | 'kg' = 'lb'): AuthContextType => ({
+  user: { id: 'test-user-id' } as any,
+  profile: { id: 'test-user-id', weight_unit: weightUnit } as any,
+  role: 'athlete',
+  viewMode: 'athlete',
+  isCoachMode: false,
+  loading: false,
+  signIn: vi.fn(),
+  signUp: vi.fn(),
+  signOut: vi.fn(),
+  updateProfile: vi.fn(),
+  switchRole: vi.fn(),
+  refreshProfile: vi.fn(),
+  resendConfirmation: vi.fn(),
+  requestPasswordReset: vi.fn(),
+  resetPassword: vi.fn(),
+});
+
+function renderWithAuth(ui: React.ReactElement, weightUnit: 'lb' | 'kg' = 'lb') {
+  return render(
+    <AuthContext.Provider value={createAuthContextValue(weightUnit)}>
+      {ui}
+    </AuthContext.Provider>
+  );
+}
 
 describe('SetRow', () => {
   const defaultGhost = {
@@ -30,7 +57,7 @@ describe('SetRow', () => {
       const onCommitSet = vi.fn();
       const onUpdateDraft = vi.fn();
 
-      render(
+      renderWithAuth(
         <SetRow
           exName="Bench Press"
           exIndex={0}
@@ -58,7 +85,7 @@ describe('SetRow', () => {
     });
 
     it('displays logged set index from loggedSet.set_index (W19)', () => {
-      render(
+      renderWithAuth(
         <SetRow
           exName="Bench Press"
           exIndex={0}
@@ -85,7 +112,7 @@ describe('SetRow', () => {
         reps: 12,
       };
 
-      render(
+      renderWithAuth(
         <SetRow
           exName="Pull Up"
           exIndex={0}
@@ -106,7 +133,7 @@ describe('SetRow', () => {
     });
 
     it('satisfies a11y standards on logged row', async () => {
-      const { container } = render(
+      const { container } = renderWithAuth(
         <SetRow
           exName="Bench Press"
           exIndex={0}
@@ -129,7 +156,7 @@ describe('SetRow', () => {
 
   describe('Pending / Draft Set (W26)', () => {
     it('provides 16px inputs, enterKeyHint and select-on-focus (W26)', () => {
-      render(
+      renderWithAuth(
         <SetRow
           exName="Bench Press"
           exIndex={0}
@@ -158,7 +185,7 @@ describe('SetRow', () => {
 
     it('navigates from weight to reps on Enter and commits on Enter in reps (W26)', () => {
       const onCommitSet = vi.fn();
-      render(
+      renderWithAuth(
         <SetRow
           exName="Bench Press"
           exIndex={0}
@@ -189,7 +216,7 @@ describe('SetRow', () => {
 
     it('commits set on one-tap check button click', () => {
       const onCommitSet = vi.fn();
-      render(
+      renderWithAuth(
         <SetRow
           exName="Bench Press"
           exIndex={0}
@@ -212,7 +239,7 @@ describe('SetRow', () => {
     it('W34: after commit, moves focus to next pending set weight input (or reps if weight prefilled)', async () => {
       vi.useFakeTimers();
       const onCommitSet = vi.fn();
-      render(
+      renderWithAuth(
         <div>
           <SetRow
             exName="Bench Press"
@@ -256,7 +283,7 @@ describe('SetRow', () => {
 
     it('W34: moves focus to reps input if next pending set weight is prefilled', async () => {
       vi.useFakeTimers();
-      render(
+      renderWithAuth(
         <div>
           <SetRow
             exName="Bench Press"
@@ -298,7 +325,7 @@ describe('SetRow', () => {
 
     it('W34: does not steal focus when a dialog or sheet is open', async () => {
       vi.useFakeTimers();
-      render(
+      renderWithAuth(
         <div>
           <div role="dialog" aria-modal="true">
             <button data-testid="dialog-btn">Dialog button</button>
@@ -346,7 +373,7 @@ describe('SetRow', () => {
     });
 
     it('satisfies a11y standards on pending row', async () => {
-      const { container } = render(
+      const { container } = renderWithAuth(
         <SetRow
           exName="Bench Press"
           exIndex={0}
@@ -363,5 +390,54 @@ describe('SetRow', () => {
 
       await expectNoA11yViolations(container);
     });
+
+    it('displays 102.1 for 225 lb logged set in kg mode (P6, W3)', () => {
+      const kgLoggedSet: WorkoutSet = {
+        ...loggedSet,
+        weight: 225,
+        reps: 5,
+      };
+
+      renderWithAuth(
+        <SetRow
+          exName="Bench Press"
+          exIndex={0}
+          rowIdx={0}
+          setIndex={1}
+          loggedSet={kgLoggedSet}
+          ghost={defaultGhost}
+          draftWeight=""
+          draftReps=""
+          isMutating={false}
+          onUpdateDraft={vi.fn()}
+          onCommitSet={vi.fn()}
+        />,
+        'kg'
+      );
+
+      expect(screen.getByText('102.1')).toBeInTheDocument();
+    });
+
+    it('renders suffix kg in placeholder when ghost weight is absent in kg mode (P6, W3)', () => {
+      renderWithAuth(
+        <SetRow
+          exName="Bench Press"
+          exIndex={0}
+          rowIdx={0}
+          setIndex={1}
+          ghost={{ weight: '', reps: '', hintText: '—', isFromPrevious: false }}
+          draftWeight=""
+          draftReps=""
+          isMutating={false}
+          onUpdateDraft={vi.fn()}
+          onCommitSet={vi.fn()}
+        />,
+        'kg'
+      );
+
+      const weightInput = screen.getByTestId('ghost-weight-0-0');
+      expect(weightInput).toHaveAttribute('placeholder', 'kg');
+    });
   });
 });
+

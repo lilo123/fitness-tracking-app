@@ -1,7 +1,8 @@
 import React, { memo, useRef } from 'react';
 import type { WorkoutSet } from '../../types/database';
 import { Check } from 'lucide-react';
-import { formatWeight } from '../../utils/weight';
+import { formatWeight, weightUnitLabel, toDisplayWeight, type WeightUnit } from '../../utils/weight';
+import { useWeightUnit } from '../../hooks/useWeightUnit';
 
 export interface SetRowProps {
   exName: string;
@@ -19,6 +20,7 @@ export interface SetRowProps {
   draftReps: string;
   targetRepCount?: number;
   isMutating: boolean;
+  unit?: WeightUnit;
   onUpdateDraft: (exName: string, setIndex: number, field: 'weight' | 'reps', val: string) => void;
   onCommitSet: (exName: string, setIndex: number, ghost: any) => void;
   onEditSet?: (exIndex: number, rowIdx: number) => void;
@@ -41,6 +43,8 @@ export const SetRow: React.FC<SetRowProps> = memo((props) => {
     onEditSet,
   } = props;
 
+  const hookUnit = useWeightUnit();
+  const unit = props.unit ?? hookUnit;
   const repsInputRef = useRef<HTMLInputElement>(null);
 
   if (loggedSet) {
@@ -65,7 +69,7 @@ export const SetRow: React.FC<SetRowProps> = memo((props) => {
         </div>
         <div className="col-span-3 flex justify-center">
           <div className="w-full max-w-[76px] h-8 rounded-lg bg-zinc-950/80 border border-zinc-700/60 flex items-center justify-center font-bold text-white text-sm tabular-nums">
-            {formatWeight(loggedSet.weight)}
+            {formatWeight(loggedSet.weight, unit)}
           </div>
         </div>
         <div className="col-span-2 flex justify-center">
@@ -103,7 +107,7 @@ export const SetRow: React.FC<SetRowProps> = memo((props) => {
           type="text"
           inputMode="decimal"
           enterKeyHint="next"
-          placeholder={typeof ghost.weight === 'number' ? ghost.weight.toString() : 'lbs'}
+          placeholder={typeof ghost.weight === 'number' ? toDisplayWeight(ghost.weight, unit).toString() : weightUnitLabel(unit)}
           value={draftWeight}
           onChange={(e) => onUpdateDraft(exName, setIndex, 'weight', e.target.value)}
           onFocus={(e) => e.target.select()}

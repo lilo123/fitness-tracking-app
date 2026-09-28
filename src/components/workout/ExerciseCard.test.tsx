@@ -3,6 +3,33 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { ExerciseCard, type ExerciseCardProps } from './ExerciseCard';
 import type { WorkoutSet } from '../../types/database';
 import { expectNoA11yViolations } from '../../test/a11y';
+import { AuthContext, type AuthContextType } from '../../context/AuthContextTypes';
+
+const createAuthContextValue = (weightUnit: 'lb' | 'kg' = 'lb'): AuthContextType => ({
+  user: { id: 'test-user-id' } as any,
+  profile: { id: 'test-user-id', weight_unit: weightUnit } as any,
+  role: 'athlete',
+  viewMode: 'athlete',
+  isCoachMode: false,
+  loading: false,
+  signIn: vi.fn(),
+  signUp: vi.fn(),
+  signOut: vi.fn(),
+  updateProfile: vi.fn(),
+  switchRole: vi.fn(),
+  refreshProfile: vi.fn(),
+  resendConfirmation: vi.fn(),
+  requestPasswordReset: vi.fn(),
+  resetPassword: vi.fn(),
+});
+
+function renderWithAuth(ui: React.ReactElement, weightUnit: 'lb' | 'kg' = 'lb') {
+  return render(
+    <AuthContext.Provider value={createAuthContextValue(weightUnit)}>
+      {ui}
+    </AuthContext.Provider>
+  );
+}
 
 describe('ExerciseCard', () => {
   const baseBenchmarks = {
@@ -58,7 +85,7 @@ describe('ExerciseCard', () => {
   };
 
   it('renders card title, index badge and chips (W7, W13)', () => {
-    render(<ExerciseCard {...defaultProps} />);
+    renderWithAuth(<ExerciseCard {...defaultProps} />);
 
     expect(screen.getByText('Bench Press')).toBeInTheDocument();
     expect(screen.getByTestId('exercise-index-0')).toHaveTextContent('1');
@@ -88,14 +115,14 @@ describe('ExerciseCard', () => {
       },
     };
 
-    render(<ExerciseCard {...bwProps} />);
+    renderWithAuth(<ExerciseCard {...bwProps} />);
     expect(screen.getByTestId('pr-chip-0')).toHaveTextContent('PR: BW×15');
     expect(screen.getByText('No prior session')).toBeInTheDocument();
   });
 
   it('handles target sets stepper decrease and increase', () => {
     const onAdjustTargetSets = vi.fn();
-    render(<ExerciseCard {...defaultProps} onAdjustTargetSets={onAdjustTargetSets} />);
+    renderWithAuth(<ExerciseCard {...defaultProps} onAdjustTargetSets={onAdjustTargetSets} />);
 
     const decreaseBtn = screen.getByTitle('Decrease target sets');
     const increaseBtn = screen.getByTitle('Increase target sets');
@@ -108,7 +135,7 @@ describe('ExerciseCard', () => {
   });
 
   it('disables decrease button when targetCount equals completed sets', () => {
-    render(
+    renderWithAuth(
       <ExerciseCard
         {...defaultProps}
         targetCount={1}
@@ -124,7 +151,7 @@ describe('ExerciseCard', () => {
     const onMoveExercise = vi.fn();
     const onRemoveExercise = vi.fn();
 
-    render(
+    renderWithAuth(
       <ExerciseCard
         {...defaultProps}
         onMoveExercise={onMoveExercise}
@@ -143,7 +170,7 @@ describe('ExerciseCard', () => {
 
   it('toggles accordion when clicking header button', () => {
     const onToggleAccordion = vi.fn();
-    render(<ExerciseCard {...defaultProps} onToggleAccordion={onToggleAccordion} />);
+    renderWithAuth(<ExerciseCard {...defaultProps} onToggleAccordion={onToggleAccordion} />);
 
     const headerBtn = screen.getByRole('button', { name: /Bench Press, collapse exercise/i });
     fireEvent.click(headerBtn);
@@ -158,26 +185,24 @@ describe('ExerciseCard', () => {
         return <ExerciseCard {...props} />;
       };
 
-      const { rerender } = render(<SpyCard {...defaultProps} />);
+      const { rerender } = renderWithAuth(<SpyCard {...defaultProps} />);
       expect(renderCount).toBe(1);
 
       // Rerender with inputDrafts change in Squat (unrelated card)
       rerender(
-        <SpyCard
-          {...defaultProps}
-          inputDrafts={{
-            'Squat_1': { weight: '225', reps: '5' },
-          }}
-        />
+        <AuthContext.Provider value={createAuthContextValue('lb')}>
+          <SpyCard
+            {...defaultProps}
+            inputDrafts={{
+              'Squat_1': { weight: '225', reps: '5' },
+            }}
+          />
+        </AuthContext.Provider>
       );
-
-      // Due to memo comparator, ExerciseCard for Bench Press should NOT re-render
-      // Note: SpyCard runs, but ExerciseCard memo skips rendering inner children
-      // We can verify that props comparison for Bench Press returned true
     });
 
     it('re-renders when benchmarks change by value', () => {
-      const { rerender } = render(<ExerciseCard {...defaultProps} />);
+      const { rerender } = renderWithAuth(<ExerciseCard {...defaultProps} />);
       expect(screen.getByTestId('pr-chip-0')).toHaveTextContent('PR: 225×5');
 
       // Update PR benchmark
@@ -186,21 +211,27 @@ describe('ExerciseCard', () => {
         pr: { weight: 230, reps: 5, date: '2026-09-27' },
       };
 
-      rerender(<ExerciseCard {...defaultProps} benchmarks={updatedBenchmarks} />);
+      rerender(
+        <AuthContext.Provider value={createAuthContextValue('lb')}>
+          <ExerciseCard {...defaultProps} benchmarks={updatedBenchmarks} />
+        </AuthContext.Provider>
+      );
       expect(screen.getByTestId('pr-chip-0')).toHaveTextContent('PR: 230×5');
     });
 
     it('re-renders when input draft for this exercise changes', () => {
-      const { rerender } = render(<ExerciseCard {...defaultProps} />);
+      const { rerender } = renderWithAuth(<ExerciseCard {...defaultProps} />);
       expect((screen.getByTestId('ghost-weight-0-1') as HTMLInputElement).value).toBe('185');
 
       rerender(
-        <ExerciseCard
-          {...defaultProps}
-          inputDrafts={{
-            'Bench Press_2': { weight: '190', reps: '8' },
-          }}
-        />
+        <AuthContext.Provider value={createAuthContextValue('lb')}>
+          <ExerciseCard
+            {...defaultProps}
+            inputDrafts={{
+              'Bench Press_2': { weight: '190', reps: '8' },
+            }}
+          />
+        </AuthContext.Provider>
       );
 
       expect((screen.getByTestId('ghost-weight-0-1') as HTMLInputElement).value).toBe('190');
@@ -208,7 +239,30 @@ describe('ExerciseCard', () => {
   });
 
   it('satisfies accessibility standards', async () => {
-    const { container } = render(<ExerciseCard {...defaultProps} />);
+    const { container } = renderWithAuth(<ExerciseCard {...defaultProps} />);
     await expectNoA11yViolations(container);
+  });
+
+  it('formats PR chip and prefills ghost weight in kg mode (P6, W3)', () => {
+    const kgProps: ExerciseCardProps = {
+      ...defaultProps,
+      benchmarks: {
+        lastSession: null,
+        pr: { weight: 225, reps: 5, date: '2026-08-15' },
+      },
+      ghostValues: [
+        { weight: 225, reps: 5, hintText: '102.1 kg × 5', isFromPrevious: true },
+        { weight: 225, reps: 5, hintText: '102.1 kg × 5', isFromPrevious: true },
+      ],
+      setsToday: [],
+    };
+
+    renderWithAuth(<ExerciseCard {...kgProps} />, 'kg');
+
+    const prChip = screen.getByTestId('pr-chip-0');
+    expect(prChip).toHaveTextContent('PR: 102.1×5');
+
+    const weightInput0 = screen.getByTestId('ghost-weight-0-0') as HTMLInputElement;
+    expect(weightInput0.value).toBe('102.1');
   });
 });

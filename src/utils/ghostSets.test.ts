@@ -875,5 +875,25 @@ describe('Ghost Sets Algorithm & Benchmarks', () => {
       expect(masterBm.pr?.weight).toBe(315);
       expect(masterBm.lastSession?.sets[0].exercise_id).toBe(masterExId);
     });
+
+    it('formats ghost hint in active unit (102.1 kg × 5) and benchmark summary in kg (P6, W3)', () => {
+      const history = [
+        {
+          id: 's-1',
+          exercise_id: 'ex-bench',
+          weight: 225,
+          reps: 5,
+          workout_date: '2026-09-20',
+          set_type: 'working',
+        },
+      ];
+
+      const ghosts = computeGhostSets('ex-bench', 1, history as any, '2026-09-27', 'kg');
+      expect(ghosts[0].hintText).toBe('102.1 kg × 5');
+
+      const bm = getExerciseBenchmarks('ex-bench', history as any, '2026-09-27', 'kg');
+      expect(bm.lastSession?.summaryText).toBe('102.1×5');
+    });
   });
 });
+
