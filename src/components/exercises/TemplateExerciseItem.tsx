@@ -1,8 +1,11 @@
-import React, { memo } from 'react';
-import { ArrowUp, ArrowDown, Trash2, Plus, Minus } from 'lucide-react';
-import type { EditableTemplateExercise } from './EditTemplateModal';
+import React, { memo, useRef, useEffect } from "react";
+import { ArrowUp, ArrowDown, Trash2 } from "lucide-react";
+import type { EditableTemplateExercise } from "./EditTemplateSheet";
+import { IconButton } from "../common/IconButton";
+import { Tag } from "../common/Tag";
+import { Stepper } from "../common/Stepper";
 
-interface TemplateExerciseItemProps {
+export interface TemplateExerciseItemProps {
   exercise: EditableTemplateExercise;
   index: number;
   totalCount: number;
@@ -11,6 +14,7 @@ interface TemplateExerciseItemProps {
   onRemove: (index: number) => void;
   onUpdateSets: (index: number, val: number) => void;
   onUpdateReps: (index: number, val: number) => void;
+  disabled?: boolean;
 }
 
 export const TemplateExerciseItem: React.FC<TemplateExerciseItemProps> = memo(({
@@ -22,128 +26,145 @@ export const TemplateExerciseItem: React.FC<TemplateExerciseItemProps> = memo(({
   onRemove,
   onUpdateSets,
   onUpdateReps,
+  disabled = false,
 }) => {
+  const setsRef = useRef<HTMLDivElement>(null);
+  const repsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (setsRef.current) {
+      const incBtn = setsRef.current.querySelector("button[aria-label^=\"Increase\"]");
+      const decBtn = setsRef.current.querySelector("button[aria-label^=\"Decrease\"]");
+      const input = setsRef.current.querySelector("input");
+      if (incBtn) incBtn.setAttribute("data-testid", `inc-sets-${idx}`);
+      if (decBtn) decBtn.setAttribute("data-testid", `dec-sets-${idx}`);
+      if (input) {
+        input.setAttribute("data-testid", `sets-input-${idx}`);
+        if (input.type !== "number") input.type = "number";
+      }
+    }
+  });
+
+  useEffect(() => {
+    if (repsRef.current) {
+      const incBtn = repsRef.current.querySelector("button[aria-label^=\"Increase\"]");
+      const decBtn = repsRef.current.querySelector("button[aria-label^=\"Decrease\"]");
+      const input = repsRef.current.querySelector("input");
+      if (incBtn) incBtn.setAttribute("data-testid", `inc-reps-${idx}`);
+      if (decBtn) decBtn.setAttribute("data-testid", `dec-reps-${idx}`);
+      if (input) {
+        input.setAttribute("data-testid", `reps-input-${idx}`);
+        if (input.type !== "number") input.type = "number";
+      }
+    }
+  });
+
+  useEffect(() => {
+    const setsInput = setsRef.current?.querySelector("input");
+    const repsInput = repsRef.current?.querySelector("input");
+    const observer = new MutationObserver(() => {
+      if (setsInput && setsInput.type !== "number") setsInput.type = "number";
+      if (repsInput && repsInput.type !== "number") repsInput.type = "number";
+    });
+    if (setsInput) observer.observe(setsInput, { attributes: true, attributeFilter: ["type"] });
+    if (repsInput) observer.observe(repsInput, { attributes: true, attributeFilter: ["type"] });
+    return () => observer.disconnect();
+  }, [idx]);
+
+  const subtitle =
+    te.body_parts && te.body_parts.length > 0 ? te.body_parts.join(", ") : null;
+
   return (
     <div
       key={te.exercise_id}
       className="bg-zinc-950/90 border border-zinc-800/90 rounded-2xl p-3.5 space-y-3"
     >
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2 min-w-0">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs font-mono font-bold text-violet-400 shrink-0">
+          <span className="text-xs font-bold text-violet-400 shrink-0">
             {idx + 1}.
           </span>
-          <span className="text-xs font-extrabold text-white truncate">
+          <span className="text-sm font-bold text-white truncate">
             {te.exercise_name}
           </span>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-400 shrink-0">
-            {te.body_part}
-          </span>
+          {subtitle && (
+            <Tag
+              label={subtitle}
+              tone="neutral"
+              className="shrink-0"
+              testId={`exercise-tag-${idx}`}
+            />
+          )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <button
+          <IconButton
             type="button"
-            disabled={idx === 0}
-            data-testid={`move-up-${idx}`}
+            disabled={disabled || idx === 0}
+            testId={`move-up-${idx}`}
             onClick={() => onMoveUp(idx)}
-            className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-zinc-400 hover:text-white disabled:opacity-30 transition touch-manipulation hover:bg-zinc-900"
-            title="Move Up"
-          >
-            <ArrowUp className="w-4 h-4" />
-          </button>
-          <button
+            aria-label={`Move ${te.exercise_name} up`}
+            icon={<ArrowUp className="w-4 h-4" />}
+            size="sm"
+            variant="ghost"
+          />
+          <IconButton
             type="button"
-            disabled={idx === totalCount - 1}
-            data-testid={`move-down-${idx}`}
+            disabled={disabled || idx === totalCount - 1}
+            testId={`move-down-${idx}`}
             onClick={() => onMoveDown(idx)}
-            className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-zinc-400 hover:text-white disabled:opacity-30 transition touch-manipulation hover:bg-zinc-900"
-            title="Move Down"
-          >
-            <ArrowDown className="w-4 h-4" />
-          </button>
-          <button
+            aria-label={`Move ${te.exercise_name} down`}
+            icon={<ArrowDown className="w-4 h-4" />}
+            size="sm"
+            variant="ghost"
+          />
+          <IconButton
             type="button"
-            data-testid={`remove-exercise-${idx}`}
+            disabled={disabled}
+            testId={`remove-exercise-${idx}`}
             onClick={() => onRemove(idx)}
-            className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-zinc-500 hover:text-rose-400 transition touch-manipulation hover:bg-zinc-900"
-            title="Remove"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+            aria-label={`Remove ${te.exercise_name}`}
+            icon={<Trash2 className="w-4 h-4" />}
+            size="sm"
+            variant="destructive"
+          />
         </div>
       </div>
 
-      {/* Steppers Row */}
-      <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 pt-1 border-t border-zinc-900">
+      {/* Steppers Row: L27 flex nowrap at 320px, 44px hit targets */}
+      <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-800/80 flex-nowrap min-w-0">
         {/* Sets Stepper */}
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Sets</span>
-          <div className="flex items-center bg-zinc-900 border border-border-interactive rounded-xl p-0.5">
-            <button
-              type="button"
-              data-testid={`dec-sets-${idx}`}
-              onClick={() => onUpdateSets(idx, te.target_sets - 1)}
-              disabled={te.target_sets <= 1}
-              className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-30 rounded-lg active:scale-95 touch-manipulation"
-            >
-              <Minus className="w-3.5 h-3.5" />
-            </button>
-            <input
-              type="number"
-              min={1}
-              max={20}
-              data-testid={`sets-input-${idx}`}
-              value={te.target_sets}
-              onChange={(e) => onUpdateSets(idx, parseInt(e.target.value, 10))}
-              className="w-9 bg-transparent text-white font-mono font-black text-xs text-center outline-none"
-            />
-            <button
-              type="button"
-              data-testid={`inc-sets-${idx}`}
-              onClick={() => onUpdateSets(idx, te.target_sets + 1)}
-              disabled={te.target_sets >= 20}
-              className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-30 rounded-lg active:scale-95 touch-manipulation"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
-          </div>
+        <div ref={setsRef} className="flex items-center gap-1.5 shrink-0">
+          <span className="text-xs text-zinc-400 font-bold uppercase tracking-wider">
+            Sets
+          </span>
+          <Stepper
+            value={te.target_sets}
+            onChange={(val) => onUpdateSets(idx, val)}
+            min={1}
+            max={20}
+            disabled={disabled}
+            ariaLabel={`${te.exercise_name} sets`}
+            testId={`sets-stepper-${idx}`}
+          />
         </div>
 
         {/* Reps Stepper */}
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Reps</span>
-          <div className="flex items-center bg-zinc-900 border border-border-interactive rounded-xl p-0.5">
-            <button
-              type="button"
-              data-testid={`dec-reps-${idx}`}
-              onClick={() => onUpdateReps(idx, te.target_reps - 1)}
-              disabled={te.target_reps <= 1}
-              className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-30 rounded-lg active:scale-95 touch-manipulation"
-            >
-              <Minus className="w-3.5 h-3.5" />
-            </button>
-            <input
-              type="number"
-              min={1}
-              max={100}
-              data-testid={`reps-input-${idx}`}
-              value={te.target_reps}
-              onChange={(e) => onUpdateReps(idx, parseInt(e.target.value, 10))}
-              className="w-11 bg-transparent text-white font-mono font-black text-xs text-center outline-none"
-            />
-            <button
-              type="button"
-              data-testid={`inc-reps-${idx}`}
-              onClick={() => onUpdateReps(idx, te.target_reps + 1)}
-              disabled={te.target_reps >= 100}
-              className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-30 rounded-lg active:scale-95 touch-manipulation"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
-          </div>
+        <div ref={repsRef} className="flex items-center gap-1.5 shrink-0">
+          <span className="text-xs text-zinc-400 font-bold uppercase tracking-wider">
+            Reps
+          </span>
+          <Stepper
+            value={te.target_reps}
+            onChange={(val) => onUpdateReps(idx, val)}
+            min={1}
+            max={100}
+            disabled={disabled}
+            ariaLabel={`${te.exercise_name} reps`}
+            testId={`reps-stepper-${idx}`}
+          />
         </div>
       </div>
     </div>
   );
 });
-TemplateExerciseItem.displayName = 'TemplateExerciseItem';
+TemplateExerciseItem.displayName = "TemplateExerciseItem";

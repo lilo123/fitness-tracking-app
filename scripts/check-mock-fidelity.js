@@ -420,7 +420,7 @@ const SERVICED_QUERIES_REGISTRY = {
       description: 'Mutation-only exercise update',
     },
   ],
-  'src/components/exercises/EditTemplateModal.test.tsx': [
+  'src/components/exercises/EditTemplateSheet.test.tsx': [
     {
       table: 'routine_templates',
       type: 'WILDCARD_MUTATION_RETURN',
