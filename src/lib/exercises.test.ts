@@ -5,6 +5,9 @@ import {
   DuplicateExerciseError,
   encodeCatalogCursor,
   flattenCatalogPages,
+  fetchAllVisibleExercises,
+  EXERCISE_SUMMARY_PROJECTION,
+  EXERCISE_LIBRARY_PROJECTION,
 } from './exercises';
 import { supabase } from './supabase';
 import { queryKeys } from './queryKeys';
@@ -201,6 +204,159 @@ describe('exercises lib', () => {
         { id: '2', name: 'B' },
       ]);
       expect(flattenCatalogPages(null)).toEqual([]);
+    });
+  });
+
+  describe('fetchAllVisibleExercises', () => {
+    it('pages until a short page (210 rows -> 2 requests at page 200) and returns complete catalog with tail exercise', async () => {
+      const mock210 = Array.from({ length: 210 }, (_, i) => ({
+        id: `ex-${i + 1}`,
+        name: i === 209 ? 'Zottman Curl' : `Exercise ${String(i + 1).padStart(3, '0')}`,
+        body_parts: ['Arms'],
+        is_master: true,
+      }));
+
+      const rangeCalls: Array<[number, number]> = [];
+
+      vi.mocked(supabase['from']).mockImplementation((_table: string) => {
+        const builder: any = {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          order: vi.fn().mockReturnThis(),
+          range: vi.fn().mockImplementation((rangeStart: number, rangeEnd: number) => {
+            rangeCalls.push([rangeStart, rangeEnd]);
+            return Promise.resolve({
+              data: mock210.slice(rangeStart, rangeEnd + 1),
+              error: null,
+            });
+          }),
+        };
+        return builder;
+      });
+
+      const result = await fetchAllVisibleExercises();
+
+      expect(rangeCalls).toEqual([
+        [0, 199],
+        [200, 399],
+      ]);
+      expect(result).toHaveLength(210);
+      expect(result[209].name).toBe('Zottman Curl');
+    });
+
+    it('applies isArchived filter when explicitly specified', async () => {
+      const eqCalls: Array<[string, any]> = [];
+
+      vi.mocked(supabase['from']).mockImplementation((_table: string) => {
+        const builder: any = {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockImplementation((col: string, val: any) => {
+            eqCalls.push([col, val]);
+            return builder;
+          }),
+          order: vi.fn().mockReturnThis(),
+          range: vi.fn().mockResolvedValue({ data: [], error: null }),
+        };
+        return builder;
+      });
+
+      await fetchAllVisibleExercises(EXERCISE_SUMMARY_PROJECTION, { isArchived: false });
+      expect(eqCalls).toContainEqual(['is_archived', false]);
+
+      eqCalls.length = 0;
+      await fetchAllVisibleExercises(EXERCISE_SUMMARY_PROJECTION);
+      expect(eqCalls.some(([col]) => col === 'is_archived')).toBe(false);
+    });
+
+    it('applies userId scope filter when provided', async () => {
+      const orCalls: string[] = [];
+      const eqCalls: Array<[string, any]> = [];
+
+      vi.mocked(supabase['from']).mockImplementation((_table: string) => {
+        const builder: any = {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockImplementation((col: string, val: any) => {
+            eqCalls.push([col, val]);
+            return builder;
+          }),
+          or: vi.fn().mockImplementation((expr: string) => {
+            orCalls.push(expr);
+            return builder;
+          }),
+          order: vi.fn().mockReturnThis(),
+          range: vi.fn().mockResolvedValue({ data: [], error: null }),
+        };
+        return builder;
+      });
+
+      // Valid UUID
+      const testUserId = '11111111-1111-4111-8111-111111111111';
+      await fetchAllVisibleExercises(EXERCISE_LIBRARY_PROJECTION, { userId: testUserId });
+      expect(orCalls).toContainEqual(`is_master.eq.true,user_id.eq.${testUserId}`);
+
+      // Invalid UUID or null
+      orCalls.length = 0;
+      eqCalls.length = 0;
+      await fetchAllVisibleExercises(EXERCISE_LIBRARY_PROJECTION, { userId: null });
+      expect(orCalls).toHaveLength(0);
+      expect(eqCalls).toContainEqual(['is_master', true]);
+
+      // Omitted userId
+      orCalls.length = 0;
+      eqCalls.length = 0;
+      await fetchAllVisibleExercises(EXERCISE_SUMMARY_PROJECTION);
+      expect(orCalls).toHaveLength(0);
+      expect(eqCalls.some(([col]) => col === 'is_master')).toBe(false);
+    });
+
+    it('respects custom pageSize option', async () => {
+      const mock50 = Array.from({ length: 50 }, (_, i) => ({
+        id: `ex-${i}`,
+        name: `Exercise ${i}`,
+        body_parts: ['Legs'],
+        is_master: true,
+      }));
+
+      const rangeCalls: Array<[number, number]> = [];
+
+      vi.mocked(supabase['from']).mockImplementation((_table: string) => {
+        const builder: any = {
+          select: vi.fn().mockReturnThis(),
+          order: vi.fn().mockReturnThis(),
+          range: vi.fn().mockImplementation((rangeStart: number, rangeEnd: number) => {
+            rangeCalls.push([rangeStart, rangeEnd]);
+            return Promise.resolve({
+              data: mock50.slice(rangeStart, rangeEnd + 1),
+              error: null,
+            });
+          }),
+        };
+        return builder;
+      });
+
+      const result = await fetchAllVisibleExercises(EXERCISE_SUMMARY_PROJECTION, { pageSize: 20 });
+      expect(rangeCalls).toEqual([
+        [0, 19],
+        [20, 39],
+        [40, 59],
+      ]);
+      expect(result).toHaveLength(50);
+    });
+
+    it('throws error when database returns an error', async () => {
+      vi.mocked(supabase['from']).mockImplementation((_table: string) => {
+        const builder: any = {
+          select: vi.fn().mockReturnThis(),
+          order: vi.fn().mockReturnThis(),
+          range: vi.fn().mockResolvedValue({
+            data: null,
+            error: new Error('Database connection failed'),
+          }),
+        };
+        return builder;
+      });
+
+      await expect(fetchAllVisibleExercises()).rejects.toThrow('Database connection failed');
     });
   });
 });

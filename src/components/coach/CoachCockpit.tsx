@@ -21,6 +21,7 @@ import { nutritionRowLimitForRange } from '../../utils/coachQueryBounds';
 import { resolveExerciseLabel } from '../../utils/exerciseLabel';
 import { invalidateExerciseDomain } from '../../lib/invalidate';
 import { queryKeys } from '../../lib/queryKeys';
+import { fetchAllVisibleExercises } from '../../lib/exercises';
 
 const SETS_PAGE_LIMIT = 500;
 
@@ -63,9 +64,8 @@ export const CoachCockpit: React.FC = () => {
   } = useQuery({
     queryKey: ['exercises', 'coach'],
     queryFn: async () => {
-      const { data, error } = await (supabase.from('exercises') as any).select('id, name, body_parts, is_master').order('name').limit(200);
-      if (error) throw error;
-      return (data && data.length > 0 ? data : DEFAULT_EXERCISES_LIST) as Exercise[];
+      const data = await fetchAllVisibleExercises<Exercise>('id, name, body_parts, is_master');
+      return data.length > 0 ? data : DEFAULT_EXERCISES_LIST;
     },
   });
 

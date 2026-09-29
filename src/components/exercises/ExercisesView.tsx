@@ -1,10 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabase';
 import { BookOpen, CalendarPlus, AlertCircle, RotateCcw } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import type { Exercise } from '../../types/database';
-import { isValidUUID } from '../workout/workoutEngineHelpers';
+import { fetchAllVisibleExercises, EXERCISE_LIBRARY_PROJECTION } from '../../lib/exercises';
 import { StatusBanner } from '../common/StatusBanner';
 import { SegmentedTabs } from '../common/SegmentedTabs';
 import { ExerciseListTab } from './ExerciseListTab';
@@ -30,19 +29,10 @@ export const ExercisesView: React.FC = () => {
   } = useQuery({
     queryKey: ['exercises', 'library', user?.id],
     queryFn: async () => {
-      let query = supabase
-        .from('exercises')
-        .select('id, name, body_parts, is_master, is_archived, user_id, created_at')
-        .eq('is_archived', false);
-      if (user?.id && isValidUUID(user.id)) {
-        const filter = ['is_master.eq.true', 'user_id.eq.' + user.id].join(',');
-        query = query.or(filter);
-      } else {
-        query = query.eq('is_master', true);
-      }
-      const { data, error } = await query.order('name').limit(200);
-      if (error) throw error;
-      return data as Exercise[];
+      return fetchAllVisibleExercises<Exercise>(EXERCISE_LIBRARY_PROJECTION, {
+        isArchived: false,
+        userId: user?.id,
+      });
     },
   });
 

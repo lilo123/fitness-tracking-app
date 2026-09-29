@@ -4,6 +4,79 @@ import { supabase } from './supabase';
 import { queryKeys } from './queryKeys';
 import { invalidateExerciseDomain, type InvalidationClient } from './invalidate';
 import { normalizeSearch, parseBodyPartTokens } from '../utils/normalizeSearch';
+import { isValidUUID } from '../utils/uuid';
+import type { Exercise } from '../types/database';
+
+export const EXERCISE_SUMMARY_PROJECTION = 'id, name, body_parts, is_master';
+export const EXERCISE_LIBRARY_PROJECTION =
+  'id, name, body_parts, is_master, is_archived, user_id, created_at';
+
+export interface VisibleExerciseFilters {
+  isArchived?: boolean;
+  userId?: string | null;
+  applyQuery?: (query: any) => any;
+  pageSize?: number;
+}
+
+/**
+ * Shared paging helper that exhaustively fetches all visible exercises via .range()
+ * until a short page (< pageSize) is encountered, eliminating silent catalog truncation.
+ */
+export async function fetchAllVisibleExercises<T = Exercise>(
+  selectOrFilters?: string | VisibleExerciseFilters,
+  maybeFilters?: VisibleExerciseFilters
+): Promise<T[]> {
+  let select = EXERCISE_SUMMARY_PROJECTION;
+  let filters: VisibleExerciseFilters = {};
+  if (typeof selectOrFilters === 'string') {
+    select = selectOrFilters;
+    if (maybeFilters) filters = maybeFilters;
+  } else if (selectOrFilters && typeof selectOrFilters === 'object') {
+    filters = selectOrFilters;
+  }
+
+  const { isArchived, applyQuery, pageSize = 200 } = filters;
+  const all: T[] = [];
+  let from = 0;
+
+  while (true) {
+    let query: any =
+      select === EXERCISE_LIBRARY_PROJECTION
+        ? supabase.from('exercises').select(EXERCISE_LIBRARY_PROJECTION)
+        : select === EXERCISE_SUMMARY_PROJECTION
+        ? supabase.from('exercises').select(EXERCISE_SUMMARY_PROJECTION)
+        : (supabase.from('exercises') as any)['select'](select);
+
+    if (isArchived !== undefined) {
+      query = query.eq('is_archived', isArchived);
+    }
+
+    if ('userId' in filters) {
+      if (filters.userId && isValidUUID(filters.userId)) {
+        query = query.or(`is_master.eq.true,user_id.eq.${filters.userId}`);
+      } else {
+        query = query.eq('is_master', true);
+      }
+    }
+
+    if (applyQuery) {
+      query = applyQuery(query);
+    }
+
+    const { data, error } = await query
+      .order('name')
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+
+    all.push(...(data as T[]));
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+
+  return all;
+}
 
 export interface CatalogExercise {
   id: string;

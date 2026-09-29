@@ -13,6 +13,7 @@ import {
 import { formatSet } from '../../utils/weight';
 import type { ExerciseBenchmarks } from '../../types/database';
 import { isValidUUID } from './workoutEngineHelpers';
+import { fetchAllVisibleExercises } from '../../lib/exercises';
 
 export const WORKOUT_WITH_SETS_PROJECTION =
   'id, date, name, sets(id, reps, weight, set_index, created_at, exercise_id)';
@@ -102,22 +103,9 @@ export async function fetchTemplateDetail(templateId: string): Promise<RoutineTe
 export const workoutExercisesQueryOptions = {
   queryKey: ['exercises', 'workout'] as const,
   queryFn: async (): Promise<Exercise[]> => {
-    const allExercises: Exercise[] = [];
-    const PAGE_SIZE = 200;
-    let from = 0;
-    while (true) {
-      const { data, error } = await supabase
-        .from('exercises')
-        .select('id, name, body_parts, is_master')
-        .eq('is_archived', false)
-        .order('name')
-        .range(from, from + PAGE_SIZE - 1);
-      if (error) throw error;
-      if (!data || data.length === 0) break;
-      allExercises.push(...(data as Exercise[]));
-      if (data.length < PAGE_SIZE) break;
-      from += PAGE_SIZE;
-    }
+    const allExercises = await fetchAllVisibleExercises<Exercise>('id, name, body_parts, is_master', {
+      isArchived: false,
+    });
     if (allExercises.length === 0) return DEFAULT_EXERCISES_LIST;
     return allExercises;
   },
