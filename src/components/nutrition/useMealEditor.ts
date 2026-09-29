@@ -243,6 +243,8 @@ export function useMealEditor({
     setInitialSnapshot(buildSnapshot(initialDraft, date));
     setErrorMessage(null);
 
+    let active = true;
+
     // If items were undefined but has_components is true and not in cache, fetch on-demand
     if (meal.items === undefined && !norm && meal.has_components) {
       void (async () => {
@@ -253,12 +255,22 @@ export function useMealEditor({
             .select('id, items')
             .eq('id', meal.id)
             .maybeSingle();
-          if (error) return;
+          if (!active || error) return;
           if (data?.items) {
             const fetchedNorm = normalizeItems(data.items);
-            if (fetchedNorm && fetchedNorm.length > 0) {
+            if (active && fetchedNorm && fetchedNorm.length > 0) {
+              logItemsMemoryCache.set(meal.id, data.items);
               const { draft: updatedDraft } = buildInitialDraft(meal, fetchedNorm, tz);
-              setDraft(updatedDraft);
+              if (!active) return;
+              setDraft((current) => {
+                if (!current) return updatedDraft;
+                return {
+                  ...updatedDraft,
+                  name: current.name,
+                  mealType: current.mealType,
+                  notes: current.notes,
+                };
+              });
               setInitialAnchorItems(updatedDraft.items);
               setInitialSnapshot(buildSnapshot(updatedDraft, date));
             }
@@ -268,6 +280,10 @@ export function useMealEditor({
         }
       })();
     }
+
+    return () => {
+      active = false;
+    };
   }, [isOpen, meal, tz]);
 
   const isDirty = useMemo(() => {

@@ -6,6 +6,7 @@ import { EditMealSheet } from './EditMealSheet';
 import type { NutritionLog } from '../../types/database';
 import type { NutritionItem } from '../../utils/itemModel';
 import { createSupabaseBuilder, clearMockHistory } from '../../test/supabaseBuilderMock';
+import { supabase } from '../../lib/supabase';
 import { expectNoA11yViolations } from '../../test/a11y';
 
 const mockUpdate = vi.fn();
@@ -340,5 +341,74 @@ describe('EditMealSheet', () => {
     );
 
     await expectNoA11yViolations(container);
+  });
+  it('preserves user edits to meal name while on-demand items fetch resolves', async () => {
+    let resolveItemsFetch: (value: any) => void = () => {};
+    const itemsFetchPromise = new Promise((resolve) => {
+      resolveItemsFetch = resolve;
+    });
+
+    const client = createClient();
+    const currentMeal: NutritionLog = {
+      id: 'log-multi',
+      user_id: 'u1',
+      food_name: 'Original Meal Name',
+      calories: 400,
+      protein: 27,
+      carbs: 43,
+      fat: 10,
+      fiber: 0,
+      meal_type: 'Breakfast',
+      serving_size: 1,
+      serving_unit: 'serving',
+      logged_at: '2026-09-29T10:00:00.000Z',
+      logged_date: '2026-09-29',
+      has_components: true,
+      items: undefined,
+    };
+
+    const originalFrom = supabase.from;
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'nutrition_logs') {
+        const builder = createSupabaseBuilder(table);
+        builder.maybeSingle = vi.fn(() => itemsFetchPromise as any);
+        return builder;
+      }
+      return originalFrom(table as any);
+    });
+
+    render(
+      <QueryClientProvider client={client}>
+        <EditMealSheet isOpen={true} meal={currentMeal} onClose={vi.fn()} />
+      </QueryClientProvider>
+    );
+
+    const nameInput = screen.getByTestId('dish-name-input');
+    expect(nameInput).toHaveValue('Original Meal Name');
+
+    // User types new name while fetch is pending
+    fireEvent.change(nameInput, { target: { value: 'Edited In History' } });
+    expect(nameInput).toHaveValue('Edited In History');
+    expect(screen.getByTestId('save-edit-meal-btn')).not.toBeDisabled();
+
+    // Now resolve the async items fetch
+    resolveItemsFetch({
+      data: {
+        id: 'log-multi',
+        items: [
+          component({ id: 'c1', name: 'Meal Item', calories: 300 }),
+          component({ id: 'c2', name: 'Side Salad', calories: 100 }),
+        ],
+      },
+      error: null,
+    });
+
+    // Await state updates
+    await waitFor(() => {
+      expect(screen.getByTestId('dish-name-input')).toHaveValue('Edited In History');
+    });
+
+    // Save button must remain enabled because name was edited!
+    expect(screen.getByTestId('save-edit-meal-btn')).not.toBeDisabled();
   });
 });

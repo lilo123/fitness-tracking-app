@@ -107,13 +107,13 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
               onChange={(e) => setCustomCoachCode(e.target.value.toUpperCase())}
               placeholder="Enter vanity code (e.g. COACH-PRO)"
               maxLength={20}
-              className="flex-1 bg-zinc-950 border border-border-interactive text-white rounded-xl px-3 py-2 text-base font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none uppercase min-h-[44px]"
+              className="flex-1 min-w-0 bg-zinc-950 border border-border-interactive text-white rounded-xl px-3 py-2 text-base font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none uppercase min-h-[44px]"
               required
             />
             <button
               type="submit"
               disabled={isSavingCode || !customCoachCode.trim()}
-              className="bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 text-cyan-300 font-bold px-4 py-2 min-h-[44px] rounded-xl text-xs flex items-center gap-1.5 disabled:opacity-50 transition touch-manipulation"
+              className="shrink-0 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 text-cyan-300 font-bold px-4 py-2 min-h-[44px] rounded-xl text-xs flex items-center gap-1.5 disabled:opacity-50 transition touch-manipulation"
             >
               {isSavingCode ? 'Activating...' : 'Activate mode'}
             </button>
@@ -210,13 +210,13 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
               onChange={(e) => setCustomCoachCode(e.target.value.toUpperCase())}
               placeholder="e.g. COACH-PRO"
               maxLength={20}
-              className="flex-1 bg-zinc-950 border border-border-interactive text-white rounded-xl px-3 py-2 text-base font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none uppercase min-h-[44px]"
+              className="flex-1 min-w-0 bg-zinc-950 border border-border-interactive text-white rounded-xl px-3 py-2 text-base font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none uppercase min-h-[44px]"
               data-testid="vanity-code-input"
             />
             <button
               type="submit"
               disabled={isSavingCode || !customCoachCode.trim()}
-              className="bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 text-cyan-300 font-bold px-4 py-2 min-h-[44px] rounded-xl text-xs flex items-center gap-1.5 disabled:opacity-50 transition touch-manipulation"
+              className="shrink-0 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 text-cyan-300 font-bold px-4 py-2 min-h-[44px] rounded-xl text-xs flex items-center gap-1.5 disabled:opacity-50 transition touch-manipulation"
               data-testid="save-vanity-code-btn"
             >
               {isSavingCode ? 'Saving...' : 'Save code'}
