@@ -26,9 +26,9 @@
 | P6 | kg/lb units across tabs | **done** 2026-09-28 | `856f4ae` (PR #14). Items W49, H48; Coach §8.2 unit strings, Settings unit toggle, export. M6 `20260928000000_users_weight_unit` (users.weight_unit text NOT NULL DEFAULT 'lb' CHECK IN ('lb','kg'); RLS unmodified: own-row update policy covers it) applied to production 04:57Z via `scripts/prod-db.sh migrate` (backup `prod-20260928T045705Z.dump` 248K verified, mode 600; counts preserved; post audit: column 1, users 3 all 'lb', 0 kg, 0 invalid; workouts 33, sets 397, checksum `fd23890ea604f04d3f367ed1605872f8` identical; check 28, latest 20260928000000; smoke of deployed frontend fdede85 vs migrated DB SMOKE_FAIL=0; ff-push; local rehearsal migrate/rollback/migrate OK 01:55Z; Rule 8 data-changing default backfill satisfied by audit + checksum). Commits: f7a0667 (M6 migration, rollback, pgTAP, audits), 00a75d4 (weight.ts units layer, useWeightUnit/useWeightUnitPreference, AuthContext select), 994fbb3 (Settings WeightUnitCard + data export weight_unit), 4a99aba (History + Coach timeline in viewer's unit, volume converted once), 4350c29 (Workout entry/EditSetSheet/FinishReview/commit paths/ghost sets in unit), ec92bb5 (red-team fixes: last 'lbs' literals, typed users update, weight_unit in supabase types), 51acf8c (E2E p6-weight-units + density + mobile-viewport), 0190691 + 856f4ae (pgTAP made seed-independent). Decisions D-P6-1..8. Gates (51acf8c / 856f4ae): tsc 0, oxlint 0e/31w, vitest 151 files/1749 + test:tz LA+Tokyo, mocks/payload/design/build/perf OK, pgTAP 11/237, density 95 ×2, E2E set 130p/0f/6s; full tests/e2e CI order retries 0 204p/0f/12s; CI green (run 36378178645, 23m23s, attempt 2; run 36377373957 failed at 9m13s on data-dependent pgTAP assertion, fixed test-only in 856f4ae). Deployed to `v2-rewrite` 2026-09-28T05:08Z. |
 | P7a | Library exercises list | **done** 2026-09-28 | `8782215` (PR #15). No migration (UI-only, uses M4). Items L4, L8, L10, L11, L13, L14, L15, L18, L19, L20, L21, L23, L24, L25, L30, L32, L34, L35, L46, L47, L48. Commits: 629a639 (CI timeout 35m D-P7a-1), 1c214ec (W0 split ExercisesView into list/row/sheets/templates), cc93c39 (W1 list + W2 sheets + W3 templates), bc79ba1 (p5a/p5b-history WebKit de-flake), 1bd03ec (integration), 1eed592 (red-team fixes), 13bba0a (W4 library.spec + density), c5f4316 (skeleton/catalog refresh/contrast/fresh-seed fixes), 8782215 (CI unmount timer fix). Decisions D-P7a-1..6. Gates (c5f4316 / 8782215): tsc 0, oxlint 0e/31w, vitest 155 files/1797 + test:tz LA+Tokyo, mocks/payload/design/build/perf OK, pgTAP 11/237, density 98 ×2, E2E set 116p/0f/6s; full tests/e2e CI order retries 0 237p/0f/12s; CI green (run 36478499542, 26m52s, attempt 2; attempt 1 failed at 20:15Z on ExerciseListRow timer after unmount, fixed in 8782215). Deployed to `v2-rewrite` 2026-09-28T20:48Z. |
 | P7b | Library template builder, coach builder, catalog content | **done** 2026-09-29 | `befe8db` (PR #16). Scope: L9, L13, L15, L16, L17, L27, L28, L29, L33, L35, L36, L37, L38, L40, L42, L43, L44, L48. Migrations M7 `20260929000000_exercise_name_guard` (01:17Z, backup `prod-20260929T011655Z.dump`), M8 `20260929010000_default_catalog_seed` (01:18Z, backup `prod-20260929T011805Z.dump`), and M9 `20260929020000_drop_body_part` (01:20Z, backup `prod-20260929T012001Z.dump`) applied to production via `scripts/prod-db.sh migrate` (audits identical to rehearsal; M8 backfilled 14 NULL-equipment masters, masters 23->208, exercises 25->210, 0 NULL-equipment masters; M9 dropped `body_part` column/trigger/fns after zero-reader verification). Deployed frontend parity: P7a vs M7+M8 0 class-B errors. `EditTemplateSheet` replaces `EditTemplateModal` (596 LOC; stepper clamp, aria-live reorder/add/remove, fetch-on-open, stale precondition PT409 -> StatusBanner + reload); `ExercisePickerSheet` + `CoachTemplateBuilder` retired; Coach adopts single `save_routine_template` RPC with `p_assigned_to` (no orphan; inline builder retained per D-P7b-6); Library routines via `get_routine_catalog` (L33); full codebase migration `body_part` -> `body_parts`. Commits: 7359a37 (DB M7/M8/M9), 73ffa06 (EditTemplateSheet), 8bdfb8c (body_parts readers), 8ea760c (coach RPC, get_routine_catalog), 13252f3 (library E2E proofs), f2eb7b9 (drop dead query), c54ef45 (pgTAP M9), 79cfae5 (red team fixes), befe8db (CI density weekday fix). Decisions D-P7b-1..6. Gates (79cfae5 / befe8db): tsc 0, oxlint 0e/29w, vitest 155 files / 1822 + test:tz LA+Tokyo, check:mocks/payload/design/build/perf OK, pgTAP 15/269 (M1-M9 applied), density 101 ×2, E2E set 134p/0f/6s, full tests/e2e CI order retries 0: 264p/0f/12s; CI green (run 36504646894, 29m46s, attempt 2; attempt 1 failed at 27m21s due to Tuesday density Lat Pull Down unseeded weight, fixed test-only in befe8db). Deployed to `v2-rewrite` 2026-09-29T01:18Z, Preview id=6723901453 SMOKE_FAIL=0, Production id=6724322094 SMOKE_FAIL=0, post-M9 smoke OK. |
-| P8 | Shell, Coach, Settings + Nutrition standards sweep | not started | |
+| P8 | Shell, Coach, Settings + Nutrition standards sweep | **done** 2026-09-29 | `fc7b171` (PR #17). Scope: L41, H25, H39, W44, C1–C30, S1–S29, RD-7, RD-12, D-P8-1..9, production UUID catalog-tail bug fix. No migration. Shell: Header coach-dashboard link (L41, D-P8-1); BottomNav 12px AA labels fit at 320px (RD-12). Coach: C1–C30 sweep (10983ec), CoachCockpit inline template builder retired for EditTemplateSheet with assignToAthleteId (D-P8-2), ConfirmDialog for disconnect, StatusBanner errors, SegmentedTabs, skeletons, 44px/16px. Settings: S1–S29 sweep (cd89850), MyCoachCard ConfirmDialog disconnect, surfaced errors with Retry, skeletons, 16px inputs, 320 grid, 44px export. Nutrition: RD-7 deferred deletes + UndoToast for log/custom dish deletes (631a44d, 05a0f28), STD-CMP-10 skeletons, 44px hit areas without row growth (H25, H39). Zero grep gate: text-zinc-500, sub-12px, font-mono, font-black, window.confirm / alert across src non-test; check:design ratchet baseline all-zero (658cd9b). Prod incident fix: useWorkoutQueries exercises .limit(200) paged via shared fetchAllVisibleExercises + scoped lookup + inline card errors (170df36, 62ad136). Commits: 235d46f (audit docs), 955d3c1 (shell A), 631a44d (nutrition D), cd89850 (settings C), 10983ec (coach B), 658cd9b (tests/ratchet E), 05a0f28 (red team), c19ea84 (tap grid F), 170df36 (UUID fix G), 62ad136 (G2 paging), 62cd3c6 (late-load race + 320 overflow fix GFIX). Decisions D-P8-1..9. Gates (c19ea84 / 62cd3c6): Gate 1 failed (useMealEditor late-load race + CoachSettingsCard 320 overflow) -> fixed in 62cd3c6; Gate 2 @62cd3c6: tsc 0, oxlint 0e/25w, vitest 155 files / 1858 + test:tz LA+Tokyo, mocks/payload/design/build/perf OK, pgTAP 15/269, density 120 ×2, E2E set 148p/0f/6s, full tests/e2e CI order retries 0: 270p/0f/12s. |
 
-Planning status: **plan drafted 2026-09-26; all open questions answered (RD-14..RD-20); no implementation started.**
+Redesign status: **all phases P0–P8 complete and shipped (2026-09-29).**
 
 ---
 
@@ -110,6 +110,15 @@ Newest first. Decisions dated 2026-09-26 in the audit reports are final and are 
 | D-P6-6 | **Export keeps sets weight in lb with unmodified header and adds `weight_unit` to the profile section**. | Preserves backward compatibility of CSV/JSON data parsers while recording user preference. |
 | D-P6-7 | **The 'lbs' literal lives only in `src/utils/weight.ts` (`weightUnitLabel`)**. | Enforces a single source of truth for unit strings across all tabs and components. |
 | D-P6-8 | **M6 version `20260928000000`, data-changing (default backfill) -> rule 8 audit + checksum**. | Satisfies §3a execution rules for safe production database migrations. |
+| D-P8-1 | **L41: Header coach-dashboard link; no 6th BottomNav tab, no tab replacement.** When a verified coach (`profile.role==='coach'`) is in coach mode and NOT on `/coach`, Header shows a 44x44 "Coach dashboard" link (`IconButton`/`Link`, `aria-label="Coach dashboard"`) navigating to `/coach`. Role pill behaviour unchanged. | Preserves 5-tab ergonomic layout at 320px while providing direct 1-tap navigation back to coach cockpit. |
+| D-P8-2 | **CoachCockpit inline template builder retired in favor of `EditTemplateSheet` with `assignToAthleteId`** (D-P7b-6 follow-up). Single `save_routine_template` RPC; `EditTemplateSheet` stays <=600 LOC (594 LOC); `coach-athlete.spec` selectors updated to match shared sheet. | Eliminates duplicate builder maintenance; satisfies single-builder architecture without inflating sheet LOC. |
+| D-P8-3 | **Grep gate: zero hits in `src/` non-test for `text-zinc-500`, sub-12px (`text-[9px|10px|11px]`), `font-mono`, `font-black`, and `confirm(`. No allow-list.** Replacements: `text-zinc-500` -> `text-zinc-400` (secondary) or remove (disabled: `opacity-50` / `disabled:opacity-50`, never `disabled:text-zinc-500`); sub-12px -> `text-xs`; `font-mono` -> `tabular-nums` (codes: `tracking-wider tabular-nums`); `font-black`/`extrabold` -> `font-bold`; UPPERCASE button copy -> written case (STD-TYP-4) where touched. | Enforces design standards ratchet with zero exemptions across entire source tree. |
+| D-P8-4 | **BottomNav RD-12/RD-18: 12px sentence-case labels; measured at 320px.** 5 slots x 64px accommodate 12px labels without wrapping or clipping (`scrollWidth <= clientWidth`); icon-only below 360px fallback not needed. | Satisfies 12px typography floor while retaining clear navigation labels on smallest supported screens. |
+| D-P8-5 | **Nutrition deletes (`NutritionEngine:409`, `CustomDishesModal:328,412`) adopt RD-7 deferred delete (`common/useDeferredDelete` + `UndoToast`, 6s).** Zero DELETE before expiry, Undo = zero writes, exactly one on expiry/flush, failure restores row + `StatusBanner`. CoachCockpit disconnect (C1) and MyCoachCard disconnect (S1) adopt `ConfirmDialog` naming the counterpart (STD-CPY-4). Coach C2 `alert` -> `StatusBanner`. | Aligns all destructive actions with RD-7 undo / ConfirmDialog standards; zero native dialogs remain. |
+| D-P8-6 | **Swallowed errors in Settings (S2, S16) surfaced via `StatusBanner` + Retry.** Query catch blocks propagate error state; query semantics unchanged otherwise. | Eliminates silent failures and gives users actionable error recovery paths. |
+| D-P8-7 | **Nutrition 44px hit areas without layout growth:** H25 `MealLogRow` retry, H39 `ComponentRow` confirms, `CustomDishesModal` row buttons use hit-area expansion (`min-h-[44px] min-w-[44px]` or negative margins/padding) keeping exact row heights (94/59/76 px). | Meets touch target standards without breaking visual density layout budgets or expanding card sizes. |
+| D-P8-8 | **Test ownership isolation in P8:** only package E edits `tests/visual-density.test.ts`, `tests/e2e/mobile-viewport.spec.ts`, `scripts/check-design-ratchet.js`, `scripts/design-ratchet-baseline.json`. Implementation packages add unit tests only. | Prevents test merge conflicts across parallel execution workers. |
+| D-P8-9 | **User decision: workout UUID bug fix ships inside P8 (one PR/CI/deploy).** Paging via `fetchAllVisibleExercises`, template/scoped id resolution, inline card set error surfacing. | Fixes production regression immediately in active release rather than requiring an emergency standalone hotfix. |
 | D-P7b-1 | **`routine_templates.updated_at` + `save_routine_template` optimistic lock bundled into M7**. Column `NOT NULL DEFAULT now()`, BEFORE UPDATE trigger, `save_routine_template` gains `p_expected_updated_at timestamptz DEFAULT NULL`. Old signature dropped in same migration so PostgREST named-arg calls from deployed P7a client still resolve to the single function. Precondition mismatch raises PT409 `stale_template` (surfaced as StatusBanner + reload, no overwrite); unseeable exercise id raises 42501. | Enforces L43 stale-edit protection without breaking deployed frontend callers; bundled into M7 to avoid an extra migration. |
 | D-P7b-2 | **Name guard trigger + partial unique index in M7**. `normalize_exercise_name(text)` lowercases and trims internal whitespace. Partial unique index on `(coalesce(user_id, '00000000-0000-0000-0000-000000000000'), normalize_exercise_name(name), coalesce(equipment, '')) WHERE NOT is_archived`. Trigger `trg_exercise_name_guard` raises 23505 `duplicate_exercise_name` with DETAIL containing the existing id when normalized name matches with equal equipment or NULL equipment on either side (against own rows, and for custom against master rows). Client maps 23505/409 to `DuplicateExerciseError` with "View" CTA pointing to the existing row. | Prevents duplicate exercises across master and custom scopes (L35); satisfies acceptance with coded error and exact existing row resolution. |
 | D-P7b-3 | **M8 default catalog seed from curated CSV (`supabase/catalog/default_exercises.csv`) with deterministic UUIDs and NULL-equipment backfill tracking**. Seed rows generated via `scripts/gen-catalog-seed.mjs` (asserted equal in vitest); deterministic ids `md5('m8:'||normalized_name)::uuid`; skips names matching any existing row. Master rows with `equipment IS NULL` updated to curated equipment; updated ids recorded in `catalog_seed_backfill` table for clean rollback. | Seeds 185 new master exercises (208 total master) without collisions; backfills 14 legacy NULL equipment rows with rollback audit trail (D-U2, D-U3). |
@@ -472,6 +481,7 @@ The password lives in `~/.config/fitness-supabase/db_password` (mode 600). Backu
 ### P8: Shell, Coach, Settings + Nutrition standards sweep
 - **Scope:**
   - L41 (coach nav entry), H25, H39, W44 (final no-`window.confirm` gate across `src/`)
+  - **Production incident (resolved in P8):** P7b M8 grew per-user visible exercises to 208–210, exceeding `/workout` `.limit(200)` -> 10 alphabetically-last exercises unloggable ('cannot be resolved to a valid UUID') from M8 (2026-09-29 01:18Z) until P8 deploy; fixed by `fetchAllVisibleExercises` paging + scoped lookup + inline card errors; regression test `workout-catalog-tail.spec.ts` (proven failing on base `b35f41a`).
   - RD-12 application: BottomNav 12px labels (measure at 320px first; if they don't fit, icon-only below 360px, RD-18), Header mono tag, remaining `text-zinc-500`/sub-12px/mono/black in `src/` to zero
   - RD-7 application: Nutrition `window.confirm` deletes (`NutritionEngine.tsx:409`, `CustomDishesModal.tsx:328,412`) → UndoToast; CoachCockpit/MyCoachCard confirms → ConfirmDialog
   - STD-CMP-10 skeletons in Nutrition; Nutrition 40px hit areas → 44 (STD-INT-9)
@@ -490,72 +500,72 @@ Severity P0-P3. Recorded before any P8 change, per the P8 scope rule. Line numbe
 
 **Coach (C1-C30)**
 
-| ID | Sev | Standard | File:Line | 1-Line Fix |
-|---|---|---|---|---|
-| C1 | P1 | STD-CMP-7 | CoachCockpit.tsx:281 | Replace `window.confirm` with `ConfirmDialog` for athlete disconnect |
-| C2 | P2 | STD-CMP-9 | CoachCockpit.tsx:290 | Replace `alert(message)` error call with inline `StatusBanner` / toast |
-| C3 | P3 | STD-TYP-2 | CoachCockpit.tsx:307 | Change `font-black` to `font-bold` on Coach Dashboard header |
-| C4 | P2 | STD-A11Y-1 | CoachCockpit.tsx:327-340 | Replace hand-rolled tab controls with `common/SegmentedTabs` (adds ARIA roles) |
-| C5 | P2 | STD-INT-9 | CoachCockpit.tsx:378-382 | Increase "+ New Template" button `min-h-[36px]` to `min-h-[44px]` |
-| C6 | P2 | STD-CMP-5 | CoachCockpit.tsx:393,414,455,470 | Remove `sm:text-xs` on inputs/select to prevent iOS auto-zoom (keep `text-base`) |
-| C7 | P2 | STD-ICO-1 | CoachCockpit.tsx:480-485 | Add required `aria-label="Remove exercise"` to trash icon button |
-| C8 | P3 | STD-TYP-4 | CoachCockpit.tsx:496 | Change "SAVE TEMPLATE" button uppercase to written case "Save template" |
-| C9 | P2 | STD-CMP-10 | CoachCockpit.tsx:519-521 | Add `Skeleton` cards when `isTemplatesLoading` to eliminate empty flash |
-| C10 | P3 | STD-TYP-2 | CoachCockpit.tsx:526 | Change `font-extrabold` to `font-bold` on template card title |
-| C11 | P2 | STD-INT-9 | CoachCockpit.tsx:535 | Increase template Edit button `min-h-[36px]` to `min-h-[44px]` |
-| C12 | P2 | STD-TYP-1 | CoachAthleteSwitcher.tsx:27 | Change `text-[10px]` to `text-xs` on "Active Athlete" label |
-| C13 | P3 | STD-TYP-2 | CoachAthleteSwitcher.tsx:28 | Change `font-black` to `font-bold` on active athlete name |
-| C14 | P2 | STD-A11Y-1 | CoachAthleteSwitcher.tsx:35-48 | Add `aria-label="Select athlete"` to athlete `<select>` dropdown |
-| C15 | P2 | STD-CMP-5 | CoachAthleteSwitcher.tsx:39 | Remove `sm:text-xs` on athlete select, keeping `text-base` (16px) |
-| C16 | P3 | STD-TYP-2,3 | CoachAthleteTimeline.tsx:210 | Remove `font-black` and `font-mono` on date text; use `font-bold` |
-| C17 | P2 | STD-TYP-1,3 | CoachAthleteTimeline.tsx:214,243,275,294,344,361 | Replace 6x `text-[10px]` with `text-xs` and `font-mono` with `tabular-nums` |
-| C18 | P3 | STD-TYP-2 | CoachAthleteTimeline.tsx:239,323 | Change `font-extrabold` to `font-bold` on session and nutrition headings |
-| C19 | P2 | STD-TYP-1 | CoachAthleteTimeline.tsx:263,356 | Change `text-[11px]` to `text-xs` on exercise and nutrition rows |
-| C20 | P2 | STD-COL-2 | CoachAthleteTimeline.tsx:296,430 | Replace `text-zinc-500` with `text-zinc-400` on Set label & fallback notice |
-| C21 | P2 | STD-TYP-1 | CoachAthleteTimeline.tsx:329,333,337 | Change compliance target pill `text-[10px]` to `text-xs` |
-| C22 | P3 | STD-TYP-2,3 | CoachAthleteTimeline.tsx:383,388 | Remove `font-black` on timeline title; remove `font-mono` on workout count |
-| C23 | P2 | STD-CMP-10 | CoachAthleteTimeline.tsx:415-423 | Render `Skeleton` cards while athlete workouts query is fetching |
-| C24 | P3 | STD-TYP-2 | CoachAthleteMacros.tsx:51 | Change `font-black` to `font-bold` on nutrition targets title |
-| C25 | P2 | STD-TYP-1 | CoachAthleteMacros.tsx:55,66,69,93-95,112-114,131-133,150-152 | Replace 11 sub-12px classes (`text-[10px]`, `text-[11px]`) with `text-xs` |
-| C26 | P3 | STD-TYP-2 | CoachAthleteMacros.tsx:66,81,93,112,131,150 | Change 6 `font-black` instances to `font-bold` |
-| C27 | P3 | STD-TYP-3 | CoachAthleteMacros.tsx:81,84,94,104,113,123,132,142,151,161 | Remove 10 `font-mono` classes on labels/inputs; use `tabular-nums` |
-| C28 | P2 | STD-CMP-5 | CoachAthleteMacros.tsx:104,123,142,161 | Remove `sm:text-xs` from all 4 macro inputs (keep `text-base`) |
-| C29 | P3 | STD-TYP-4 | CoachAthleteMacros.tsx:171 | Change button uppercase to written case "Update athlete targets" |
-| C30 | P2 | STD-LAY-3 | CoachAthleteMacros.tsx:89 | Add `min-w-0` to 2-col macro grid cells to prevent 320px truncation |
+| ID | Sev | Standard | File:Line | 1-Line Fix | Status |
+|---|---|---|---|---|---|
+| C1 | P1 | done | STD-CMP-7 | CoachCockpit.tsx:281 | Replace `window.confirm` with `ConfirmDialog` for athlete disconnect |
+| C2 | P2 | done | STD-CMP-9 | CoachCockpit.tsx:290 | Replace `alert(message)` error call with inline `StatusBanner` / toast |
+| C3 | P3 | done | STD-TYP-2 | CoachCockpit.tsx:307 | Change `font-black` to `font-bold` on Coach Dashboard header |
+| C4 | P2 | done | STD-A11Y-1 | CoachCockpit.tsx:327-340 | Replace hand-rolled tab controls with `common/SegmentedTabs` (adds ARIA roles) |
+| C5 | P2 | done | STD-INT-9 | CoachCockpit.tsx:378-382 | Increase "+ New Template" button `min-h-[36px]` to `min-h-[44px]` |
+| C6 | P2 | done | STD-CMP-5 | CoachCockpit.tsx:393,414,455,470 | Remove `sm:text-xs` on inputs/select to prevent iOS auto-zoom (keep `text-base`) |
+| C7 | P2 | done | STD-ICO-1 | CoachCockpit.tsx:480-485 | Add required `aria-label="Remove exercise"` to trash icon button |
+| C8 | P3 | done | STD-TYP-4 | CoachCockpit.tsx:496 | Change "SAVE TEMPLATE" button uppercase to written case "Save template" |
+| C9 | P2 | done | STD-CMP-10 | CoachCockpit.tsx:519-521 | Add `Skeleton` cards when `isTemplatesLoading` to eliminate empty flash |
+| C10 | P3 | done | STD-TYP-2 | CoachCockpit.tsx:526 | Change `font-extrabold` to `font-bold` on template card title |
+| C11 | P2 | done | STD-INT-9 | CoachCockpit.tsx:535 | Increase template Edit button `min-h-[36px]` to `min-h-[44px]` |
+| C12 | P2 | done | STD-TYP-1 | CoachAthleteSwitcher.tsx:27 | Change `text-[10px]` to `text-xs` on "Active Athlete" label |
+| C13 | P3 | done | STD-TYP-2 | CoachAthleteSwitcher.tsx:28 | Change `font-black` to `font-bold` on active athlete name |
+| C14 | P2 | done | STD-A11Y-1 | CoachAthleteSwitcher.tsx:35-48 | Add `aria-label="Select athlete"` to athlete `<select>` dropdown |
+| C15 | P2 | done | STD-CMP-5 | CoachAthleteSwitcher.tsx:39 | Remove `sm:text-xs` on athlete select, keeping `text-base` (16px) |
+| C16 | P3 | done | STD-TYP-2,3 | CoachAthleteTimeline.tsx:210 | Remove `font-black` and `font-mono` on date text; use `font-bold` |
+| C17 | P2 | done | STD-TYP-1,3 | CoachAthleteTimeline.tsx:214,243,275,294,344,361 | Replace 6x `text-[10px]` with `text-xs` and `font-mono` with `tabular-nums` |
+| C18 | P3 | done | STD-TYP-2 | CoachAthleteTimeline.tsx:239,323 | Change `font-extrabold` to `font-bold` on session and nutrition headings |
+| C19 | P2 | done | STD-TYP-1 | CoachAthleteTimeline.tsx:263,356 | Change `text-[11px]` to `text-xs` on exercise and nutrition rows |
+| C20 | P2 | done | STD-COL-2 | CoachAthleteTimeline.tsx:296,430 | Replace `text-zinc-500` with `text-zinc-400` on Set label & fallback notice |
+| C21 | P2 | done | STD-TYP-1 | CoachAthleteTimeline.tsx:329,333,337 | Change compliance target pill `text-[10px]` to `text-xs` |
+| C22 | P3 | done | STD-TYP-2,3 | CoachAthleteTimeline.tsx:383,388 | Remove `font-black` on timeline title; remove `font-mono` on workout count |
+| C23 | P2 | done | STD-CMP-10 | CoachAthleteTimeline.tsx:415-423 | Render `Skeleton` cards while athlete workouts query is fetching |
+| C24 | P3 | done | STD-TYP-2 | CoachAthleteMacros.tsx:51 | Change `font-black` to `font-bold` on nutrition targets title |
+| C25 | P2 | done | STD-TYP-1 | CoachAthleteMacros.tsx:55,66,69,93-95,112-114,131-133,150-152 | Replace 11 sub-12px classes (`text-[10px]`, `text-[11px]`) with `text-xs` |
+| C26 | P3 | done | STD-TYP-2 | CoachAthleteMacros.tsx:66,81,93,112,131,150 | Change 6 `font-black` instances to `font-bold` |
+| C27 | P3 | done | STD-TYP-3 | CoachAthleteMacros.tsx:81,84,94,104,113,123,132,142,151,161 | Remove 10 `font-mono` classes on labels/inputs; use `tabular-nums` |
+| C28 | P2 | done | STD-CMP-5 | CoachAthleteMacros.tsx:104,123,142,161 | Remove `sm:text-xs` from all 4 macro inputs (keep `text-base`) |
+| C29 | P3 | done | STD-TYP-4 | CoachAthleteMacros.tsx:171 | Change button uppercase to written case "Update athlete targets" |
+| C30 | P2 | done | STD-LAY-3 | CoachAthleteMacros.tsx:89 | Add `min-w-0` to 2-col macro grid cells to prevent 320px truncation |
 
 **Settings (S1-S29)**
 
-| ID | Sev | Standard | File:Line | 1-Line Fix |
-|---|---|---|---|---|
-| S1 | P1 | STD-CMP-7 | MyCoachCard.tsx:82 | Replace `window.confirm` with `ConfirmDialog` for coach disconnect |
-| S2 | P2 | STD-CMP-9 | MyCoachCard.tsx:30-41 | Remove swallowed `catch { return null; }`; surface `StatusBanner` error |
-| S3 | P3 | STD-TYP-2 | MyCoachCard.tsx:111,133,177 | Change `font-black` to `font-bold` on header, coach name, and submit button |
-| S4 | P2 | STD-TYP-1 | MyCoachCard.tsx:116,130,136 | Replace sub-12px `text-[10px]` and `text-[11px]` with `text-xs` |
-| S5 | P3 | STD-TYP-3 | MyCoachCard.tsx:116,123,136,170 | Remove `font-mono` from badge, status message, code, and input |
-| S6 | P2 | STD-COL-2 | MyCoachCard.tsx:123,130,139 | Replace `text-zinc-500` (3 hits) with AA-compliant `text-zinc-400` |
-| S7 | P2 | STD-CMP-10 | MyCoachCard.tsx:122-126 | Replace raw text "Loading coaching status..." with `Skeleton` card |
-| S8 | P3 | STD-DAT-5 | MyCoachCard.tsx:140 | Replace `toLocaleDateString()` with `formatShortDate(coachLink.linked_at)` |
-| S9 | P2 | STD-CMP-5 | MyCoachCard.tsx:170 | Remove `sm:text-xs` on coach code input (keep `text-base` 16px) |
-| S10 | P3 | STD-TYP-4 | MyCoachCard.tsx:177 | Change button uppercase to written case "Link coach" |
-| S11 | P3 | STD-TYP-2 | SettingsView.tsx:93,106,191 | Change `font-black` to `font-bold` on section headers |
-| S12 | P2 | STD-TYP-1 | SettingsView.tsx:113,122,135,167,199 | Replace 5x sub-12px (`text-[10px]`, `text-[11px]`) with `text-xs` |
-| S13 | P3 | STD-TYP-3 | SettingsView.tsx:116 | Remove `font-mono` from email address text |
-| S14 | P2 | STD-CMP-5 | SettingsView.tsx:130 | Remove `sm:text-xs` on display name input (keep `text-base`) |
-| S15 | P2 | STD-COL-2 | SettingsView.tsx:167 | Replace `text-zinc-500` with `text-zinc-400` on "(Managed by Coach)" |
-| S16 | P2 | STD-CMP-9 | CoachSettingsCard.tsx:32-44 | Stop swallowing query catch block; propagate error to `StatusBanner` |
-| S17 | P3 | STD-TYP-2 | CoachSettingsCard.tsx:93,140,159 | Change `font-black` to `font-bold` on headings and code display |
-| S18 | P2 | STD-TYP-1 | CoachSettingsCard.tsx:145,155,180 | Replace `text-[10px]` with `text-xs` on badge and labels |
-| S19 | P3 | STD-TYP-3 | CoachSettingsCard.tsx:108,145,159,191 | Remove `font-mono` from capacity badge, code display, and inputs |
-| S20 | P2 | STD-COL-2 | CoachSettingsCard.tsx:155 | Replace `text-zinc-500` with `text-zinc-400` on "Your Coach Code" |
-| S21 | P2 | STD-CMP-5 | CoachSettingsCard.tsx:108,191 | Remove `sm:text-xs` on vanity code inputs (keep `text-base`) |
-| S22 | P3 | STD-TYP-2 | MacroGoalsCard.tsx:50,131 | Change `font-black` to `font-bold` on header and Save button |
-| S23 | P2 | STD-TYP-1 | MacroGoalsCard.tsx:57,71,85,99,113 | Replace 5x `text-[10px]` macro labels with `text-xs` |
-| S24 | P2 | STD-TYP-3,5 | MacroGoalsCard.tsx:66,80,94,108,122 | Remove `font-mono` and `sm:text-xs` from all 5 inputs (keep `text-base`) |
-| S25 | P2 | STD-LAY-3 | MacroGoalsCard.tsx:55 | Rebalance 6-col grid to responsive 2-col to avoid 320px overflow |
-| S26 | P3 | STD-TYP-2 | DataExportCard.tsx:170 | Change `font-black` to `font-bold` on "Data Extract" title |
-| S27 | P2 | STD-TYP-1 | DataExportCard.tsx:203,226,263,270,299,305,322,353,369 | Replace 9x sub-12px (`text-[9px]`, `text-[10px]`, `text-[11px]`) with `text-xs` |
-| S28 | P2 | STD-INT-9 | DataExportCard.tsx:230-256,325-346 | Expand format & preset button tap areas from `py-1.5` to `min-h-[44px]` |
-| S29 | P2 | STD-CMP-5 | DataExportCard.tsx:363,379 | Increase custom date inputs from `text-xs` to `text-base` (iOS zoom) |
+| ID | Sev | Standard | File:Line | 1-Line Fix | Status |
+|---|---|---|---|---|---|
+| S1 | P1 | done | STD-CMP-7 | MyCoachCard.tsx:82 | Replace `window.confirm` with `ConfirmDialog` for coach disconnect |
+| S2 | P2 | done | STD-CMP-9 | MyCoachCard.tsx:30-41 | Remove swallowed `catch { return null; }`; surface `StatusBanner` error |
+| S3 | P3 | done | STD-TYP-2 | MyCoachCard.tsx:111,133,177 | Change `font-black` to `font-bold` on header, coach name, and submit button |
+| S4 | P2 | done | STD-TYP-1 | MyCoachCard.tsx:116,130,136 | Replace sub-12px `text-[10px]` and `text-[11px]` with `text-xs` |
+| S5 | P3 | done | STD-TYP-3 | MyCoachCard.tsx:116,123,136,170 | Remove `font-mono` from badge, status message, code, and input |
+| S6 | P2 | done | STD-COL-2 | MyCoachCard.tsx:123,130,139 | Replace `text-zinc-500` (3 hits) with AA-compliant `text-zinc-400` |
+| S7 | P2 | done | STD-CMP-10 | MyCoachCard.tsx:122-126 | Replace raw text "Loading coaching status..." with `Skeleton` card |
+| S8 | P3 | done | STD-DAT-5 | MyCoachCard.tsx:140 | Replace `toLocaleDateString()` with `formatShortDate(coachLink.linked_at)` |
+| S9 | P2 | done | STD-CMP-5 | MyCoachCard.tsx:170 | Remove `sm:text-xs` on coach code input (keep `text-base` 16px) |
+| S10 | P3 | done | STD-TYP-4 | MyCoachCard.tsx:177 | Change button uppercase to written case "Link coach" |
+| S11 | P3 | done | STD-TYP-2 | SettingsView.tsx:93,106,191 | Change `font-black` to `font-bold` on section headers |
+| S12 | P2 | done | STD-TYP-1 | SettingsView.tsx:113,122,135,167,199 | Replace 5x sub-12px (`text-[10px]`, `text-[11px]`) with `text-xs` |
+| S13 | P3 | done | STD-TYP-3 | SettingsView.tsx:116 | Remove `font-mono` from email address text |
+| S14 | P2 | done | STD-CMP-5 | SettingsView.tsx:130 | Remove `sm:text-xs` on display name input (keep `text-base`) |
+| S15 | P2 | done | STD-COL-2 | SettingsView.tsx:167 | Replace `text-zinc-500` with `text-zinc-400` on "(Managed by Coach)" |
+| S16 | P2 | done | STD-CMP-9 | CoachSettingsCard.tsx:32-44 | Stop swallowing query catch block; propagate error to `StatusBanner` |
+| S17 | P3 | done | STD-TYP-2 | CoachSettingsCard.tsx:93,140,159 | Change `font-black` to `font-bold` on headings and code display |
+| S18 | P2 | done | STD-TYP-1 | CoachSettingsCard.tsx:145,155,180 | Replace `text-[10px]` with `text-xs` on badge and labels |
+| S19 | P3 | done | STD-TYP-3 | CoachSettingsCard.tsx:108,145,159,191 | Remove `font-mono` from capacity badge, code display, and inputs |
+| S20 | P2 | done | STD-COL-2 | CoachSettingsCard.tsx:155 | Replace `text-zinc-500` with `text-zinc-400` on "Your Coach Code" |
+| S21 | P2 | done | STD-CMP-5 | CoachSettingsCard.tsx:108,191 | Remove `sm:text-xs` on vanity code inputs (keep `text-base`) |
+| S22 | P3 | done | STD-TYP-2 | MacroGoalsCard.tsx:50,131 | Change `font-black` to `font-bold` on header and Save button |
+| S23 | P2 | done | STD-TYP-1 | MacroGoalsCard.tsx:57,71,85,99,113 | Replace 5x `text-[10px]` macro labels with `text-xs` |
+| S24 | P2 | done | STD-TYP-3,5 | MacroGoalsCard.tsx:66,80,94,108,122 | Remove `font-mono` and `sm:text-xs` from all 5 inputs (keep `text-base`) |
+| S25 | P2 | done | STD-LAY-3 | MacroGoalsCard.tsx:55 | Rebalance 6-col grid to responsive 2-col to avoid 320px overflow |
+| S26 | P3 | done | STD-TYP-2 | DataExportCard.tsx:170 | Change `font-black` to `font-bold` on "Data Extract" title |
+| S27 | P2 | done | STD-TYP-1 | DataExportCard.tsx:203,226,263,270,299,305,322,353,369 | Replace 9x sub-12px (`text-[9px]`, `text-[10px]`, `text-[11px]`) with `text-xs` |
+| S28 | P2 | done | STD-INT-9 | DataExportCard.tsx:230-256,325-346 | Expand format & preset button tap areas from `py-1.5` to `min-h-[44px]` |
+| S29 | P2 | done | STD-CMP-5 | DataExportCard.tsx:363,379 | Increase custom date inputs from `text-xs` to `text-base` (iOS zoom) |
 
 ---
 
@@ -590,7 +600,7 @@ Primary phase first; `+` = also touched later (a split noted in the phase scope)
 | W1 | P2 | W11 | P2 | W21 | P3b | W31 | P2 | W41 | P2 |
 | W2 | P2 | W12 | P4 | W22 | P4 | W32 | P3a | W42 | P2 |
 | W3 | P3a | W13 | P3a | W23 | P3b | W33 | P3a +P3b | W43 | Deferred |
-| W4 | P2 | W14 | P4 | W24 | P2 | W34 | P3b | W44 | P3a +P3b +P8 |
+| W4 | P2 | W14 | P4 | W24 | P2 | W34 | P3b | W44 | P3a +P3b +P8 (done) |
 | W5 | P2 | W15 | P3a | W25 | P3b | W35 | P2 | W45 | Deferred |
 | W6 | P2 | W16 | P2 +P4 | W26 | P3a | W36 | P3a +P3b | W46 | P2 |
 | W7 | P2 +P3a | W17 | P3a | W27 | P4 | W37 | P2 +P3a | W47 | P3a |
@@ -601,7 +611,7 @@ Primary phase first; `+` = also touched later (a split noted in the phase scope)
 ### Library (L1–L48)
 | ID | Phase | ID | Phase | ID | Phase | ID | Phase | ID | Phase |
 |---|---|---|---|---|---|---|---|---|---|
-| L1 | P1 | L11 | P7a +P2 | L21 | P7a | L31 | Deferred | L41 | P8 |
+| L1 | P1 | L11 | P7a +P2 | L21 | P7a | L31 | Deferred | L41 | P8 (done) |
 | L2 | P1 | L12 | P1 | L22 | P4 | L32 | P7a | L42 | P3a +P7b |
 | L3 | P1 | L13 | P7a +P7b | L23 | P4 +P7a | L33 | P4 +P7b | L43 | P7b |
 | L4 | P7a | L14 | P7a | L24 | P7a | L34 | P7a | L44 | P4 +P7b |
@@ -617,10 +627,10 @@ Primary phase first; `+` = also touched later (a split noted in the phase scope)
 |---|---|---|---|---|---|---|---|---|---|
 | H1 | P3a | H12 | P5a | H23 | P5b | H34 | P5a | H45 | P5a |
 | H2 | P2 | H13 | P0 +P5a | H24 | P5b | H35 | P5a +P5b | H46 | P5a +P5b |
-| H3 | P5a | H14 | P5a | H25 | P8 | H36 | P3a +P5b | H47 | P2 +P5b |
+| H3 | P5a | H14 | P5a | H25 | P8 (done) | H36 | P3a +P5b | H47 | P2 +P5b |
 | H4 | P2 | H15 | P2 | H26 | P5a | H37 | P5b | H48 | P6 |
 | H5 | P5a | H16 | P2 | H27 | P5b | H38 | P5a | H49 | P5b |
-| H6 | P5a | H17 | P3a | H28 | P0 | H39 | P8 | H50 | P5a |
+| H6 | P5a | H17 | P3a | H28 | P0 | H39 | P8 (done) | H50 | P5a |
 | H7 | P5a | H18 | P5a | H29 | P5b | H40 | N/A (RP-6) | H51 | P5b |
 | H8 | P5b +P5a | H19 | P0 | H30 | P5a | H41 | P5b | H52 | N/A (RP-6) |
 | H9 | P5a | H20 | P5a | H31 | P5a | H42 | P5b | H53 | N/A (RP-6) |
@@ -701,10 +711,16 @@ The agent has no production DB credentials (anon key only); re-run the query bef
 | CI job duration now 29m46s (run 36504646894, limit 35m per D-P7a-1) | High; CI cancellation on timeout in P8 if suite grows further | Split the job into parallel matrix/shards before it passes ~32 min. |
 | Prod-dump rehearsal restore misses nutrition tables (`pg_restore` 29 errors) | Nutrition tables (`nutrition_logs`, `custom_dishes`) absent from restored dev DB during rehearsal | Backup lacks schema `private`; include `private` schema in backup dump or pre-create it before restore (DEAD_ENDS #17). |
 | M9 rollback down file repopulates `body_part` from `body_parts[1]` | Original free-text formatting in `body_part` is lost if rolled back | Original free-text values retained only in production backup `prod-20260929T012001Z.dump`. |
-| CoachCockpit retains duplicate inline template builder (D-P7b-6) | Two template builders in codebase (inline in CoachCockpit + shared `EditTemplateSheet`) | Single RPC `save_routine_template` adopted; full retirement of inline builder deferred to P8 Coach sweep. |
+| ~~CoachCockpit retains duplicate inline template builder (D-P7b-6)~~ **Resolved in P8 (10983ec)**: inline builder retired, CoachCockpit reduced 593 -> 420 LOC, opens `EditTemplateSheet` with `assignToAthleteId`. | — | — |
 | `EditTemplateSheet.tsx` at 596 LOC (near 600 LOC budget) | Perf gate failure on next edit | Extract sub-components (e.g. day picker, exercise list item wrappers) if extended in future phases. |
 | pgTAP must never assert shared/seeded DB state or literal checksums (two failures in P6: 0190691, 856f4ae) | CI test failure on environment/seed differences | Invariant testing only: assert relative before/after invariants within the test transaction; never hardcode expected checksums from local DB (lesson from P6). |
 | NutritionEngine.dateChange / QuickLogToast.integration unit tests time out at ~5.2 s under heavy local load | Low impact; pass alone, CI unaffected | Run tests in isolation if local machine is under heavy concurrency load. |
+| CI job duration 31m10s (P8 run 36614078601) against 35m limit | High; next spec additions will hit the cap | Split CI job into parallel matrix/shards BEFORE any further E2E/density additions. |
+| SetRow "previous" hint column 58->38px at 320 after 44px reps input (fc7b171) | Low; long hints truncate at 320 | Explicit grid template (fixed set/commit widths) in a follow-up. |
+| History `.limit(1000)` exercise reads (`HistoryView.tsx:132`, `useHistoryData.ts:49`) | History exercise catalog queries lack pagination; catalog growth beyond 1000 truncates | Adopt shared `fetchAllVisibleExercises` helper in History queries. |
+| `font-extrabold` (800) remaining in history components (`ExerciseStatsList.tsx:263`, `HistoryView.tsx:333`, `WorkoutExerciseHistory.tsx:153`) | Outside grep gate (which checked `font-black`/900); typography inconsistency | Normalize remaining 800-weight tokens in history to `font-bold` (700) or add to ratchet rule. |
+| Component LOC near 600 ceiling: `WorkoutEngine.tsx` (589 LOC), `NutritionEngine.tsx` (595 LOC), `EditTemplateSheet.tsx` (594 LOC) | Perf gate fails if future edits add code without extracting sub-components | Extract sub-components/hooks before modifying any of these three surfaces. |
+| Production backups lack schema `private` | Dev rehearsal restore misses `nutrition_logs` and `custom_dishes` tables | Update `scripts/prod-db.sh` backup routines to include `--schema=public --schema=auth --schema=private` or full database dump. |
 
 ## 9. Change log of this file
 | Date | Change |
@@ -725,3 +741,4 @@ The agent has no production DB credentials (anon key only); re-run the query bef
 | 2026-09-28 | P6 done and shipped (`856f4ae`, PR #14, CI green run 36378178645 23m23s attempt 2 after data-dependent pgTAP fix in `856f4ae`): M6 `users_weight_unit` applied to production with verified backup and identical sets checksum; cross-tab weight units (kg/lb) in Workout, History, Coach timeline, Settings (`WeightUnitCard`), data export; items W49, H48; Decisions D-P6-1..8; local gate 151 files / 1749 tests, pgTAP 11/237, density 95 ×2, E2E set 130p/0f/6s, full CI-order E2E 204p/0f/12s; CI duration (23m23s) and pgTAP seed-independence lesson noted; next phase P7a (Library). |
 | 2026-09-28 | P7a done and shipped (`8782215`, PR #15, CI green run 36478499542 26m52s attempt 2 after unmount timer fix in `8782215`): Library exercises list; `ExercisesView` split into modular components (`ExerciseListTab`, `ExerciseListRow`, `CreateExerciseSheet`, `TemplateListTab`, `EditExerciseSheet`); RD-7 deferred archive and template delete with `UndoToast`; coach hide ConfirmDialog with athlete count; scope chips (All/Defaults/Mine/Athlete/From coach/Archived/Hidden) and owner pills; infinite catalog with "Showing N of M"; duplicate check on create/edit; "Start routine" deep link; WebKit history de-flake; items L4, L8, L10, L11, L13, L14, L15, L18, L19, L20, L21, L23, L24, L25, L30, L32, L34, L35, L46, L47, L48; Decisions D-P7a-1..6; local gate 155 files / 1797 tests, pgTAP 11/237, density 98 ×2, E2E set 116p/0f/6s, full CI-order E2E 237p/0f/12s; CI duration (~27 min vs 35m limit) and P7b leftovers noted; next phase P7b (Library template builder). |
 | 2026-09-29 | P7b done and shipped (`befe8db`, PR #16, CI green run 36504646894 29m46s attempt 2 after density weekday Lat Pull Down fix in `befe8db`): M7 `exercise_name_guard`, M8 `default_catalog_seed`, and M9 `drop_body_part` applied to production with verified backups and identical checksums; M8 backfilled 14 NULL-equipment masters, masters 23->208, exercises 25->210; shared `EditTemplateSheet` (596 LOC), `TemplateExerciseItem` (44px hit areas, stepper clamp), single `save_routine_template` in Coach (no orphan), Library routines via `get_routine_catalog`, full codebase migration to `body_parts`; items L9, L13, L15, L16, L17, L27, L28, L29, L33, L35, L36, L37, L38, L40, L42, L43, L44, L48; Decisions D-P7b-1..6; local gate 155 files / 1822 tests, pgTAP 15/269 (M1-M9 applied), density 101 ×2, E2E set 134p/0f/6s, full CI-order E2E 264p/0f/12s; deployed-frontend parity 0 class-B; new risks noted; next phase P8 (Shell, Coach, Settings + Nutrition standards sweep). |
+| 2026-09-29 | P8 done and shipped (`fc7b171`, PR #17): Shell (L41, RD-12 BottomNav 12px), Coach (C1–C30, inline builder retired), Settings (S1–S29), Nutrition standards sweep (RD-7 deferred delete, skeletons, 44px hit areas H25/H39), zero grep gate across src, production UUID catalog-tail bug fix (10 affected exercises post-M8); Decisions D-P8-1..9; local gate 155 files / 1858 tests, pgTAP 15/269, density 120 ×2, E2E set 148p/0f/6s, full CI-order E2E 270p/0f/12s; all redesign phases P0–P8 complete. |
