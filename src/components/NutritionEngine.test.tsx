@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NutritionEngine } from './nutrition/NutritionEngine';
+import { ToastProvider } from '../context/ToastContext';
+import { ToastHost } from './common/ToastHost';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../context/AuthContext';
 import { CoachProvider } from '../context/CoachContext';
@@ -85,7 +87,10 @@ describe('NutritionEngine', () => {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <CoachProvider>
-            <NutritionEngine />
+            <ToastProvider>
+              <NutritionEngine />
+              <ToastHost />
+            </ToastProvider>
           </CoachProvider>
         </AuthProvider>
       </QueryClientProvider>

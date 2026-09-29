@@ -7,7 +7,6 @@ import { EditSetSheet } from '../sets/EditSetSheet';
 import { RemoveExerciseSheet } from './RemoveExerciseSheet';
 import { FinishReviewSheet } from './FinishReviewSheet';
 import { ConfirmDialog } from '../common/ConfirmDialog';
-import { UndoToast } from '../common/UndoToast';
 import { ExercisePicker, type ExercisePickerProps } from '../exercises/ExercisePicker';
 
 export interface WorkoutDialogsProps {
@@ -86,8 +85,6 @@ export const WorkoutDialogs: React.FC<WorkoutDialogsProps> = ({
   isReloadConfirmOpen,
   onCancelReloadConfirm,
   onConfirmReloadRoutine,
-  exerciseRemovalToast,
-  deleteToast,
   isExercisePickerOpen,
   onCloseExercisePicker,
   onAddExercisesFromPicker,
@@ -154,23 +151,7 @@ export const WorkoutDialogs: React.FC<WorkoutDialogsProps> = ({
         testId="reload-routine-dialog"
       />
 
-      {/* Deferred Delete Undo Toasts (W3, W8, RD-7) */}
-      {exerciseRemovalToast && (
-        <UndoToast
-          toast={exerciseRemovalToast}
-          onDismiss={() => {}}
-          testId="quick-log-toast"
-          stackIndex={deleteToast ? 1 : 0}
-        />
-      )}
-      {deleteToast && (
-        <UndoToast
-          toast={deleteToast}
-          onDismiss={() => {}}
-          testId="quick-log-toast"
-          stackIndex={0}
-        />
-      )}
+
 
       {/* Exercise Picker Sheet (P4-W2) */}
       <ExercisePicker

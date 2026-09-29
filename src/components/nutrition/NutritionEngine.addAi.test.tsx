@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { NutritionEngine } from './NutritionEngine';
+import { ToastProvider } from '../../context/ToastContext';
+import { ToastHost } from '../common/ToastHost';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../../context/AuthContext';
 import { CoachProvider } from '../../context/CoachContext';
@@ -65,7 +67,10 @@ describe('NutritionEngine D45 Add Items with AI', () => {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <CoachProvider>
-            <NutritionEngine />
+            <ToastProvider>
+              <NutritionEngine />
+              <ToastHost />
+            </ToastProvider>
           </CoachProvider>
         </AuthProvider>
       </QueryClientProvider>

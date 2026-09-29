@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MyCoachCard } from './MyCoachCard';
+import { ToastProvider } from '../../context/ToastContext';
+import { ToastHost } from '../common/ToastHost';
 import { expectNoA11yViolations } from '../../test/a11y';
 import type { UserProfile } from '../../types/database';
 import { supabase } from '../../lib/supabase';
@@ -52,7 +54,10 @@ describe('MyCoachCard accessibility and live regions', () => {
   const renderCard = () =>
     render(
       <QueryClientProvider client={queryClient}>
-        <MyCoachCard profile={mockProfile} />
+        <ToastProvider>
+          <MyCoachCard profile={mockProfile} />
+          <ToastHost />
+        </ToastProvider>
       </QueryClientProvider>
     );
 
@@ -96,9 +101,9 @@ describe('MyCoachCard accessibility and live regions', () => {
       expect(screen.getByTestId('link-coach-status')).toHaveTextContent('Successfully linked to coach!');
     });
 
-    expect(container.querySelector('[role="status"]')).toBe(polite);
     expect(container.querySelector('[role="alert"]')).toBe(assertive);
-    expect(polite!.textContent).toContain('Successfully linked to coach!');
+    const politeSuccess = screen.getAllByRole('status').find((r) => r.textContent?.includes('Successfully linked to coach!'));
+    expect(politeSuccess).toBeDefined();
     expect(assertive!.textContent).toBe('');
   });
 

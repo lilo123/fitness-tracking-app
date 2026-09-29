@@ -177,7 +177,7 @@ export const CoachAthleteMacros: React.FC<CoachAthleteMacrosProps> = ({
 
       <StatusBanner
         message={macroStatus?.message ?? null}
-        tone={macroStatus?.type === 'error' ? 'error' : 'success'}
+        tone={macroStatus?.type === 'error' ? 'error' : 'info'}
         testId="athlete-macro-status"
         icon={
           macroStatus?.type === 'error' ? (

@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback, useSyncExternalStore } from 'react';
+import { createElement, useState, useMemo, useRef, useCallback, useSyncExternalStore } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import type { Database } from '../../types/supabase';
@@ -22,6 +22,7 @@ import {
 } from '../../utils/date';
 import { nutritionDayKey } from '../../utils/nutritionDayKey';
 import { roundTo1Decimal, calculateRemainingFuel } from '../../utils/nutrition';
+import { useToast } from '../../hooks/useToast';
 import { restTimerStore } from '../../utils/restTimerStore';
 import {
   itemsForPersist,
@@ -74,6 +75,7 @@ export function useNutritionData({
   setIsError,
 }: UseNutritionDataOptions) {
   const queryClient = useQueryClient();
+  const { show: showToast } = useToast();
 
   const targetCalories = profile?.target_calories || 2200;
   const targetProtein = profile?.target_protein || 160;
@@ -212,6 +214,7 @@ export function useNutritionData({
     },
     onSuccess: (data) => {
       const created = Array.isArray(data) ? data[0] : (data as any);
+      const isQuickLog = Boolean(pendingLogIdResolveRef.current);
       if (created?.id) {
         lastCreatedLogIdRef.current = created.id;
         if (pendingLogIdResolveRef.current) {
@@ -219,7 +222,10 @@ export function useNutritionData({
           pendingLogIdResolveRef.current = null;
         }
       }
-      setStatus('Saved');
+      if (!isQuickLog) {
+        showToast({ message: 'Saved', kind: 'success' });
+      }
+      setStatus('');
       setIsError(false);
       queryClient.invalidateQueries({ queryKey: ['nutrition_logs', targetUserId] });
       onMutationSuccessReset();
@@ -332,7 +338,8 @@ export function useNutritionData({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['custom_dishes', targetUserId] });
-      setStatus('Custom dish saved');
+      showToast({ message: 'Custom dish saved', kind: 'success' });
+      setStatus('');
       setIsError(false);
     },
     onError: (err: Error) => {
@@ -402,6 +409,19 @@ export function useNutritionData({
           calories,
           onUndo: options?.onUndo,
         });
+        showToast({
+          kind: 'undo',
+          verb: 'Updated',
+          subject: dishName,
+          detail: `${calories} kcal`,
+          durationMs: 5000,
+          onUndo: options?.onUndo,
+          undoAriaLabel: `Undo update ${dishName}`,
+          testId: 'quick-log-toast',
+          subjectTestId: 'toast-dish-text',
+          undoBtnTestId: 'toast-undo-btn',
+          undoSpanTestId: 'undo-add-favorite-btn',
+        });
         return;
       }
 
@@ -415,6 +435,28 @@ export function useNutritionData({
           onUndo: options?.onUndo,
           forMeal: options?.forMeal,
           preMeal: options?.preMeal,
+        });
+        showToast({
+          kind: 'undo',
+          verb: 'Added to meal',
+          subject: dishName,
+          detail: `+${calories} kcal`,
+          durationMs: 5000,
+          onUndo: options?.onUndo,
+          undoAriaLabel: `Undo add ${dishName}`,
+          testId: 'quick-log-toast',
+          subjectTestId: 'toast-dish-text',
+          undoBtnTestId: 'toast-undo-btn',
+          undoSpanTestId: 'undo-add-favorite-btn',
+          children: createElement(
+            'span',
+            {
+              'data-testid': 'add-favorite-status-banner',
+              className: 'sr-only',
+              'aria-hidden': true,
+            },
+            `Added ${dishName} to staged meal`
+          ),
         });
         return;
       }
@@ -463,8 +505,21 @@ export function useNutritionData({
         calories,
         onUndo,
       });
+      showToast({
+        kind: 'undo',
+        verb: 'Logged',
+        subject: dishName,
+        detail: `+${calories} kcal`,
+        durationMs: 5000,
+        onUndo,
+        undoAriaLabel: `Undo log ${dishName}`,
+        testId: 'quick-log-toast',
+        subjectTestId: 'toast-dish-text',
+        undoBtnTestId: 'toast-undo-btn',
+        undoSpanTestId: 'undo-add-favorite-btn',
+      });
     },
-    [dismissToast, deleteMutation]
+    [dismissToast, deleteMutation, showToast]
   );
 
   const timerState = useSyncExternalStore(

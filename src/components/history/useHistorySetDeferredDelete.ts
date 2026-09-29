@@ -8,6 +8,7 @@ import type { UndoToastItem } from "../common/UndoToast";
 import type { HistorySet } from "./useHistoryData";
 import { useWeightUnit } from "../../hooks/useWeightUnit";
 import { formatSet } from "../../utils/weight";
+import { useToast } from "../../hooks/useToast";
 
 export interface UseHistorySetDeferredDeleteOptions {
   targetUserId?: string;
@@ -33,6 +34,7 @@ export function useHistorySetDeferredDelete({
   const queryClient = useQueryClient();
   const unit = useWeightUnit();
 
+  const { show: showToast } = useToast();
   const { pending, schedule, undo, flush } = useDeferredDelete<WorkoutSet>({
     commit: async (item) => {
       if (!item.id) return;
@@ -68,8 +70,19 @@ export function useHistorySetDeferredDelete({
       setEditingSet(null);
       const label = set.exercise_name || "Workout set";
       schedule(set, label);
+      showToast({
+        kind: 'undo',
+        verb: 'Set deleted',
+        subject: label,
+        detail: formatSet(set.weight, set.reps, unit),
+        durationMs: 6000,
+        onUndo: undo,
+        onCommit: flush,
+        undoAriaLabel: `Undo delete ${label}`,
+        testId: 'quick-log-toast',
+      });
     },
-    [schedule, setEditingSet]
+    [schedule, setEditingSet, showToast, unit, undo, flush]
   );
 
   const handleSetSaved = useCallback(

@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { SettingsView } from './SettingsView';
+import { ToastProvider } from '../../context/ToastContext';
+import { ToastHost } from '../common/ToastHost';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../../context/AuthContext';
@@ -73,7 +75,10 @@ describe('SettingsView', () => {
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <AuthProvider>
-            <SettingsView />
+            <ToastProvider>
+              <SettingsView />
+              <ToastHost />
+            </ToastProvider>
           </AuthProvider>
         </BrowserRouter>
       </QueryClientProvider>

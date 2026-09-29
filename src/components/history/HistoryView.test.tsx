@@ -9,6 +9,8 @@ import { groupSessionSetsByExercise } from '../../utils/historyGrouping';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../../context/AuthContext';
 import { CoachProvider } from '../../context/CoachContext';
+import { ToastProvider } from '../../context/ToastContext';
+import { ToastHost } from '../common/ToastHost';
 import { supabase } from '../../lib/supabase';
 import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory, recordedTables } from '../../test/supabaseBuilderMock';
 
@@ -226,7 +228,10 @@ describe('HistoryView', () => {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <CoachProvider>
-              <HistoryView />
+              <ToastProvider>
+                <HistoryView />
+                <ToastHost />
+              </ToastProvider>
             </CoachProvider>
           </AuthProvider>
         </QueryClientProvider>
@@ -2167,7 +2172,10 @@ describe('HistoryView', () => {
           <QueryClientProvider client={queryClient}>
             <AuthProvider>
               <CoachProvider>
-                <TestNavigator />
+                <ToastProvider>
+                  <TestNavigator />
+                  <ToastHost />
+                </ToastProvider>
               </CoachProvider>
             </AuthProvider>
           </QueryClientProvider>

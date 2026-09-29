@@ -3,12 +3,22 @@ import { render } from '@testing-library/react';
 import fs from 'node:fs';
 import path from 'node:path';
 import { QuickLogToast } from './QuickLogToast';
+import { ToastProvider } from '../../context/ToastContext';
+import { ToastHost } from '../common/ToastHost';
+
+const renderComponent = (ui: React.ReactElement) =>
+  render(
+    <ToastProvider>
+      {ui}
+      <ToastHost />
+    </ToastProvider>
+  );
 
 const BASELINE_DIR = '/tmp/p3a_toast_before';
 
 describe('QuickLogToast DOM byte-identical proof', () => {
   it('renders byte-identical DOM for null toast', () => {
-    const { container } = render(
+    const { container } = renderComponent(
       <QuickLogToast
         toast={null}
         onDismiss={vi.fn()}
@@ -28,7 +38,7 @@ describe('QuickLogToast DOM byte-identical proof', () => {
   });
 
   it('renders byte-identical DOM for logged with undo', () => {
-    const { container } = render(
+    const { container } = renderComponent(
       <QuickLogToast
         toast={{
           variant: 'logged',
@@ -56,7 +66,7 @@ describe('QuickLogToast DOM byte-identical proof', () => {
   });
 
   it('renders byte-identical DOM for logged without undo', () => {
-    const { container } = render(
+    const { container } = renderComponent(
       <QuickLogToast
         toast={{
           variant: 'logged',
@@ -80,7 +90,7 @@ describe('QuickLogToast DOM byte-identical proof', () => {
   });
 
   it('renders byte-identical DOM for added variant', () => {
-    const { container } = render(
+    const { container } = renderComponent(
       <QuickLogToast
         toast={{
           variant: 'added',
@@ -108,7 +118,7 @@ describe('QuickLogToast DOM byte-identical proof', () => {
   });
 
   it('renders byte-identical DOM for updated variant', () => {
-    const { container } = render(
+    const { container } = renderComponent(
       <QuickLogToast
         toast={{
           variant: 'updated',
@@ -136,7 +146,7 @@ describe('QuickLogToast DOM byte-identical proof', () => {
   });
 
   it('renders byte-identical DOM for timer position', () => {
-    const { container } = render(
+    const { container } = renderComponent(
       <QuickLogToast
         toast={{
           variant: 'logged',

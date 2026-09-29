@@ -12,6 +12,8 @@ import { workoutSessionStore } from '../../utils/workoutSessionStore';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../../context/AuthContext';
 import { CoachProvider } from '../../context/CoachContext';
+import { ToastProvider } from '../../context/ToastContext';
+import { ToastHost } from '../common/ToastHost';
 import { useCoach } from '../../hooks/useCoach';
 import { supabase } from '../../lib/supabase';
 import { getLocalDateStr } from '../../utils/ghostSets';
@@ -76,13 +78,16 @@ describe('WorkoutEngine', () => {
     });
   });
 
-  const renderComponent = () =>
+  const renderComponent = (includeToast = false) =>
     render(
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <CoachProvider>
-            <WorkoutEngine />
-            <GlobalRestTimerPill />
+            <ToastProvider>
+              <WorkoutEngine />
+              <GlobalRestTimerPill />
+              {includeToast && <ToastHost />}
+            </ToastProvider>
           </CoachProvider>
         </AuthProvider>
       </QueryClientProvider>
@@ -3405,7 +3410,7 @@ describe('WorkoutEngine', () => {
 
     it("tapping a logged set row opens EditSetSheet (W3)", async () => {
       setupLoggedSet();
-      renderComponent();
+      renderComponent(true);
 
       await waitFor(() => {
         expect(screen.getByText("Barbell Bench Press")).toBeDefined();
@@ -3427,7 +3432,7 @@ describe('WorkoutEngine', () => {
     it("delete via sheet closes sheet, optimistically hides set, renders UndoToast, and sends exactly 1 DELETE after 6s", async () => {
       const deleteSetSpy = vi.spyOn(setsLib, "deleteSet").mockResolvedValue(undefined as any);
       setupLoggedSet();
-      renderComponent();
+      renderComponent(true);
 
       await waitFor(() => {
         expect(screen.getByTestId("logged-set-row-0-0")).toBeDefined();
@@ -3472,7 +3477,7 @@ describe('WorkoutEngine', () => {
     it("delete via sheet then Undo restores set and sends 0 DELETE calls", async () => {
       const deleteSetSpy = vi.spyOn(setsLib, "deleteSet").mockResolvedValue(undefined as any);
       setupLoggedSet();
-      renderComponent();
+      renderComponent(true);
 
       await waitFor(() => {
         expect(screen.getByTestId("logged-set-row-0-0")).toBeDefined();

@@ -15,7 +15,7 @@ import { Skeleton } from '../common/Skeleton';
 import { Chip } from '../common/Chip';
 import { Button } from '../common/Button';
 import { ConfirmDialog } from '../common/ConfirmDialog';
-import { UndoToast, type UndoToastItem } from '../common/UndoToast';
+import { useToast } from '../../hooks/useToast';
 import { useDeferredDelete } from '../common/useDeferredDelete';
 import { ExerciseListRow, type ExerciseRowItem } from './ExerciseListRow';
 import { CreateExerciseSheet } from './CreateExerciseSheet';
@@ -53,7 +53,8 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
     const [isCreateOpen, setIsCreateOpen] = useState(false), [editingExercise, setEditingExercise] = useState<ExerciseRowItem | null>(null);
     const [createExerciseError, setCreateExerciseError] = useState<string | null>(null), [archiveError, setArchiveError] = useState<string | null>(null);
     const [hideError, setHideError] = useState<string | null>(null), [hideConfirmTarget, setHideConfirmTarget] = useState<ExerciseRowItem | null>(null);
-    const [isHidePending, setIsHidePending] = useState(false), [hiddenToast, setHiddenToast] = useState<UndoToastItem | null>(null);
+    const { show: showToast } = useToast();
+    const [isHidePending, setIsHidePending] = useState(false);
 
     const {
       data: catalogData, isPending, isSuccess, isError, error: catalogError,
@@ -105,19 +106,24 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
         const { error } = await (supabase.from as any)('exercise_hides').insert({ hidden_by: currentUserId, exercise_id: ex.id });
         if (error) throw error;
         await invalidateExerciseDomain(queryClient, currentUserId || undefined);
-        setHiddenToast({
-          verb: 'Hidden', subject: ex.name, detail: 'Hidden for you',
+        showToast({
+          kind: 'undo',
+          verb: 'Hidden',
+          subject: ex.name,
+          detail: 'Hidden for you',
+          durationMs: 6000,
           onUndo: async () => {
             try {
               const { error: delErr } = await (supabase.from as any)('exercise_hides').delete().eq('exercise_id', ex.id).eq('hidden_by', currentUserId);
               if (delErr) throw delErr;
               await invalidateExerciseDomain(queryClient, currentUserId || undefined);
-              setHiddenToast(null);
             } catch (err: any) {
               setHideError(err?.message || 'Failed to unhide exercise');
             }
           },
           undoAriaLabel: `Undo hide ${ex.name}`,
+          testId: 'undo-toast',
+          undoBtnTestId: 'toast-undo-btn',
         });
       } catch (err: any) { setHideError(err?.message || 'Failed to hide exercise'); }
     };
@@ -267,7 +273,35 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
             <ExerciseListRow
               key={ex.id} exercise={ex} currentUserId={currentUserId} isCoach={isCoach}
               athleteFirstName={athletes?.find((a) => a.id === ex.user_id)?.name.split(' ')[0]}
-              onEdit={setEditingExercise} onArchive={(item) => scheduleArchive(item, item.name)} onDelete={(item) => scheduleArchive(item, item.name)} onRestore={handleRestore}
+              onEdit={setEditingExercise} onArchive={(item) => {
+                scheduleArchive(item, item.name);
+                showToast({
+                  kind: 'undo',
+                  verb: 'Archived',
+                  subject: item.name,
+                  detail: 'Exercise archived',
+                  durationMs: 6000,
+                  onUndo: undoArchive,
+                  onCommit: flushArchive,
+                  undoAriaLabel: `Undo archive ${item.name}`,
+                  testId: 'undo-toast',
+                  undoBtnTestId: 'toast-undo-btn',
+                });
+              }} onDelete={(item) => {
+                scheduleArchive(item, item.name);
+                showToast({
+                  kind: 'undo',
+                  verb: 'Archived',
+                  subject: item.name,
+                  detail: 'Exercise archived',
+                  durationMs: 6000,
+                  onUndo: undoArchive,
+                  onCommit: flushArchive,
+                  undoAriaLabel: `Undo archive ${item.name}`,
+                  testId: 'undo-toast',
+                  undoBtnTestId: 'toast-undo-btn',
+                });
+              }} onRestore={handleRestore}
               onHide={(item) => (isCoach ? setHideConfirmTarget(item) : void handleAthleteHide(item))} onUnhide={handleUnhide}
             />
           ))}
@@ -288,15 +322,7 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
           title="Hide Exercise" consequence={coachHideConsequence} confirmLabel="Hide" cancelLabel="Cancel"
           isDestructive isLoading={isHidePending} testId="coach-hide-confirm-dialog" />
 
-        {pendingArchive && (
-          <UndoToast
-            toast={{ verb: 'Archived', subject: pendingArchive.label, detail: 'Exercise archived', onUndo: undoArchive, undoAriaLabel: `Undo archive ${pendingArchive.label}` }}
-            onDismiss={flushArchive} durationMs={6000} testId="undo-toast" undoBtnTestId="toast-undo-btn" />
-        )}
 
-        {hiddenToast && !pendingArchive && (
-          <UndoToast toast={hiddenToast} onDismiss={() => setHiddenToast(null)} durationMs={6000} testId="undo-toast" undoBtnTestId="toast-undo-btn" />
-        )}
       </div>
     );
   }

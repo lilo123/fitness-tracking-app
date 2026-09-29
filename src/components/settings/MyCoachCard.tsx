@@ -7,9 +7,9 @@ import {
   UserMinus,
   UserPlus,
   AlertCircle,
-  CheckCircle2,
 } from 'lucide-react';
 import { StatusBanner } from '../common/StatusBanner';
+import { useToast } from '../../hooks/useToast';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { Skeleton } from '../common/Skeleton';
 import { Button } from '../common/Button';
@@ -55,6 +55,7 @@ export const MyCoachCard: React.FC<MyCoachCardProps> = ({
   });
 
   // Link / Disconnect Coach state
+  const { show: showToast } = useToast();
   const [linkCodeInput, setLinkCodeInput] = useState('');
   const [linkStatus, setLinkStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isLinking, setIsLinking] = useState(false);
@@ -74,7 +75,8 @@ export const MyCoachCard: React.FC<MyCoachCardProps> = ({
       if (data && (data as any).success === false) {
         throw new Error((data as { error?: string } | null)?.error || 'Failed to link to coach.');
       }
-      setLinkStatus({ type: 'success', message: 'Successfully linked to coach!' });
+      showToast({ message: 'Successfully linked to coach!', kind: 'success', testId: 'link-coach-status' });
+      setLinkStatus(null);
       setLinkCodeInput('');
       
       queryClient.invalidateQueries({ queryKey: ['my_coach_link'] });
@@ -100,7 +102,8 @@ export const MyCoachCard: React.FC<MyCoachCardProps> = ({
     try {
       const { error } = await supabase.rpc('disconnect_coach');
       if (error) throw error;
-      setLinkStatus({ type: 'success', message: 'Successfully disconnected from coach.' });
+      showToast({ message: 'Successfully disconnected from coach.', kind: 'success', testId: 'link-coach-status' });
+      setLinkStatus(null);
       
       queryClient.invalidateQueries({ queryKey: ['my_coach_link'] });
       queryClient.invalidateQueries({ queryKey: ['routine_templates'] });
@@ -225,15 +228,9 @@ export const MyCoachCard: React.FC<MyCoachCardProps> = ({
 
       <StatusBanner
         testId="link-coach-status"
-        message={linkStatus?.message}
-        tone={linkStatus?.type === 'error' ? 'error' : 'success'}
-        icon={
-          linkStatus?.type === 'error' ? (
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />
-          ) : (
-            <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />
-          )
-        }
+        message={linkStatus?.type === 'error' ? linkStatus.message : null}
+        tone="error"
+        icon={<AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />}
       />
 
       <ConfirmDialog

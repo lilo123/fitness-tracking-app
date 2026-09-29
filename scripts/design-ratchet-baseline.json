@@ -7,7 +7,8 @@
     "font-black",
     "font-extrabold",
     "sub-12px",
-    "zinc-500"
+    "zinc-500",
+    "adhoc-success"
   ],
   "hardRuleDirectories": [
     "src"
@@ -19,7 +20,8 @@
     "font-black": 0,
     "sub-12px": 0,
     "zinc-500": 0,
-    "font-extrabold": 0
+    "font-extrabold": 0,
+    "adhoc-success": 0
   },
   "files": {}
 }

@@ -8,6 +8,8 @@ import { BottomNav } from './components/common/BottomNav';
 import { LoginView } from './components/auth/LoginView';
 import { ResetPasswordView } from './components/auth/ResetPasswordView';
 import { GlobalRestTimerPill } from './components/common/GlobalRestTimerPill';
+import { ToastProvider } from './context/ToastContext';
+import { ToastHost } from './components/common/ToastHost';
 import './App.css';
 
 const WorkoutEngine = React.lazy(() =>
@@ -253,7 +255,10 @@ export function App() {
     <Router>
       <AuthProvider>
         <CoachProvider>
-          <AppLayout />
+          <ToastProvider>
+            <AppLayout />
+            <ToastHost />
+          </ToastProvider>
         </CoachProvider>
       </AuthProvider>
     </Router>

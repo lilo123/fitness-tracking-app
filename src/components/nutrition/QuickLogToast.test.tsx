@@ -1,6 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { QuickLogToast } from './QuickLogToast';
+import { ToastProvider } from '../../context/ToastContext';
+import { ToastHost } from '../common/ToastHost';
+
+const renderComponent = (ui: React.ReactElement) =>
+  render(
+    <ToastProvider>
+      {ui}
+      <ToastHost />
+    </ToastProvider>
+  );
 
 describe('QuickLogToast', () => {
   beforeEach(() => {
@@ -15,7 +25,7 @@ describe('QuickLogToast', () => {
     const onUndo = vi.fn();
     const onDismiss = vi.fn();
 
-    render(
+    renderComponent(
       <QuickLogToast
         toast={{
           variant: 'logged',
@@ -61,7 +71,7 @@ describe('QuickLogToast', () => {
     const onUndo = vi.fn();
     const onDismiss = vi.fn();
 
-    render(
+    renderComponent(
       <QuickLogToast
         toast={{
           variant: 'added',
@@ -99,7 +109,7 @@ describe('QuickLogToast', () => {
   it('does not dismiss when the toast body is clicked (no tap-anywhere dismiss)', () => {
     const onDismiss = vi.fn();
 
-    render(
+    renderComponent(
       <QuickLogToast
         toast={{
           variant: 'logged',
@@ -122,7 +132,7 @@ describe('QuickLogToast', () => {
   it('auto-hides after >= 5000ms when Undo is not focused', () => {
     const onDismiss = vi.fn();
 
-    render(
+    renderComponent(
       <QuickLogToast
         toast={{
           variant: 'logged',
@@ -154,7 +164,7 @@ describe('QuickLogToast', () => {
   it('does not auto-hide while Undo has focus and hides on blur if expired', () => {
     const onDismiss = vi.fn();
 
-    render(
+    renderComponent(
       <QuickLogToast
         toast={{
           variant: 'logged',
@@ -192,7 +202,7 @@ describe('QuickLogToast', () => {
     const onUndo = vi.fn();
     const onDismiss = vi.fn();
 
-    render(
+    renderComponent(
       <QuickLogToast
         toast={{
           variant: 'logged',
@@ -218,7 +228,7 @@ describe('QuickLogToast', () => {
     const onUndo = vi.fn();
     const onDismiss = vi.fn();
 
-    render(
+    renderComponent(
       <QuickLogToast
         toast={{
           variant: 'updated',

@@ -8,6 +8,7 @@ interface RatchetScanCounts {
   'font-extrabold'?: number;
   'sub-12px'?: number;
   'zinc-500'?: number;
+  'adhoc-success'?: number;
 }
 
 interface RatchetBaseline {
@@ -57,7 +58,7 @@ interface ComparisonResult {
   };
 }
 
-type ScanContentFn = (rawContent: string) => RatchetScanCounts;
+type ScanContentFn = (rawContent: string, filePath?: string) => RatchetScanCounts;
 type CompareFn = (
   currentCounts: Record<string, RatchetScanCounts>,
   baseline: RatchetBaseline,
@@ -105,7 +106,7 @@ describe('Design Ratchet Checker (scripts/check-design-ratchet.js)', () => {
   const mockBaseline: RatchetBaseline = {
     version: 1,
     description: 'Test Baseline',
-    rules: ['confirm', 'font-mono', 'font-black', 'font-extrabold', 'sub-12px', 'zinc-500'],
+    rules: ['confirm', 'font-mono', 'font-black', 'font-extrabold', 'sub-12px', 'zinc-500', 'adhoc-success'],
     hardRuleDirectories: ['src'],
     flaggedConfirm: {
       'src/components/workout/EditSetModal.tsx': {
@@ -120,6 +121,7 @@ describe('Design Ratchet Checker (scripts/check-design-ratchet.js)', () => {
       'font-extrabold': 0,
       'sub-12px': 5,
       'zinc-500': 0,
+      'adhoc-success': 0,
     },
     files: {
       'src/components/workout/EditSetModal.tsx': {
@@ -129,6 +131,7 @@ describe('Design Ratchet Checker (scripts/check-design-ratchet.js)', () => {
         'font-extrabold': 0,
         'sub-12px': 2,
         'zinc-500': 0,
+        'adhoc-success': 0,
       },
       'src/components/history/HistoryView.tsx': {
         confirm: 0,
@@ -137,6 +140,7 @@ describe('Design Ratchet Checker (scripts/check-design-ratchet.js)', () => {
         'font-extrabold': 0,
         'sub-12px': 3,
         'zinc-500': 0,
+        'adhoc-success': 0,
       },
     },
   };
@@ -507,6 +511,7 @@ describe('Design Ratchet Checker (scripts/check-design-ratchet.js)', () => {
         'font-extrabold': 0,
         'sub-12px': 2,
         'zinc-500': 0,
+        'adhoc-success': 0,
       });
       expect(updated.totals['font-mono']).toBe(1);
     });
@@ -689,6 +694,68 @@ describe('Design Ratchet Checker (scripts/check-design-ratchet.js)', () => {
   describe('7. Baseline File Existence and Integrity', () => {
     it('baseline path is defined and exists', () => {
       expect(defaultBaselinePath).toBeDefined();
+    });
+  });
+
+  describe('8. adhoc-success Rule (STD-FB-1)', () => {
+    it('detects StatusBanner with tone="success"', () => {
+      const code = '<StatusBanner tone="success" message="Done" />';
+      const counts = scanFileContent(code);
+      expect(counts['adhoc-success']).toBe(1);
+    });
+
+    it('detects StatusBanner with dynamic tone returning success', () => {
+      const code = '<StatusBanner tone={isOk ? "success" : "error"} message="Done" />';
+      const counts = scanFileContent(code);
+      expect(counts['adhoc-success']).toBe(1);
+    });
+
+    it('detects StatusBanner with tone="info" carrying legacy success copy', () => {
+      const code = '<StatusBanner tone="info" message="Saved" />';
+      const counts = scanFileContent(code);
+      expect(counts['adhoc-success']).toBe(1);
+    });
+
+    it('detects legacy setStatus calls with success messages', () => {
+      const code = "setStatus('Saved');";
+      const counts = scanFileContent(code);
+      expect(counts['adhoc-success']).toBe(1);
+    });
+
+    it('detects inline Copied! in JSX', () => {
+      const code = '<button><span>Copied!</span></button>';
+      const counts = scanFileContent(code);
+      expect(counts['adhoc-success']).toBe(1);
+    });
+
+    it('fails when a fixture with adhoc-success is compared against baseline 0', () => {
+      const fixtureCode = '<StatusBanner tone="success" message="Done" />';
+      const counts = scanFileContent(fixtureCode);
+      expect(counts['adhoc-success']).toBe(1);
+      const current = {
+        'src/components/fixture.tsx': counts,
+      };
+      const result = compareWithBaseline(current, mockBaseline);
+      expect(result.ok).toBe(false);
+      expect(result.violations.some((v) => v.rule === 'adhoc-success')).toBe(true);
+    });
+
+    it('detects direct <UndoToast outside ToastHost', () => {
+      const code = '<UndoToast toast={toastItem} onDismiss={() => {}} />';
+      const counts = scanFileContent(code, 'src/components/workout/WorkoutDialogs.tsx');
+      expect(counts['adhoc-success']).toBe(1);
+    });
+
+    it('exempts standard toast infrastructure files', () => {
+      const code = '<StatusBanner tone="success" message="Saved" /><UndoToast toast={null} onDismiss={() => {}} />';
+      const countsUndo = scanFileContent(code, 'src/components/common/UndoToast.tsx');
+      expect(countsUndo['adhoc-success']).toBe(0);
+
+      const countsHost = scanFileContent(code, 'src/components/common/ToastHost.tsx');
+      expect(countsHost['adhoc-success']).toBe(0);
+
+      const countsContext = scanFileContent(code, 'src/context/ToastContext.tsx');
+      expect(countsContext['adhoc-success']).toBe(0);
     });
   });
 });

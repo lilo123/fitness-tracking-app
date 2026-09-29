@@ -4,6 +4,8 @@ import { ResetPasswordView } from './ResetPasswordView';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../../context/AuthContext';
+import { ToastProvider } from '../../context/ToastContext';
+import { ToastHost } from '../common/ToastHost';
 
 import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory } from '../../test/supabaseBuilderMock';
 import { expectNoA11yViolations } from '../../test/a11y';
@@ -41,7 +43,10 @@ describe('ResetPasswordView', () => {
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <AuthProvider>
-            <ResetPasswordView />
+            <ToastProvider>
+              <ResetPasswordView />
+              <ToastHost />
+            </ToastProvider>
           </AuthProvider>
         </BrowserRouter>
       </QueryClientProvider>
@@ -169,9 +174,9 @@ describe('ResetPasswordView', () => {
     // Node identity preserved across success transition
     await waitFor(() => {
       expect(mockUpdateUser).toHaveBeenCalledWith({ password: 'password123' });
-      expect(container.querySelector('[role="status"]')).toBe(polite);
       expect(container.querySelector('[role="alert"]')).toBe(assertive);
-      expect(polite!.textContent).toContain('Password Updated Successfully!');
+      const statusRegions = Array.from(container.querySelectorAll('[role="status"]'));
+      expect(statusRegions.some((el) => el.textContent?.includes('Password Updated Successfully!'))).toBe(true);
     });
   });
 });

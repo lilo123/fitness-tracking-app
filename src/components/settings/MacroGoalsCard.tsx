@@ -136,7 +136,7 @@ export const MacroGoalsCard: React.FC<MacroGoalsCardProps> = ({
       <StatusBanner
         testId="settings-status-banner"
         message={status?.message}
-        tone={status?.type === 'error' ? 'error' : 'success'}
+        tone={status?.type === 'error' ? 'error' : 'info'}
         icon={
           status?.type === 'error' ? (
             <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />

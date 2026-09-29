@@ -3,6 +3,7 @@ import { useDeferredDelete } from '../common/useDeferredDelete';
 import type { UndoToastItem } from '../common/UndoToast';
 import type { WorkoutSet } from '../../types/database';
 import type { SetDraftInput } from '../../utils/workoutSessionStore';
+import { useToast } from '../../hooks/useToast';
 
 export interface RemovedExerciseState {
   exerciseName: string;
@@ -40,6 +41,7 @@ export function useExerciseRemoval({
   timeoutMs = 6000,
   onError,
 }: UseExerciseRemovalOptions) {
+  const { show: showToast } = useToast();
   const [sheetState, setSheetState] = useState<{
     isOpen: boolean;
     exerciseName: string;
@@ -109,6 +111,20 @@ export function useExerciseRemoval({
       // 0 logged sets -> remove immediately + UndoToast
       onRemoveExerciseLocally(index);
       schedule(stateToSave, `Removed ${exName}`);
+      showToast({
+        kind: 'undo',
+        verb: 'Removed',
+        subject: exName,
+        detail: '0 sets logged',
+        durationMs: timeoutMs,
+        onUndo: handleUndo,
+        onCommit: flush,
+        undoAriaLabel: `Undo remove ${exName}`,
+        testId: 'quick-log-toast',
+        subjectTestId: 'toast-dish-text',
+        undoBtnTestId: 'toast-undo-btn',
+        undoSpanTestId: 'undo-add-favorite-btn',
+      });
     } else {
       // Has logged sets -> open RemoveExerciseSheet
       setSheetState({
@@ -127,6 +143,10 @@ export function useExerciseRemoval({
     targetRepCounts,
     onRemoveExerciseLocally,
     schedule,
+    showToast,
+    timeoutMs,
+    handleUndo,
+    flush,
   ]);
 
   const handleConfirmRemoveAndDelete = useCallback(() => {
@@ -155,6 +175,23 @@ export function useExerciseRemoval({
     setSheetState({ isOpen: false, exerciseName: '', index: -1, loggedSetsCount: 0 });
     onRemoveExerciseLocally(index);
     schedule(stateToSave, `Removed ${exName}`);
+    showToast({
+      kind: 'undo',
+      verb: 'Removed',
+      subject: exName,
+      detail:
+        stateToSave.sets.length === 0
+          ? '0 sets logged'
+          : `${stateToSave.sets.length} set${stateToSave.sets.length === 1 ? '' : 's'} deleted`,
+      durationMs: timeoutMs,
+      onUndo: handleUndo,
+      onCommit: flush,
+      undoAriaLabel: `Undo remove ${exName}`,
+      testId: 'quick-log-toast',
+      subjectTestId: 'toast-dish-text',
+      undoBtnTestId: 'toast-undo-btn',
+      undoSpanTestId: 'undo-add-favorite-btn',
+    });
   }, [
     sheetState,
     getSetsForExercise,
@@ -164,6 +201,10 @@ export function useExerciseRemoval({
     targetRepCounts,
     onRemoveExerciseLocally,
     schedule,
+    showToast,
+    timeoutMs,
+    handleUndo,
+    flush,
   ]);
 
   const handleKeepSetsAndCollapse = useCallback(() => {

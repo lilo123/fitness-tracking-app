@@ -6,7 +6,6 @@ import type { WorkoutSet, NutritionLog, Exercise } from '../../types/database';
 import { AlertCircle, Shield, RotateCcw } from 'lucide-react';
 import { EditMealSheet } from '../nutrition/EditMealSheet';
 import { EditSetSheet } from '../sets/EditSetSheet';
-import { UndoToast } from '../common/UndoToast';
 import { useHistorySetDeferredDelete } from './useHistorySetDeferredDelete';
 import { useHistoryMealDeferredDelete } from './useHistoryMealDeferredDelete';
 import { useHistorySessionFilter } from './useHistorySessionFilter';
@@ -137,8 +136,6 @@ export const HistoryView: React.FC = () => {
     handleDeleteSetRequested,
     handleSetSaved,
     displayedSessionsWithSets,
-    flushDelete: flushSetDelete,
-    toastItem: setDeleteToastItem,
   } = useHistorySetDeferredDelete({
     targetUserId,
     exercises,
@@ -194,8 +191,6 @@ export const HistoryView: React.FC = () => {
   const {
     handleDeleteMealRequested,
     pendingDeleteMealId,
-    toastItem: mealDeleteToastItem,
-    flushDelete: flushMealDelete,
   } = useHistoryMealDeferredDelete({
     targetUserId,
     setMutationError,
@@ -466,19 +461,7 @@ export const HistoryView: React.FC = () => {
         timeZone={effectiveTimeZone}
       />
 
-      {/* Undo Toast for deferred set deletion */}
-      <UndoToast
-        toast={setDeleteToastItem}
-        onDismiss={flushSetDelete}
-        stackIndex={0}
-      />
 
-      {/* Undo Toast for deferred meal deletion */}
-      <UndoToast
-        toast={mealDeleteToastItem}
-        onDismiss={flushMealDelete}
-        stackIndex={setDeleteToastItem ? 1 : 0}
-      />
 
       {/* Edit Set Sheet */}
       <EditSetSheet

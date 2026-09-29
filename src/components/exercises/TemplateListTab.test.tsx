@@ -3,6 +3,8 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { TemplateListTab } from './TemplateListTab';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ToastProvider } from '../../context/ToastContext';
+import { ToastHost } from '../common/ToastHost';
 import { supabase } from '../../lib/supabase';
 import { createSupabaseBuilder, clearMockHistory, getRecordedTables } from '../../test/supabaseBuilderMock';
 import type { Exercise, RoutineTemplate } from '../../types/database';
@@ -135,11 +137,14 @@ describe('TemplateListTab - W3 Features', () => {
     return render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
-          <TemplateListTab
-            exercises={mockExercises}
-            targetUserId="user-athlete-1"
-            {...props}
-          />
+          <ToastProvider>
+            <TemplateListTab
+              exercises={mockExercises}
+              targetUserId="user-athlete-1"
+              {...props}
+            />
+            <ToastHost />
+          </ToastProvider>
         </MemoryRouter>
       </QueryClientProvider>
     );

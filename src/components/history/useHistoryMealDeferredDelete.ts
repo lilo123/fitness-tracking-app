@@ -5,6 +5,7 @@ import type { NutritionLog } from '../../types/database';
 import { useDeferredDelete } from '../common/useDeferredDelete';
 import { deleteCachedLogItems } from '../nutrition/useNutritionData';
 import { formatCalories } from '../../utils/nutrition';
+import { useToast } from '../../hooks/useToast';
 import type { UndoToastItem } from '../common/UndoToast';
 
 export interface UseHistoryMealDeferredDeleteOptions {
@@ -22,6 +23,7 @@ export function useHistoryMealDeferredDelete({
 }: UseHistoryMealDeferredDeleteOptions) {
   const queryClient = useQueryClient();
 
+  const { show: showToast } = useToast();
   const { pending, schedule, undo, flush } = useDeferredDelete<NutritionLog>({
     durationMs: 6000,
     commit: async (item: NutritionLog) => {
@@ -54,11 +56,8 @@ export function useHistoryMealDeferredDelete({
 
   const handleDeleteMealRequested = useCallback(
     (mealOrId: NutritionLog | string) => {
-      if (typeof mealOrId === 'string') {
-        const found = meals?.find((m) => m.id === mealOrId);
-        const meal: NutritionLog =
-          found ||
-          ({
+      const resolvedMeal: NutritionLog = typeof mealOrId === 'string'
+        ? (meals?.find((m) => m.id === mealOrId) || ({
             id: mealOrId,
             food_name: 'Meal',
             calories: 0,
@@ -67,13 +66,25 @@ export function useHistoryMealDeferredDelete({
             fat: 0,
             fiber: 0,
             logged_at: new Date().toISOString(),
-          } as NutritionLog);
-        schedule(meal, meal.food_name || 'Meal');
-      } else {
-        schedule(mealOrId, mealOrId.food_name || 'Meal');
-      }
+          } as NutritionLog))
+        : mealOrId;
+
+      const label = resolvedMeal.food_name || 'Meal';
+      schedule(resolvedMeal, label);
+      const kcalStr = formatCalories(resolvedMeal.calories);
+      showToast({
+        kind: 'undo',
+        verb: 'Meal deleted',
+        subject: label,
+        detail: `${kcalStr} kcal`,
+        durationMs: 6000,
+        onUndo: undo,
+        onCommit: flush,
+        undoAriaLabel: `Undo delete ${label}`,
+        testId: 'quick-log-toast',
+      });
     },
-    [schedule, meals]
+    [schedule, meals, showToast, undo, flush]
   );
 
   const toastItem: UndoToastItem | null = useMemo(() => {

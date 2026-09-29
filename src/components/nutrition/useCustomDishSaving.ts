@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { roundTo1Decimal } from '../../utils/nutrition';
 import { itemsForPersist, sumItems } from '../../utils/itemModel';
 import { stagedToItem, type StagedItem, type StagedMeal } from './nutritionEngineHelpers';
+import { useToast } from '../../hooks/useToast';
 
 export interface UseCustomDishSavingOptions {
   targetUserId: string;
@@ -18,9 +19,11 @@ export function useCustomDishSaving({
   setIsError,
 }: UseCustomDishSavingOptions) {
   const queryClient = useQueryClient();
+  const { show: showToast, dismiss: dismissToast } = useToast();
 
   const handleSaveStagedAsCustomDish = async () => {
     if (!stagedMeal) return;
+    dismissToast();
     try {
       const items = stagedMeal.items.map(stagedToItem);
       const totals = sumItems(items);
@@ -40,7 +43,8 @@ export function useCustomDishSaving({
         },
       ]);
       if (error) throw error;
-      setStatus('Saved custom dish');
+      showToast({ message: 'Saved custom dish', kind: 'success' });
+      setStatus('');
       setIsError(false);
       queryClient.invalidateQueries({ queryKey: ['custom_dishes', targetUserId] });
     } catch (err: any) {
@@ -66,7 +70,8 @@ export function useCustomDishSaving({
         },
       ]);
       if (error) throw error;
-      setStatus(`Saved ${item.name} as custom dish`);
+      showToast({ message: `Saved ${item.name} as custom dish`, kind: 'success' });
+      setStatus('');
       setIsError(false);
       queryClient.invalidateQueries({ queryKey: ['custom_dishes', targetUserId] });
     } catch (err: any) {

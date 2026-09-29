@@ -6,10 +6,11 @@ import {
   Shield,
   Copy,
   Check,
-  CheckCircle2,
   AlertCircle,
+  CheckCircle2,
 } from 'lucide-react';
 import { StatusBanner } from '../common/StatusBanner';
+import { useToast } from '../../hooks/useToast';
 import { Button } from '../common/Button';
 
 interface CoachSettingsCardProps {
@@ -46,6 +47,7 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
     },
   });
 
+  const { show: showToast } = useToast();
   // Vanity code state
   const [customCoachCode, setCustomCoachCode] = useState('');
   const [copiedCode, setCopiedCode] = useState(false);
@@ -59,6 +61,7 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
     }
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
+    showToast({ message: 'Copied!', kind: 'success' });
   };
 
   const handleSaveVanityCode = async (e: React.FormEvent) => {
@@ -77,6 +80,7 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
     try {
       const { error } = await supabase.rpc('set_coach_code', { custom_code: trimmed });
       if (error) throw error;
+      showToast({ message: 'Coach code updated successfully!', kind: 'success' });
       setCoachCodeStatus({ type: 'success', message: 'Coach code updated successfully!' });
       setCustomCoachCode('');
       if (refreshProfile) await refreshProfile();
@@ -120,12 +124,12 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
           </div>
           <StatusBanner
             message={coachCodeStatus?.message}
-            tone={coachCodeStatus?.type === 'error' ? 'error' : 'success'}
+            tone={coachCodeStatus?.type === 'error' ? 'error' : 'info'}
             icon={
               coachCodeStatus?.type === 'error' ? (
                 <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />
               ) : (
-                <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" aria-hidden="true" />
               )
             }
           />
@@ -193,7 +197,7 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
               data-testid="copy-coach-code-btn"
             >
               {copiedCode ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-              <span>{copiedCode ? 'Copied!' : 'Copy code'}</span>
+              <span>Copy code</span>
             </button>
           )}
         </div>
@@ -226,12 +230,12 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
           <StatusBanner
             testId="coach-code-status"
             message={coachCodeStatus?.message}
-            tone={coachCodeStatus?.type === 'error' ? 'error' : 'success'}
+            tone={coachCodeStatus?.type === 'error' ? 'error' : 'info'}
             icon={
               coachCodeStatus?.type === 'error' ? (
                 <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />
               ) : (
-                <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" aria-hidden="true" />
               )
             }
           />

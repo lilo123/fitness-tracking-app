@@ -9,7 +9,7 @@ import { PlusCircle, RefreshCw, AlertCircle, Pencil, Copy, Trash2, ChevronDown, 
 import { StatusBanner } from '../common/StatusBanner';
 import { EditTemplateSheet } from './EditTemplateSheet';
 import { useDeferredDelete } from '../common/useDeferredDelete';
-import { UndoToast } from '../common/UndoToast';
+import { useToast } from '../../hooks/useToast';
 import { Tag } from '../common/Tag';
 import { Button } from '../common/Button';
 import { invalidateExerciseDomain } from '../../lib/invalidate';
@@ -79,6 +79,7 @@ export const TemplateListTab: React.FC<TemplateListTabProps> = ({
       ? 50
       : 6000);
 
+  const { show: showToast } = useToast();
   const { pending, schedule, undo, flush } = useDeferredDelete<RoutineTemplate>({
     durationMs: effectiveDurationMs,
     commit: async (item: RoutineTemplate) => {
@@ -281,7 +282,18 @@ export const TemplateListTab: React.FC<TemplateListTabProps> = ({
                     {canDelete && (
                       <button
                         type="button"
-                        onClick={() => schedule(tpl, tpl.name)}
+                        onClick={() => {
+                          schedule(tpl, tpl.name);
+                          showToast({
+                            kind: 'undo',
+                            verb: 'Routine deleted',
+                            subject: tpl.name,
+                            onUndo: undo,
+                            onCommit: flush,
+                            undoAriaLabel: `Undo delete ${tpl.name}`,
+                            durationMs: effectiveDurationMs,
+                          });
+                        }}
                         data-testid={`delete-template-${tpl.id}`}
                         className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-rose-400 transition touch-manipulation cursor-pointer"
                         title="Delete"
@@ -357,20 +369,7 @@ export const TemplateListTab: React.FC<TemplateListTabProps> = ({
         )}
       </div>
 
-      {/* RD-7 Deferred Delete UndoToast */}
-      <UndoToast
-        toast={
-          pending
-            ? {
-                verb: 'Routine deleted',
-                subject: pending.label,
-                onUndo: undo,
-                undoAriaLabel: `Undo delete ${pending.label}`,
-              }
-            : null
-        }
-        onDismiss={flush}
-      />
+
 
       {/* Edit Template Sheet */}
       <EditTemplateSheet

@@ -145,7 +145,12 @@ export const UndoToast: React.FC<UndoToastProps> = ({
     isPausedRef.current = false;
     if (isExpiredRef.current && !isHoveredRef.current) onDismiss();
   };
-  const handleMouseEnter = () => { isHoveredRef.current = true; };
+  const handleMouseEnter = () => {
+    if (typeof window !== 'undefined' && window.matchMedia && !window.matchMedia('(hover: hover)').matches) {
+      return;
+    }
+    isHoveredRef.current = true;
+  };
   const handleMouseLeave = () => {
     isHoveredRef.current = false;
     if (isExpiredRef.current && !isPausedRef.current) onDismiss();
@@ -161,7 +166,7 @@ export const UndoToast: React.FC<UndoToastProps> = ({
   const subject = toast?.subject ?? '';
   const detail = toast?.detail;
   const line2Title = toast ? (detail ? `${subject} · ${detail}` : subject) : '';
-  const announcementMessage = toast ? `${verb}: ${line2Title}` : null;
+  const announcementMessage = toast ? (verb ? `${verb}: ${line2Title}` : line2Title) : null;
   const shouldShowUndo = showUndo !== undefined ? showUndo : Boolean(toast?.onUndo);
   const undoLabel = toast?.undoLabel ?? 'Undo';
   const undoAriaLabel =
@@ -184,11 +189,11 @@ export const UndoToast: React.FC<UndoToastProps> = ({
               <CheckCircle2 className="w-4 h-4 text-emerald-400" aria-hidden="true" />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-xs text-zinc-400 font-normal leading-none">{verb}</div>
+              {verb ? <div className="text-xs text-zinc-400 font-normal leading-none">{verb}</div> : null}
               <div
                 data-testid={subjectTestId}
                 title={line2Title}
-                className="text-sm font-semibold text-white truncate mt-1 leading-snug"
+                className={`text-sm font-semibold text-white truncate ${verb ? 'mt-1 leading-snug' : 'leading-snug'}`}
               >
                 <span>{subject}</span>
                 {detail ? (

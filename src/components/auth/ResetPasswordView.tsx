@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { Lock, AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react';
+import { Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { StatusBanner } from '../common/StatusBanner';
+import { useToast } from '../../hooks/useToast';
 
 export const ResetPasswordView: React.FC = () => {
   const { resetPassword } = useAuth();
+  const { show: showToast } = useToast();
   const navigate = useNavigate();
   
   const [password, setPassword] = useState('');
@@ -42,6 +44,7 @@ export const ResetPasswordView: React.FC = () => {
     const res = await resetPassword(password);
     if (res.success) {
       setSuccess(true);
+      showToast({ message: 'Password Updated Successfully!', kind: 'success' });
     } else {
       setError(res.error || 'Failed to reset password');
     }
@@ -61,16 +64,10 @@ export const ResetPasswordView: React.FC = () => {
 
       <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-6 shadow-2xl backdrop-blur-xl">
         <StatusBanner
-          message={error || (success ? 'Password Updated Successfully!' : null)}
-          tone={error ? 'error' : 'success'}
-          icon={
-            error ? (
-              <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
-            ) : (
-              <CheckCircle2 className="w-5 h-5 shrink-0" aria-hidden="true" />
-            )
-          }
-          className={`mb-4 ${success ? 'justify-center' : ''}`}
+          message={error || null}
+          tone="error"
+          icon={<AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />}
+          className="mb-4"
         />
 
         {success ? (

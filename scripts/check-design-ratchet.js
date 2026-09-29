@@ -33,7 +33,7 @@ export const rootDir = path.resolve(__dirname, '..');
 export const srcDir = path.resolve(rootDir, 'src');
 export const defaultBaselinePath = path.resolve(__dirname, 'design-ratchet-baseline.json');
 
-export const RULES = ['confirm', 'font-mono', 'font-black', 'font-extrabold', 'sub-12px', 'zinc-500'];
+export const RULES = ['confirm', 'font-mono', 'font-black', 'font-extrabold', 'sub-12px', 'zinc-500', 'adhoc-success'];
 
 export const HARD_RULE_DIRECTORIES = ['src'];
 
@@ -154,7 +154,7 @@ export function isHardRuleDir(relPath) {
 /**
  * Scans a single file's content and returns counts for all rules.
  */
-export function scanFileContent(rawContent) {
+export function scanFileContent(rawContent, filePath = '') {
   const content = stripComments(rawContent);
 
   // 1. confirm: window.confirm(, bare confirm(, window.alert(, bare alert(
@@ -201,6 +201,35 @@ export function scanFileContent(rawContent) {
   // 5. zinc-500: class token text-zinc-500 (allows variant prefixes like placeholder:text-zinc-500, disabled:text-zinc-500)
   const zinc500Matches = content.match(/(?:^|[^\w-])(?:[a-zA-Z0-9_-]+:)*text-zinc-500(?=[^\w-]|$)/g) || [];
 
+  // 6. adhoc-success: Detects ad-hoc success notifications and banners (STD-FB-1)
+  let adhocSuccess = 0;
+  const normPath = filePath.replace(/\\/g, '/');
+  const isExempt = ['ToastHost', 'ToastContext', 'useToast', 'UndoToast'].some((name) =>
+    normPath.includes(name)
+  );
+
+  if (!isExempt) {
+    // 6a. StatusBanner with tone="success" or tone containing 'success'
+    const sbSuccess = content.match(/<StatusBanner[^>]*\btone\s*=\s*(?:["']success["']|\{[^}]*["']success["'][^}]*\})/g) || [];
+    adhocSuccess += sbSuccess.length;
+
+    // 6b. StatusBanner with tone="info" carrying legacy success copy ('Saved', 'Meal deleted', etc.)
+    const sbInfoSuccess = content.match(/<StatusBanner[^>]*\btone\s*=\s*["']info["'][^>]*(?:message\s*=\s*\{[^}]*(?:Saved|Meal deleted|Custom dish saved)[^}]*\}|message\s*=\s*["'](?:Saved|Meal deleted|Custom dish saved)["']|>(?:[^<]*(?:Saved|Meal deleted))<)/g) || [];
+    adhocSuccess += sbInfoSuccess.length;
+
+    // 6c. Legacy setStatus calls with success/saved/deleted messages (should use useToast().show)
+    const setStatusSuccess = content.match(/\bsetStatus\s*\(\s*['"`]Saved['"`]\s*\)/g) || [];
+    adhocSuccess += setStatusSuccess.length;
+
+    // 6d. Literal 'Copied!' in JSX elements (should use toast instead of inline toggle)
+    const litCopied = content.match(/>\s*Copied!\s*<|['"`]Copied!['"`]\s*:/g) || [];
+    adhocSuccess += litCopied.length;
+
+    // 6e. Direct <UndoToast usage outside ToastHost (STD-CMP-8: one floating toast slot via useToast)
+    const undoToastDirect = content.match(/<UndoToast\b/g) || [];
+    adhocSuccess += undoToastDirect.length;
+  }
+
   return {
     confirm: confirmMatches.length,
     'font-mono': monoMatches.length,
@@ -208,6 +237,7 @@ export function scanFileContent(rawContent) {
     'font-extrabold': extraBoldMatches.length,
     'sub-12px': sub12,
     'zinc-500': zinc500Matches.length,
+    'adhoc-success': adhocSuccess,
   };
 }
 
@@ -245,7 +275,7 @@ export function scanCodebase(options = {}) {
   for (const fullPath of files) {
     const relPath = path.relative(baseDir, fullPath).replace(/\\/g, '/');
     const content = fs.readFileSync(fullPath, 'utf8');
-    fileCounts[relPath] = scanFileContent(content);
+    fileCounts[relPath] = scanFileContent(content, relPath);
   }
 
   return fileCounts;
@@ -263,8 +293,8 @@ export function compareWithBaseline(currentCounts, baseline, _options = {}) {
   const baselineFiles = baseline?.files || {};
   const flaggedConfirm = baseline?.flaggedConfirm || {};
 
-  const currentTotals = { confirm: 0, 'font-mono': 0, 'font-black': 0, 'font-extrabold': 0, 'sub-12px': 0, 'zinc-500': 0 };
-  const baselineTotals = { confirm: 0, 'font-mono': 0, 'font-black': 0, 'font-extrabold': 0, 'sub-12px': 0, 'zinc-500': 0 };
+  const currentTotals = { confirm: 0, 'font-mono': 0, 'font-black': 0, 'font-extrabold': 0, 'sub-12px': 0, 'zinc-500': 0, 'adhoc-success': 0 };
+  const baselineTotals = { confirm: 0, 'font-mono': 0, 'font-black': 0, 'font-extrabold': 0, 'sub-12px': 0, 'zinc-500': 0, 'adhoc-success': 0 };
 
   // Calculate baseline totals
   for (const f of Object.keys(baselineFiles)) {
@@ -277,8 +307,8 @@ export function compareWithBaseline(currentCounts, baseline, _options = {}) {
   const allFiles = new Set([...Object.keys(currentCounts), ...Object.keys(baselineFiles)]);
 
   for (const file of Array.from(allFiles).sort()) {
-    const current = currentCounts[file] || { confirm: 0, 'font-mono': 0, 'font-black': 0, 'font-extrabold': 0, 'sub-12px': 0, 'zinc-500': 0 };
-    const base = baselineFiles[file] || { confirm: 0, 'font-mono': 0, 'font-black': 0, 'font-extrabold': 0, 'sub-12px': 0, 'zinc-500': 0 };
+    const current = currentCounts[file] || { confirm: 0, 'font-mono': 0, 'font-black': 0, 'font-extrabold': 0, 'sub-12px': 0, 'zinc-500': 0, 'adhoc-success': 0 };
+    const base = baselineFiles[file] || { confirm: 0, 'font-mono': 0, 'font-black': 0, 'font-extrabold': 0, 'sub-12px': 0, 'zinc-500': 0, 'adhoc-success': 0 };
 
     if (currentCounts[file]) {
       for (const rule of RULES) {
@@ -384,7 +414,7 @@ export function updateBaseline(currentCounts, oldBaseline, options = {}) {
     rules: [...RULES],
     hardRuleDirectories: [...HARD_RULE_DIRECTORIES],
     flaggedConfirm: {},
-    totals: { confirm: 0, 'font-mono': 0, 'font-black': 0, 'font-extrabold': 0, 'sub-12px': 0, 'zinc-500': 0 },
+    totals: { confirm: 0, 'font-mono': 0, 'font-black': 0, 'font-extrabold': 0, 'sub-12px': 0, 'zinc-500': 0, 'adhoc-success': 0 },
     files: {},
   };
 
@@ -393,7 +423,7 @@ export function updateBaseline(currentCounts, oldBaseline, options = {}) {
     const increases = [];
     for (const file of Object.keys(currentCounts)) {
       const current = currentCounts[file];
-      const old = oldFiles[file] || { confirm: 0, 'font-mono': 0, 'font-black': 0, 'font-extrabold': 0, 'sub-12px': 0, 'zinc-500': 0 };
+      const old = oldFiles[file] || { confirm: 0, 'font-mono': 0, 'font-black': 0, 'font-extrabold': 0, 'sub-12px': 0, 'zinc-500': 0, 'adhoc-success': 0 };
 
       for (const rule of RULES) {
         const curVal = current[rule] || 0;
@@ -430,6 +460,7 @@ export function updateBaseline(currentCounts, oldBaseline, options = {}) {
         'font-extrabold': counts['font-extrabold'] || 0,
         'sub-12px': counts['sub-12px'] || 0,
         'zinc-500': counts['zinc-500'] || 0,
+        'adhoc-success': counts['adhoc-success'] || 0,
       };
     }
   }

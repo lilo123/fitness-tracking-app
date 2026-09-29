@@ -12,6 +12,7 @@ import { CoachSettingsCard } from './CoachSettingsCard';
 import { MyCoachCard } from './MyCoachCard';
 import { MacroGoalsCard } from './MacroGoalsCard';
 import { DataExportCard } from './DataExportCard';
+import { useToast } from '../../hooks/useToast';
 import { WeightUnitCard } from './WeightUnitCard';
 
 interface SettingsFormProps {
@@ -31,6 +32,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
   switchRole,
   refreshProfile,
 }) => {
+  const { show: showToast } = useToast();
   const [username, setUsername] = useState(profile?.username || '');
   const [targetCalories, setTargetCalories] = useState(profile?.target_calories || 2200);
   const [targetProtein, setTargetProtein] = useState(profile?.target_protein || 160);
@@ -78,7 +80,8 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
     });
 
     if (res.success) {
-      setStatus({ type: 'success', message: 'Settings saved' });
+      showToast({ message: 'Settings saved', kind: 'success', testId: 'settings-status-banner' });
+      setStatus(null);
     } else {
       setStatus({ type: 'error', message: 'Failed to save settings: ' + (res.error || 'Unknown error') });
     }

@@ -4,19 +4,14 @@ import type { NutritionLog, CustomDish } from '../../types/database';
 import { getLocalDateStr, formatLocalTimestamp } from '../../utils/date';
 import { EditMealSheet } from './EditMealSheet';
 import { roundTo1Decimal, calculateRemainingFuel } from '../../utils/nutrition';
-import {
-  itemsForPersist, sumItems, type NutritionItem,
-} from '../../utils/itemModel';
+import { itemsForPersist, sumItems, type NutritionItem } from '../../utils/itemModel';
 import { MealLogRow } from './MealLogRow';
 import { NutrientBreakdownModal, type BreakdownNutrient } from './NutrientBreakdownModal';
-import {
-  stagedToItem, recomputeStagedTotals, buildStagedMealFromManualData,
-  useStagedCardFocus, type StagedMeal,
-} from './nutritionEngineHelpers';
+import { stagedToItem, recomputeStagedTotals, buildStagedMealFromManualData, useStagedCardFocus, type StagedMeal } from './nutritionEngineHelpers';
 import { Skeleton } from '../common/Skeleton';
 import { useDeferredDelete } from '../common/useDeferredDelete';
-import { UndoToast } from '../common/UndoToast';
 import { useNutritionData } from './useNutritionData';
+import { useToast, useToastOffset } from '../../hooks/useToast';
 import { useNutritionAi } from './useNutritionAi';
 import { useCustomDishModal } from './useCustomDishModal';
 import { NutritionDashboardRings } from './NutritionDashboardRings';
@@ -29,9 +24,8 @@ import { useCustomDishSaving } from './useCustomDishSaving';
 import { useCustomDishActions } from './useCustomDishActions';
 import { useStagedMealAddAi } from './useStagedMealAddAi';
 import { CustomDishesModal } from './CustomDishesModal';
-import { Utensils, CheckCircle2, AlertCircle, RotateCcw } from 'lucide-react';
+import { Utensils, AlertCircle, RotateCcw } from 'lucide-react';
 import { StatusBanner } from '../common/StatusBanner';
-import { QuickLogToast } from './QuickLogToast';
 
 export const NutritionEngine: React.FC = () => {
   const { user, profile } = useAuth();
@@ -64,7 +58,7 @@ export const NutritionEngine: React.FC = () => {
   const {
     customDishes, nutritionLogs, todayLogs, dailyTotals, targets, remainingFuel,
     mutation, deleteMutation, saveCustomDishMutation, deleteCustomDishMutation,
-    activeToast, dismissToast, triggerToast, isTimerActive,
+    activeToast, triggerToast, isTimerActive,
     isNutritionLogsError, isNutritionLogsPending, nutritionLogsError, refetchNutritionLogs,
     isCustomDishesError, customDishesError, refetchCustomDishes, fetchDishDetail,
   } = useNutritionData({
@@ -72,19 +66,16 @@ export const NutritionEngine: React.FC = () => {
     selectedDate,
     profile,
     onMutationSuccessReset: () => {
-      setStagedMeal(null);
-      ai.setSelectedPhoto(null);
-      setShowManualForm(false);
-      ai.setIsRateLimited(false);
-      ai.setNlInput('');
-      manualMealForm.resetManualForm();
+      setStagedMeal(null); ai.setSelectedPhoto(null); setShowManualForm(false);
+      ai.setIsRateLimited(false); ai.setNlInput(''); manualMealForm.resetManualForm();
     },
     setStatus,
     setIsError,
   });
 
   const [dishFetchError, setDishFetchError] = useState<{ message: string; retry: () => void } | null>(null);
-
+  const { show: showToast, dismiss: dismissToast } = useToast();
+  useToastOffset(stagedMeal ? 128 : isTimerActive ? 148 : undefined);
 
   // RD-7: Deferred delete for NutritionLog (6s window with UndoToast)
   const deferredMealDelete = useDeferredDelete<NutritionLog>({
@@ -116,9 +107,21 @@ export const NutritionEngine: React.FC = () => {
     (log: NutritionLog) => {
       deferredDishDelete.flush();
       dismissToast();
-      deferredMealDelete.schedule(log, log.food_name || 'Meal');
+      const label = log.food_name || 'Meal';
+      deferredMealDelete.schedule(log, label);
+      showToast({
+        kind: 'undo',
+        verb: 'Deleted',
+        subject: label,
+        detail: 'Meal log removed',
+        durationMs: 6000,
+        onUndo: deferredMealDelete.undo,
+        onCommit: deferredMealDelete.flush,
+        undoAriaLabel: `Undo delete ${label}`,
+        testId: 'quick-log-toast',
+      });
     },
-    [deferredDishDelete, dismissToast, deferredMealDelete]
+    [deferredDishDelete, dismissToast, deferredMealDelete, showToast]
   );
 
   const handleScheduleDishDelete = useCallback(
@@ -127,9 +130,21 @@ export const NutritionEngine: React.FC = () => {
       dismissToast();
       const found = customDishes.find((d) => d.id === dishId);
       const dish = found || ({ id: dishId, name: 'Custom dish' } as CustomDish);
-      deferredDishDelete.schedule(dish, dish.name || 'Custom dish');
+      const label = dish.name || 'Custom dish';
+      deferredDishDelete.schedule(dish, label);
+      showToast({
+        kind: 'undo',
+        verb: 'Deleted',
+        subject: label,
+        detail: 'Custom dish removed',
+        durationMs: 6000,
+        onUndo: deferredDishDelete.undo,
+        onCommit: deferredDishDelete.flush,
+        undoAriaLabel: `Undo delete ${label}`,
+        testId: 'quick-log-toast',
+      });
     },
-    [deferredMealDelete, dismissToast, customDishes, deferredDishDelete]
+    [deferredMealDelete, dismissToast, customDishes, deferredDishDelete, showToast]
   );
 
   const displayedTodayLogs = useMemo(() => {
@@ -145,11 +160,8 @@ export const NutritionEngine: React.FC = () => {
   const displayedDailyTotals = useMemo(() => {
     if (!deferredMealDelete.pending) return dailyTotals;
     return displayedTodayLogs.reduce((acc, log) => ({
-      calories: acc.calories + (Number(log.calories) || 0),
-      protein: acc.protein + (Number(log.protein) || 0),
-      carbs: acc.carbs + (Number(log.carbs) || 0),
-      fat: acc.fat + (Number(log.fat) || 0),
-      fiber: acc.fiber + (Number(log.fiber) || 0),
+      calories: acc.calories + (Number(log.calories) || 0), protein: acc.protein + (Number(log.protein) || 0),
+      carbs: acc.carbs + (Number(log.carbs) || 0), fat: acc.fat + (Number(log.fat) || 0), fiber: acc.fiber + (Number(log.fiber) || 0),
     }), { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 });
   }, [dailyTotals, displayedTodayLogs, deferredMealDelete.pending]);
 
@@ -166,6 +178,7 @@ export const NutritionEngine: React.FC = () => {
     onParsedSuccess: (meal) => {
       setStagedMeal(meal);
       setShowManualForm(false);
+      showToast({ message: 'Analyzed', verb: 'Analyzed', subject: meal.name, kind: 'info', testId: 'status-message' });
     },
     onFallbackToManual: (dishName) => {
       setShowManualForm(true);
@@ -193,15 +206,10 @@ export const NutritionEngine: React.FC = () => {
     const updatedItems = stagedMeal.items.map((it) =>
       it.id === itemId
         ? {
-            ...it,
-            name: next.name,
-            quantity: roundTo1Decimal(next.quantity),
-            unit: next.unit,
-            calories: roundTo1Decimal(next.calories),
-            protein: roundTo1Decimal(next.protein),
-            carbs: roundTo1Decimal(next.carbs),
-            fat: roundTo1Decimal(next.fat),
-            fiber: roundTo1Decimal(next.fiber),
+            ...it, name: next.name, unit: next.unit,
+            quantity: roundTo1Decimal(next.quantity), calories: roundTo1Decimal(next.calories),
+            protein: roundTo1Decimal(next.protein), carbs: roundTo1Decimal(next.carbs),
+            fat: roundTo1Decimal(next.fat), fiber: roundTo1Decimal(next.fiber),
             portionMultiplier: it.baseQuantity > 0 ? next.quantity / it.baseQuantity : 1,
           }
         : it
@@ -222,6 +230,7 @@ export const NutritionEngine: React.FC = () => {
 
   const handleLogStagedMeal = (e?: React.MouseEvent | React.UIEvent) => {
     if (!stagedMeal) return;
+    dismissToast();
     decideFocusRestore(e);
     const items = stagedMeal.items.map(stagedToItem);
     const totals = sumItems(items);
@@ -298,7 +307,7 @@ export const NutritionEngine: React.FC = () => {
       <QuickLogFavorites
         customDishes={displayedCustomDishes}
         onOpenNewDishModal={dishModal.handleOpenNewDishModal}
-        onStageCustomDish={handleStageCustomDish}
+        onStageCustomDish={(d) => { setStatus(''); setIsError(false); handleStageCustomDish(d); }}
         onOpenEditDishModal={dishModal.handleOpenEditDishModal}
         onQuickLogCustomDishDirect={handleQuickLogCustomDishDirect}
         onDismissToast={dismissToast}
@@ -333,19 +342,10 @@ export const NutritionEngine: React.FC = () => {
         }
       />
 
-      {stagedMeal && status ? (
+      {stagedMeal && isError && status ? (
         <StatusBanner
-          message={status}
-          tone={isError ? 'error' : 'info'}
-          testId="status-message"
-          className="shadow-lg"
-          icon={
-            isError ? (
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />
-            ) : (
-              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" aria-hidden="true" />
-            )
-          }
+          message={status} tone="error" testId="status-message" className="shadow-lg"
+          icon={<AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />}
         />
       ) : null}
 
@@ -497,9 +497,8 @@ export const NutritionEngine: React.FC = () => {
       </div>
 
       <CustomDishesModal
-        isOpen={dishModal.showDishModal}
-        onClose={dishModal.handleCloseDishModal}
-        editingDish={dishModal.editingDish}
+        isOpen={dishModal.showDishModal} onClose={dishModal.handleCloseDishModal}
+        editingDish={dishModal.editingDish} customDishes={displayedCustomDishes}
         dishModalKind={dishModal.dishModalKind} setDishModalKind={dishModal.setDishModalKind}
         dishModalName={dishModal.dishModalName} setDishModalName={dishModal.setDishModalName}
         dishModalCalories={dishModal.dishModalCalories} setDishModalCalories={dishModal.setDishModalCalories}
@@ -509,54 +508,10 @@ export const NutritionEngine: React.FC = () => {
         dishModalFiber={dishModal.dishModalFiber} setDishModalFiber={dishModal.setDishModalFiber}
         dishModalNotes={dishModal.dishModalNotes} setDishModalNotes={dishModal.setDishModalNotes}
         dishModalItems={dishModal.dishModalItems} setDishModalItems={dishModal.setDishModalItems}
-        onSaveDish={dishModal.handleSaveCustomDishModal}
-        onDeleteDish={dishModal.handleDeleteCustomDish}
-        isSaving={saveCustomDishMutation.isPending}
-        isDeleting={deleteCustomDishMutation.isPending}
-        customDishes={displayedCustomDishes}
+        onSaveDish={dishModal.handleSaveCustomDishModal} onDeleteDish={dishModal.handleDeleteCustomDish}
+        isSaving={saveCustomDishMutation.isPending} isDeleting={deleteCustomDishMutation.isPending}
         onOpenEditDishModal={dishModal.handleOpenEditDishModal}
       />
-
-      {/* Floating Undo Toast for Deferred Deletes (RD-7) */}
-      {deferredMealDelete.pending || deferredDishDelete.pending ? (
-        <UndoToast
-          toast={
-            deferredMealDelete.pending
-              ? {
-                  verb: 'Deleted',
-                  subject: deferredMealDelete.pending.label,
-                  detail: 'Meal log removed',
-                  onUndo: deferredMealDelete.undo,
-                  undoAriaLabel: `Undo delete ${deferredMealDelete.pending.label}`,
-                }
-              : deferredDishDelete.pending
-              ? {
-                  verb: 'Deleted',
-                  subject: deferredDishDelete.pending.label,
-                  detail: 'Custom dish removed',
-                  onUndo: deferredDishDelete.undo,
-                  undoAriaLabel: `Undo delete ${deferredDishDelete.pending.label}`,
-                }
-              : null
-          }
-          onDismiss={() => {
-            if (deferredMealDelete.pending) deferredMealDelete.flush();
-            if (deferredDishDelete.pending) deferredDishDelete.flush();
-          }}
-          showUndo={Boolean(deferredMealDelete.pending || deferredDishDelete.pending)}
-          durationMs={6000}
-          isStaged={Boolean(stagedMeal)}
-          isTimerActive={isTimerActive}
-        />
-      ) : (
-        /* Floating Quick-Log Toast (D41 & D42) */
-        <QuickLogToast
-          toast={activeToast}
-          onDismiss={dismissToast}
-          isStaged={Boolean(stagedMeal)}
-          isTimerActive={isTimerActive}
-        />
-      )}
 
       {/* Edit Meal Sheet (D44) */}
       <EditMealSheet

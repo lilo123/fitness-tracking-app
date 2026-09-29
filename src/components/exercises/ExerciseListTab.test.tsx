@@ -3,6 +3,8 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { createRef } from 'react';
 import { ExerciseListTab, type ExerciseListTabHandle } from './ExerciseListTab';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ToastProvider } from '../../context/ToastContext';
+import { ToastHost } from '../common/ToastHost';
 import { supabase } from '../../lib/supabase';
 import { createSupabaseBuilder, clearMockHistory, getRecordedTables } from '../../test/supabaseBuilderMock';
 import type { CatalogExercise } from '../../lib/exercises';
@@ -122,7 +124,10 @@ describe('ExerciseListTab', () => {
   const renderComponent = (props: any = {}) =>
     render(
       <QueryClientProvider client={queryClient}>
-        <ExerciseListTab {...props} />
+        <ToastProvider>
+          <ExerciseListTab {...props} />
+          <ToastHost />
+        </ToastProvider>
       </QueryClientProvider>
     );
 
