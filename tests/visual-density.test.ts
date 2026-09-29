@@ -6320,4 +6320,129 @@ test.describe("P8 Route-Wide Density & Tap Grid", () => {
       }
     }
   });
+
+  // 4. SetRow previous hint column and input dimensions at 320px
+  test("SetRow previous hint column is not truncated and inputs stay >= 44x44 at 320px", async ({ browser }) => {
+    const page = await browser.newPage({
+      viewport: { width: 320, height: 844 },
+      deviceScaleFactor: 1,
+    });
+
+    const testWorkoutId = 'e8000000-0000-0000-0000-000000000097';
+    const testSetId = 'e8000000-0000-0000-0000-000000000098';
+    const psqlCmd = getPsqlCommand();
+
+    // Clean up test rows and any today workout residue before seeding
+    const cleanSql = `
+      DELETE FROM public.sets WHERE id = '${testSetId}';
+      DELETE FROM public.workouts WHERE id = '${testWorkoutId}';
+      DELETE FROM public.sets WHERE workout_id IN (
+        SELECT id FROM public.workouts
+        WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io')
+          AND (workout_date = CURRENT_DATE OR date::date = CURRENT_DATE)
+      );
+      DELETE FROM public.workouts
+      WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io')
+        AND (workout_date = CURRENT_DATE OR date::date = CURRENT_DATE);
+    `;
+    execSync(psqlCmd, { input: cleanSql, encoding: 'utf8' });
+
+    const seedSql = `
+      DO $$
+      DECLARE
+        v_athlete_id uuid;
+        v_ex_id uuid;
+        v_workout_id uuid;
+      BEGIN
+        SELECT id INTO v_athlete_id FROM public.users WHERE email = 'athlete@cybergym.io' LIMIT 1;
+        SELECT id INTO v_ex_id FROM public.exercises WHERE name = 'Incline Bench Press' LIMIT 1;
+
+        INSERT INTO public.workouts (id, user_id, name, date, workout_date, created_at)
+        VALUES ('${testWorkoutId}', v_athlete_id, 'Prior Workout', (CURRENT_DATE - INTERVAL '1 day')::date, (CURRENT_DATE - INTERVAL '1 day')::date, now() - INTERVAL '1 day')
+        ON CONFLICT (user_id, workout_date) DO UPDATE SET name = 'Prior Workout'
+        RETURNING id INTO v_workout_id;
+
+        INSERT INTO public.sets (id, workout_id, exercise_id, weight, reps, set_index, set_type, created_at)
+        VALUES ('${testSetId}', v_workout_id, v_ex_id, 135, 10, 1, 'working', now() - INTERVAL '1 day')
+        ON CONFLICT (id) DO UPDATE SET workout_id = v_workout_id, exercise_id = v_ex_id, weight = 135, reps = 10;
+      END $$;
+    `;
+    execSync(psqlCmd, { input: seedSql, encoding: 'utf8' });
+
+    let testErr: any = null;
+    let cleanupErr: any = null;
+    try {
+      await page.goto("/login");
+      await page.fill('input[type="email"]', "athlete@cybergym.io");
+      await page.fill('input[type="password"]', "password123");
+      await page.click('button[type="submit"]');
+      await page.waitForURL("**/workout");
+
+      await page.goto('/workout?routine=' + encodeURIComponent('Workout A (Push, Quads & Core)'));
+      await page.waitForLoadState('domcontentloaded');
+      await expect(page.locator('[data-testid="exercise-card-0"]')).toBeVisible();
+      await expect(page.locator('#exercise-card-body-0')).toBeVisible();
+
+      // Locate hint element in first exercise card row 0
+      const hintLocator = page.locator('#exercise-card-body-0').locator('[data-testid="ghost-hint-0-0"], .text-zinc-400.tabular-nums.truncate').first();
+      await expect(hintLocator).toBeVisible();
+      await expect(hintLocator).toHaveText(/135.*10/);
+
+      // Measure: hint element scrollWidth <= clientWidth (not truncated)
+      const { scrollWidth, clientWidth } = await hintLocator.evaluate((el: HTMLElement) => ({
+        scrollWidth: el.scrollWidth,
+        clientWidth: el.clientWidth,
+      }));
+      expect(
+        scrollWidth,
+        `hint element scrollWidth (${scrollWidth}px) <= clientWidth (${clientWidth}px) (not truncated)`
+      ).toBeLessThanOrEqual(clientWidth);
+
+      // Measure: weight and reps input boxes >= 44x44 (raw px)
+      const weightInput = page.locator('[data-testid="ghost-weight-0-0"]');
+      const repsInput = page.locator('[data-testid="ghost-reps-0-0"]');
+      await expect(weightInput).toBeVisible();
+      await expect(repsInput).toBeVisible();
+
+      const weightBox = await weightInput.boundingBox();
+      const repsBox = await repsInput.boundingBox();
+      expect(weightBox, 'weight input bounding box').toBeTruthy();
+      expect(repsBox, 'reps input bounding box').toBeTruthy();
+      expect(weightBox!.width, `weight input width ${weightBox!.width} >= 44`).toBeGreaterThanOrEqual(44);
+      expect(weightBox!.height, `weight input height ${weightBox!.height} >= 44`).toBeGreaterThanOrEqual(44);
+      expect(repsBox!.width, `reps input width ${repsBox!.width} >= 44`).toBeGreaterThanOrEqual(44);
+      expect(repsBox!.height, `reps input height ${repsBox!.height} >= 44`).toBeGreaterThanOrEqual(44);
+
+      // Measure: commit button pseudo hit area >= 44x44
+      const commitBtn = page.locator('[data-testid="commit-set-btn-0-0"]');
+      await expect(commitBtn).toBeVisible();
+      const commitPseudoValid = await commitBtn.evaluate((el: HTMLElement) => {
+        const ps = window.getComputedStyle(el, '::before');
+        const minW = parseFloat(ps.minWidth) || 0;
+        const minH = parseFloat(ps.minHeight) || 0;
+        return minW >= 44 && minH >= 44;
+      });
+      expect(commitPseudoValid, 'commit button hit area >= 44x44').toBe(true);
+    } catch (err) {
+      testErr = err;
+    } finally {
+      try {
+        await page.close();
+      } catch (e) {
+        if (!cleanupErr) cleanupErr = e;
+      }
+      try {
+        execSync(psqlCmd, { input: cleanSql, encoding: 'utf8' });
+      } catch (cleanupErrCaught) {
+        console.error('[visual-density SetRow hint cleanup error]:', cleanupErrCaught);
+        if (!cleanupErr) cleanupErr = cleanupErrCaught;
+      }
+    }
+    if (cleanupErr) {
+      throw cleanupErr;
+    }
+    if (testErr) {
+      throw testErr;
+    }
+  });
 });

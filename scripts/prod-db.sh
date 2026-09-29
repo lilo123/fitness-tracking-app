@@ -48,7 +48,7 @@ backup(){
   local out="$BACKUP_DIR/prod-$(date -u +%Y%m%dT%H%M%SZ).dump" live dumped
   live=$(counts) || { echo "CONNECT_FAIL"; return 1; }
   PGPASSWORD="$(cat "$PWF")" pg_dump -h $HOST -p $PORT -U $USER_ -d $DB --format=custom --no-owner --no-privileges \
-    --schema=public --schema=auth --file="$out" || { echo "DUMP_FAIL"; rm -f "$out"; return 1; }
+    --schema=public --schema=auth --schema=private --file="$out" || { echo "DUMP_FAIL"; rm -f "$out"; return 1; }
   chmod 600 "$out"
   n(){ pg_restore --data-only --schema=public --table="$1" -f - "$out" 2>/dev/null | awk '/^COPY /{c=1;next} /^\\\.$/{c=0} c' | wc -l; }
   dumped="workouts=$(n workouts) sets=$(n sets) users=$(n users) exercises=$(n exercises) nutrition_logs=$(n nutrition_logs)"

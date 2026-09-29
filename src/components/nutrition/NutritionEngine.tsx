@@ -159,7 +159,7 @@ export const NutritionEngine: React.FC = () => {
   }, [remainingFuel, displayedDailyTotals, targets, deferredMealDelete.pending]);
 
   // Own query status (not a prefix lookup in the cache, which matched other nutrition_logs keys and was not reactive).
-  const isLogsPending = Boolean(targetUserId) && !isNutritionLogsError && isNutritionLogsPending;
+  const isLogsPending = !isNutritionLogsError && (isNutritionLogsPending || !targetUserId);
 
   const ai = useNutritionAi({
     customDishes,

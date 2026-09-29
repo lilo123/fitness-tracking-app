@@ -9,7 +9,7 @@
  *      Any legacy occurrences at the P3a base are explicitly flagged in `design-ratchet-baseline.json`
  *      and ratcheted down to zero.
  * 2. STD-TYP-3: No `font-mono` (one family: system sans + tabular-nums on numbers).
- * 3. STD-TYP-2: No `font-black` (weights 400/600/700 only; no 500/800/900).
+ * 3. STD-TYP-2: No `font-black` or `font-extrabold` (weights 400/600/700 only; no 500/800/900).
  * 4. STD-TYP-1: No sub-12px text (sizes 16px, 14px, 12px; nothing below 12px).
  *    Detects arbitrary text classes (`text-[10px]`, `text-[11px]`, `text-[9px]`, `text-[0.6..0.7rem]`,
  *    `text-[<length>] < 12px`), named sub-12px tokens (`text-2xs`, `text-3xs`), and inline style `fontSize < 12`.
@@ -33,7 +33,7 @@ export const rootDir = path.resolve(__dirname, '..');
 export const srcDir = path.resolve(rootDir, 'src');
 export const defaultBaselinePath = path.resolve(__dirname, 'design-ratchet-baseline.json');
 
-export const RULES = ['confirm', 'font-mono', 'font-black', 'sub-12px', 'zinc-500'];
+export const RULES = ['confirm', 'font-mono', 'font-black', 'font-extrabold', 'sub-12px', 'zinc-500'];
 
 export const HARD_RULE_DIRECTORIES = ['src'];
 
@@ -167,6 +167,9 @@ export function scanFileContent(rawContent) {
   // 3. font-black: class name (allows variant prefixes like sm:font-black)
   const blackMatches = content.match(/(?:^|[^\w-])(?:[a-zA-Z0-9_-]+:)*font-black(?=[^\w-]|$)/g) || [];
 
+  // 3b. font-extrabold: class name (allows variant prefixes like sm:font-extrabold)
+  const extraBoldMatches = content.match(/(?:^|[^\w-])(?:[a-zA-Z0-9_-]+:)*font-extrabold(?=[^\w-]|$)/g) || [];
+
   // 4. sub-12px: arbitrary text classes, named tokens (text-2xs, text-3xs), and inline style fontSize < 12
   let sub12 = 0;
 
@@ -202,6 +205,7 @@ export function scanFileContent(rawContent) {
     confirm: confirmMatches.length,
     'font-mono': monoMatches.length,
     'font-black': blackMatches.length,
+    'font-extrabold': extraBoldMatches.length,
     'sub-12px': sub12,
     'zinc-500': zinc500Matches.length,
   };
@@ -259,8 +263,8 @@ export function compareWithBaseline(currentCounts, baseline, _options = {}) {
   const baselineFiles = baseline?.files || {};
   const flaggedConfirm = baseline?.flaggedConfirm || {};
 
-  const currentTotals = { confirm: 0, 'font-mono': 0, 'font-black': 0, 'sub-12px': 0, 'zinc-500': 0 };
-  const baselineTotals = { confirm: 0, 'font-mono': 0, 'font-black': 0, 'sub-12px': 0, 'zinc-500': 0 };
+  const currentTotals = { confirm: 0, 'font-mono': 0, 'font-black': 0, 'font-extrabold': 0, 'sub-12px': 0, 'zinc-500': 0 };
+  const baselineTotals = { confirm: 0, 'font-mono': 0, 'font-black': 0, 'font-extrabold': 0, 'sub-12px': 0, 'zinc-500': 0 };
 
   // Calculate baseline totals
   for (const f of Object.keys(baselineFiles)) {
@@ -273,8 +277,8 @@ export function compareWithBaseline(currentCounts, baseline, _options = {}) {
   const allFiles = new Set([...Object.keys(currentCounts), ...Object.keys(baselineFiles)]);
 
   for (const file of Array.from(allFiles).sort()) {
-    const current = currentCounts[file] || { confirm: 0, 'font-mono': 0, 'font-black': 0, 'sub-12px': 0, 'zinc-500': 0 };
-    const base = baselineFiles[file] || { confirm: 0, 'font-mono': 0, 'font-black': 0, 'sub-12px': 0, 'zinc-500': 0 };
+    const current = currentCounts[file] || { confirm: 0, 'font-mono': 0, 'font-black': 0, 'font-extrabold': 0, 'sub-12px': 0, 'zinc-500': 0 };
+    const base = baselineFiles[file] || { confirm: 0, 'font-mono': 0, 'font-black': 0, 'font-extrabold': 0, 'sub-12px': 0, 'zinc-500': 0 };
 
     if (currentCounts[file]) {
       for (const rule of RULES) {
@@ -380,7 +384,7 @@ export function updateBaseline(currentCounts, oldBaseline, options = {}) {
     rules: [...RULES],
     hardRuleDirectories: [...HARD_RULE_DIRECTORIES],
     flaggedConfirm: {},
-    totals: { confirm: 0, 'font-mono': 0, 'font-black': 0, 'sub-12px': 0, 'zinc-500': 0 },
+    totals: { confirm: 0, 'font-mono': 0, 'font-black': 0, 'font-extrabold': 0, 'sub-12px': 0, 'zinc-500': 0 },
     files: {},
   };
 
@@ -389,7 +393,7 @@ export function updateBaseline(currentCounts, oldBaseline, options = {}) {
     const increases = [];
     for (const file of Object.keys(currentCounts)) {
       const current = currentCounts[file];
-      const old = oldFiles[file] || { confirm: 0, 'font-mono': 0, 'font-black': 0, 'sub-12px': 0, 'zinc-500': 0 };
+      const old = oldFiles[file] || { confirm: 0, 'font-mono': 0, 'font-black': 0, 'font-extrabold': 0, 'sub-12px': 0, 'zinc-500': 0 };
 
       for (const rule of RULES) {
         const curVal = current[rule] || 0;
@@ -423,6 +427,7 @@ export function updateBaseline(currentCounts, oldBaseline, options = {}) {
         confirm: counts.confirm || 0,
         'font-mono': counts['font-mono'] || 0,
         'font-black': counts['font-black'] || 0,
+        'font-extrabold': counts['font-extrabold'] || 0,
         'sub-12px': counts['sub-12px'] || 0,
         'zinc-500': counts['zinc-500'] || 0,
       };
@@ -484,6 +489,7 @@ Rules Enforced:
   - confirm:   zero window.confirm() / bare confirm() / alert(). Hard rule across all of src.
   - font-mono: zero font-mono classes (STD-TYP-3).
   - font-black: zero font-black classes (STD-TYP-2).
+  - font-extrabold: zero font-extrabold classes (STD-TYP-2).
   - sub-12px:  zero text-[<12px], text-2xs/3xs, or inline fontSize < 12 (STD-TYP-1).
   - zinc-500:  zero text-zinc-500 classes (STD-COL-2).
 `);

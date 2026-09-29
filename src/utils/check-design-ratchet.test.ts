@@ -5,6 +5,7 @@ interface RatchetScanCounts {
   confirm?: number;
   'font-mono'?: number;
   'font-black'?: number;
+  'font-extrabold'?: number;
   'sub-12px'?: number;
   'zinc-500'?: number;
 }
@@ -104,7 +105,7 @@ describe('Design Ratchet Checker (scripts/check-design-ratchet.js)', () => {
   const mockBaseline: RatchetBaseline = {
     version: 1,
     description: 'Test Baseline',
-    rules: ['confirm', 'font-mono', 'font-black', 'sub-12px', 'zinc-500'],
+    rules: ['confirm', 'font-mono', 'font-black', 'font-extrabold', 'sub-12px', 'zinc-500'],
     hardRuleDirectories: ['src'],
     flaggedConfirm: {
       'src/components/workout/EditSetModal.tsx': {
@@ -116,6 +117,7 @@ describe('Design Ratchet Checker (scripts/check-design-ratchet.js)', () => {
       confirm: 1,
       'font-mono': 4,
       'font-black': 2,
+      'font-extrabold': 0,
       'sub-12px': 5,
       'zinc-500': 0,
     },
@@ -124,6 +126,7 @@ describe('Design Ratchet Checker (scripts/check-design-ratchet.js)', () => {
         confirm: 1,
         'font-mono': 2,
         'font-black': 1,
+        'font-extrabold': 0,
         'sub-12px': 2,
         'zinc-500': 0,
       },
@@ -131,6 +134,7 @@ describe('Design Ratchet Checker (scripts/check-design-ratchet.js)', () => {
         confirm: 0,
         'font-mono': 2,
         'font-black': 1,
+        'font-extrabold': 0,
         'sub-12px': 3,
         'zinc-500': 0,
       },
@@ -211,6 +215,23 @@ describe('Design Ratchet Checker (scripts/check-design-ratchet.js)', () => {
       const result = compareWithBaseline(current, mockBaseline);
       expect(result.ok).toBe(false);
       expect(result.violations.some((v) => v.rule === 'zinc-500' && v.delta === 2)).toBe(true);
+    });
+
+    it('fails when an existing file increases count for font-extrabold', () => {
+      const current = {
+        'src/components/history/HistoryView.tsx': {
+          confirm: 0,
+          'font-mono': 2,
+          'font-black': 1,
+          'font-extrabold': 2, // Increased from 0 to 2
+          'sub-12px': 3,
+          'zinc-500': 0,
+        },
+      };
+
+      const result = compareWithBaseline(current, mockBaseline);
+      expect(result.ok).toBe(false);
+      expect(result.violations.some((v) => v.rule === 'font-extrabold' && v.delta === 2)).toBe(true);
     });
   });
 
@@ -483,6 +504,7 @@ describe('Design Ratchet Checker (scripts/check-design-ratchet.js)', () => {
         confirm: 0,
         'font-mono': 1,
         'font-black': 0,
+        'font-extrabold': 0,
         'sub-12px': 2,
         'zinc-500': 0,
       });
@@ -566,6 +588,27 @@ describe('Design Ratchet Checker (scripts/check-design-ratchet.js)', () => {
       `;
       const counts = scanFileContent(code);
       expect(counts['font-black']).toBe(2);
+    });
+
+    it('detects font-extrabold and variant-prefixed font-extrabold', () => {
+      const code = `
+        <h1 className="text-xl font-extrabold">Title</h1>
+        <h2 className="md:font-extrabold not-font-extrabold">Sub</h2>
+      `;
+      const counts = scanFileContent(code);
+      expect(counts['font-extrabold']).toBe(2);
+    });
+
+    it('fails when a fixture with font-extrabold is compared against baseline 0', () => {
+      const fixtureCode = '<span className="font-extrabold">Header</span>';
+      const counts = scanFileContent(fixtureCode);
+      expect(counts['font-extrabold']).toBe(1);
+      const current = {
+        'src/components/fixture.tsx': counts,
+      };
+      const result = compareWithBaseline(current, mockBaseline);
+      expect(result.ok).toBe(false);
+      expect(result.violations.some((v) => v.rule === 'font-extrabold')).toBe(true);
     });
 
     it('detects sub-12px arbitrary classes, named tokens, and inline fontSize', () => {

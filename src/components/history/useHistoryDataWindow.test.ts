@@ -278,4 +278,32 @@ describe('useHistoryData: 14-day window infinite query (H11, D-P5b-2)', () => {
     expect(minus20Group?.meals).toHaveLength(1);
     expect(minus20Group?.totals.calories).toBe(550);
   });
+
+  it('exhaustively returns all visible exercises via paging when catalog has > 1000 items', async () => {
+    const manyExercises = Array.from({ length: 1050 }, (_, i) => ({
+      id: `ex-${i}`,
+      name: `Exercise ${String(i).padStart(4, '0')}`,
+      body_parts: ['Chest'],
+      is_master: true,
+    }));
+
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
+      if (table === 'exercises') {
+        return createSupabaseBuilder('exercises', {
+          data: manyExercises,
+          error: null,
+        }) as any;
+      }
+      return createSupabaseBuilder(table, { data: [], error: null }) as any;
+    });
+
+    const { result } = renderHook(() => useHistoryData(targetUserId), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.exercises).toHaveLength(1050);
+    });
+
+    expect(result.current.exercises[0].name).toBe('Exercise 0000');
+    expect(result.current.exercises[1049].name).toBe('Exercise 1049');
+  });
 });

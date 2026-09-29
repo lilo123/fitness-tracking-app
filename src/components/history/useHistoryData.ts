@@ -11,6 +11,7 @@ import {
   rehydrateLogWithCachedItems,
 } from '../nutrition/useNutritionData';
 import { getLocalDateStr, normalizeDateStr } from '../../utils/date';
+import { fetchAllVisibleExercises, EXERCISE_SUMMARY_PROJECTION } from '../../lib/exercises';
 
 export {
   fetchSessionSets,
@@ -42,14 +43,9 @@ export function useHistoryData(targetUserId: string, onMutationError?: (msg: str
   } = useQuery({
     queryKey: ['exercises'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('exercises')
-        .select('id, name, body_parts, is_master')
-        .order('name')
-        .limit(1000);
-      if (error) throw error;
+      const data = await fetchAllVisibleExercises<Exercise>(EXERCISE_SUMMARY_PROJECTION);
       if (!data || data.length === 0) return DEFAULT_EXERCISES_LIST;
-      return data as Exercise[];
+      return data;
     },
     staleTime: 5 * 60 * 1000,
   });

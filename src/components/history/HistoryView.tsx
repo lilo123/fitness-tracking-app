@@ -28,8 +28,8 @@ import {
 import { StatusBanner } from '../common/StatusBanner';
 import { groupNutritionDays } from '../../utils/nutritionDayGrouping';
 import { DEFAULT_EXERCISES_LIST } from '../../utils/ghostSets';
-import { supabase } from '../../lib/supabase';
 import { normalizeDateStr } from '../../utils/ghostSets';
+import { fetchAllVisibleExercises, EXERCISE_SUMMARY_PROJECTION } from '../../lib/exercises';
 
 export const HistoryView: React.FC = () => {
   const { user, isCoachMode } = useAuth();
@@ -125,14 +125,9 @@ export const HistoryView: React.FC = () => {
   } = useQuery({
     queryKey: ['exercises'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('exercises')
-        .select('id, name, body_parts, is_master')
-        .order('name')
-        .limit(1000);
-      if (error) throw error;
+      const data = await fetchAllVisibleExercises<Exercise>(EXERCISE_SUMMARY_PROJECTION);
       if (!data || data.length === 0) return DEFAULT_EXERCISES_LIST;
-      return data as Exercise[];
+      return data;
     },
     staleTime: 5 * 60 * 1000,
   });
@@ -330,7 +325,7 @@ export const HistoryView: React.FC = () => {
               <div className="text-xs font-bold text-white truncate">
                 {inspectMode === 'athlete' ? (
                   <>
-                    Viewing Athlete: <span className="text-cyan-300 font-extrabold">{selectedAthlete?.name}</span> (Read-Only)
+                    Viewing Athlete: <span className="text-cyan-300 font-bold">{selectedAthlete?.name}</span> (Read-Only)
                   </>
                 ) : (
                   <span className="text-zinc-400">Viewing My Personal History</span>

@@ -4807,13 +4807,14 @@ Total Fiber: 1 g`;
 
       renderComponent();
 
-      // After query succeeds with 0 rows: empty state rendered
+      // While auth is unresolved, empty state must NOT be shown
+      expect(screen.queryByText('No meals logged for this date yet.')).toBeNull();
+
+      // Deterministic end state inside waitFor: skeleton gone AND empty text present
       await waitFor(() => {
+        expect(screen.queryByTestId('nutrition-logs-skeleton')).toBeNull();
         expect(screen.getByText('No meals logged for this date yet.')).toBeDefined();
       });
-
-      // Skeleton should not be rendered once resolved
-      expect(screen.queryByTestId('nutrition-logs-skeleton')).toBeNull();
     });
 
     it('STD-CMP-10: displays error banner and retry button when nutrition logs query fails', async () => {

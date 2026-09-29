@@ -2302,5 +2302,35 @@ describe('HistoryView', () => {
         expect(screen.getByText('Leg Day Squats')).toBeDefined();
       });
     });
+
+    it('exhaustively returns all visible exercises via paging when catalog has > 1000 items in HistoryView', async () => {
+      const manyExercises = Array.from({ length: 1050 }, (_, i) => ({
+        id: `ex-${i}`,
+        name: `Exercise ${String(i).padStart(4, '0')}`,
+        body_parts: ['Chest'],
+        is_master: true,
+      }));
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'exercises') {
+          return createSupabaseBuilder('exercises', { data: manyExercises, error: null });
+        }
+        return createSupabaseBuilder(table, { data: [], error: null });
+      });
+
+      renderComponent();
+
+      fireEvent.click(screen.getByText('By Exercise'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('toggle-unlogged-exercises')).toBeDefined();
+      });
+      fireEvent.click(screen.getByTestId('toggle-unlogged-exercises'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Exercise 0000')).toBeDefined();
+        expect(screen.getByText('Exercise 1049')).toBeDefined();
+      });
+    });
   });
 });

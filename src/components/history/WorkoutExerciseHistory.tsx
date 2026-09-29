@@ -150,7 +150,7 @@ export const WorkoutExerciseHistory: React.FC<WorkoutExerciseHistoryProps> = ({
         {/* H37: 'All-time: N sets · Last 3:' + year when not current year */}
         {totalSets > 0 && (
           <div className="space-y-1.5">
-            <span className="text-xs font-extrabold uppercase text-zinc-400 tracking-wider block mb-1">
+            <span className="text-xs font-bold uppercase text-zinc-400 tracking-wider block mb-1">
               All-time: {totalSets} sets · Last 3:
             </span>
             <div className="space-y-1">

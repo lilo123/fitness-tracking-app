@@ -1,5 +1,8 @@
 -- Rollback: 20260929020000_drop_body_part.down.sql
 -- Restores pre-migration M9 state (D-P7b-4)
+-- WARNING: down is LOSSY (re-adds body_part reconstructed from body_parts;
+-- original free-text values exist only in backup prod-20260929T012001Z.dump
+-- taken right before M9).
 
 -- 1. Re-add column and backfill from body_parts
 ALTER TABLE public.exercises ADD COLUMN IF NOT EXISTS body_part text;
