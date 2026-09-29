@@ -3201,7 +3201,8 @@ Total Fiber: 1 g`;
   });
 
 
-  it('triggers deleteCustomDishMutation from inline Delete button inside edit modal and closes modal', async () => {
+  it('triggers deferred delete from inline Delete button inside edit modal: shows UndoToast, zero delete before 6s expiry, and commits on expiry', async () => {
+    vi.useFakeTimers();
     const mockDelete = vi.fn().mockReturnValue({
       eq: vi.fn().mockResolvedValue({ error: null }),
     });
@@ -3220,29 +3221,46 @@ Total Fiber: 1 g`;
       return createSupabaseBuilder(table, { data: [], error: null });
     });
 
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const confirmSpy = vi.spyOn(window, 'confirm');
 
     renderComponent();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(screen.getByTestId('edit-dish-btn-dish-del-1')).toBeDefined();
     });
 
     fireEvent.click(screen.getByTestId('edit-dish-btn-dish-del-1'));
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(screen.getByTestId('modal-delete-dish-btn')).toBeDefined();
     });
 
     fireEvent.click(screen.getByTestId('modal-delete-dish-btn'));
 
-    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('Delete Me Dish'));
-    await waitFor(() => {
-      expect(mockDelete).toHaveBeenCalled();
+    // RD-7: Zero window.confirm call
+    expect(confirmSpy).not.toHaveBeenCalled();
+
+    // Modal closes immediately
+    await vi.waitFor(() => {
+      expect(screen.queryByText('Edit Custom Dish')).toBeNull();
     });
 
-    await waitFor(() => {
-      expect(screen.queryByText('Edit Custom Dish')).toBeNull();
+    // Zero DELETE before expiry
+    expect(mockDelete).not.toHaveBeenCalled();
+
+    // UndoToast is visible
+    expect(screen.getByText('Delete Me Dish')).toBeDefined();
+    expect(screen.getByText('Deleted')).toBeDefined();
+    expect(screen.getByTestId('toast-undo-btn')).toBeDefined();
+
+    // Fast-forward 6s expiry
+    await act(async () => {
+      vi.advanceTimersByTime(6000);
+    });
+
+    // Exactly one DELETE on expiry
+    await vi.waitFor(() => {
+      expect(mockDelete).toHaveBeenCalledTimes(1);
     });
 
     confirmSpy.mockRestore();
@@ -4513,6 +4531,203 @@ Total Fiber: 1 g`;
       expect(screen.queryByTestId('add-favorite-status-banner')).toBeNull();
     });
 
+  });
+
+  describe('RD-7 & STD-CMP-10 Nutrition Standards Suite', () => {
+    it('meal log deferred delete: 0 DELETE before expiry, Undo zero writes, exactly 1 DELETE on expiry', async () => {
+      vi.useFakeTimers();
+      const mockDelete = vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      });
+
+      const todayStr = getLocalDateStr(new Date());
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'nutrition_logs') {
+          const b = createSupabaseBuilder('nutrition_logs', {
+            data: [
+              {
+                id: 'log-def-1',
+                user_id: 'test-user-123',
+                food_name: 'Avocado Toast',
+                meal_type: 'breakfast',
+                calories: 320,
+                protein: 8,
+                carbs: 24,
+                fat: 16,
+                fiber: 6,
+                serving_size: 1,
+                serving_unit: 'serving',
+                logged_at: new Date().toISOString(),
+                logged_date: todayStr,
+                created_at: new Date().toISOString(),
+              },
+            ],
+            error: null,
+          });
+          b.delete = mockDelete;
+          return b;
+        }
+        return createSupabaseBuilder(table, { data: [], error: null });
+      });
+
+      const confirmSpy = vi.spyOn(window, 'confirm');
+
+      renderComponent();
+
+      await vi.waitFor(() => {
+        expect(screen.getByText('Avocado Toast')).toBeDefined();
+      });
+
+      // Open overflow menu and click Delete meal
+      const actionsBtn = screen.getByTestId('meal-actions-log-def-1');
+      fireEvent.click(actionsBtn);
+      const deleteBtn = screen.getByTestId('delete-meal-log-def-1');
+      fireEvent.click(deleteBtn);
+
+      // Zero confirm dialog
+      expect(confirmSpy).not.toHaveBeenCalled();
+
+      // Row is optimistically hidden
+      expect(screen.queryByTestId('meal-log-item')).toBeNull();
+
+      // UndoToast is visible
+      expect(screen.getByText('Meal log removed')).toBeDefined();
+      const undoBtn = screen.getByTestId('toast-undo-btn');
+      expect(undoBtn).toBeDefined();
+
+      // 0 DELETE calls before expiry
+      expect(mockDelete).not.toHaveBeenCalled();
+
+      // Click Undo
+      fireEvent.click(undoBtn);
+
+      // Meal row restored immediately
+      await vi.waitFor(() => {
+        expect(screen.getByText('Avocado Toast')).toBeDefined();
+      });
+
+      // Advance timers beyond 6s
+      await act(async () => {
+        vi.advanceTimersByTime(7000);
+      });
+
+      // Undo resulted in ZERO writes
+      expect(mockDelete).not.toHaveBeenCalled();
+
+      // Now delete again and let it expire
+      const actionsBtnAgain = screen.getByTestId('meal-actions-log-def-1');
+      fireEvent.click(actionsBtnAgain);
+      const deleteBtnAgain = screen.getByTestId('delete-meal-log-def-1');
+      fireEvent.click(deleteBtnAgain);
+
+      // Fast-forward 6s expiry
+      await act(async () => {
+        vi.advanceTimersByTime(6000);
+      });
+
+      // Exactly 1 DELETE on expiry
+      await vi.waitFor(() => {
+        expect(mockDelete).toHaveBeenCalledTimes(1);
+      });
+
+      confirmSpy.mockRestore();
+    });
+
+    it('custom dish deferred delete: clicking Undo cancels deletion with zero writes and restores dish', async () => {
+      vi.useFakeTimers();
+      const mockDelete = vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      });
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'custom_dishes') {
+          const b = createSupabaseBuilder('custom_dishes', {
+            data: [
+              { id: 'dish-undo-1', name: 'Berry Smoothie', calories: 250, protein: 20, carbs: 30, fat: 4, fiber: 5 },
+            ],
+            error: null,
+          });
+          b.delete = mockDelete;
+          return b;
+        }
+        return createSupabaseBuilder(table, { data: [], error: null });
+      });
+
+      renderComponent();
+
+      await vi.waitFor(() => {
+        expect(screen.getByTestId('edit-dish-btn-dish-undo-1')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByTestId('edit-dish-btn-dish-undo-1'));
+
+      await vi.waitFor(() => {
+        expect(screen.getByTestId('modal-delete-dish-btn')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByTestId('modal-delete-dish-btn'));
+
+      // UndoToast is visible
+      const undoBtn = screen.getByTestId('toast-undo-btn');
+      expect(undoBtn).toBeDefined();
+
+      // Zero DELETE before expiry
+      expect(mockDelete).not.toHaveBeenCalled();
+
+      // Click Undo
+      fireEvent.click(undoBtn);
+
+      // Advance timers
+      await act(async () => {
+        vi.advanceTimersByTime(7000);
+      });
+
+      // Zero DELETE ever issued
+      expect(mockDelete).not.toHaveBeenCalled();
+    });
+
+    it('STD-CMP-10: renders empty state only after query succeeds with 0 rows, and retry button on error', async () => {
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'nutrition_logs') {
+          return createSupabaseBuilder('nutrition_logs', {
+            data: [],
+            error: null,
+          });
+        }
+        return createSupabaseBuilder(table, { data: [], error: null });
+      });
+
+      renderComponent();
+
+      // After query succeeds with 0 rows: empty state rendered
+      await waitFor(() => {
+        expect(screen.getByText('No meals logged for this date yet.')).toBeDefined();
+      });
+
+      // Skeleton should not be rendered once resolved
+      expect(screen.queryByTestId('nutrition-logs-skeleton')).toBeNull();
+    });
+
+    it('STD-CMP-10: displays error banner and retry button when nutrition logs query fails', async () => {
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'nutrition_logs') {
+          return createSupabaseBuilder('nutrition_logs', {
+            data: null,
+            error: { message: 'Database connection failed' },
+          });
+        }
+        return createSupabaseBuilder(table, { data: [], error: null });
+      });
+
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('retry-nutrition-btn')).toBeDefined();
+      });
+      expect(screen.getByTestId('nutrition-read-error')).toBeDefined();
+      expect(screen.getAllByText(/Failed to load nutrition logs/i).length).toBeGreaterThan(0);
+      expect(screen.queryByText('No meals logged for this date yet.')).toBeNull();
+    });
   });
 
 });

@@ -129,7 +129,7 @@ export const CustomDishEditor: React.FC<CustomDishEditorProps> = ({ items, onCha
                   onClick={() => remove(index)}
                   aria-label={`Remove component ${index + 1}`}
                   data-testid="dish-item-remove"
-                  className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-rose-500/10 hover:text-rose-400 touch-manipulation"
+                  className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-rose-500/10 hover:text-rose-400 touch-manipulation"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -139,7 +139,7 @@ export const CustomDishEditor: React.FC<CustomDishEditorProps> = ({ items, onCha
                 <div className="col-span-2">
                   <label
                     htmlFor={qtyId}
-                    className="mb-1 block text-xs font-bold uppercase tracking-wider text-zinc-500"
+                    className="mb-1 block text-xs font-bold uppercase tracking-wider text-zinc-400"
                   >
                     Qty
                   </label>
@@ -160,7 +160,7 @@ export const CustomDishEditor: React.FC<CustomDishEditorProps> = ({ items, onCha
                   />
                 </div>
                 <div className="col-span-2">
-                  <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-zinc-500">
+                  <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-zinc-400">
                     Unit
                   </span>
                   <div className="flex min-h-[44px] items-center">
@@ -199,7 +199,7 @@ export const CustomDishEditor: React.FC<CustomDishEditorProps> = ({ items, onCha
               </div>
 
             {item.displayPortion && (
-              <span className="block tabular-nums text-xs text-zinc-500">
+              <span className="block tabular-nums text-xs text-zinc-400">
                 was &ldquo;{item.displayPortion}&rdquo; &middot; {roundTo1Decimal(item.quantity)}{' '}
                 {shortUnitLabel(item.unit)}
               </span>
@@ -214,7 +214,7 @@ export const CustomDishEditor: React.FC<CustomDishEditorProps> = ({ items, onCha
           data-testid="dish-derived-totals"
           className="flex flex-wrap items-center gap-1.5 rounded-xl border border-zinc-800/80 bg-zinc-950 p-2.5 tabular-nums text-xs text-zinc-400"
         >
-          <span className="font-bold uppercase tracking-wider text-zinc-500">Dish total</span>
+          <span className="font-bold uppercase tracking-wider text-zinc-400">Dish total</span>
           <span className="font-bold text-amber-400">{formatCalories(totals.calories)} kcal</span>
           <span className="text-cyan-400">P {formatMacro(totals.protein)}</span>
           <span className="text-emerald-400">C {formatMacro(totals.carbs)}</span>

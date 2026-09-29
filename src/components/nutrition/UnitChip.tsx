@@ -109,7 +109,7 @@ export const UnitChip: React.FC<UnitChipProps> = ({
             ref={sheetRef}
             className="w-full max-w-md space-y-1 rounded-t-3xl border border-zinc-800 bg-zinc-900 p-4 pb-[max(1.25rem,env(safe-area-inset-bottom,1.25rem))] shadow-2xl sm:rounded-3xl"
           >
-            <span className="block pb-2 text-xs font-bold uppercase tracking-wider text-zinc-500">
+            <span className="block pb-2 text-xs font-bold uppercase tracking-wider text-zinc-400">
               Unit
             </span>
             {CANONICAL_UNITS.map((unit) => (

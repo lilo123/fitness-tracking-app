@@ -151,7 +151,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
         <button
           type="button"
           onClick={onClose}
-          className="text-zinc-500 hover:text-white text-xs min-h-[40px] min-w-[40px] px-2 flex items-center justify-center rounded-lg transition touch-manipulation"
+          className="text-zinc-400 hover:text-white text-xs min-h-[40px] min-w-[40px] px-2 flex items-center justify-center rounded-lg transition touch-manipulation"
         >
           Cancel
         </button>
@@ -173,7 +173,7 @@ export const ManualMealForm: React.FC<ManualMealFormProps> = memo(({
                 type="button"
                 data-testid="remove-pinned-photo-button"
                 onClick={onRemovePhoto}
-                className="text-zinc-500 hover:text-rose-400 text-xs min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg transition touch-manipulation"
+                className="text-zinc-400 hover:text-rose-400 text-xs min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg transition touch-manipulation"
                 title="Remove Photo"
               >
                 <X className="w-3.5 h-3.5" />

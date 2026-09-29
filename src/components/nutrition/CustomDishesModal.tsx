@@ -148,7 +148,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
               <label
                 className={`flex items-center justify-center gap-2 p-2.5 min-h-[44px] rounded-xl border text-xs font-bold transition ${
                   isFoodDisabled
-                    ? 'opacity-50 cursor-not-allowed bg-zinc-950/50 border-zinc-800 text-zinc-500'
+                    ? 'opacity-50 cursor-not-allowed bg-zinc-950/50 border-zinc-800 text-zinc-400'
                     : dishModalKind === 'food'
                     ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-300 cursor-pointer'
                     : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white cursor-pointer'
@@ -325,9 +325,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
               <button
                 type="button"
                 onClick={() => {
-                  if (window.confirm(`Delete "${editingDish.name}" from your custom dishes?`)) {
-                    onDeleteDish(editingDish.id);
-                  }
+                  onDeleteDish(editingDish.id);
                 }}
                 data-testid="modal-delete-dish-btn"
                 disabled={isDeleting}
@@ -361,7 +359,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
         {/* List of existing custom dishes */}
         {customDishes.length > 0 && (
           <div className="border-t border-zinc-800 pt-3 space-y-2">
-            <span className="text-xs font-bold uppercase text-zinc-500 tracking-wider block">
+            <span className="text-xs font-bold uppercase text-zinc-400 tracking-wider block">
               Saved Dishes ({customDishes.length})
             </span>
             <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
@@ -401,7 +399,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
                     <button
                       type="button"
                       onClick={() => onOpenEditDishModal(dish)}
-                      className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-cyan-300 hover:bg-zinc-800 rounded-lg transition touch-manipulation"
+                      className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-cyan-300 hover:bg-zinc-800 rounded-lg transition touch-manipulation relative before:absolute before:inset-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:min-w-[44px] before:min-h-[44px] before:content-['']"
                       title="Edit"
                     >
                       <Edit2 className="w-4 h-4" />
@@ -409,11 +407,9 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
                     <button
                       type="button"
                       onClick={() => {
-                        if (window.confirm(`Delete "${dish.name}" from your custom dishes?`)) {
-                          onDeleteDish(dish.id);
-                        }
+                        onDeleteDish(dish.id);
                       }}
-                      className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition touch-manipulation"
+                      className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition touch-manipulation relative before:absolute before:inset-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:min-w-[44px] before:min-h-[44px] before:content-['']"
                       title="Delete"
                     >
                       <Trash2 className="w-4 h-4" />

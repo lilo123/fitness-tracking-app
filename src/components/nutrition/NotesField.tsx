@@ -128,7 +128,7 @@ export const NotesField: React.FC<NotesFieldProps> = ({
           title="Clear and remove note"
           aria-label="Remove note"
           data-testid="clear-note-btn"
-          className="p-1 min-h-[44px] min-w-[44px] sm:min-h-[28px] sm:min-w-[28px] flex items-center justify-center text-zinc-500 hover:text-rose-400 transition touch-manipulation rounded-lg"
+          className="p-1 min-h-[44px] min-w-[44px] sm:min-h-[28px] sm:min-w-[28px] flex items-center justify-center text-zinc-400 hover:text-rose-400 transition touch-manipulation rounded-lg"
         >
           <X className="w-4 h-4" aria-hidden="true" />
         </button>
@@ -153,7 +153,7 @@ export const NotesField: React.FC<NotesFieldProps> = ({
 
       <div className="flex items-center justify-between text-xs">
         {/* Static accessibility hint read once on focus */}
-        <span id={hintId} className="text-zinc-500 sr-only">
+        <span id={hintId} className="text-zinc-400 sr-only">
           Maximum 500 characters.
         </span>
 

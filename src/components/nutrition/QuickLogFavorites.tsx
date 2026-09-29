@@ -85,7 +85,7 @@ export const QuickLogFavorites: React.FC<QuickLogFavoritesProps> = ({
           </h3>
           <output
             aria-live="polite"
-            className="text-xs font-normal tabular-nums text-zinc-500"
+            className="text-xs font-normal tabular-nums text-zinc-400"
           >
             {isSearching
               ? `(${filteredDishes.length} of ${sortedDishes.length})`
@@ -107,14 +107,14 @@ export const QuickLogFavorites: React.FC<QuickLogFavoritesProps> = ({
 
       {/* Empty State when no custom dishes exist */}
       {sortedDishes.length === 0 ? (
-        <p className="text-xs text-zinc-500 py-1">
+        <p className="text-xs text-zinc-400 py-1">
           No saved custom dishes yet. Create a custom dish or save a logged meal to quick-log it later.
         </p>
       ) : (
         <>
           {/* Controlled Inline Search Input - always visible when dishes exist */}
           <div className="relative shrink-0">
-            <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               ref={searchInputRef}
               type="text"
@@ -133,7 +133,7 @@ export const QuickLogFavorites: React.FC<QuickLogFavoritesProps> = ({
                   searchInputRef.current?.focus();
                 }}
                 aria-label="Clear search"
-                className="absolute right-1 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-500 hover:text-zinc-300 touch-manipulation"
+                className="absolute right-1 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-zinc-300 touch-manipulation"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -144,7 +144,7 @@ export const QuickLogFavorites: React.FC<QuickLogFavoritesProps> = ({
           {isSearching && filteredDishes.length === 0 ? (
             <output
               aria-live="polite"
-              className="block py-8 text-center text-zinc-500 text-xs"
+              className="block py-8 text-center text-zinc-400 text-xs"
             >
               No dishes found matching &quot;{searchQuery}&quot;
             </output>
@@ -192,7 +192,7 @@ export const QuickLogFavorites: React.FC<QuickLogFavoritesProps> = ({
                   ? 'Collapse to top favorites'
                   : `Show all ${sortedDishes.length} favorites`}
               </span>
-              <div className="flex items-center gap-1 text-xs font-normal text-zinc-500 group-hover:text-cyan-300">
+              <div className="flex items-center gap-1 text-xs font-normal text-zinc-400 group-hover:text-cyan-300">
                 <span>{isExpanded ? 'Collapse' : 'Expand'}</span>
                 {isExpanded ? (
                   <ChevronUp className="w-3.5 h-3.5" />

@@ -146,7 +146,7 @@ export const AddItemForm: React.FC<AddItemFormProps> = memo(({
           type="button"
           data-testid="cancel-add-item-button"
           onClick={onCancel}
-          className="text-zinc-500 hover:text-white text-xs min-h-[40px] min-w-[40px] px-2 flex items-center justify-center rounded-lg transition touch-manipulation"
+          className="text-zinc-400 hover:text-white text-xs min-h-[40px] min-w-[40px] px-2 flex items-center justify-center rounded-lg transition touch-manipulation"
         >
           Cancel
         </button>

@@ -122,12 +122,12 @@ export const NutritionAiInput: React.FC<NutritionAiInputProps> = memo(({
                   >
                     {formatFileSize(selectedPhoto.sizeBytes)}
                   </span>
-                  <span className="text-xs text-zinc-500 tabular-nums">
+                  <span className="text-xs text-zinc-400 tabular-nums">
                     {selectedPhoto.width}×{selectedPhoto.height}
                   </span>
                 </div>
                 <p className="text-xs font-bold text-zinc-300">Meal Photo Attached</p>
-                <p className="text-xs text-zinc-500">Ready for multimodal analysis</p>
+                <p className="text-xs text-zinc-400">Ready for multimodal analysis</p>
               </div>
             </div>
 

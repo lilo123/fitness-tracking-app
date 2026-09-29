@@ -180,7 +180,7 @@ const MealBreakdownRow: React.FC<MealBreakdownRowProps> = ({
             {expanded ? (
               <ChevronDown className="w-4 h-4 text-cyan-400 shrink-0" aria-hidden="true" />
             ) : (
-              <ChevronRight className="w-4 h-4 text-zinc-500 shrink-0" aria-hidden="true" />
+              <ChevronRight className="w-4 h-4 text-zinc-400 shrink-0" aria-hidden="true" />
             )}
             <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900">
               {getDishIcon(log.food_name)}
@@ -251,7 +251,7 @@ const MealBreakdownRow: React.FC<MealBreakdownRowProps> = ({
                       <span
                         data-testid="breakdown-child-portion"
                         title={child.displayPortion}
-                        className="text-xs tabular-nums text-zinc-500 truncate max-w-[90px] shrink-0"
+                        className="text-xs tabular-nums text-zinc-400 truncate max-w-[90px] shrink-0"
                       >
                         ({child.displayPortion})
                       </span>
@@ -299,7 +299,7 @@ const MealBreakdownRow: React.FC<MealBreakdownRowProps> = ({
           <span
             data-testid={`breakdown-leaf-serving-${log.id}`}
             title={`${log.serving_size} ${log.serving_unit}`}
-            className="text-xs tabular-nums text-zinc-500 truncate max-w-[90px] shrink-0"
+            className="text-xs tabular-nums text-zinc-400 truncate max-w-[90px] shrink-0"
           >
             ({log.serving_size} {log.serving_unit})
           </span>
@@ -467,7 +467,7 @@ export const NutrientBreakdownModal: React.FC<NutrientBreakdownModalProps> = ({
               {formattedDailyTotal}
             </span>
             {formattedTargetVal && (
-              <span className="text-zinc-500 text-xs">/ {formattedTargetVal}</span>
+              <span className="text-zinc-400 text-xs">/ {formattedTargetVal}</span>
             )}
           </div>
         </div>
@@ -482,7 +482,7 @@ export const NutrientBreakdownModal: React.FC<NutrientBreakdownModalProps> = ({
           {contributingLogs.length === 0 ? (
             <div
               data-testid="breakdown-empty-state"
-              className="py-8 text-center text-zinc-500 text-xs font-normal"
+              className="py-8 text-center text-zinc-400 text-xs font-normal"
             >
               {logs.length === 0
                 ? 'No meals logged for this date.'

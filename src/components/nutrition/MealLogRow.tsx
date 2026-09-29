@@ -220,7 +220,7 @@ export const MealLogRow: React.FC<MealLogRowProps> = ({
                   }
                 }).catch(() => {});
               }}
-              className="shrink-0 rounded border border-rose-400/40 bg-rose-500/20 px-1.5 py-0.5 text-xs font-bold text-rose-200 hover:bg-rose-500/30"
+              className="shrink-0 rounded border border-rose-400/40 bg-rose-500/20 px-1.5 py-0.5 text-xs font-bold text-rose-200 hover:bg-rose-500/30 relative before:absolute before:inset-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:min-w-[44px] before:min-h-[44px] before:content-[''] touch-manipulation"
             >
               Retry
             </button>
