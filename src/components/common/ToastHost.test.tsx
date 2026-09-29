@@ -264,4 +264,37 @@ describe('ToastHost Component & ToastContext (STD-FB-1)', () => {
     });
     expect(onCommit).toHaveBeenCalledTimes(1);
   });
+
+  it('immediately commits pending action of an undo toast upon unmount', () => {
+    const onCommit = vi.fn();
+
+    const TriggerComponent: React.FC = () => {
+      const { show } = useToast();
+      return (
+        <button
+          data-testid="trigger-undo"
+          onClick={() =>
+            show({
+              kind: 'undo',
+              verb: 'Deleted',
+              subject: 'Workout Set',
+              onCommit,
+            })
+          }
+        >
+          Delete Set
+        </button>
+      );
+    };
+
+    const { unmount } = renderWithProvider(<TriggerComponent />);
+
+    act(() => {
+      screen.getByTestId('trigger-undo').click();
+    });
+    expect(onCommit).not.toHaveBeenCalled();
+
+    unmount();
+    expect(onCommit).toHaveBeenCalledTimes(1);
+  });
 });

@@ -5,11 +5,6 @@ import { supabase } from '../lib/supabase';
 import type { UserProfile, UserRole } from '../types/database';
 import type { PrMode } from '../lib/prComparator';
 
-declare module '../types/database' {
-  interface UserProfile {
-    pr_mode?: PrMode;
-  }
-}
 import { AuthContext, type AuthContextType } from './AuthContextTypes';
 import { restTimerStore } from '../utils/restTimerStore';
 import { dedupeInFlight } from '../utils/promiseDedupe';
@@ -93,7 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const { data, error } = await (supabase
           .from('users') as any)
-          .select('id, email, username, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, is_coach_mode, coach_code, coach_tier, max_athletes, created_at, timezone, weight_unit')
+          .select('id, email, username, role, target_calories, target_protein, target_carbs, target_fat, target_fiber, auto_rest_timer, is_coach_mode, coach_code, coach_tier, max_athletes, created_at, timezone, weight_unit, pr_mode')
           .eq('id', userId)
           .single();
 
@@ -109,18 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (deviceZone && data.timezone !== deviceZone) {
             syncUserTimezone(userId, true);
           }
-          let prModeVal: PrMode = (data as any)?.pr_mode || 'weight';
-          try {
-            const { data: prData } = await (supabase.from('users') as any)
-              .select('pr_mode')
-              .eq('id', userId)
-              .maybeSingle();
-            if (prData?.pr_mode === 'e1rm' || prData?.pr_mode === 'weight') {
-              prModeVal = prData.pr_mode;
-            }
-          } catch {
-            // fallback to weight
-          }
+          const prModeVal: PrMode = (data as any)?.pr_mode === 'e1rm' ? 'e1rm' : 'weight';
 
           const storedTz = typeof window !== 'undefined' && window.localStorage ? localStorage.getItem(`cybergym_user_timezone_${userId}`) : null;
           const userWithTz = {

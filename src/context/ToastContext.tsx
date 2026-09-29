@@ -31,6 +31,13 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, []);
 
+  // Flush and commit any pending undo toast on unmount (STD-FB-1)
+  useEffect(() => {
+    return () => {
+      commitActiveToast(activeToastRef.current);
+    };
+  }, [commitActiveToast]);
+
   const dismiss = useCallback(() => {
     const current = activeToastRef.current;
     if (current) {

@@ -1,3 +1,4 @@
+import type { PrMode } from '../lib/prComparator';
 import type { WeightUnit } from "../utils/weight";
 import type { NutritionItem } from '../utils/itemModel';
 
@@ -20,6 +21,7 @@ export interface UserProfile {
   coach_tier?: 'free' | 'pro' | 'enterprise';
   max_athletes?: number;
   weight_unit?: WeightUnit;
+  pr_mode?: PrMode;
   created_at?: string;
 }
 

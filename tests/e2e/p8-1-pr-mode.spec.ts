@@ -241,9 +241,7 @@ test.describe('P8.1 PR Mode Setting E2E', () => {
     await expect(sheetPrSummary).toContainText('e1RM 240 lbs');
 
     // Close sheet
-    const closeBtn = page.getByRole('button', { name: /^Close/i });
-    await expect(closeBtn).toBeVisible({ timeout: 10000 });
-    await closeBtn.click();
+    await page.keyboard.press('Escape');
     await expect(sheetPrSummary).not.toBeVisible();
 
     // 4. Verify /workout ExerciseCard trophy chip updated to e1RM
