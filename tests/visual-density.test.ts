@@ -4142,17 +4142,19 @@ async function setupWorkoutDensityPage(page: Page) {
 
   const card = page.locator('[data-testid="exercise-card-0"]');
   const chooseBtn = page.locator('button:has-text("Choose Routine")');
+  const routineSelectBtn = page.locator('[data-testid="routine-select-btn"]');
 
-  try {
-    await card.waitFor({ state: 'visible', timeout: 5000 });
-  } catch {
-    if (await chooseBtn.isVisible()) {
-      await chooseBtn.click();
-      await page.locator('[data-testid="routine-picker-modal"] button:has-text("Workout A")').click();
-      await expect(page.locator('[data-testid="routine-picker-modal"]')).not.toBeVisible();
-    }
-    await card.waitFor({ state: 'visible', timeout: 10000 });
+  // Pin "Workout A" regardless of weekday: the default schedule (ghostSets.ts DEFAULT_WORKOUT_TEMPLATES)
+  // picks a different routine per day, and on Tue/Fri its first exercise has no seeded benchmark weight,
+  // so committing set 1 without a draft weight is rejected client-side.
+  await expect(routineSelectBtn.or(chooseBtn).first()).toBeVisible({ timeout: 10000 });
+  const routineText = (await routineSelectBtn.count()) > 0 ? await routineSelectBtn.textContent() : null;
+  if (!routineText?.includes('Workout A')) {
+    await (routineText === null ? chooseBtn : routineSelectBtn).click();
+    await page.locator('[data-testid="routine-picker-modal"] button:has-text("Workout A")').click();
+    await expect(page.locator('[data-testid="routine-picker-modal"]')).not.toBeVisible();
   }
+  await card.waitFor({ state: 'visible', timeout: 10000 });
 
   // Ensure set 1 is logged so we have both a logged set and a pending set
   const loggedRow = card.locator('[data-testid^="logged-set-row-"]').first();
