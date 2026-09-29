@@ -485,6 +485,78 @@ The password lives in `~/.config/fitness-supabase/db_password` (mode 600). Backu
   - D43 walker + tap grid run on every route.
   - Nutrition density suite still green with 44px hit areas and no layout growth beyond the documented px.
 
+#### P8 Coach + Settings audit findings (read-only audit 2026-09-29 @befe8db; all owned by P8)
+Severity P0-P3. Recorded before any P8 change, per the P8 scope rule. Line numbers are as of befe8db.
+
+**Coach (C1-C30)**
+
+| ID | Sev | Standard | File:Line | 1-Line Fix |
+|---|---|---|---|---|
+| C1 | P1 | STD-CMP-7 | CoachCockpit.tsx:281 | Replace `window.confirm` with `ConfirmDialog` for athlete disconnect |
+| C2 | P2 | STD-CMP-9 | CoachCockpit.tsx:290 | Replace `alert(message)` error call with inline `StatusBanner` / toast |
+| C3 | P3 | STD-TYP-2 | CoachCockpit.tsx:307 | Change `font-black` to `font-bold` on Coach Dashboard header |
+| C4 | P2 | STD-A11Y-1 | CoachCockpit.tsx:327-340 | Replace hand-rolled tab controls with `common/SegmentedTabs` (adds ARIA roles) |
+| C5 | P2 | STD-INT-9 | CoachCockpit.tsx:378-382 | Increase "+ New Template" button `min-h-[36px]` to `min-h-[44px]` |
+| C6 | P2 | STD-CMP-5 | CoachCockpit.tsx:393,414,455,470 | Remove `sm:text-xs` on inputs/select to prevent iOS auto-zoom (keep `text-base`) |
+| C7 | P2 | STD-ICO-1 | CoachCockpit.tsx:480-485 | Add required `aria-label="Remove exercise"` to trash icon button |
+| C8 | P3 | STD-TYP-4 | CoachCockpit.tsx:496 | Change "SAVE TEMPLATE" button uppercase to written case "Save template" |
+| C9 | P2 | STD-CMP-10 | CoachCockpit.tsx:519-521 | Add `Skeleton` cards when `isTemplatesLoading` to eliminate empty flash |
+| C10 | P3 | STD-TYP-2 | CoachCockpit.tsx:526 | Change `font-extrabold` to `font-bold` on template card title |
+| C11 | P2 | STD-INT-9 | CoachCockpit.tsx:535 | Increase template Edit button `min-h-[36px]` to `min-h-[44px]` |
+| C12 | P2 | STD-TYP-1 | CoachAthleteSwitcher.tsx:27 | Change `text-[10px]` to `text-xs` on "Active Athlete" label |
+| C13 | P3 | STD-TYP-2 | CoachAthleteSwitcher.tsx:28 | Change `font-black` to `font-bold` on active athlete name |
+| C14 | P2 | STD-A11Y-1 | CoachAthleteSwitcher.tsx:35-48 | Add `aria-label="Select athlete"` to athlete `<select>` dropdown |
+| C15 | P2 | STD-CMP-5 | CoachAthleteSwitcher.tsx:39 | Remove `sm:text-xs` on athlete select, keeping `text-base` (16px) |
+| C16 | P3 | STD-TYP-2,3 | CoachAthleteTimeline.tsx:210 | Remove `font-black` and `font-mono` on date text; use `font-bold` |
+| C17 | P2 | STD-TYP-1,3 | CoachAthleteTimeline.tsx:214,243,275,294,344,361 | Replace 6x `text-[10px]` with `text-xs` and `font-mono` with `tabular-nums` |
+| C18 | P3 | STD-TYP-2 | CoachAthleteTimeline.tsx:239,323 | Change `font-extrabold` to `font-bold` on session and nutrition headings |
+| C19 | P2 | STD-TYP-1 | CoachAthleteTimeline.tsx:263,356 | Change `text-[11px]` to `text-xs` on exercise and nutrition rows |
+| C20 | P2 | STD-COL-2 | CoachAthleteTimeline.tsx:296,430 | Replace `text-zinc-500` with `text-zinc-400` on Set label & fallback notice |
+| C21 | P2 | STD-TYP-1 | CoachAthleteTimeline.tsx:329,333,337 | Change compliance target pill `text-[10px]` to `text-xs` |
+| C22 | P3 | STD-TYP-2,3 | CoachAthleteTimeline.tsx:383,388 | Remove `font-black` on timeline title; remove `font-mono` on workout count |
+| C23 | P2 | STD-CMP-10 | CoachAthleteTimeline.tsx:415-423 | Render `Skeleton` cards while athlete workouts query is fetching |
+| C24 | P3 | STD-TYP-2 | CoachAthleteMacros.tsx:51 | Change `font-black` to `font-bold` on nutrition targets title |
+| C25 | P2 | STD-TYP-1 | CoachAthleteMacros.tsx:55,66,69,93-95,112-114,131-133,150-152 | Replace 11 sub-12px classes (`text-[10px]`, `text-[11px]`) with `text-xs` |
+| C26 | P3 | STD-TYP-2 | CoachAthleteMacros.tsx:66,81,93,112,131,150 | Change 6 `font-black` instances to `font-bold` |
+| C27 | P3 | STD-TYP-3 | CoachAthleteMacros.tsx:81,84,94,104,113,123,132,142,151,161 | Remove 10 `font-mono` classes on labels/inputs; use `tabular-nums` |
+| C28 | P2 | STD-CMP-5 | CoachAthleteMacros.tsx:104,123,142,161 | Remove `sm:text-xs` from all 4 macro inputs (keep `text-base`) |
+| C29 | P3 | STD-TYP-4 | CoachAthleteMacros.tsx:171 | Change button uppercase to written case "Update athlete targets" |
+| C30 | P2 | STD-LAY-3 | CoachAthleteMacros.tsx:89 | Add `min-w-0` to 2-col macro grid cells to prevent 320px truncation |
+
+**Settings (S1-S29)**
+
+| ID | Sev | Standard | File:Line | 1-Line Fix |
+|---|---|---|---|---|
+| S1 | P1 | STD-CMP-7 | MyCoachCard.tsx:82 | Replace `window.confirm` with `ConfirmDialog` for coach disconnect |
+| S2 | P2 | STD-CMP-9 | MyCoachCard.tsx:30-41 | Remove swallowed `catch { return null; }`; surface `StatusBanner` error |
+| S3 | P3 | STD-TYP-2 | MyCoachCard.tsx:111,133,177 | Change `font-black` to `font-bold` on header, coach name, and submit button |
+| S4 | P2 | STD-TYP-1 | MyCoachCard.tsx:116,130,136 | Replace sub-12px `text-[10px]` and `text-[11px]` with `text-xs` |
+| S5 | P3 | STD-TYP-3 | MyCoachCard.tsx:116,123,136,170 | Remove `font-mono` from badge, status message, code, and input |
+| S6 | P2 | STD-COL-2 | MyCoachCard.tsx:123,130,139 | Replace `text-zinc-500` (3 hits) with AA-compliant `text-zinc-400` |
+| S7 | P2 | STD-CMP-10 | MyCoachCard.tsx:122-126 | Replace raw text "Loading coaching status..." with `Skeleton` card |
+| S8 | P3 | STD-DAT-5 | MyCoachCard.tsx:140 | Replace `toLocaleDateString()` with `formatShortDate(coachLink.linked_at)` |
+| S9 | P2 | STD-CMP-5 | MyCoachCard.tsx:170 | Remove `sm:text-xs` on coach code input (keep `text-base` 16px) |
+| S10 | P3 | STD-TYP-4 | MyCoachCard.tsx:177 | Change button uppercase to written case "Link coach" |
+| S11 | P3 | STD-TYP-2 | SettingsView.tsx:93,106,191 | Change `font-black` to `font-bold` on section headers |
+| S12 | P2 | STD-TYP-1 | SettingsView.tsx:113,122,135,167,199 | Replace 5x sub-12px (`text-[10px]`, `text-[11px]`) with `text-xs` |
+| S13 | P3 | STD-TYP-3 | SettingsView.tsx:116 | Remove `font-mono` from email address text |
+| S14 | P2 | STD-CMP-5 | SettingsView.tsx:130 | Remove `sm:text-xs` on display name input (keep `text-base`) |
+| S15 | P2 | STD-COL-2 | SettingsView.tsx:167 | Replace `text-zinc-500` with `text-zinc-400` on "(Managed by Coach)" |
+| S16 | P2 | STD-CMP-9 | CoachSettingsCard.tsx:32-44 | Stop swallowing query catch block; propagate error to `StatusBanner` |
+| S17 | P3 | STD-TYP-2 | CoachSettingsCard.tsx:93,140,159 | Change `font-black` to `font-bold` on headings and code display |
+| S18 | P2 | STD-TYP-1 | CoachSettingsCard.tsx:145,155,180 | Replace `text-[10px]` with `text-xs` on badge and labels |
+| S19 | P3 | STD-TYP-3 | CoachSettingsCard.tsx:108,145,159,191 | Remove `font-mono` from capacity badge, code display, and inputs |
+| S20 | P2 | STD-COL-2 | CoachSettingsCard.tsx:155 | Replace `text-zinc-500` with `text-zinc-400` on "Your Coach Code" |
+| S21 | P2 | STD-CMP-5 | CoachSettingsCard.tsx:108,191 | Remove `sm:text-xs` on vanity code inputs (keep `text-base`) |
+| S22 | P3 | STD-TYP-2 | MacroGoalsCard.tsx:50,131 | Change `font-black` to `font-bold` on header and Save button |
+| S23 | P2 | STD-TYP-1 | MacroGoalsCard.tsx:57,71,85,99,113 | Replace 5x `text-[10px]` macro labels with `text-xs` |
+| S24 | P2 | STD-TYP-3,5 | MacroGoalsCard.tsx:66,80,94,108,122 | Remove `font-mono` and `sm:text-xs` from all 5 inputs (keep `text-base`) |
+| S25 | P2 | STD-LAY-3 | MacroGoalsCard.tsx:55 | Rebalance 6-col grid to responsive 2-col to avoid 320px overflow |
+| S26 | P3 | STD-TYP-2 | DataExportCard.tsx:170 | Change `font-black` to `font-bold` on "Data Extract" title |
+| S27 | P2 | STD-TYP-1 | DataExportCard.tsx:203,226,263,270,299,305,322,353,369 | Replace 9x sub-12px (`text-[9px]`, `text-[10px]`, `text-[11px]`) with `text-xs` |
+| S28 | P2 | STD-INT-9 | DataExportCard.tsx:230-256,325-346 | Expand format & preset button tap areas from `py-1.5` to `min-h-[44px]` |
+| S29 | P2 | STD-CMP-5 | DataExportCard.tsx:363,379 | Increase custom date inputs from `text-xs` to `text-base` (iOS zoom) |
+
 ---
 
 ## 5. Ownership of shared files and migrations
