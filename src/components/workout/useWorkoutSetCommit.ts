@@ -1,5 +1,5 @@
 import { useCallback, type RefObject } from 'react';
-import type { Exercise, WorkoutSet } from '../../types/database';
+import type { Exercise, WorkoutSet, RoutineTemplate } from '../../types/database';
 import type { UseMutationResult } from '@tanstack/react-query';
 import type { SetDraftInput } from '../../utils/workoutSessionStore';
 import { isUUID } from './workoutEngineHelpers';
@@ -8,21 +8,25 @@ import { resolveWeightInput, type WeightUnit } from '../../utils/weight';
 
 export interface UseWorkoutSetCommitOptions {
   exercises: Exercise[];
+  customTemplates?: RoutineTemplate[];
   inputDraftsRef: RefObject<Record<string, SetDraftInput>>;
   targetRepCountsRef: RefObject<Record<string, number>>;
   logSetMutation: UseMutationResult<any, any, any, any>;
   batchLogSetsMutation: UseMutationResult<any, any, any, any>;
   setMutationError: (err: string | null) => void;
+  setExerciseError?: (exerciseName: string, message: string) => void;
   unit?: WeightUnit;
 }
 
 export function useWorkoutSetCommit({
   exercises,
+  customTemplates,
   inputDraftsRef,
   targetRepCountsRef,
   logSetMutation,
   batchLogSetsMutation,
   setMutationError,
+  setExerciseError,
   unit: propUnit,
 }: UseWorkoutSetCommitOptions) {
   const contextUnit = useWeightUnit();
@@ -52,14 +56,31 @@ export function useWorkoutSetCommit({
       : NaN;
 
     if (!Number.isFinite(weightVal) || weightVal < 0 || !Number.isFinite(repsVal) || repsVal <= 0) {
-      setMutationError('Please enter weight and reps or use previous set values.');
+      if (setExerciseError) {
+        setExerciseError(exName, 'Please enter weight and reps or use previous set values.');
+      } else {
+        setMutationError('Please enter weight and reps or use previous set values.');
+      }
       return;
     }
 
+    const norm = exName.trim().toLowerCase();
     const matchedEx = exercises.find(
-      (e) => e.name.toLowerCase() === exName.toLowerCase() || e.id === exName
+      (e) => e.name.trim().toLowerCase() === norm || e.id === exName
     );
-    const exerciseId = matchedEx ? matchedEx.id : isUUID(exName) ? exName : undefined;
+    let exerciseId = matchedEx ? matchedEx.id : isUUID(exName) ? exName : undefined;
+    if (!exerciseId && customTemplates) {
+      for (const tpl of customTemplates) {
+        for (const item of tpl.exercises || []) {
+          const itemName = item.exercise?.name || (item as any).exercise_name;
+          if (itemName && itemName.trim().toLowerCase() === norm && isUUID(item.exercise_id)) {
+            exerciseId = item.exercise_id;
+            break;
+          }
+        }
+        if (exerciseId) break;
+      }
+    }
 
     logSetMutation.mutate({
       exerciseName: exName,
@@ -68,7 +89,7 @@ export function useWorkoutSetCommit({
       reps: repsVal,
       setIndex,
     });
-  }, [exercises, logSetMutation, inputDraftsRef, setMutationError, unit]);
+  }, [exercises, customTemplates, logSetMutation, inputDraftsRef, setMutationError, setExerciseError, unit]);
 
   const handleBatchLogExercise = useCallback((
     exName: string,
@@ -114,14 +135,27 @@ export function useWorkoutSetCommit({
     }
 
     if (unloggedSets.length > 0) {
+      const norm = exName.trim().toLowerCase();
       const matchedEx = exercises.find(
-        (e) => e.name.toLowerCase() === exName.toLowerCase() || e.id === exName
+        (e) => e.name.trim().toLowerCase() === norm || e.id === exName
       );
-      const exerciseId = matchedEx ? matchedEx.id : isUUID(exName) ? exName : undefined;
+      let exerciseId = matchedEx ? matchedEx.id : isUUID(exName) ? exName : undefined;
+      if (!exerciseId && customTemplates) {
+        for (const tpl of customTemplates) {
+          for (const item of tpl.exercises || []) {
+            const itemName = item.exercise?.name || (item as any).exercise_name;
+            if (itemName && itemName.trim().toLowerCase() === norm && isUUID(item.exercise_id)) {
+              exerciseId = item.exercise_id;
+              break;
+            }
+          }
+          if (exerciseId) break;
+        }
+      }
       const setsWithId = unloggedSets.map((s) => ({ ...s, exerciseId }));
       batchLogSetsMutation.mutate(setsWithId);
     }
-  }, [batchLogSetsMutation, exercises, inputDraftsRef, targetRepCountsRef, unit]);
+  }, [batchLogSetsMutation, exercises, customTemplates, inputDraftsRef, targetRepCountsRef, unit]);
 
   return {
     handleCommitSet,

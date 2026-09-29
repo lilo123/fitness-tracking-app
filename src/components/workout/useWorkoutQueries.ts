@@ -102,15 +102,24 @@ export async function fetchTemplateDetail(templateId: string): Promise<RoutineTe
 export const workoutExercisesQueryOptions = {
   queryKey: ['exercises', 'workout'] as const,
   queryFn: async (): Promise<Exercise[]> => {
-    const { data, error } = await supabase
-      .from('exercises')
-      .select('id, name, body_parts, is_master')
-      .eq('is_archived', false)
-      .order('name')
-      .limit(200);
-    if (error) throw error;
-    if (!data || data.length === 0) return DEFAULT_EXERCISES_LIST;
-    return data as Exercise[];
+    const allExercises: Exercise[] = [];
+    const PAGE_SIZE = 200;
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from('exercises')
+        .select('id, name, body_parts, is_master')
+        .eq('is_archived', false)
+        .order('name')
+        .range(from, from + PAGE_SIZE - 1);
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+      allExercises.push(...(data as Exercise[]));
+      if (data.length < PAGE_SIZE) break;
+      from += PAGE_SIZE;
+    }
+    if (allExercises.length === 0) return DEFAULT_EXERCISES_LIST;
+    return allExercises;
   },
   staleTime: 5 * 60 * 1000,
 };

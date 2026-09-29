@@ -6,6 +6,7 @@ import { useWorkoutMutations } from './useWorkoutMutations';
 import * as setsLib from '../../lib/sets';
 import * as invalidateLib from '../../lib/invalidate';
 import { workoutSessionStore } from '../../utils/workoutSessionStore';
+import { supabase } from '../../lib/supabase';
 
 describe('useWorkoutMutations (P2 / W4 / W20 / W35 / H2)', () => {
   let queryClient: QueryClient;
@@ -67,8 +68,9 @@ describe('useWorkoutMutations (P2 / W4 / W20 / W35 / H2)', () => {
       }
     });
 
-    // Error banner was called with the failure message
-    expect(mockSetMutationError).toHaveBeenCalledWith('Network insert failure');
+    // Error is routed to exerciseErrors for the exercise card, mutationError stays null
+    expect(result.current.exerciseErrors['Bench Press']?.message).toBe('Network insert failure');
+    expect(result.current.mutationError).toBeNull();
 
     // Cache must have rolled back to the initial 1 set
     const currentData = queryClient.getQueryData<any[]>(queryKey);
@@ -191,5 +193,218 @@ describe('useWorkoutMutations (P2 / W4 / W20 / W35 / H2)', () => {
     });
 
     expect(invalidateSpy).toHaveBeenCalledWith(expect.anything(), targetUserId);
+  });
+  it('resolves 210th exercise from a 210-row catalog and logs set successfully', async () => {
+    const catalog210 = Array.from({ length: 210 }, (_, i) => ({
+      id: `00000000-0000-0000-0000-${String(i + 1).padStart(12, '0')}`,
+      name: i === 209 ? 'Zottman Curl' : `Exercise ${String(i + 1).padStart(3, '0')}`,
+      body_parts: ['Arms'],
+      is_master: true,
+    }));
+
+    const insertSpy = vi.spyOn(setsLib, 'insertSet').mockResolvedValue({
+      id: 'logged-set-zottman',
+      workout_id: 'w-123',
+      exercise_id: catalog210[209].id,
+      weight: 35,
+      reps: 10,
+      set_index: 1,
+      set_type: 'working',
+      rpe: null,
+      created_at: new Date().toISOString(),
+    });
+    vi.spyOn(setsLib, 'getOrCreateWorkout').mockResolvedValue('w-123');
+
+    const { result } = renderHook(
+      () =>
+        useWorkoutMutations({
+          targetUserId,
+          workoutDate,
+          activeRoutineName: 'Arm Day',
+          exercises: catalog210 as any,
+          autoRestTimer: false,
+        }),
+      { wrapper }
+    );
+
+    await act(async () => {
+      await result.current.logSetMutation.mutateAsync({
+        exerciseName: 'Zottman Curl',
+        weight: 35,
+        reps: 10,
+        setIndex: 1,
+      });
+    });
+
+    expect(insertSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      'w-123',
+      expect.objectContaining({
+        exerciseId: catalog210[209].id,
+        weight: 35,
+        reps: 10,
+      })
+    );
+  });
+
+  it('falls back to single scoped lookup when exercise is not in loaded exercises list', async () => {
+    const lookupExId = '00000000-0000-0000-0000-000000000999';
+    vi.spyOn(supabase, 'from').mockImplementation((table: string) => {
+      if (table === 'exercises') {
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          ilike: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({
+            data: { id: lookupExId, name: 'Weighted Sit-Up' },
+            error: null,
+          }),
+        } as any;
+      }
+      return {} as any;
+    });
+
+    const insertSpy = vi.spyOn(setsLib, 'insertSet').mockResolvedValue({
+      id: 'logged-set-weighted-situp',
+      workout_id: 'w-123',
+      exercise_id: lookupExId,
+      weight: 45,
+      reps: 15,
+      set_index: 1,
+      set_type: 'working',
+      rpe: null,
+      created_at: new Date().toISOString(),
+    });
+    vi.spyOn(setsLib, 'getOrCreateWorkout').mockResolvedValue('w-123');
+
+    const { result } = renderHook(
+      () =>
+        useWorkoutMutations({
+          targetUserId,
+          workoutDate,
+          activeRoutineName: 'Core Day',
+          exercises: [],
+          autoRestTimer: false,
+        }),
+      { wrapper }
+    );
+
+    await act(async () => {
+      await result.current.logSetMutation.mutateAsync({
+        exerciseName: 'Weighted Sit-Up',
+        weight: 45,
+        reps: 15,
+        setIndex: 1,
+      });
+    });
+
+    expect(insertSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      'w-123',
+      expect.objectContaining({
+        exerciseId: lookupExId,
+        weight: 45,
+        reps: 15,
+      })
+    );
+  });
+
+  it('resolves exercise ID carried by customTemplates item when present', async () => {
+    const templateExId = '00000000-0000-0000-0000-000000000888';
+    const mockTemplates = [
+      {
+        id: 'tmpl-1',
+        name: 'Shoulder Day',
+        exercises: [
+          { exercise_id: templateExId, exercise: { name: 'Face Pull' } },
+        ],
+      },
+    ];
+
+    const insertSpy = vi.spyOn(setsLib, 'insertSet').mockResolvedValue({
+      id: 'logged-set-facepull',
+      workout_id: 'w-123',
+      exercise_id: templateExId,
+      weight: 50,
+      reps: 15,
+      set_index: 1,
+      set_type: 'working',
+      rpe: null,
+      created_at: new Date().toISOString(),
+    });
+    vi.spyOn(setsLib, 'getOrCreateWorkout').mockResolvedValue('w-123');
+
+    const { result } = renderHook(
+      () =>
+        useWorkoutMutations({
+          targetUserId,
+          workoutDate,
+          activeRoutineName: 'Shoulder Day',
+          exercises: [],
+          customTemplates: mockTemplates as any,
+          autoRestTimer: false,
+        }),
+      { wrapper }
+    );
+
+    await act(async () => {
+      await result.current.logSetMutation.mutateAsync({
+        exerciseName: 'Face Pull',
+        weight: 50,
+        reps: 15,
+        setIndex: 1,
+      });
+    });
+
+    expect(insertSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      'w-123',
+      expect.objectContaining({
+        exerciseId: templateExId,
+        weight: 50,
+        reps: 15,
+      })
+    );
+  });
+
+  it('isolates exercise mutation errors to exerciseErrors and leaves mutationError null', async () => {
+    vi.spyOn(setsLib, 'getOrCreateWorkout').mockResolvedValue('w-123');
+    vi.spyOn(setsLib, 'insertSet').mockRejectedValue(new Error('Card error only'));
+
+    const { result } = renderHook(
+      () =>
+        useWorkoutMutations({
+          targetUserId,
+          workoutDate,
+          activeRoutineName: 'Chest Day',
+          exercises: exercises as any,
+          autoRestTimer: false,
+          setMutationError: mockSetMutationError,
+        }),
+      { wrapper }
+    );
+
+    await act(async () => {
+      try {
+        await result.current.logSetMutation.mutateAsync({
+          exerciseName: 'Bench Press',
+          weight: 225,
+          reps: 3,
+          setIndex: 1,
+        });
+      } catch {
+        // Expected mutation failure
+      }
+    });
+
+    expect(result.current.exerciseErrors['Bench Press']?.message).toBe('Card error only');
+    expect(result.current.mutationError).toBeNull();
+    expect(mockSetMutationError).not.toHaveBeenCalled();
+
+    act(() => {
+      result.current.clearExerciseError('Bench Press');
+    });
+    expect(result.current.exerciseErrors['Bench Press']).toBeUndefined();
   });
 });

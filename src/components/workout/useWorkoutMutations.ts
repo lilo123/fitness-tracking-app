@@ -1,25 +1,32 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabase';
-import type { Exercise } from '../../types/database';
-import { restTimerStore } from '../../utils/restTimerStore';
-import { workoutSessionStore } from '../../utils/workoutSessionStore';
-import { queryKeys } from '../../lib/queryKeys';
-import { invalidateWorkoutDerived } from '../../lib/invalidate';
+import { useState, useCallback } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "../../lib/supabase";
+import type { Exercise, RoutineTemplate } from "../../types/database";
+import { restTimerStore } from "../../utils/restTimerStore";
+import { workoutSessionStore } from "../../utils/workoutSessionStore";
+import { queryKeys } from "../../lib/queryKeys";
+import { invalidateWorkoutDerived } from "../../lib/invalidate";
 import {
   getOrCreateWorkout,
   insertSet,
   batchInsertSets,
   deleteSet,
-} from '../../lib/sets';
-import { isUUID } from './workoutEngineHelpers';
+} from "../../lib/sets";
+import { isUUID } from "./workoutEngineHelpers";
+
+export interface ExerciseCardError {
+  message: string;
+  onRetry?: () => void;
+}
 
 export interface UseWorkoutMutationsOptions {
   targetUserId: string;
   workoutDate: string;
   activeRoutineName: string;
   exercises: Exercise[];
+  customTemplates?: RoutineTemplate[];
   autoRestTimer: boolean;
-  setMutationError: (err: string | null) => void;
+  setMutationError?: (err: string | null) => void;
   onDraftSuccess?: (variables: {
     exerciseName?: string;
     exerciseId?: string;
@@ -32,34 +39,111 @@ export function useWorkoutMutations({
   workoutDate,
   activeRoutineName,
   exercises,
+  customTemplates,
   autoRestTimer,
-  setMutationError,
+  setMutationError: externalSetMutationError,
   onDraftSuccess,
 }: UseWorkoutMutationsOptions) {
   const queryClient = useQueryClient();
 
+  const [pageMutationError, setPageMutationError] = useState<string | null>(null);
+  const [exerciseErrors, setExerciseErrors] = useState<Record<string, ExerciseCardError>>({});
+
+  const setMutationError = useCallback((err: string | null) => {
+    setPageMutationError(err);
+    if (externalSetMutationError) {
+      externalSetMutationError(err);
+    }
+  }, [externalSetMutationError]);
+
+  const clearMutationError = useCallback(() => {
+    setPageMutationError(null);
+    if (externalSetMutationError) {
+      externalSetMutationError(null);
+    }
+  }, [externalSetMutationError]);
+
+  const setExerciseError = useCallback((exerciseName: string, message: string, onRetry?: () => void) => {
+    setExerciseErrors((prev) => ({
+      ...prev,
+      [exerciseName]: { message, onRetry },
+    }));
+  }, []);
+
+  const clearExerciseError = useCallback((exerciseName: string) => {
+    setExerciseErrors((prev) => {
+      if (!prev[exerciseName]) return prev;
+      const next = { ...prev };
+      delete next[exerciseName];
+      return next;
+    });
+  }, []);
+
   const resolveUserId = async (): Promise<string> => {
     if (targetUserId) return targetUserId;
     const { data: authData } = await supabase.auth.getUser();
-    const resolved = authData?.user?.id || '';
-    if (!resolved) throw new Error('Authenticated user required to log workout');
+    const resolved = authData?.user?.id || "";
+    if (!resolved) throw new Error("Authenticated user required to log workout");
     return resolved;
   };
 
-  const resolveExerciseId = (exerciseIdentifier: string): string => {
+  const resolveExerciseId = async (exerciseIdentifier: string): Promise<string> => {
     if (!exerciseIdentifier) {
-      throw new Error('Exercise identifier required');
+      throw new Error("Exercise identifier required");
     }
+    if (isUUID(exerciseIdentifier)) {
+      return exerciseIdentifier;
+    }
+    const norm = exerciseIdentifier.trim().toLowerCase();
     const matchedEx = exercises.find(
-      (e) =>
-        e.id === exerciseIdentifier ||
-        e.name.toLowerCase() === exerciseIdentifier.toLowerCase()
+      (e) => e.id === exerciseIdentifier || e.name.trim().toLowerCase() === norm
     );
-    const exerciseId = matchedEx ? matchedEx.id : isUUID(exerciseIdentifier) ? exerciseIdentifier : null;
-    if (!exerciseId) {
-      throw new Error(`Exercise "${exerciseIdentifier}" cannot be resolved to a valid UUID.`);
+    if (matchedEx?.id) {
+      return matchedEx.id;
     }
-    return exerciseId;
+
+    // 1. Prefer exercise id carried by routine/template items when present
+    const templatesToCheck = customTemplates
+      ? [
+          ...customTemplates.filter((t) => t.name.trim().toLowerCase() === activeRoutineName.trim().toLowerCase()),
+          ...customTemplates.filter((t) => t.name.trim().toLowerCase() !== activeRoutineName.trim().toLowerCase()),
+        ]
+      : [];
+
+    for (const tpl of templatesToCheck) {
+      if (Array.isArray(tpl.exercises)) {
+        for (const item of tpl.exercises) {
+          const itemName = item.exercise?.name || (item as any).exercise_name;
+          if (
+            itemName &&
+            itemName.trim().toLowerCase() === norm &&
+            item.exercise_id &&
+            isUUID(item.exercise_id)
+          ) {
+            return item.exercise_id;
+          }
+        }
+      }
+    }
+
+    // 2. Single scoped lookup against exercises table (visible to user, is_archived=false, case-insensitive exact name)
+    try {
+      const { data, error } = await supabase
+        .from("exercises")
+        .select("id, name")
+        .eq("is_archived", false)
+        .ilike("name", exerciseIdentifier.trim())
+        .limit(1)
+        .maybeSingle();
+
+      if (!error && data?.id && isUUID(data.id)) {
+        return data.id;
+      }
+    } catch {
+      // Fall through to error
+    }
+
+    throw new Error(`Exercise "${exerciseIdentifier}" cannot be resolved to a valid UUID.`);
   };
 
   const logSetMutation = useMutation({
@@ -69,13 +153,13 @@ export function useWorkoutMutations({
       weight: number;
       reps: number;
       setIndex: number;
-      setType?: 'working' | 'warmup' | 'drop';
+      setType?: "working" | "warmup" | "drop";
       rpe?: number | null;
     }) => {
       const effectiveUserId = await resolveUserId();
-      const exerciseId = payload.exerciseId
+      const exerciseId = payload.exerciseId && isUUID(payload.exerciseId)
         ? payload.exerciseId
-        : resolveExerciseId(payload.exerciseName || '');
+        : await resolveExerciseId(payload.exerciseName || "");
 
       const workoutId = await getOrCreateWorkout(
         supabase,
@@ -89,14 +173,17 @@ export function useWorkoutMutations({
         weight: payload.weight,
         reps: payload.reps,
         setIndex: payload.setIndex,
-        setType: payload.setType || 'working',
+        setType: payload.setType || "working",
         rpe: payload.rpe ?? null,
       });
 
       return loggedSet;
     },
     onMutate: async (newSetPayload) => {
-      const effectiveUserId = targetUserId || '';
+      if (newSetPayload.exerciseName) {
+        clearExerciseError(newSetPayload.exerciseName);
+      }
+      const effectiveUserId = targetUserId || "";
       const dateKey = queryKeys.workoutSets.byDate(effectiveUserId, workoutDate);
       const ninetyKey = queryKeys.workoutSets.recent90d(effectiveUserId);
       const workoutsKey = queryKeys.workouts.byDate(effectiveUserId, workoutDate);
@@ -111,22 +198,21 @@ export function useWorkoutMutations({
 
       let resolvedExId = newSetPayload.exerciseId;
       if (!resolvedExId && newSetPayload.exerciseName) {
-        try {
-          resolvedExId = resolveExerciseId(newSetPayload.exerciseName);
-        } catch {
-          resolvedExId = '';
-        }
+        const matched = exercises.find(
+          (e) => e.id === newSetPayload.exerciseName || e.name.toLowerCase() === newSetPayload.exerciseName?.toLowerCase()
+        );
+        resolvedExId = matched?.id || "";
       }
 
       const optimisticRow = {
         id: `optimistic-${Date.now()}`,
-        workout_id: 'pending',
-        exercise_id: resolvedExId || '',
-        exercise_name: newSetPayload.exerciseName || '',
+        workout_id: "pending",
+        exercise_id: resolvedExId || "",
+        exercise_name: newSetPayload.exerciseName || "",
         weight: newSetPayload.weight,
         reps: newSetPayload.reps,
         set_index: newSetPayload.setIndex,
-        set_type: newSetPayload.setType || 'working',
+        set_type: newSetPayload.setType || "working",
         rpe: newSetPayload.rpe ?? null,
         created_at: new Date().toISOString(),
         workout_date: workoutDate,
@@ -158,12 +244,21 @@ export function useWorkoutMutations({
       const message =
         err instanceof Error
           ? err.message
-          : (err as { message?: string })?.message || 'Failed to log set. Please try again.';
-      setMutationError(message);
+          : (err as { message?: string })?.message || "Failed to log set. Please try again.";
+      if (_vars?.exerciseName) {
+        setExerciseError(_vars.exerciseName, message, () => {
+          logSetMutation.mutate(_vars);
+        });
+      } else {
+        setMutationError(message);
+      }
     },
     onSuccess: (_data, variables) => {
-      const effectiveUserId = targetUserId || '';
-      const exId = variables.exerciseId || (variables.exerciseName ? exercises.find(e => e.name.toLowerCase() === variables.exerciseName?.toLowerCase())?.id : '');
+      if (variables.exerciseName) {
+        clearExerciseError(variables.exerciseName);
+      }
+      const effectiveUserId = targetUserId || "";
+      const exId = variables.exerciseId || (variables.exerciseName ? exercises.find(e => e.name.toLowerCase() === variables.exerciseName?.toLowerCase())?.id : "");
       if (exId) {
         workoutSessionStore.clearDraft(effectiveUserId, workoutDate, exId, variables.setIndex);
       }
@@ -190,7 +285,7 @@ export function useWorkoutMutations({
         weight: number;
         reps: number;
         setIndex: number;
-        setType?: 'working' | 'warmup' | 'drop';
+        setType?: "working" | "warmup" | "drop";
         rpe?: number | null;
       }[]
     ) => {
@@ -204,29 +299,34 @@ export function useWorkoutMutations({
         activeRoutineName
       );
 
-      const payloads = setsToLog.map((s) => {
-        const exerciseId = s.exerciseId || resolveExerciseId(s.exerciseName || '');
-        return {
-          exerciseId,
-          weight: s.weight,
-          reps: s.reps,
-          setIndex: s.setIndex,
-          setType: s.setType || 'working',
-          rpe: s.rpe ?? null,
-        };
-      });
+      const payloads = await Promise.all(
+        setsToLog.map(async (s) => {
+          const exerciseId = s.exerciseId && isUUID(s.exerciseId)
+            ? s.exerciseId
+            : await resolveExerciseId(s.exerciseName || "");
+          return {
+            exerciseId,
+            weight: s.weight,
+            reps: s.reps,
+            setIndex: s.setIndex,
+            setType: s.setType || "working",
+            rpe: s.rpe ?? null,
+          };
+        })
+      );
 
       return await batchInsertSets(supabase, workoutId, payloads);
     },
     onSuccess: (_data, variables) => {
-      const effectiveUserId = targetUserId || '';
+      const effectiveUserId = targetUserId || "";
       for (const s of variables) {
-        const exId = s.exerciseId || (s.exerciseName ? exercises.find(e => e.name.toLowerCase() === s.exerciseName?.toLowerCase())?.id : '');
+        const exId = s.exerciseId || (s.exerciseName ? exercises.find(e => e.name.toLowerCase() === s.exerciseName?.toLowerCase())?.id : "");
         if (exId) {
           workoutSessionStore.clearDraft(effectiveUserId, workoutDate, exId, s.setIndex);
         }
         if (s.exerciseName) {
           workoutSessionStore.clearDraft(effectiveUserId, workoutDate, s.exerciseName, s.setIndex);
+          clearExerciseError(s.exerciseName);
         }
         if (onDraftSuccess) {
           onDraftSuccess(s);
@@ -236,12 +336,19 @@ export function useWorkoutMutations({
         restTimerStore.start(90);
       }
     },
-    onError: (err: unknown) => {
+    onError: (err: unknown, variables) => {
       const message =
         err instanceof Error
           ? err.message
-          : (err as { message?: string })?.message || 'Failed to log sets. Please try again.';
-      setMutationError(message);
+          : (err as { message?: string })?.message || "Failed to log sets. Please try again.";
+      const affectedName = variables?.[0]?.exerciseName;
+      if (affectedName) {
+        setExerciseError(affectedName, message, () => {
+          batchLogSetsMutation.mutate(variables);
+        });
+      } else {
+        setMutationError(message);
+      }
     },
     onSettled: async () => {
       await invalidateWorkoutDerived(queryClient, targetUserId);
@@ -256,7 +363,7 @@ export function useWorkoutMutations({
       const message =
         err instanceof Error
           ? err.message
-          : (err as { message?: string })?.message || 'Failed to delete set. Please try again.';
+          : (err as { message?: string })?.message || "Failed to delete set. Please try again.";
       setMutationError(message);
     },
     onSettled: async () => {
@@ -268,5 +375,12 @@ export function useWorkoutMutations({
     logSetMutation,
     batchLogSetsMutation,
     deleteSetMutation,
+    resolveExerciseId,
+    mutationError: pageMutationError,
+    clearMutationError,
+    exerciseErrors,
+    clearExerciseError,
+    setExerciseError,
+    setMutationError,
   };
 }

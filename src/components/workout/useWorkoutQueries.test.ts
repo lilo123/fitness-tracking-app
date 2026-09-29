@@ -32,6 +32,10 @@ describe('useWorkoutQueries (P2 / W1 / W2 / W11 / W16 / W50 / L11)', () => {
             data: null,
             error: new Error('Exercises query network failure'),
           }),
+          range: vi.fn().mockResolvedValue({
+            data: null,
+            error: new Error('Exercises query network failure'),
+          }),
         };
         return b;
       }
@@ -66,6 +70,12 @@ describe('useWorkoutQueries (P2 / W1 / W2 / W11 / W16 / W50 / L11)', () => {
       eq: eqSpy,
       order: vi.fn().mockReturnValue({
         limit: vi.fn().mockResolvedValue({
+          data: [
+            { id: 'ex-1', name: 'Active Exercise', body_parts: ['Chest'], is_master: true, is_archived: false },
+          ],
+          error: null,
+        }),
+        range: vi.fn().mockResolvedValue({
           data: [
             { id: 'ex-1', name: 'Active Exercise', body_parts: ['Chest'], is_master: true, is_archived: false },
           ],
@@ -369,5 +379,50 @@ describe('useWorkoutQueries (P2 / W1 / W2 / W11 / W16 / W50 / L11)', () => {
     expect(restQueried).toBe(true);
     expect(result.current.customTemplates.some((t) => t.name === 'Fallback Routine')).toBe(true);
     warnSpy.mockRestore();
+  });
+  it('pages exercises with .range() to load complete 210-row catalog without silent truncation', async () => {
+    const mock210 = Array.from({ length: 210 }, (_, i) => ({
+      id: `ex-${i + 1}`,
+      name: i === 209 ? 'Zottman Curl' : `Exercise ${String(i + 1).padStart(3, '0')}`,
+      body_parts: ['Arms'],
+      is_master: true,
+    }));
+
+    vi.spyOn(supabase, 'from').mockImplementation((table: string) => {
+      if (table === 'exercises') {
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          order: vi.fn().mockReturnThis(),
+          range: vi.fn().mockImplementation((start: number, end: number) => {
+            const slice = mock210.slice(start, end + 1);
+            return Promise.resolve({ data: slice, error: null });
+          }),
+        } as any;
+      }
+      return {
+        select: vi.fn().mockReturnThis(),
+        or: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+        range: vi.fn().mockResolvedValue({ data: [], error: null }),
+        eq: vi.fn().mockReturnThis(),
+        gte: vi.fn().mockReturnThis(),
+        lte: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      } as any;
+    });
+
+    const { result } = renderHook(
+      () => useWorkoutQueries(targetUserId, '2026-09-27'),
+      { wrapper }
+    );
+
+    await waitFor(() => {
+      expect(result.current.exercisesFetched).toBe(true);
+    });
+
+    expect(result.current.exercises).toHaveLength(210);
+    expect(result.current.exercises[209].name).toBe('Zottman Curl');
   });
 });

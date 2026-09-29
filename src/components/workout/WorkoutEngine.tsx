@@ -38,17 +38,13 @@ export const WorkoutEngine: React.FC = () => {
   const { user, profile } = useAuth();
   const unit = useWeightUnit();
 
-  const targetUserId =
-    user?.id ||
-    (() => {
-      try { return JSON.parse(localStorage.getItem('cybergym_user') || '{}')?.id || ''; }
-      catch { return ''; }
-    })();
+  const targetUserId = user?.id || (() => {
+    try { return JSON.parse(localStorage.getItem('cybergym_user') || '{}')?.id || ''; } catch { return ''; }
+  })();
   const autoRestTimer = profile?.auto_rest_timer ?? (localStorage.getItem('cybergym_auto_rest_timer') !== 'false');
 
   const [showRoutineModal, setShowRoutineModal] = useState(false);
   const [isExercisePickerOpen, setIsExercisePickerOpen] = useState(false);
-  const [mutationError, setMutationError] = useState<string | null>(null);
 
   // Dialog States
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
@@ -145,14 +141,13 @@ export const WorkoutEngine: React.FC = () => {
   );
 
   // 4. Set Mutations
-  const { logSetMutation, batchLogSetsMutation, deleteSetMutation } = useWorkoutMutations({
-    targetUserId,
-    workoutDate,
-    activeRoutineName,
-    exercises,
-    autoRestTimer,
-    setMutationError,
-    onDraftSuccess: handleDraftSuccess,
+  const {
+    logSetMutation, batchLogSetsMutation, deleteSetMutation,
+    mutationError, clearMutationError, exerciseErrors, clearExerciseError,
+    setMutationError, setExerciseError,
+  } = useWorkoutMutations({
+    targetUserId, workoutDate, activeRoutineName, exercises,
+    customTemplates, autoRestTimer, onDraftSuccess: handleDraftSuccess,
   });
 
   // 5. Deferred Set Deletion with Undo Toast (W3, RD-7)
@@ -226,12 +221,8 @@ export const WorkoutEngine: React.FC = () => {
 
   // 8. Set Commit & Batch Log
   const { handleCommitSet, handleBatchLogExercise } = useWorkoutSetCommit({
-    exercises,
-    inputDraftsRef,
-    targetRepCountsRef,
-    logSetMutation,
-    batchLogSetsMutation,
-    setMutationError,
+    exercises, customTemplates, inputDraftsRef, targetRepCountsRef,
+    logSetMutation, batchLogSetsMutation, setMutationError, setExerciseError,
   });
 
   // 9. Finish Workout Review Sheet (W18)
@@ -320,7 +311,7 @@ export const WorkoutEngine: React.FC = () => {
       {/* Header controls & stats */}
       <WorkoutHeader
         mutationError={mutationError}
-        onClearMutationError={() => setMutationError(null)}
+        onClearMutationError={clearMutationError}
         activeRoutineName={activeRoutineName}
         onOpenRoutineModal={() => setShowRoutineModal(true)}
         workoutDate={workoutDate}
@@ -439,6 +430,8 @@ export const WorkoutEngine: React.FC = () => {
                     inputDrafts={inputDrafts}
                     isMutating={logSetMutation.isPending || batchLogSetsMutation.isPending}
                     isBatchPending={batchLogSetsMutation.isPending}
+                    error={exerciseErrors[exName]}
+                    onDismissError={clearExerciseError}
                     onToggleAccordion={toggleAccordion}
                     onAdjustTargetSets={adjustTargetSets}
                     onMoveExercise={moveExercise}

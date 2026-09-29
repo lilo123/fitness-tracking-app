@@ -265,4 +265,45 @@ describe('ExerciseCard', () => {
     const weightInput0 = screen.getByTestId('ghost-weight-0-0') as HTMLInputElement;
     expect(weightInput0.value).toBe('102.1');
   });
+  it('renders inline error alert with retry and dismiss buttons when error prop is provided', async () => {
+    const mockRetry = vi.fn();
+    const mockDismiss = vi.fn();
+
+    const { rerender, container } = renderWithAuth(
+      <ExerciseCard
+        {...defaultProps}
+        error={{ message: 'Exercise "Bench Press" cannot be resolved to a valid UUID.', onRetry: mockRetry }}
+        onDismissError={mockDismiss}
+      />
+    );
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toBeInTheDocument();
+    expect(alert).toHaveTextContent('Bench Press:');
+    expect(alert).toHaveTextContent('Exercise "Bench Press" cannot be resolved to a valid UUID.');
+
+    // Retry button triggers onRetry
+    const retryBtn = screen.getByTestId('retry-exercise-btn-0');
+    fireEvent.click(retryBtn);
+    expect(mockRetry).toHaveBeenCalledTimes(1);
+
+    // Dismiss button triggers onDismissError
+    const dismissBtn = screen.getByTestId('dismiss-exercise-error-btn-0');
+    fireEvent.click(dismissBtn);
+    expect(mockDismiss).toHaveBeenCalledWith('Bench Press');
+
+    // Also renders when collapsed
+    rerender(
+      <AuthContext.Provider value={createAuthContextValue('lb')}>
+        <ExerciseCard
+          {...defaultProps}
+          isExpanded={false}
+          error={{ message: 'Exercise "Bench Press" cannot be resolved to a valid UUID.', onRetry: mockRetry }}
+          onDismissError={mockDismiss}
+        />
+      </AuthContext.Provider>
+    );
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
 });

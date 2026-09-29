@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import type { WorkoutSet } from '../../types/database';
-import { ChevronDown, Trophy, Check, ArrowUp, ArrowDown, Trash2 } from 'lucide-react';
+import { ChevronDown, Trophy, Check, ArrowUp, ArrowDown, Trash2, AlertCircle, RotateCcw } from 'lucide-react';
 import { SetRow } from './SetRow';
 import { Card } from '../common/Card';
 import { Chip } from '../common/Chip';
@@ -20,6 +20,8 @@ export interface ExerciseCardProps {
   inputDrafts: Record<string, { weight?: string; reps?: string }>;
   isMutating: boolean;
   isBatchPending: boolean;
+  error?: { message: string; onRetry?: () => void } | null;
+  onDismissError?: (exName: string) => void;
   onToggleAccordion: (exName: string) => void;
   onAdjustTargetSets: (exName: string, delta: number) => void;
   onMoveExercise: (index: number, direction: number) => void;
@@ -87,6 +89,8 @@ function areExerciseCardPropsEqual(prev: ExerciseCardProps, next: ExerciseCardPr
     prev.isExpanded !== next.isExpanded ||
     prev.isMutating !== next.isMutating ||
     prev.isBatchPending !== next.isBatchPending ||
+    prev.error?.message !== next.error?.message ||
+    prev.onDismissError !== next.onDismissError ||
     prev.onToggleAccordion !== next.onToggleAccordion ||
     prev.onAdjustTargetSets !== next.onAdjustTargetSets ||
     prev.onMoveExercise !== next.onMoveExercise ||
@@ -142,6 +146,8 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
     inputDrafts,
     isMutating,
     isBatchPending,
+    error,
+    onDismissError,
     onToggleAccordion,
     onAdjustTargetSets,
     onMoveExercise,
@@ -369,6 +375,46 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
             );
           })}
 
+          {error && (
+            <div
+              role="alert"
+              data-testid={`exercise-card-error-${exIndex}`}
+              className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs my-1.5"
+            >
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" aria-hidden="true" />
+                <span className="break-words">
+                  <span className="font-bold text-rose-200">{exName}: </span>
+                  {error.message}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {error.onRetry && (
+                  <button
+                    type="button"
+                    onClick={error.onRetry}
+                    data-testid={`retry-exercise-btn-${exIndex}`}
+                    className="flex items-center gap-1 px-3 py-1.5 min-h-[44px] min-w-[44px] text-xs font-bold text-rose-200 bg-rose-500/20 hover:bg-rose-500/30 active:scale-95 border border-rose-500/40 rounded-xl transition touch-manipulation cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>Retry</span>
+                  </button>
+                )}
+                {onDismissError && (
+                  <button
+                    type="button"
+                    onClick={() => onDismissError(exName)}
+                    aria-label={`Dismiss error for ${exName}`}
+                    data-testid={`dismiss-exercise-error-btn-${exIndex}`}
+                    className="flex items-center justify-center min-h-[44px] min-w-[44px] text-rose-400 hover:text-white transition touch-manipulation cursor-pointer text-xs font-bold"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {!isCompleted && (
             <div className="flex justify-end pt-1">
               <button
@@ -383,6 +429,46 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {!isExpanded && error && (
+        <div
+          role="alert"
+          data-testid={`exercise-card-error-${exIndex}`}
+          className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs my-1"
+        >
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" aria-hidden="true" />
+            <span className="break-words">
+              <span className="font-bold text-rose-200">{exName}: </span>
+              {error.message}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {error.onRetry && (
+              <button
+                type="button"
+                onClick={error.onRetry}
+                data-testid={`retry-exercise-btn-${exIndex}`}
+                className="flex items-center gap-1 px-3 py-1.5 min-h-[44px] min-w-[44px] text-xs font-bold text-rose-200 bg-rose-500/20 hover:bg-rose-500/30 active:scale-95 border border-rose-500/40 rounded-xl transition touch-manipulation cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Retry</span>
+              </button>
+            )}
+            {onDismissError && (
+              <button
+                type="button"
+                onClick={() => onDismissError(exName)}
+                aria-label={`Dismiss error for ${exName}`}
+                data-testid={`dismiss-exercise-error-btn-${exIndex}`}
+                className="flex items-center justify-center min-h-[44px] min-w-[44px] text-rose-400 hover:text-white transition touch-manipulation cursor-pointer text-xs font-bold"
+              >
+                ✕
+              </button>
+            )}
+          </div>
         </div>
       )}
     </Card>
