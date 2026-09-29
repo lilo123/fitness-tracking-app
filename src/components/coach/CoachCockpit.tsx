@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useCoach } from '../../hooks/useCoach';
-import type { Exercise, RoutineTemplate, UserProfile } from '../../types/database';
+import type { Exercise, RoutineTemplate, UserProfile, NutritionLog } from '../../types/database';
 import { DEFAULT_EXERCISES_LIST, normalizeDateStr } from '../../utils/ghostSets';
 import { getDayBounds } from '../../utils/date';
 import { WORKOUT_WITH_SETS_PROJECTION, COACH_SETS_PER_WORKOUT_LIMIT, warnIfCoachSetsTruncated } from '../workout/useWorkoutQueries';
@@ -76,6 +76,7 @@ export const CoachCockpit: React.FC = () => {
   } = useQuery({
     queryKey: ['routine_templates', user?.id, 'coach'],
     queryFn: async () => {
+      // payload-gate: accepted-list — standing watch item W-1, measured 54223 B on /coach
       const { data, error } = await supabase.from('routine_templates')
         .select('id, user_id, name, is_master, assigned_to, days_of_week, created_at, exercises:template_exercises(id, template_id, exercise_id, order_index, target_sets, target_reps)')
         .order('created_at', { ascending: false }).limit(100);
@@ -161,7 +162,7 @@ export const CoachCockpit: React.FC = () => {
         .order('logged_at', { ascending: false })
         .limit(rowLimit);
       if (error) throw error;
-      return (data || []) as any[];
+      return (data || []) as NutritionLog[];
     },
   });
 
@@ -231,7 +232,7 @@ export const CoachCockpit: React.FC = () => {
   };
 
   const handleConfirmDisconnect = async () => {
-    if (!selectedAthleteId) return;
+    if (!selectedAthleteId || isDisconnecting) return;
     setIsDisconnecting(true);
     setDisconnectStatus(null);
     try {
@@ -252,7 +253,7 @@ export const CoachCockpit: React.FC = () => {
 
   const isCoachReadError = isExercisesError || isTemplatesError || isAthleteNutritionError || isAthleteProfileError;
   const coachReadError = exercisesError || templatesError || athleteNutritionError || athleteProfileError;
-  const coachReadErrorMessage = coachReadError instanceof Error ? coachReadError.message : typeof coachReadError === 'string' ? coachReadError : (coachReadError as any)?.message || 'Unable to load coach data. Please try again.';
+  const coachReadErrorMessage = coachReadError instanceof Error ? coachReadError.message : typeof coachReadError === 'string' ? coachReadError : (coachReadError as unknown as { message?: string })?.message || 'Unable to load coach data. Please try again.';
   const handleRetryCoachRead = () => { void refetchExercises(); void refetchTemplates(); void refetchAthleteNutrition(); void refetchAthleteProfile(); };
 
   return (

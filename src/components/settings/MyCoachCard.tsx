@@ -15,6 +15,12 @@ import { Skeleton } from '../common/Skeleton';
 import { Button } from '../common/Button';
 import { formatShortDate } from '../../utils/date';
 
+interface CoachJoinedInfo {
+  username?: string | null;
+  email?: string | null;
+  coach_code?: string | null;
+}
+
 interface MyCoachCardProps {
   profile: UserProfile | null;
   refreshProfile?: () => Promise<void>;
@@ -66,7 +72,7 @@ export const MyCoachCard: React.FC<MyCoachCardProps> = ({
       const { data, error } = await supabase.rpc('link_to_coach', { input_code: trimmed });
       if (error) throw error;
       if (data && (data as any).success === false) {
-        throw new Error((data as any).error || 'Failed to link to coach.');
+        throw new Error((data as { error?: string } | null)?.error || 'Failed to link to coach.');
       }
       setLinkStatus({ type: 'success', message: 'Successfully linked to coach!' });
       setLinkCodeInput('');
@@ -78,14 +84,16 @@ export const MyCoachCard: React.FC<MyCoachCardProps> = ({
 
       await refetchCoachLink();
       if (refreshProfile) await refreshProfile();
-    } catch (err: any) {
-      setLinkStatus({ type: 'error', message: err?.message || 'Failed to link to coach.' });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : (err as { message?: string })?.message || 'Failed to link to coach.';
+      setLinkStatus({ type: 'error', message });
     } finally {
       setIsLinking(false);
     }
   };
 
   const handleConfirmDisconnect = async () => {
+    if (isDisconnecting) return;
     setIsDisconnectConfirmOpen(false);
     setIsDisconnecting(true);
     setLinkStatus(null);
@@ -101,14 +109,18 @@ export const MyCoachCard: React.FC<MyCoachCardProps> = ({
 
       await refetchCoachLink();
       if (refreshProfile) await refreshProfile();
-    } catch (err: any) {
-      setLinkStatus({ type: 'error', message: err?.message || 'Failed to disconnect from coach.' });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : (err as { message?: string })?.message || 'Failed to disconnect from coach.';
+      setLinkStatus({ type: 'error', message });
     } finally {
       setIsDisconnecting(false);
     }
   };
 
-  const coachName = (coachLink?.coach as any)?.username || (coachLink?.coach as any)?.email || 'your coach';
+  const coachData = (
+    Array.isArray(coachLink?.coach) ? coachLink.coach[0] : coachLink?.coach
+  ) as CoachJoinedInfo | null | undefined;
+  const coachName = coachData?.username || coachData?.email || 'your coach';
 
   return (
     <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-5 shadow-2xl space-y-4">
@@ -158,10 +170,10 @@ export const MyCoachCard: React.FC<MyCoachCardProps> = ({
                 Assigned Coach
               </div>
               <div className="text-sm font-bold text-white mt-0.5" data-testid="assigned-coach-name">
-                {(coachLink.coach as any)?.username || (coachLink.coach as any)?.email || 'Coach'}
+                {coachData?.username || coachData?.email || 'Coach'}
               </div>
               <div className="text-xs text-zinc-400 tabular-nums">
-                Code: <span className="text-cyan-400 font-bold tracking-wider">{(coachLink.coach as any)?.coach_code || 'N/A'}</span>
+                Code: <span className="text-cyan-400 font-bold tracking-wider">{coachData?.coach_code || 'N/A'}</span>
                 {coachLink.linked_at && (
                   <span className="ml-2 text-zinc-400">
                     • Linked {formatShortDate(coachLink.linked_at)}

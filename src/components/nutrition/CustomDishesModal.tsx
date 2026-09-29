@@ -395,11 +395,11 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 shrink-0">
                     <button
                       type="button"
                       onClick={() => onOpenEditDishModal(dish)}
-                      className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-cyan-300 hover:bg-zinc-800 rounded-lg transition touch-manipulation relative before:absolute before:inset-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:min-w-[44px] before:min-h-[44px] before:content-['']"
+                      className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-cyan-300 hover:bg-zinc-800 rounded-lg transition touch-manipulation"
                       title="Edit"
                     >
                       <Edit2 className="w-4 h-4" />
@@ -409,7 +409,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
                       onClick={() => {
                         onDeleteDish(dish.id);
                       }}
-                      className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition touch-manipulation relative before:absolute before:inset-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:min-w-[44px] before:min-h-[44px] before:content-['']"
+                      className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition touch-manipulation"
                       title="Delete"
                     >
                       <Trash2 className="w-4 h-4" />

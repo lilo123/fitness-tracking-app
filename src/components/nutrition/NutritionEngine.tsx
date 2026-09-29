@@ -94,8 +94,9 @@ export const NutritionEngine: React.FC = () => {
     commit: async (log) => {
       await deleteMutation.mutateAsync(log.id);
     },
-    onError: (err: any) => {
-      setStatus('Failed to delete meal: ' + (err?.message || 'Error deleting meal'));
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : (err as { message?: string })?.message || 'Error deleting meal';
+      setStatus('Failed to delete meal: ' + msg);
       setIsError(true);
     },
   });
@@ -106,8 +107,9 @@ export const NutritionEngine: React.FC = () => {
     commit: async (dish) => {
       await deleteCustomDishMutation.mutateAsync(dish.id);
     },
-    onError: (err: any) => {
-      setStatus('Failed to delete dish: ' + (err?.message || 'Error deleting dish'));
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : (err as { message?: string })?.message || 'Error deleting dish';
+      setStatus('Failed to delete dish: ' + msg);
       setIsError(true);
     },
   });
@@ -144,17 +146,13 @@ export const NutritionEngine: React.FC = () => {
 
   const displayedDailyTotals = useMemo(() => {
     if (!deferredMealDelete.pending) return dailyTotals;
-    return displayedTodayLogs.reduce(
-      (acc, log) => {
-        acc.calories += Number(log.calories) || 0;
-        acc.protein += Number(log.protein) || 0;
-        acc.carbs += Number(log.carbs) || 0;
-        acc.fat += Number(log.fat) || 0;
-        acc.fiber += Number(log.fiber) || 0;
-        return acc;
-      },
-      { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
-    );
+    return displayedTodayLogs.reduce((acc, log) => ({
+      calories: acc.calories + (Number(log.calories) || 0),
+      protein: acc.protein + (Number(log.protein) || 0),
+      carbs: acc.carbs + (Number(log.carbs) || 0),
+      fat: acc.fat + (Number(log.fat) || 0),
+      fiber: acc.fiber + (Number(log.fiber) || 0),
+    }), { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 });
   }, [dailyTotals, displayedTodayLogs, deferredMealDelete.pending]);
 
   const displayedRemainingFuel = useMemo(() => {
@@ -166,7 +164,6 @@ export const NutritionEngine: React.FC = () => {
   const isLogsSuccess = logsQuery?.state.status === 'success';
   const isLogsPending =
     Boolean(targetUserId) && !isNutritionLogsError && !isLogsSuccess && nutritionLogs.length === 0;
-
 
   const ai = useNutritionAi({
     customDishes,
@@ -356,8 +353,6 @@ export const NutritionEngine: React.FC = () => {
         />
       ) : null}
 
-
-
       {stagedMeal ? (
         <div {...cardFocusProps}>
           <StagedMealCard
@@ -509,24 +504,15 @@ export const NutritionEngine: React.FC = () => {
         isOpen={dishModal.showDishModal}
         onClose={dishModal.handleCloseDishModal}
         editingDish={dishModal.editingDish}
-        dishModalKind={dishModal.dishModalKind}
-        setDishModalKind={dishModal.setDishModalKind}
-        dishModalName={dishModal.dishModalName}
-        setDishModalName={dishModal.setDishModalName}
-        dishModalCalories={dishModal.dishModalCalories}
-        setDishModalCalories={dishModal.setDishModalCalories}
-        dishModalProtein={dishModal.dishModalProtein}
-        setDishModalProtein={dishModal.setDishModalProtein}
-        dishModalCarbs={dishModal.dishModalCarbs}
-        setDishModalCarbs={dishModal.setDishModalCarbs}
-        dishModalFat={dishModal.dishModalFat}
-        setDishModalFat={dishModal.setDishModalFat}
-        dishModalFiber={dishModal.dishModalFiber}
-        setDishModalFiber={dishModal.setDishModalFiber}
-        dishModalNotes={dishModal.dishModalNotes}
-        setDishModalNotes={dishModal.setDishModalNotes}
-        dishModalItems={dishModal.dishModalItems}
-        setDishModalItems={dishModal.setDishModalItems}
+        dishModalKind={dishModal.dishModalKind} setDishModalKind={dishModal.setDishModalKind}
+        dishModalName={dishModal.dishModalName} setDishModalName={dishModal.setDishModalName}
+        dishModalCalories={dishModal.dishModalCalories} setDishModalCalories={dishModal.setDishModalCalories}
+        dishModalProtein={dishModal.dishModalProtein} setDishModalProtein={dishModal.setDishModalProtein}
+        dishModalCarbs={dishModal.dishModalCarbs} setDishModalCarbs={dishModal.setDishModalCarbs}
+        dishModalFat={dishModal.dishModalFat} setDishModalFat={dishModal.setDishModalFat}
+        dishModalFiber={dishModal.dishModalFiber} setDishModalFiber={dishModal.setDishModalFiber}
+        dishModalNotes={dishModal.dishModalNotes} setDishModalNotes={dishModal.setDishModalNotes}
+        dishModalItems={dishModal.dishModalItems} setDishModalItems={dishModal.setDishModalItems}
         onSaveDish={dishModal.handleSaveCustomDishModal}
         onDeleteDish={dishModal.handleDeleteCustomDish}
         isSaving={saveCustomDishMutation.isPending}

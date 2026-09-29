@@ -562,6 +562,88 @@ describe('CustomDishesModal', () => {
     fireEvent.change(textarea, { target: { value: 'Updated note on dish' } });
     expect(setDishModalNotes).toHaveBeenCalledWith('Updated note on dish');
   });
+
+  it('RD-7: invokes onDeleteDish on row delete, and when deletion fails in parent, dish remains rendered in saved dishes list', () => {
+    const onDeleteDish = vi.fn();
+    const dishes = [
+      {
+        id: 'dish-keep-1',
+        user_id: 'user-1',
+        name: 'Protein Bowl',
+        calories: 400,
+        protein: 30,
+        carbs: 45,
+        fat: 10,
+        fiber: 5,
+        kind: 'food' as const,
+        use_count: 1,
+        notes: null,
+        created_at: '2026-09-01T12:00:00Z',
+      },
+    ];
+
+    const { rerender } = render(
+      <CustomDishesModal
+        isOpen={true}
+        onClose={vi.fn()}
+        editingDish={null}
+        dishModalName=""
+        setDishModalName={vi.fn()}
+        dishModalCalories=""
+        setDishModalCalories={vi.fn()}
+        dishModalProtein=""
+        setDishModalProtein={vi.fn()}
+        dishModalCarbs=""
+        setDishModalCarbs={vi.fn()}
+        dishModalFat=""
+        setDishModalFat={vi.fn()}
+        dishModalFiber=""
+        setDishModalFiber={vi.fn()}
+        dishModalItems={[]}
+        setDishModalItems={vi.fn()}
+        onSaveDish={vi.fn()}
+        onDeleteDish={onDeleteDish}
+        isSaving={false}
+        isDeleting={false}
+        customDishes={dishes}
+        onOpenEditDishModal={vi.fn()}
+      />
+    );
+
+    const deleteBtn = screen.getByTitle('Delete');
+    fireEvent.click(deleteBtn);
+    expect(onDeleteDish).toHaveBeenCalledWith('dish-keep-1');
+
+    rerender(
+      <CustomDishesModal
+        isOpen={true}
+        onClose={vi.fn()}
+        editingDish={null}
+        dishModalName=""
+        setDishModalName={vi.fn()}
+        dishModalCalories=""
+        setDishModalCalories={vi.fn()}
+        dishModalProtein=""
+        setDishModalProtein={vi.fn()}
+        dishModalCarbs=""
+        setDishModalCarbs={vi.fn()}
+        dishModalFat=""
+        setDishModalFat={vi.fn()}
+        dishModalFiber=""
+        setDishModalFiber={vi.fn()}
+        dishModalItems={[]}
+        setDishModalItems={vi.fn()}
+        onSaveDish={vi.fn()}
+        onDeleteDish={onDeleteDish}
+        isSaving={false}
+        isDeleting={false}
+        customDishes={dishes}
+        onOpenEditDishModal={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Protein Bowl')).toBeDefined();
+  });
 });
 
 

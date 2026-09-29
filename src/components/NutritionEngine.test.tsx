@@ -4686,6 +4686,114 @@ Total Fiber: 1 g`;
       expect(mockDelete).not.toHaveBeenCalled();
     });
 
+    it('RD-7: meal log DELETE failure on expiry restores item and displays error banner', async () => {
+      vi.useFakeTimers();
+      const mockDelete = vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: new Error('Network error deleting meal') }),
+      });
+
+      const todayStr = getLocalDateStr(new Date());
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'nutrition_logs') {
+          const b = createSupabaseBuilder('nutrition_logs', {
+            data: [
+              {
+                id: 'log-def-fail-1',
+                user_id: 'test-user-123',
+                food_name: 'Overnight Oats',
+                meal_type: 'breakfast',
+                calories: 350,
+                protein: 15,
+                carbs: 45,
+                fat: 10,
+                fiber: 8,
+                serving_size: 1,
+                serving_unit: 'serving',
+                logged_at: new Date().toISOString(),
+                logged_date: todayStr,
+                created_at: new Date().toISOString(),
+              },
+            ],
+            error: null,
+          });
+          b.delete = mockDelete;
+          return b;
+        }
+        return createSupabaseBuilder(table, { data: [], error: null });
+      });
+
+      renderComponent();
+
+      await vi.waitFor(() => {
+        expect(screen.getByText('Overnight Oats')).toBeDefined();
+      });
+
+      const actionsBtn = screen.getByTestId('meal-actions-log-def-fail-1');
+      fireEvent.click(actionsBtn);
+      const deleteBtn = screen.getByTestId('delete-meal-log-def-fail-1');
+      fireEvent.click(deleteBtn);
+
+      expect(screen.queryByTestId('meal-log-item')).toBeNull();
+      expect(screen.getByText('Meal log removed')).toBeDefined();
+
+      await act(async () => {
+        vi.advanceTimersByTime(6000);
+      });
+
+      await vi.waitFor(() => {
+        expect(screen.getByText('Overnight Oats')).toBeDefined();
+        const statusBanner = screen.getByTestId('status-message');
+        expect(statusBanner).toBeDefined();
+        expect(statusBanner.textContent).toContain('Failed to delete meal');
+      });
+    });
+
+    it('RD-7: custom dish DELETE failure on expiry restores item and displays error banner', async () => {
+      vi.useFakeTimers();
+      const mockDelete = vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: new Error('Network error deleting dish') }),
+      });
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'custom_dishes') {
+          const b = createSupabaseBuilder('custom_dishes', {
+            data: [
+              { id: 'dish-fail-1', name: 'Power Bowl', calories: 450, protein: 35, carbs: 40, fat: 12, fiber: 7 },
+            ],
+            error: null,
+          });
+          b.delete = mockDelete;
+          return b;
+        }
+        return createSupabaseBuilder(table, { data: [], error: null });
+      });
+
+      renderComponent();
+
+      await vi.waitFor(() => {
+        expect(screen.getByTestId('edit-dish-btn-dish-fail-1')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByTestId('edit-dish-btn-dish-fail-1'));
+
+      await vi.waitFor(() => {
+        expect(screen.getByTestId('modal-delete-dish-btn')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByTestId('modal-delete-dish-btn'));
+
+      await act(async () => {
+        vi.advanceTimersByTime(6000);
+      });
+
+      await vi.waitFor(() => {
+        expect(screen.getByTestId('edit-dish-btn-dish-fail-1')).toBeDefined();
+        const statusBanner = screen.getByTestId('status-message');
+        expect(statusBanner).toBeDefined();
+        expect(statusBanner.textContent).toContain('Failed to delete dish');
+      });
+    });
+
     it('STD-CMP-10: renders empty state only after query succeeds with 0 rows, and retry button on error', async () => {
       (supabase.from as any).mockImplementation((table: string) => {
         if (table === 'nutrition_logs') {
