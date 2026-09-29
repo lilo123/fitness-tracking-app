@@ -18,20 +18,15 @@ import { RoutinePickerModal } from './RoutinePickerModal';
 import { RestDayView } from './RestDayView';
 import { ExerciseCard } from './ExerciseCard';
 import { StatusBanner } from '../common/StatusBanner';
-import { UndoToast } from '../common/UndoToast';
-import { ConfirmDialog } from '../common/ConfirmDialog';
 import { Skeleton } from '../common/Skeleton';
-import { EditSetSheet } from '../sets/EditSetSheet';
 import { useSetDeletion } from './useSetDeletion';
 import { useExerciseRemoval } from './useExerciseRemoval';
 import { useWorkoutUrlParams } from './useWorkoutUrlParams';
 import { useWorkoutEditSheet } from './useWorkoutEditSheet';
 import { useWorkoutSetCommit } from './useWorkoutSetCommit';
 import { useWorkoutFinishReview } from './useWorkoutFinishReview';
-import { FinishReviewSheet } from './FinishReviewSheet';
-import { RemoveExerciseSheet } from './RemoveExerciseSheet';
 import { WorkoutEmptyState } from './WorkoutEmptyState';
-import { ExercisePicker } from '../exercises/ExercisePicker';
+import { WorkoutDialogs } from './WorkoutDialogs';
 import type { CatalogExercise } from '../../lib/exercises';
 
 export const WorkoutEngine: React.FC = () => {
@@ -279,6 +274,16 @@ export const WorkoutEngine: React.FC = () => {
     }
   }, [isScheduledRoutineDirty, handleReloadScheduledRoutine]);
 
+  const handleConfirmClearWorkout = useCallback(() => {
+    setIsClearConfirmOpen(false);
+    executeClearWorkout();
+  }, [executeClearWorkout]);
+
+  const handleConfirmReloadRoutine = useCallback(() => {
+    setIsReloadConfirmOpen(false);
+    handleReloadScheduledRoutine();
+  }, [handleReloadScheduledRoutine]);
+
   const handleAddExercisesFromPicker = useCallback(
     (chosen: CatalogExercise[]) => {
       if (!chosen || chosen.length === 0) return;
@@ -491,95 +496,38 @@ export const WorkoutEngine: React.FC = () => {
         </>
       )}
 
-      {/* Edit Set Sheet (W3, W17) */}
-      <EditSetSheet
-        isOpen={isEditSheetOpen}
-        set={editingSet}
+      {/* Workout Dialogs, Sheets & Undo Toasts */}
+      <WorkoutDialogs
+        isEditSheetOpen={isEditSheetOpen}
+        editingSet={editingSet}
         exercises={exercises}
         targetUserId={targetUserId}
-        onClose={handleCloseEditSheet}
-        onSaved={handleSavedEditSet}
+        onCloseEditSheet={handleCloseEditSheet}
+        onSavedEditSet={handleSavedEditSet}
         onDeleteRequested={handleDeleteRequested}
-      />
-
-      {/* Remove Exercise Sheet (W8) */}
-      <RemoveExerciseSheet
-        isOpen={removeSheetState.isOpen}
-        onClose={handleCloseRemoveSheet}
-        exerciseName={removeSheetState.exerciseName}
-        loggedSetsCount={removeSheetState.loggedSetsCount}
-        onRemoveAndDeleteSets={handleConfirmRemoveAndDelete}
+        removeSheetState={removeSheetState}
+        onCloseRemoveSheet={handleCloseRemoveSheet}
+        onConfirmRemoveAndDelete={handleConfirmRemoveAndDelete}
         onKeepSetsAndCollapse={handleKeepSetsAndCollapse}
-        isDeleting={deleteSetMutation.isPending}
-      />
-
-      {/* Finish Review Sheet (W18) */}
-      <FinishReviewSheet
-        isOpen={isFinishReviewOpen}
-        onClose={() => setIsFinishReviewOpen(false)}
-        pendingSets={pendingReviewSets}
+        isDeletingSet={deleteSetMutation.isPending}
+        isFinishReviewOpen={isFinishReviewOpen}
+        onCloseFinishReview={() => setIsFinishReviewOpen(false)}
+        pendingReviewSets={pendingReviewSets}
         onConfirmFinishWithSets={handleConfirmFinishWithSets}
         onFinishWithoutSets={handleFinishWithoutSets}
-        isSubmitting={batchLogSetsMutation.isPending}
-      />
-
-      {/* Clear Workout Confirm Dialog (W9) */}
-      <ConfirmDialog
-        isOpen={isClearConfirmOpen}
-        onCancel={() => setIsClearConfirmOpen(false)}
-        onConfirm={() => {
-          setIsClearConfirmOpen(false);
-          executeClearWorkout();
-        }}
-        title="Clear workout?"
-        consequence="Logged sets stay in history. All exercises and drafts will be cleared from today's workout."
-        confirmLabel="Clear workout"
-        cancelLabel="Cancel"
-        isDestructive={true}
-        testId="clear-workout-dialog"
-      />
-
-      {/* Reload Scheduled Routine Confirm Dialog (W10) */}
-      <ConfirmDialog
-        isOpen={isReloadConfirmOpen}
-        onCancel={() => setIsReloadConfirmOpen(false)}
-        onConfirm={() => {
-          setIsReloadConfirmOpen(false);
-          handleReloadScheduledRoutine();
-        }}
-        title="Reload scheduled routine?"
-        consequence="This will discard your customized exercises and any unlogged set drafts."
-        confirmLabel="Reload routine"
-        cancelLabel="Cancel"
-        isDestructive={true}
-        testId="reload-routine-dialog"
-      />
-
-      {/* Deferred Delete Undo Toasts (W3, W8, RD-7) */}
-      {exerciseRemovalToast && (
-        <UndoToast
-          toast={exerciseRemovalToast}
-          onDismiss={() => {}}
-          testId="quick-log-toast"
-          stackIndex={deleteToast ? 1 : 0}
-        />
-      )}
-      {deleteToast && (
-        <UndoToast
-          toast={deleteToast}
-          onDismiss={() => {}}
-          testId="quick-log-toast"
-          stackIndex={0}
-        />
-      )}
-
-      {/* Exercise Picker Sheet (P4-W2) */}
-      <ExercisePicker
-        isOpen={isExercisePickerOpen}
-        onClose={() => setIsExercisePickerOpen(false)}
-        onAdd={handleAddExercisesFromPicker}
+        isSubmittingFinishReview={batchLogSetsMutation.isPending}
+        isClearConfirmOpen={isClearConfirmOpen}
+        onCancelClearConfirm={() => setIsClearConfirmOpen(false)}
+        onConfirmClearWorkout={handleConfirmClearWorkout}
+        isReloadConfirmOpen={isReloadConfirmOpen}
+        onCancelReloadConfirm={() => setIsReloadConfirmOpen(false)}
+        onConfirmReloadRoutine={handleConfirmReloadRoutine}
+        exerciseRemovalToast={exerciseRemovalToast}
+        deleteToast={deleteToast}
+        isExercisePickerOpen={isExercisePickerOpen}
+        onCloseExercisePicker={() => setIsExercisePickerOpen(false)}
+        onAddExercisesFromPicker={handleAddExercisesFromPicker}
         activeExerciseNames={activeExercises}
-        targetUserId={targetUserId}
         userLogs={userLogs}
       />
     </div>
