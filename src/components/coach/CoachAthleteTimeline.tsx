@@ -273,7 +273,7 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
                                   onClick={() => onToggleExercise(exKey)}
                                   data-testid={`toggle-exercise-${g.exerciseId}`}
                                   aria-expanded={isExpanded}
-                                  className="w-full flex items-center justify-between font-bold text-zinc-300 hover:text-white transition cursor-pointer text-left touch-manipulation"
+                                  className="w-full min-h-[44px] flex items-center justify-between font-bold text-zinc-300 hover:text-white transition cursor-pointer text-left touch-manipulation"
                                 >
                                   <span className="truncate max-w-[160px] sm:max-w-xs">
                                     {g.exerciseName}
@@ -299,7 +299,7 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
                                         key={s.id || sIdx}
                                         className="flex items-center justify-between text-xs text-zinc-400 tabular-nums px-2 py-1 bg-zinc-900/60 rounded-lg"
                                       >
-                                        <span className="text-zinc-400 font-medium">
+                                        <span className="text-zinc-400 font-normal">
                                           Set {s.set_index ?? s.set_order ?? sIdx + 1}
                                         </span>
                                         <span className="text-cyan-300 font-bold">
@@ -361,7 +361,7 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
                           key={n.id}
                           className="bg-zinc-950/80 rounded-lg px-2.5 py-1.5 flex items-center justify-between text-xs"
                         >
-                          <span className="text-zinc-300 font-medium truncate max-w-[160px] sm:max-w-xs">
+                          <span className="text-zinc-300 font-normal truncate max-w-[160px] sm:max-w-xs">
                             {n.food_name}
                           </span>
                           <span className="text-amber-400 tabular-nums text-xs font-bold shrink-0">

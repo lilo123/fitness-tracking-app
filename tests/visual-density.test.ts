@@ -6180,8 +6180,7 @@ test.describe("P8 Route-Wide Density & Tap Grid", () => {
       const firstDishRow = savedDishRows.first();
       const dishBox = await firstDishRow.boundingBox();
       expect(dishBox, "Dish row bounding box").toBeTruthy();
-      expect(dishBox!.height, "Dish row height >= 44px").toBeGreaterThanOrEqual(44);
-      expect(dishBox!.height, "Dish row height <= 76px (no layout growth)").toBeLessThanOrEqual(76);
+      expect(Math.round(dishBox!.height), "Dish row height at 320px is 76px").toBe(76);
 
       // Verify Edit and Delete buttons inside the dish row have 44px hit targets
       const editBtn = firstDishRow.locator("button").first();

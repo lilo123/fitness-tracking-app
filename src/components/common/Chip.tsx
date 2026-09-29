@@ -49,7 +49,7 @@ export const Chip: React.FC<ChipProps> = ({
         aria-pressed={selected}
         disabled={disabled}
         onClick={onClick}
-        className={`${baseClasses} relative before:absolute before:-inset-y-2.5 before:-inset-x-1 before:content-[''] cursor-pointer touch-manipulation active:scale-95 motion-reduce:transition-none motion-reduce:transform-none disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+        className={`${baseClasses} relative before:absolute before:inset-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:min-w-[44px] before:min-h-[44px] before:content-[''] cursor-pointer touch-manipulation active:scale-95 motion-reduce:transition-none motion-reduce:transform-none disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
       >
         {icon && <span className="shrink-0 [&>svg]:w-3.5 [&>svg]:h-3.5">{icon}</span>}
         <span className="truncate">{label}</span>

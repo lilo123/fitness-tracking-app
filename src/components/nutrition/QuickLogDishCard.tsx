@@ -57,7 +57,7 @@ export const QuickLogDishCard: React.FC<QuickLogDishCardProps> = memo(({
             ? `Add ${dish.name} to staged meal, ${dish.calories ?? 0} calories, ${dish.protein ?? 0} grams protein${hasNote ? ', note attached' : ''}`
             : `Stage ${dish.name}, ${dish.calories ?? 0} calories, ${dish.protein ?? 0} grams protein${hasNote ? ', note attached' : ''}`
         }
-        className="flex items-center gap-2.5 min-w-0 flex-1 text-left min-h-[40px] h-10 outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 rounded-xl touch-manipulation"
+        className="flex items-center gap-2.5 min-w-0 flex-1 text-left min-h-[40px] h-10 outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 rounded-xl touch-manipulation relative before:absolute before:right-0 before:bottom-0 before:min-w-[44px] before:min-h-[44px] before:content-['']"
       >
         <div className="w-7 h-7 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0 group-hover:border-cyan-500/30 transition-colors">
           {getDishIcon(dish.name)}
@@ -104,7 +104,7 @@ export const QuickLogDishCard: React.FC<QuickLogDishCardProps> = memo(({
             title="Edit Custom Dish"
             aria-label={`Edit ${dish.name}`}
             data-testid={`edit-dish-btn-${dish.id}`}
-            className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-xl text-zinc-400 hover:text-cyan-300 hover:bg-zinc-800 transition flex items-center justify-center touch-manipulation"
+            className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-xl text-zinc-400 hover:text-cyan-300 hover:bg-zinc-800 transition flex items-center justify-center touch-manipulation relative before:absolute before:right-0 before:bottom-0 before:min-w-[44px] before:min-h-[44px] before:content-['']"
           >
             <Edit2 className="w-3.5 h-3.5" />
           </button>
@@ -115,7 +115,7 @@ export const QuickLogDishCard: React.FC<QuickLogDishCardProps> = memo(({
           title={isStaged ? 'Add to staged meal' : '1-Tap Log Meal'}
           aria-label={isStaged ? `Add ${dish.name} to staged meal` : `Quick log 1 serving of ${dish.name}`}
           data-testid={`quick-log-btn-${dish.id}`}
-          className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-xl bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30 flex items-center justify-center transition active:scale-95 touch-manipulation"
+          className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-xl bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30 flex items-center justify-center transition active:scale-95 touch-manipulation relative before:absolute before:right-0 before:bottom-0 before:min-w-[44px] before:min-h-[44px] before:content-['']"
         >
           <Plus className="w-4 h-4" />
         </button>

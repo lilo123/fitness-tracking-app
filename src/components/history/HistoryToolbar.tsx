@@ -52,7 +52,7 @@ export const HistoryToolbar: React.FC<HistoryToolbarProps> = ({
             type="button"
             onClick={() => onSelectedCategoryChange(cat)}
             aria-pressed={selectedCategory === cat}
-            className={`px-3.5 py-2 min-h-[44px] flex items-center justify-center rounded-xl text-xs font-bold shrink-0 transition touch-manipulation cursor-pointer ${
+            className={`px-3.5 py-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-xs font-bold shrink-0 transition touch-manipulation cursor-pointer ${
               selectedCategory === cat
                 ? 'bg-cyan-500 text-black shadow-neon-cyan'
                 : 'bg-zinc-900 text-zinc-400 hover:text-white border border-border-interactive'

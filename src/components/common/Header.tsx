@@ -29,7 +29,10 @@ export const Header: React.FC = () => {
     <header className="bg-zinc-900/90 backdrop-blur-xl border-b border-zinc-800/80 sticky top-0 z-30 px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 shadow-lg">
       <div className="max-w-xl mx-auto flex items-center justify-between">
         {/* Brand */}
-        <Link to="/workout" className="flex items-center gap-2.5 min-w-0 group">
+        <Link
+          to="/workout"
+          className="flex items-center gap-2.5 min-w-0 min-h-[44px] group relative before:absolute before:inset-0 before:min-w-[44px] before:min-h-[44px] before:content-['']"
+        >
           <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-[0_0_15px_rgba(6,182,212,0.4)] shrink-0 group-hover:scale-105 transition-transform">
             <Zap className="w-4 h-4 text-zinc-950 fill-zinc-950" />
           </div>

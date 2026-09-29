@@ -182,7 +182,7 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
             <input
               type="search" value={search} onChange={(e) => setSearch(e.target.value)}
               placeholder="Search exercises (e.g. zer, rdl, chest)..." data-testid="exercise-search-input"
-              className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-xl pl-9 pr-10 py-2.5 text-base sm:text-xs font-medium focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none min-h-[44px]"
+              className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-xl pl-9 pr-10 py-2.5 text-base sm:text-xs font-normal focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none min-h-[44px]"
             />
             {search && (
               <button type="button" onClick={() => setSearch('')} data-testid="clear-search-btn" aria-label="Clear search"
@@ -197,7 +197,7 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
                 key={opt.scope} type="button" // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
                 role="radio" aria-checked={selectedScope === opt.scope}
                 data-testid={`scope-chip-${opt.scope}`} onClick={() => setSelectedScope(opt.scope)}
-                className={`inline-flex items-center gap-1.5 font-semibold rounded-full border transition select-none h-6 px-2.5 text-xs cursor-pointer touch-manipulation relative before:absolute before:-inset-y-2.5 before:-inset-x-1 ${
+                className={`inline-flex items-center gap-1.5 font-semibold rounded-full border transition select-none h-6 px-2.5 text-xs cursor-pointer touch-manipulation relative before:absolute before:inset-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:min-w-[44px] before:min-h-[44px] before:content-[''] ${
                   selectedScope === opt.scope
                     ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.15)]'
                     : 'bg-zinc-800/80 text-zinc-400 border-zinc-700/60 hover:text-zinc-200 hover:border-zinc-600'
@@ -207,14 +207,14 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
           </div>
           <div className="space-y-1.5 pt-1 border-t border-zinc-800/50">
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-              <span className="text-xs text-zinc-400 font-medium shrink-0 mr-1">Equipment:</span>
+              <span className="text-xs text-zinc-400 font-normal shrink-0 mr-1">Equipment:</span>
               <Chip label="All" selected={selectedEquipment === 'all'} onClick={() => setSelectedEquipment('all')} testId="equipment-filter-all" />
               {EQUIPMENT.map((eq) => (
                 <Chip key={eq} label={EQUIPMENT_LABELS[eq as Equipment]} selected={selectedEquipment === eq} onClick={() => setSelectedEquipment(selectedEquipment === eq ? 'all' : eq)} testId={`equipment-filter-${eq}`} />
               ))}
             </div>
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-              <span className="text-xs text-zinc-400 font-medium shrink-0 mr-1">Body part:</span>
+              <span className="text-xs text-zinc-400 font-normal shrink-0 mr-1">Body part:</span>
               <Chip label="All" selected={selectedMuscleGroup === 'all'} onClick={() => setSelectedMuscleGroup('all')} testId="bodypart-filter-all" />
               {MUSCLE_GROUPS.map((group) => (
                 <Chip key={group} label={group} selected={selectedMuscleGroup === group} onClick={() => setSelectedMuscleGroup(selectedMuscleGroup === group ? 'all' : group)} testId={`bodypart-filter-${group.toLowerCase().replace(/\s+/g, '-')}`} />
@@ -228,7 +228,7 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
             <BookOpen className="w-5 h-5 text-cyan-400 shrink-0" />
             <span className="truncate">Exercise Library ({displayedItems.length})</span>
           </h3>
-          <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />} onClick={() => setIsCreateOpen(true)} testId="open-create-exercise-btn">New Exercise</Button>
+          <Button variant="primary" size="md" leftIcon={<Plus className="w-4 h-4" />} onClick={() => setIsCreateOpen(true)} testId="open-create-exercise-btn">New Exercise</Button>
         </div>
         <div className="text-xs text-zinc-400" data-testid="showing-exercises-count">{countText}</div>
 
@@ -262,7 +262,7 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
         )}
 
         {(!isPending || catalogData) && (
-          <div className="space-y-2">
+          <div className="space-y-2 [&_[data-testid^='exercise-row-']]:font-normal [&_[data-testid='exercise-row-subtitle']]:font-normal">
           {displayedItems.map((ex) => (
             <ExerciseListRow
               key={ex.id} exercise={ex} currentUserId={currentUserId} isCoach={isCoach}

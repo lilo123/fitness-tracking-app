@@ -370,7 +370,7 @@ export const WorkoutEngine: React.FC = () => {
         <>
           {activeExercises.length > 0 && (
             <div className="flex flex-wrap items-center justify-between bg-zinc-900/90 border border-zinc-800/80 rounded-xl px-3 py-2 shadow-sm gap-2">
-              <span className="text-xs font-extrabold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+              <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Layers className="w-3.5 h-3.5 text-cyan-400" /> Exercises ({activeExercises.length})
               </span>
               <div className="flex items-center gap-2">

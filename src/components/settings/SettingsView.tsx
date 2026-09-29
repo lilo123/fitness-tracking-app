@@ -208,7 +208,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
             aria-labelledby={restTimerLabelId}
             data-testid="toggle-auto-timer"
             onClick={handleToggleAutoTimer}
-            className={`relative inline-flex before:absolute before:-inset-y-2.5 before:inset-x-0 before:content-[''] h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+            className={`relative inline-flex before:absolute before:-inset-y-2.5 before:inset-x-0 before:inset-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:min-w-[44px] before:min-h-[44px] before:content-[''] h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none touch-manipulation ${
               autoRestTimer ? 'bg-cyan-500' : 'bg-zinc-800'
             }`}
           >

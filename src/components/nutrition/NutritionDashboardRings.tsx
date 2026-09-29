@@ -70,7 +70,7 @@ export const NutritionDashboardRings: React.FC<NutritionDashboardRingsProps> = m
           data-testid="nutrition-date-input"
           value={selectedDate}
           onChange={(e) => onDateChange(e.target.value)}
-          className="bg-zinc-950 border border-border-interactive text-cyan-400 rounded-xl px-1 sm:px-2.5 py-1 text-base tabular-nums font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none cursor-pointer shrink-0 min-h-[40px] h-10 -my-1 w-[120px] sm:w-auto"
+          className="bg-zinc-950 border border-border-interactive text-cyan-400 rounded-xl px-1 sm:px-2.5 py-1 text-base tabular-nums font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none cursor-pointer shrink-0 min-h-[44px] h-11 -my-1.5 w-[120px] sm:w-auto"
         />
       </div>
 

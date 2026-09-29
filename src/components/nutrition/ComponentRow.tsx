@@ -285,7 +285,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
                 setPendingAbsurdEdit(null);
                 setDraft(null);
               }}
-              className="rounded bg-amber-500 px-3 py-2 font-bold text-zinc-950 hover:bg-amber-400 min-h-[44px] touch-manipulation flex items-center justify-center"
+              className="rounded bg-amber-500 px-2 py-1 font-bold text-zinc-950 hover:bg-amber-400 min-h-[40px] touch-manipulation relative before:absolute before:inset-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:min-w-[44px] before:min-h-[44px] before:content-['']"
             >
               Apply anyway
             </button>
@@ -296,7 +296,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
                 setPendingAbsurdEdit(null);
                 setDraft(null);
               }}
-              className="rounded bg-zinc-800 px-3 py-2 text-zinc-300 hover:bg-zinc-700 min-h-[44px] touch-manipulation flex items-center justify-center"
+              className="rounded bg-zinc-800 px-2 py-1 text-zinc-300 hover:bg-zinc-700 min-h-[40px] touch-manipulation relative before:absolute before:inset-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:min-w-[44px] before:min-h-[44px] before:content-['']"
             >
               Cancel
             </button>
