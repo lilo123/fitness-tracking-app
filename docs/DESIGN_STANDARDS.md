@@ -9,6 +9,18 @@
 - A tab may deviate only through a dated entry in the REDESIGN_STATUS decision log.
 - Where Nutrition itself breaks a standard today, that is listed under **Nutrition gap** and fixed in Phase 8 (the Nutrition sweep).
 
+### Standards Index
+- **§2 Layout, spacing and navigation:** `STD-LAY-1..5`, `STD-NAV-1..4`
+- **§3 Components:** `STD-CMP-1..11`
+- **§4 Typography, colour and icons:** `STD-TYP-1..4`, `STD-COL-1..4`, `STD-ICO-1`
+- **§5 Interactions:** `STD-INT-1..9`
+- **§6 Data display:** `STD-DAT-1..9`
+- **§7 Copy and tone:** `STD-CPY-1..6`
+- **§8 Feedback:** `STD-FB-1`
+- **§9 Accessibility (cross-cutting):** `STD-A11Y-1..4`
+- **§10 Nutrition-specific: do NOT copy elsewhere**
+- **§11 Guards that enforce these standards**
+
 ---
 
 ## 1. Takeaways from the Nutrition redesign
@@ -74,8 +86,8 @@
 | STD-CMP-5 | **Inputs:** 16px text on every `input/select/textarea` at every width (iOS no-zoom; drop `sm:text-xs`); visible height 40px (a 32px visible box is allowed when the hit wrapper is ≥44, D32); filled `bg-zinc-950` + `border-border-interactive` + cyan focus ring; custom chevron on selects (`appearance-none` + lucide ChevronDown, ≥8px inset); `inputMode` per type; select-on-focus for numbers; Enter moves to the next field or commits. | D17, D27, D31, D32, D35 | SetRow inputs (W26, W33), EditSetSheet RPE (W28, H36), History search (H36), Library forms (L32), Stepper typing (L40). |
 | STD-CMP-6 | **Choosing a unit or option from ≤6 values** uses a chip + bottom sheet (UnitChip), not a native `<select>`, when horizontal space is tight. | `UnitChip.tsx` | The kg/lb input suffix (W49), set type is hidden (K9), equipment/body-part filters use Chips. |
 | STD-CMP-7 | **Dialogs:** AccessibleModal (focus trap, Escape, focus restore, `dismissible={!dirty && !saving}`); full height below 640px. **ConfirmDialog** only for bulk, irreversible or other-people-affecting actions. `window.confirm` is banned. | `AccessibleModal.tsx`; D44 | W44, H17, L4, L13; CoachCockpit/MyCoachCard confirms (Phase 8). **Nutrition gap:** `NutritionEngine.tsx:409`, `CustomDishesModal.tsx:328,412`. |
-| STD-CMP-8 | **Toasts:** one floating **UndoToast** slot (promoted from QuickLogToast): check icon, 12px verb, 14px "subject · detail", 44px Undo whose `aria-label` names the subject; positioned above nav, timer pill and sticky rows; newest replaces; **6s**, paused while focused or hovered; one polite announcement. | D41 `QuickLogToast.tsx` | Set delete / exercise remove (W3, W8), meal delete (H27), archive/hide (L4, L47), success feedback (L30). |
-| STD-CMP-9 | **Status and errors:** `StatusBanner` with always-mounted live regions; tones success/error/info chosen by outcome (never an error in a green banner); read errors offer Retry (44px); mutation errors keep the user's input. | `StatusBanner.tsx`, `NutritionEngine.tsx:388` | W11, L6, L9 (error in a green banner), H6, H33. |
+| STD-CMP-8 | **Toasts:** one floating **UndoToast** slot (promoted from QuickLogToast): check icon, 12px verb, 14px "subject · detail", 44px Undo whose `aria-label` names the subject; positioned above nav, timer pill and sticky rows; newest replaces; **6s**, paused while focused or hovered; one polite announcement. *(Unified into STD-FB-1)*. | D41 `QuickLogToast.tsx` | Set delete / exercise remove (W3, W8), meal delete (H27), archive/hide (L4, L47), success feedback (L30). |
+| STD-CMP-9 | **Status and errors:** `StatusBanner` with always-mounted live regions; tones success/error/info chosen by outcome (never an error in a green banner); read errors offer Retry (44px); mutation errors keep the user's input. *(See STD-FB-1: inline StatusBanner reserved for persistent errors; never inline success)*. | `StatusBanner.tsx`, `NutritionEngine.tsx:388` | W11, L6, L9 (error in a green banner), H6, H33. |
 | STD-CMP-10 | **Loading:** skeletons that match the final layout (`aria-busy`, `role=status` label) whenever data is pending on first load; **the empty state renders only when the query succeeded with 0 rows**; spinners only for in-place actions (Analyze, Save). | Spinners only; **Nutrition gap: no skeletons** (adopt in Phase 8) | W21, L10, H7, H23. |
 | STD-CMP-11 | **Empty states:** one sentence saying what's missing plus a primary CTA to fix it, and "Clear filters" when filters caused it. | "No meals logged for this date yet." (CTA via the AI box above) | W25, H20, H23, L8 ("Create '<query>'"). |
 
@@ -90,7 +102,7 @@
 | STD-COL-1 | **Surfaces:** base zinc-950, card zinc-900, elevated zinc-800; borders `border-border-subtle` / `border-border-interactive`; glow only via `.shadow-neon-*` tokens (no raw `rgba` literals). | `index.css` tokens | W48, H35 (raw emerald shadow). |
 | STD-COL-2 | **Text contrast AA:** body/secondary text ≥ `text-zinc-400` on zinc-900 (6.4–6.9:1); `zinc-500` only for disabled or decorative text; low-emphasis numbers ≥3:1. | **Nutrition gap:** 28× `text-zinc-500`, zero values `zinc-600` (Phase 8) | W15, L20, H18, H24 (NEW-14). |
 | STD-COL-3 | **Semantic tones:** success emerald-400, error/over rose-400, warning amber-400, info/interactive cyan-400. Colour never carries meaning alone (sr-only text or icon too). | D8, D20 `MacroCell.tsx:31,73` | PR highlight, error rows, "Hidden"/"Archived" tags. |
-| STD-COL-4 | **Domain colour sets are local.** The macro palette (kcal amber, P cyan, C emerald, F violet, Fib teal) is Nutrition-only. Workout/History may define their own small identity set (e.g. PR = amber, volume = cyan) in one constant, documented here when created. | `macroColumns.ts` | See §9 "Do not copy". |
+| STD-COL-4 | **Domain colour sets are local.** The macro palette (kcal amber, P cyan, C emerald, F violet, Fib teal) is Nutrition-only. Workout/History may define their own small identity set (e.g. PR = amber, volume = cyan) in one constant, documented here when created. | `macroColumns.ts` | See §10 "Do not copy". |
 | STD-ICO-1 | **Icons:** `lucide-react` only; 14px inline with 12px text, 16px in buttons/rows, 20px in the nav and sheet close; icon-only controls need `aria-label`; an icon must match its action (no ✓ that deletes, no ↻ that stops). | Nutrition icon inventory | W3 (✓ deletes), W30 (RotateCw = stop), W9 (icon-only Clear). |
 
 ## 5. Interactions
@@ -132,13 +144,53 @@
 | STD-CPY-5 | **aria-labels include the subject**: "Undo add Oats", "Edit set 2 of Bench Press", "Actions for Bench Press". | `QuickLogToast`, `ComponentRow` | L16, W29, H33. |
 | STD-CPY-6 | **Placeholders show an example**, not instructions ("e.g. a banana and 200 ml oat milk"). | D45 | Picker search ("e.g. bench, rdl"), set inputs placeholder "BW" (W7). |
 
-## 8. Accessibility (cross-cutting)
+## 8. Feedback
+
+| ID | Rule | In Nutrition | Other tabs |
+|---|---|---|---|
+| STD-FB-1 | **One transient feedback system** (decision D-P8.1-6/-7): ONE app-shell toast host (`src/components/common/ToastHost.tsx` mounted in `App.tsx` inside `ToastProvider`), consuming `useToast().show({ message, kind, action, durationMs })`. Visual format is `UndoToast` (`src/components/common/UndoToast.tsx`). One position above bottom chrome with measured offsets (74px base above BottomNav, 128px staged bar, 148px rest-timer bar) registered via `useToastOffset`. Screen reader live region uses `role="status"` and `aria-live="polite"`. Timing: `success` and `info` auto-dismiss after default 4000ms; `undo` countdown auto-dismisses after default 6000ms (`useDeferredDelete`). Concurrency: maximum ONE toast visible at any time; a new toast immediately commits any pending undo action and replaces the active toast. Supports one optional action button (`ToastAction`). **Persistent inline errors:** errors needing user action stay persistent inline as `StatusBanner` (`tone="error"`) directly next to the failing element, cleared on retry or success; never render inline success/info text anywhere. **Enforcement:** `npm run check:design` ratchet rule `adhoc-success` at baseline 0 (flags inline success banners, legacy `setStatus('Saved')`, inline `Copied!`, and direct `<UndoToast>` usage outside `ToastHost`). | Replaced ad-hoc `setStatus('Saved')` and inline status banner above staged meal (D-P8.1-5); QuickLog and timeline deletion use `kind: 'undo'`. | App-wide standard: Workout set deletion, History meal deletion, Library exercise archive, Settings toggle confirmations. All trigger `useToast()` into shell host. Zero direct `<UndoToast>` in tabs. |
+
+### 8.1 Transient Feedback API & Contract (`STD-FB-1`)
+- **App-shell Host:** `<ToastHost />` is mounted once in the app root (`App.tsx`) wrapped by `<ToastProvider>`. Tab components and modals never render `<UndoToast>` directly.
+- **Hook API:** `const { show, dismiss } = useToast();`
+  - `show({ message, kind, action, durationMs, verb, subject, detail, onCommit, onUndo, undoLabel })`
+  - `kind`: `'success' | 'info' | 'undo'` (default: `'success'`, or `'undo'` if undo action/callback provided).
+  - `action`: `{ label: string, onAction: () => void | Promise<void>, ariaLabel?: string, testId?: string }`.
+  - `durationMs`: default `4000ms` for `success`/`info`; default `6000ms` for `undo`.
+- **Dynamic Offsets (`useToastOffset`):** Components that mount sticky bottom bars register an offset via `useToastOffset(offsetVal)`:
+  - Base above BottomNav: `74px`
+  - Staged meal card active: `128px`
+  - Rest-timer bar active: `148px`
+- **Accessibility:** Live region with `role="status"` and `aria-live="polite"` announces `${verb}: ${subject} · ${detail}`. Action buttons require descriptive `aria-label` (e.g. `"Undo delete Bench Press Set"`).
+- **Single-Slot Concurrency:** Only one toast is visible. Triggering `show()` while a toast is active replaces it immediately. If the previous toast was an uncommitted `undo` toast, replacing it immediately calls `onCommit()` exactly once (same as timer expiration).
+- **Error vs Feedback Distinction:**
+  - Transient feedback (toasts) is strictly for non-critical confirmations (`success`, `info`, or reversible `undo`).
+  - Errors requiring user resolution must remain persistent inline `StatusBanner` (`tone="error"`) adjacent to the input or action control until resolved on retry/success. Never auto-dismiss actionable error states.
+  - Never render inline success banners or status text (`StatusBanner tone="success"`, `setStatus('Saved')`, or inline `Copied!`).
+- **Ratchet Enforcement:** `scripts/check-design-ratchet.js` enforces the `adhoc-success` rule at baseline 0:
+  - Zero `<StatusBanner tone="success">` or dynamic tone returning `'success'`.
+  - Zero `<StatusBanner tone="info">` containing success copy (`'Saved'`, `'Meal deleted'`, `'Custom dish saved'`).
+  - Zero `setStatus('Saved')` calls.
+  - Zero literal `Copied!` in JSX.
+  - Zero `<UndoToast>` usage outside `ToastHost`.
+
+### 8.2 Do / Don't Examples
+| Context | Do | Don't |
+|---|---|---|
+| **Save confirmation** | `useToast().show({ message: 'Routine saved', kind: 'success' })` | `<StatusBanner tone="success" message="Routine saved" />` (inline banner causes layout shift; trips `adhoc-success` ratchet) |
+| **Reversible deletion** | `useToast().show({ verb: 'Deleted', subject: 'Set 2', kind: 'undo', onUndo, onCommit })` | Delete immediately without undo window, or block user with a modal confirmation dialog for single reversible actions |
+| **Toast mounting** | Let `<ToastHost />` at app root render the toast via `useToast().show(...)` | `<UndoToast toast={localToast} onDismiss={...} />` inside a tab or sheet (trips `adhoc-success` ratchet) |
+| **Actionable error** | `<StatusBanner tone="error" message="Failed to save routine. Check connection." onRetry={handleRetry} />` next to submit button | `useToast().show({ message: 'Error saving', kind: 'error' })` (auto-dismissing errors risk data loss before user can read or retry) |
+| **Clipboard copy** | `await navigator.clipboard.writeText(url); useToast().show({ message: 'Link copied to clipboard', kind: 'info' })` | `const [copied, setCopied] = useState(false);` with inline `<span>{copied ? 'Copied!' : 'Copy'}</span>` |
+| **Sticky bar offset** | `useToastOffset(isStaged ? 128 : undefined)` in the component owning the sticky bar | Hard-coding `bottom-20` on toast instances or letting floating toasts obscure sticky action bars |
+
+## 9. Accessibility (cross-cutting)
 - **STD-A11Y-1:** Tabs use `role=tablist/tab`, `aria-selected`, `aria-controls` and roving tabindex (SegmentedTabs); toggle chips use `aria-pressed`; single-select filters use `radiogroup` (L14, L15, H12, H22).
 - **STD-A11Y-2:** Accordions are `<button aria-expanded aria-controls>`; each page has one h1 and each section an h2 (W29, H33).
 - **STD-A11Y-3:** Animations honour `motion-reduce` (W29 pill pulse).
 - **STD-A11Y-4:** Every new surface gets an axe check in its unit tests and a density block at 320/390 (W38, H46, L37).
 
-## 9. Nutrition-specific: do NOT copy elsewhere
+## 10. Nutrition-specific: do NOT copy elsewhere
 | Pattern | Why it's Nutrition-only |
 |---|---|
 | Macro colour palette (kcal/P/C/F/Fib) | Nutritional identity; reusing it for workout data would imply macros. |
@@ -150,7 +202,7 @@
 | 5-day superset nutrition query window | Workaround for `logged_at` vs `logged_date`; workouts get a civil column directly (K5). |
 | Rings (MacroRing) as the page header | Daily targets; Workout has no daily target ring (don't force one). |
 
-## 10. Guards that enforce these standards (extend per tab)
+## 11. Guards that enforce these standards (extend per tab)
 | Guard | Enforces | Extend in |
 |---|---|---|
 | D43 type walker (`visual-density.test.ts`) | STD-TYP-1..3 | Workout (Phase 3a), History (5a), Library (7a), shell (8) |
@@ -158,3 +210,4 @@
 | Overflow check at 320 | STD-LAY-3 | every tab route |
 | No `window.confirm` (lint grep in CI) | STD-CMP-7 | Phase 3a adds the check; Phase 8 removes the last callers |
 | No `text-[10px]`/`text-[11px]`/`font-mono`/`font-black`/`text-zinc-500` on text in `src/` (grep gate, allow-list with STD IDs) | STD-TYP, STD-COL-2 | ratchet per phase; zero by Phase 8 |
+| Design ratchet `check:design` (`adhoc-success`, zero direct `<UndoToast>` outside `ToastHost`) | STD-FB-1 | baseline 0 across all `src/` (P8.1 D-P8.1-7) |
