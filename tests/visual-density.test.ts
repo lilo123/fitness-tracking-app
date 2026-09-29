@@ -1,4 +1,27 @@
+import { execSync } from 'child_process';
 import { test, expect, type Page, type Locator } from '@playwright/test';
+
+const DB_URL =
+  process.env.DATABASE_URL ||
+  'postgresql://postgres:postgres@127.0.0.1:58822/postgres';
+
+function getPsqlCommand(): string {
+  if (process.env.DATABASE_URL) {
+    let parsed: URL;
+    try {
+      parsed = new URL(process.env.DATABASE_URL);
+    } catch {
+      return `psql "${process.env.DATABASE_URL}" -v ON_ERROR_STOP=1`;
+    }
+    if (
+      (parsed.port && parsed.port !== '58822') ||
+      (parsed.hostname && parsed.hostname !== '127.0.0.1' && parsed.hostname !== 'localhost')
+    ) {
+      return `psql -h "${parsed.hostname}" -p "${parsed.port || '5432'}" -U "${parsed.username || 'postgres'}" -d "${parsed.pathname.slice(1) || 'postgres'}" -v ON_ERROR_STOP=1`;
+    }
+  }
+  return `psql "${DB_URL}" -v ON_ERROR_STOP=1`;
+}
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -6106,37 +6129,50 @@ test.describe("P8 Route-Wide Density & Tap Grid", () => {
       viewport: { width: 320, height: 844 },
       deviceScaleFactor: 1,
     });
+
+    const testLogId = 'e8000000-0000-0000-0000-000000000094';
+    const testDishId = 'e8000000-0000-0000-0000-000000000076';
+    const psqlCmd = getPsqlCommand();
+
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const todayStr = `${year}-${month}-${day}`;
+
+    // Seed own user-scoped rows: meal log on pinned today date & custom dish favorite
+    const seedSql = `
+      DELETE FROM public.nutrition_logs WHERE id = '${testLogId}';
+      DELETE FROM public.custom_dishes WHERE id = '${testDishId}';
+
+      INSERT INTO public.nutrition_logs (
+        id, user_id, food_name, meal_type, calories, protein, carbs, fat, fiber, serving_size, serving_unit, logged_at, logged_date
+      ) VALUES (
+        '${testLogId}',
+        (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io'),
+        'Grilled Salmon with Rice',
+        'Dinner',
+        550, 45, 50, 18, 4, 1, 'serving',
+        now(),
+        '${todayStr}'::date
+      );
+
+      INSERT INTO public.custom_dishes (
+        id, user_id, name, calories, protein, carbs, fat, fiber, kind, use_count, notes, created_at
+      ) VALUES (
+        '${testDishId}',
+        (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io'),
+        'Poached Chicken Slices',
+        132, 22, 0, 4.8, 0,
+        'food',
+        99999,
+        NULL,
+        now()
+      );
+    `;
+    execSync(psqlCmd, { input: seedSql, encoding: 'utf8' });
+
     try {
-      const todayStr = new Date().toISOString().split("T")[0];
-      const deterministicLogs = [
-        {
-          id: "log-timeline-p8",
-          user_id: "test-user",
-          food_name: "Grilled Salmon with Rice",
-          meal_type: "Dinner",
-          calories: 550,
-          protein: 45,
-          carbs: 50,
-          fat: 18,
-          fiber: 4,
-          serving_size: 1,
-          serving_unit: "serving",
-          logged_at: new Date().toISOString(),
-          logged_date: todayStr,
-          created_at: new Date().toISOString(),
-          has_components: false,
-        },
-      ];
-
-      await page.route("**/rest/v1/nutrition_logs*", async (route: any) => {
-        return route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          headers: { "access-control-allow-origin": "*" },
-          body: JSON.stringify(deterministicLogs),
-        });
-      });
-
       await page.goto("/login");
       await page.fill('input[type="email"]', "athlete@cybergym.io");
       await page.fill('input[type="password"]', "password123");
@@ -6195,7 +6231,18 @@ test.describe("P8 Route-Wide Density & Tap Grid", () => {
       expect(deleteBox!.height, "Dish row delete button height >= 44px").toBeGreaterThanOrEqual(44);
       expect(deleteBox!.width, "Dish row delete button width >= 44px").toBeGreaterThanOrEqual(44);
     } finally {
-      await page.close();
+      try {
+        const cleanupSql = `
+          DELETE FROM public.nutrition_logs WHERE id = '${testLogId}';
+          DELETE FROM public.custom_dishes WHERE id = '${testDishId}';
+        `;
+        execSync(psqlCmd, { input: cleanupSql, encoding: 'utf8' });
+      } catch (cleanupErr) {
+        console.error('[visual-density cleanup error]:', cleanupErr);
+        throw cleanupErr;
+      } finally {
+        await page.close();
+      }
     }
   });
 });
