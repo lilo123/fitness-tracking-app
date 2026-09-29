@@ -13,7 +13,6 @@ import {
   stagedToItem, recomputeStagedTotals, buildStagedMealFromManualData,
   useStagedCardFocus, type StagedMeal,
 } from './nutritionEngineHelpers';
-import { useQueryClient } from '@tanstack/react-query';
 import { Skeleton } from '../common/Skeleton';
 import { useDeferredDelete } from '../common/useDeferredDelete';
 import { UndoToast } from '../common/UndoToast';
@@ -66,7 +65,7 @@ export const NutritionEngine: React.FC = () => {
     customDishes, nutritionLogs, todayLogs, dailyTotals, targets, remainingFuel,
     mutation, deleteMutation, saveCustomDishMutation, deleteCustomDishMutation,
     activeToast, dismissToast, triggerToast, isTimerActive,
-    isNutritionLogsError, nutritionLogsError, refetchNutritionLogs,
+    isNutritionLogsError, isNutritionLogsPending, nutritionLogsError, refetchNutritionLogs,
     isCustomDishesError, customDishesError, refetchCustomDishes, fetchDishDetail,
   } = useNutritionData({
     targetUserId,
@@ -86,7 +85,6 @@ export const NutritionEngine: React.FC = () => {
 
   const [dishFetchError, setDishFetchError] = useState<{ message: string; retry: () => void } | null>(null);
 
-  const queryClient = useQueryClient();
 
   // RD-7: Deferred delete for NutritionLog (6s window with UndoToast)
   const deferredMealDelete = useDeferredDelete<NutritionLog>({
@@ -160,10 +158,8 @@ export const NutritionEngine: React.FC = () => {
     return calculateRemainingFuel(displayedDailyTotals, targets);
   }, [remainingFuel, displayedDailyTotals, targets, deferredMealDelete.pending]);
 
-  const logsQuery = queryClient.getQueryCache().find({ queryKey: ['nutrition_logs'] });
-  const isLogsSuccess = logsQuery?.state.status === 'success';
-  const isLogsPending =
-    Boolean(targetUserId) && !isNutritionLogsError && !isLogsSuccess && nutritionLogs.length === 0;
+  // Own query status (not a prefix lookup in the cache, which matched other nutrition_logs keys and was not reactive).
+  const isLogsPending = Boolean(targetUserId) && !isNutritionLogsError && isNutritionLogsPending;
 
   const ai = useNutritionAi({
     customDishes,

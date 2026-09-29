@@ -109,6 +109,7 @@ export function useNutritionData({
   // Fetch nutrition logs for target user
   const {
     data: nutritionLogs = [],
+    isPending: isNutritionLogsPending,
     isError: isNutritionLogsError,
     error: nutritionLogsError,
     refetch: refetchNutritionLogs,
@@ -498,6 +499,7 @@ export function useNutritionData({
     isCustomDishesError,
     customDishesError,
     refetchCustomDishes,
+    isNutritionLogsPending,
     isNutritionLogsError,
     nutritionLogsError,
     refetchNutritionLogs,
