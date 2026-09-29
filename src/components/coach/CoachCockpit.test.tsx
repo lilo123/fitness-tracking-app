@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { CoachCockpit } from './CoachCockpit';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../../context/AuthContext';
@@ -113,6 +113,18 @@ describe('CoachCockpit', () => {
     (supabase.auth.onAuthStateChange as any).mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } });
 
     (supabase.from as any).mockImplementation((table: string) => defaultMock(table));
+    (supabase.rpc as any).mockImplementation((fn: string) => {
+      if (fn === 'get_exercise_catalog') {
+        return Promise.resolve({
+          data: [
+            { id: 'ex-1', name: 'Leg Extension Machine', body_parts: ['Legs'], is_master: true, equipment: null, is_archived: false, is_hidden: false, user_id: null },
+            { id: 'ex-2', name: 'Incline Bench Press', body_parts: ['Chest'], is_master: true, equipment: null, is_archived: false, is_hidden: false, user_id: null },
+          ],
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: { success: true, template_id: 'tpl-1' }, error: null });
+    });
 
     queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -136,7 +148,7 @@ describe('CoachCockpit', () => {
       expect(screen.getByText('Coach Dashboard')).toBeDefined();
       expect(screen.getByText('Alex Johnson')).toBeDefined();
     });
-    expect(screen.getByText('Workout Template Builder')).toBeDefined();
+    expect(screen.getByTestId('coach-open-new-template-sheet-btn')).toBeDefined();
 
     expect(getRecordedTables()).toContain('users');
     expect(getRecordedSelects()).toContainEqual({
@@ -170,58 +182,10 @@ describe('CoachCockpit', () => {
     });
   });
 
-  it('allows adding exercises and customizing target sets and reps in template builder with single atomic RPC', async () => {
-    renderComponent();
-
-    // Wait for coach session and athlete to load
-    await screen.findByText('Workout Template Builder');
-
-    const nameInput = screen.getByPlaceholderText('e.g. Hypertrophy Upper Body A');
-    fireEvent.change(nameInput, { target: { value: 'Hypertrophy Legs' } });
-
-    // Pick an exercise to add
-    const addSelect = await screen.findByTestId('template-exercise-select');
-    fireEvent.change(addSelect, { target: { value: 'Leg Extension Machine' } });
-
-    const addBtn = screen.getByTestId('add-template-exercise-btn');
-    fireEvent.click(addBtn);
-
-    // Verify exercise row was added
-    expect(await screen.findByText('Leg Extension Machine')).toBeDefined();
-
-    // Customize target sets and reps
-    const targetSetsInput = screen.getByTestId('template-target-sets-0');
-    const targetRepsInput = screen.getByTestId('template-target-reps-0');
-    fireEvent.change(targetSetsInput, { target: { value: '4' } });
-    fireEvent.change(targetRepsInput, { target: { value: '15' } });
-
-    const saveBtn = screen.getByTestId('save-template-btn');
-    fireEvent.click(saveBtn);
-
-    await waitFor(() => {
-      expect(supabase.rpc).toHaveBeenCalledWith(
-        'save_routine_template',
-        expect.objectContaining({
-          p_name: 'Hypertrophy Legs',
-          p_is_master: false,
-          p_assigned_to: 'ath-1',
-          p_exercises: [
-            {
-              exercise_id: 'ex-1',
-              order_index: 0,
-              target_sets: 4,
-              target_reps: 15,
-            },
-          ],
-        })
-      );
-    });
-  });
-
   it('opens EditTemplateSheet with assignToAthleteId when + New Template button is clicked', async () => {
     renderComponent();
 
-    await screen.findByText('Workout Template Builder');
+    await screen.findByTestId('coach-open-new-template-sheet-btn');
 
     const newTplBtn = screen.getByTestId('coach-open-new-template-sheet-btn');
     fireEvent.click(newTplBtn);
@@ -294,8 +258,6 @@ describe('CoachCockpit', () => {
   });
 
   it('allows switching athlete and disconnecting athlete with confirmation', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-
     renderComponent();
 
     await waitFor(() => {
@@ -304,19 +266,21 @@ describe('CoachCockpit', () => {
 
     fireEvent.click(screen.getByTestId('disconnect-athlete-btn'));
 
-    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('Disconnect athlete'));
+    await waitFor(() => {
+      expect(screen.getByTestId('disconnect-athlete-confirm-dialog')).toBeDefined();
+    });
+    expect(screen.getByTestId('disconnect-athlete-confirm-dialog').textContent).toContain('Disconnect Alex Johnson?');
+
+    fireEvent.click(screen.getByTestId('disconnect-athlete-confirm-dialog-confirm'));
+
     await waitFor(() => {
       expect(supabase.rpc).toHaveBeenCalledWith('disconnect_coach', {
         target_athlete_id: 'ath-1',
       });
     });
-
-    confirmSpy.mockRestore();
   });
 
   it('does not disconnect athlete if confirmation is cancelled', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
-
     renderComponent();
 
     await waitFor(() => {
@@ -325,14 +289,20 @@ describe('CoachCockpit', () => {
 
     fireEvent.click(screen.getByTestId('disconnect-athlete-btn'));
 
-    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('Disconnect athlete'));
-    expect(supabase.rpc).not.toHaveBeenCalledWith('disconnect_coach', expect.anything());
+    await waitFor(() => {
+      expect(screen.getByTestId('disconnect-athlete-confirm-dialog')).toBeDefined();
+    });
 
-    confirmSpy.mockRestore();
+    fireEvent.click(screen.getByTestId('disconnect-athlete-confirm-dialog-cancel'));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('disconnect-athlete-confirm-dialog')).toBeNull();
+    });
+
+    expect(supabase.rpc).not.toHaveBeenCalledWith('disconnect_coach', expect.anything());
   });
 
-  it('handles disconnect athlete RPC failure with alert and error logging', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  it('handles disconnect athlete RPC failure with StatusBanner (no alert)', async () => {
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -350,15 +320,22 @@ describe('CoachCockpit', () => {
     fireEvent.click(screen.getByTestId('disconnect-athlete-btn'));
 
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith('Database failure while disconnecting athlete');
+      expect(screen.getByTestId('disconnect-athlete-confirm-dialog')).toBeDefined();
     });
+
+    fireEvent.click(screen.getByTestId('disconnect-athlete-confirm-dialog-confirm'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('coach-disconnect-status')).toBeDefined();
+    });
+    expect(screen.getByTestId('coach-disconnect-status').textContent).toContain('Database failure while disconnecting athlete');
+    expect(alertSpy).not.toHaveBeenCalled();
 
     expect(consoleSpy).toHaveBeenCalledWith(
       'Failed to disconnect athlete:',
       expect.objectContaining({ message: 'Database failure while disconnecting athlete' })
     );
 
-    confirmSpy.mockRestore();
     alertSpy.mockRestore();
     consoleSpy.mockRestore();
   });
@@ -488,53 +465,6 @@ describe('CoachCockpit', () => {
     fireEvent.click(loadOlderBtn);
   });
 
-  it('applies responsive flex overflow prevention classes to template builder exercise selector and sequence rows', async () => {
-    renderComponent();
-
-    await screen.findByText('Workout Template Builder');
-
-    const select = screen.getByTestId('template-exercise-select');
-    expect(select.className).toContain('min-w-0');
-    expect(select.className).toContain('max-w-full');
-    expect(select.className).toContain('truncate');
-    expect(select.className).toContain('cursor-pointer');
-
-    const selectorRow = select.parentElement;
-    expect(selectorRow?.className).toContain('w-full');
-    expect(selectorRow?.className).toContain('min-w-0');
-
-    const addBtn = screen.getByTestId('add-template-exercise-btn');
-    expect(addBtn.className).toContain('shrink-0');
-
-    // Wait for exercise options to load in select
-    await waitFor(() => {
-      expect(screen.getByText(/Leg Extension Machine/)).toBeDefined();
-    });
-
-    // Add exercise to test sequence row classes
-    fireEvent.change(select, { target: { value: 'Leg Extension Machine' } });
-    fireEvent.click(addBtn);
-
-    const nameEl = await screen.findByText('Leg Extension Machine');
-    expect(nameEl.className).toContain('truncate');
-    expect(nameEl.className).toContain('min-w-0');
-    expect(nameEl.className).toContain('flex-1');
-
-    const nameContainer = nameEl.parentElement;
-    expect(nameContainer?.className).toContain('min-w-0');
-    expect(nameContainer?.className).toContain('flex-1');
-    expect(nameContainer?.className).toContain('truncate');
-
-    const setsInput = screen.getByTestId('template-target-sets-0');
-    const controlsContainer = setsInput.closest('.flex-wrap');
-    expect(controlsContainer).not.toBeNull();
-    expect(controlsContainer?.className).toContain('shrink-0');
-    expect(controlsContainer?.className).toContain('flex-wrap');
-
-    const removeBtn = screen.getByTestId('template-remove-ex-0');
-    expect(removeBtn.className).toContain('shrink-0');
-  });
-
   it('applies flex overflow prevention classes to existing workout template cards', async () => {
     const mockTemplates = [
       {
@@ -557,7 +487,7 @@ describe('CoachCockpit', () => {
 
     renderComponent();
 
-    await screen.findByText('Workout Template Builder');
+    await screen.findByText(/Workout Templates/);
 
     const templateTitle = await screen.findByText(/Hypertrophy Upper Body Specialization/);
     expect(templateTitle.className).toContain('truncate');
@@ -792,7 +722,8 @@ describe('CoachCockpit', () => {
     expect(retryBtn).toBeNull();
   });
 
-  it('L9: coach single rpc zero inserts on template save', async () => {
+
+  it('opens EditTemplateSheet with assignToAthleteId and saving = exactly one rpc with p_assigned_to, zero table inserts', async () => {
     const insertSpy = vi.fn();
     (supabase.from as any).mockImplementation((table: string) => {
       const b = defaultMock(table);
@@ -801,30 +732,64 @@ describe('CoachCockpit', () => {
     });
 
     renderComponent();
-    await screen.findByText('Workout Template Builder');
 
-    fireEvent.change(screen.getByPlaceholderText('e.g. Hypertrophy Upper Body A'), {
-      target: { value: 'Zero Inserts Routine' },
+    await screen.findByTestId('coach-open-new-template-sheet-btn');
+
+    const newTplBtn = screen.getByTestId('coach-open-new-template-sheet-btn');
+    fireEvent.click(newTplBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('edit-template-modal')).toBeDefined();
     });
-    const addSelect = await screen.findByTestId('template-exercise-select');
-    fireEvent.change(addSelect, { target: { value: 'Leg Extension Machine' } });
-    fireEvent.click(screen.getByTestId('add-template-exercise-btn'));
-    await screen.findByText('Leg Extension Machine');
+
+    const nameInput = screen.getByTestId('template-name-input');
+    fireEvent.change(nameInput, { target: { value: 'Assigned Coach Routine' } });
+
+    // Add an exercise so template has at least one exercise
+    const addTrigger = screen.getByTestId('open-exercise-picker');
+    fireEvent.click(addTrigger);
+    await screen.findByTestId('exercise-picker-sheet');
+    const addExRow = await screen.findByTestId('exercise-row-ex-1');
+    fireEvent.click(addExRow);
+    const confirmAdd = screen.getByTestId('picker-confirm-add-btn');
+    fireEvent.click(confirmAdd);
 
     insertSpy.mockClear();
     vi.mocked(supabase.rpc).mockClear();
 
-    fireEvent.click(screen.getByTestId('save-template-btn'));
+    const modal = screen.getByTestId('edit-template-modal');
+    const saveBtn = within(modal).getByTestId('save-template-btn');
+    fireEvent.click(saveBtn);
 
     await waitFor(() => {
       expect(supabase.rpc).toHaveBeenCalledWith(
         'save_routine_template',
-        expect.objectContaining({ p_name: 'Zero Inserts Routine' })
+        expect.objectContaining({
+          p_name: 'Assigned Coach Routine',
+          p_assigned_to: 'ath-1',
+        })
       );
     });
 
     expect(vi.mocked(supabase.rpc).mock.calls.filter((c) => c[0] === 'save_routine_template')).toHaveLength(1);
     expect(insertSpy).not.toHaveBeenCalled();
+  });
+
+  it('renders skeleton while templates are loading', async () => {
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'routine_templates') {
+        const b = createSupabaseBuilder('routine_templates', { data: [], error: null });
+        b.then = () => new Promise(() => {}); // never resolves
+        return b;
+      }
+      return defaultMock(table);
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('templates-loading-skeleton')).toBeDefined();
+    });
   });
 
 });

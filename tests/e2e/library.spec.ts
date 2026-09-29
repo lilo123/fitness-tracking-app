@@ -931,22 +931,22 @@ test.describe('P7b Library Template Builder and Catalog Acceptance Proofs', () =
     }
     await expect(athleteSelect).toHaveValue(athleteId);
 
-    // 5. Fill template name
-    const templateInput = page.locator('input[placeholder*="Hypertrophy Upper Body A"]');
-    await expect(templateInput).toBeVisible();
+    // 5. Open EditTemplateSheet and fill template name
+    await page.locator('[data-testid="coach-open-new-template-sheet-btn"]').click();
+    await expect(page.locator('[data-testid="edit-template-modal"]')).toBeVisible({ timeout: 10000 });
     const templateName = `P7B Coach Routine ${Date.now()}`;
-    await templateInput.fill(templateName);
+    await page.locator('[data-testid="template-name-input"]').fill(templateName);
 
-    // 6. Add 1-2 exercises
-    const exerciseSelect = page.locator('[data-testid="template-exercise-select"]');
-    await expect(exerciseSelect).toBeVisible();
-    await exerciseSelect.selectOption({ index: 1 });
-    await page.locator('[data-testid="add-template-exercise-btn"]').click();
-    await expect(page.locator('text=Exercise Sequence (1):')).toBeVisible();
-
-    await exerciseSelect.selectOption({ index: 2 });
-    await page.locator('[data-testid="add-template-exercise-btn"]').click();
-    await expect(page.locator('text=Exercise Sequence (2):')).toBeVisible();
+    // 6. Add 1-2 exercises via ExercisePicker
+    await page.locator('[data-testid="open-exercise-picker"]').click();
+    await expect(page.locator('[data-testid="exercise-picker-sheet"]')).toBeVisible({ timeout: 10000 });
+    const exerciseRows = page.locator('[data-testid^="exercise-row-"]');
+    await expect(exerciseRows.first()).toBeVisible({ timeout: 10000 });
+    await exerciseRows.nth(0).click();
+    await exerciseRows.nth(1).click();
+    await page.locator('[data-testid="picker-confirm-add-btn"]').click();
+    await expect(page.locator('[data-testid="sets-input-0"]')).toBeVisible();
+    await expect(page.locator('[data-testid="sets-input-1"]')).toBeVisible();
 
     // 7. Click save
     const saveBtn = page.locator('[data-testid="save-template-btn"]');
@@ -954,7 +954,8 @@ test.describe('P7b Library Template Builder and Catalog Acceptance Proofs', () =
     await saveBtn.click();
 
     // 8. Assert save confirmation
-    await expect(page.locator('span').filter({ hasText: 'Template saved' })).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-testid="edit-template-modal"]')).not.toBeVisible({ timeout: 10000 });
+    await expect(page.locator(`text=${templateName}`).first()).toBeVisible({ timeout: 10000 });
 
     // 9. Verify network calls: exactly ONE save_routine_template RPC with p_assigned_to = athlete id, zero direct table writes
     expect(rpcCalls).toHaveLength(1);
@@ -1009,18 +1010,20 @@ test.describe('P7b Library Template Builder and Catalog Acceptance Proofs', () =
     }
     await expect(athleteSelect).toHaveValue(athleteId);
 
-    // 4. Fill template name
-    const templateInput = page.locator('input[placeholder*="Hypertrophy Upper Body A"]');
-    await expect(templateInput).toBeVisible();
+    // 4. Open EditTemplateSheet and fill template name
+    await page.locator('[data-testid="coach-open-new-template-sheet-btn"]').click();
+    await expect(page.locator('[data-testid="edit-template-modal"]')).toBeVisible({ timeout: 10000 });
     const failTemplateName = `P7B Coach Fail Routine ${Date.now()}`;
-    await templateInput.fill(failTemplateName);
+    await page.locator('[data-testid="template-name-input"]').fill(failTemplateName);
 
-    // 5. Add an exercise
-    const exerciseSelect = page.locator('[data-testid="template-exercise-select"]');
-    await expect(exerciseSelect).toBeVisible();
-    await exerciseSelect.selectOption({ index: 1 });
-    await page.locator('[data-testid="add-template-exercise-btn"]').click();
-    await expect(page.locator('text=Exercise Sequence (1):')).toBeVisible();
+    // 5. Add an exercise via ExercisePicker
+    await page.locator('[data-testid="open-exercise-picker"]').click();
+    await expect(page.locator('[data-testid="exercise-picker-sheet"]')).toBeVisible({ timeout: 10000 });
+    const exerciseRows = page.locator('[data-testid^="exercise-row-"]');
+    await expect(exerciseRows.first()).toBeVisible({ timeout: 10000 });
+    await exerciseRows.first().click();
+    await page.locator('[data-testid="picker-confirm-add-btn"]').click();
+    await expect(page.locator('[data-testid="sets-input-0"]')).toBeVisible();
 
     // 6. Route save_routine_template RPC to respond 500 once
     await page.route('**/rest/v1/rpc/save_routine_template*', (route) => {
@@ -1037,7 +1040,9 @@ test.describe('P7b Library Template Builder and Catalog Acceptance Proofs', () =
       await saveBtn.click();
 
       // 7. Assert error status shown
-      await expect(page.locator('span').filter({ hasText: 'Error: Simulated RPC failure' })).toBeVisible({ timeout: 10000 });
+      const errorBanner = page.locator('[data-testid="template-error"]');
+      await expect(errorBanner).toBeVisible({ timeout: 10000 });
+      await expect(errorBanner).toContainText('Simulated RPC failure');
 
       // 8. Assert zero direct table writes
       expect(directTableWrites).toHaveLength(0);

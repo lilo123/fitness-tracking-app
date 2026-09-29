@@ -13,6 +13,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { StatusBanner } from '../common/StatusBanner';
+import { Skeleton } from '../common/Skeleton';
 import { FALLBACK_WINDOW } from '../history/virtualizationConstants';
 import { useWeightUnit } from '../../hooks/useWeightUnit';
 import { formatVolume, formatWeight } from '../../utils/weight';
@@ -88,6 +89,8 @@ export interface CoachAthleteTimelineProps {
   isError?: boolean;
   error?: unknown;
   onRetry?: () => void;
+  isLoading?: boolean;
+  isWorkoutsLoading?: boolean;
 }
 
 export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
@@ -106,7 +109,10 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
   isError,
   error,
   onRetry,
+  isLoading,
+  isWorkoutsLoading,
 }) => {
+  const isQueryLoading = Boolean(isLoading ?? isWorkoutsLoading);
   const unit = useWeightUnit();
   const hasError = Boolean(isWorkoutsError ?? isError);
   const activeError = workoutsError ?? error;
@@ -207,11 +213,11 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
                 <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-cyan-400" />
-                    <span className="text-xs font-black text-white uppercase tracking-wider font-mono">
+                    <span className="text-xs font-bold text-white uppercase tracking-wider">
                       {formatShortDate(day.date)}
                     </span>
                   </div>
-                  <span className="text-[10px] text-zinc-400 font-mono">
+                  <span className="text-xs text-zinc-400 tabular-nums">
                     {day.workouts.length > 0 && `${day.workouts.length} ${day.workouts.length === 1 ? 'workout' : 'workouts'}`}
                     {day.workouts.length > 0 && day.nutrition.length > 0 && ' • '}
                     {day.nutrition.length > 0 && `${day.nutrition.length} ${day.nutrition.length === 1 ? 'meal' : 'meals'}`}
@@ -236,11 +242,11 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
                           <div className="w-6 h-6 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center shrink-0">
                             <Dumbbell className="w-3 h-3 text-cyan-400" />
                           </div>
-                          <span className="font-extrabold text-white text-xs truncate">
+                          <span className="font-bold text-white text-xs truncate">
                             {w.name || 'Workout Session'}
                           </span>
                         </div>
-                        <div className="text-[10px] text-zinc-400 font-mono shrink-0">
+                        <div className="text-xs text-zinc-400 tabular-nums shrink-0">
                           {w.sets && w.sets.length > 0 ? (
                             <span>
                               {w.sets.length} sets • {formatVolume(totalVol, unit)} vol
@@ -260,7 +266,7 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
                             return (
                               <div
                                 key={g.exerciseId}
-                                className="bg-zinc-950/80 rounded-xl p-2 text-[11px] border border-zinc-850/60 space-y-1.5"
+                                className="bg-zinc-950/80 rounded-xl p-2 text-xs border border-zinc-850/60 space-y-1.5"
                               >
                                 <button
                                   type="button"
@@ -272,7 +278,7 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
                                   <span className="truncate max-w-[160px] sm:max-w-xs">
                                     {g.exerciseName}
                                   </span>
-                                  <div className="flex items-center gap-1.5 text-zinc-400 font-mono text-[10px] shrink-0">
+                                  <div className="flex items-center gap-1.5 text-zinc-400 tabular-nums text-xs shrink-0">
                                     <span>
                                       {g.sets.length} sets • {formatVolume(g.totalVolume, unit)}
                                     </span>
@@ -291,9 +297,9 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
                                     {g.sets.map((s, sIdx: number) => (
                                       <div
                                         key={s.id || sIdx}
-                                        className="flex items-center justify-between text-[10px] text-zinc-400 font-mono px-2 py-1 bg-zinc-900/60 rounded-lg"
+                                        className="flex items-center justify-between text-xs text-zinc-400 tabular-nums px-2 py-1 bg-zinc-900/60 rounded-lg"
                                       >
-                                        <span className="text-zinc-500 font-medium">
+                                        <span className="text-zinc-400 font-medium">
                                           Set {s.set_index ?? s.set_order ?? sIdx + 1}
                                         </span>
                                         <span className="text-cyan-300 font-bold">
@@ -320,28 +326,28 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
                         <div className="w-6 h-6 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0">
                           <Flame className="w-3 h-3 text-amber-400" />
                         </div>
-                        <span className="font-extrabold text-white text-xs truncate">
+                        <span className="font-bold text-white text-xs truncate">
                           Nutrition ({dayCal} kcal)
                         </span>
                       </div>
                       <div>
                         {isCompliant ? (
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/20 border border-emerald-500/40 text-emerald-400">
+                          <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-emerald-500/20 border border-emerald-500/40 text-emerald-400">
                             On Target
                           </span>
                         ) : isUnder ? (
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/20 border border-amber-500/40 text-amber-400">
+                          <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-amber-500/20 border border-amber-500/40 text-amber-400">
                             Under Target
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-500/20 border border-rose-500/40 text-rose-400">
+                          <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-rose-500/20 border border-rose-500/40 text-rose-400">
                             Over Target
                           </span>
                         )}
                       </div>
                     </div>
 
-                    <div className="text-[10px] text-zinc-400 font-mono flex items-center gap-2">
+                    <div className="text-xs text-zinc-400 tabular-nums flex items-center gap-2">
                       <span className="text-cyan-400 font-bold">{dayPro}g P</span>
                       <span>•</span>
                       <span className="text-emerald-400 font-bold">{dayCarb}g C</span>
@@ -353,12 +359,12 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
                       {day.nutrition.map((n: CoachNutritionLog) => (
                         <div
                           key={n.id}
-                          className="bg-zinc-950/80 rounded-lg px-2.5 py-1.5 flex items-center justify-between text-[11px]"
+                          className="bg-zinc-950/80 rounded-lg px-2.5 py-1.5 flex items-center justify-between text-xs"
                         >
                           <span className="text-zinc-300 font-medium truncate max-w-[160px] sm:max-w-xs">
                             {n.food_name}
                           </span>
-                          <span className="text-amber-400 font-mono text-[10px] font-bold shrink-0">
+                          <span className="text-amber-400 tabular-nums text-xs font-bold shrink-0">
                             {n.calories} kcal
                           </span>
                         </div>
@@ -380,12 +386,12 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
   return (
     <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-5 shadow-2xl space-y-4">
       <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-        <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+        <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
           <Activity className="w-4 h-4 text-cyan-400" />
           Activity Timeline: {selectedAthlete?.name || 'None'}
         </h3>
         {selectedAthleteId && (
-          <span className="text-xs font-mono font-bold text-amber-400">
+          <span className="text-xs tabular-nums font-bold text-amber-400">
             {athleteWorkoutsWithSets.length} Workouts Logged
           </span>
         )}
@@ -416,6 +422,10 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
         <div className="p-6 text-center text-zinc-400 text-xs">
           Select an athlete above to view their training history and nutrition timeline.
         </div>
+      ) : isQueryLoading ? (
+        <div data-testid="timeline-loading-skeleton" className="space-y-3">
+          <Skeleton variant="card" count={2} ariaLabel="Loading athlete workouts..." />
+        </div>
       ) : hasError ? null : timelineDays.length === 0 ? (
         <div className="p-6 text-center text-zinc-400 text-xs">
           No workouts or nutrition logged for this athlete yet.
@@ -427,7 +437,7 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
               {timelineDays.length > FALLBACK_WINDOW && (
                 <div
                   data-testid="virtualizer-fallback-notice"
-                  className="text-xs text-zinc-500 text-center py-2 font-mono"
+                  className="text-xs text-zinc-400 text-center py-2 tabular-nums"
                 >
                   Showing first {FALLBACK_WINDOW} of {timelineDays.length} (virtualization disabled)
                 </div>

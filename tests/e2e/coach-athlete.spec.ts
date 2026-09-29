@@ -33,28 +33,37 @@ test.describe('Coach-Athlete Multi-Tenant Flow E2E', () => {
       await templatesTab.click();
     }
 
+    // Open EditTemplateSheet via + New Template button (D-P8-2)
+    const newTplBtn = page.locator('[data-testid="coach-open-new-template-sheet-btn"]');
+    await expect(newTplBtn).toBeVisible();
+    await newTplBtn.click();
+
+    await expect(page.locator('[data-testid="edit-template-modal"]')).toBeVisible({ timeout: 10000 });
+
     // Enter template name
-    const templateInput = page.locator('input[placeholder*="Hypertrophy Upper Body A"]');
-    await templateInput.fill('Playwright Test Coach Routine');
+    const templateName = `Playwright Test Coach Routine ${Date.now()}`;
+    const nameInput = page.locator('[data-testid="template-name-input"]');
+    await expect(nameInput).toBeVisible();
+    await nameInput.fill(templateName);
 
-    // Select an exercise if available
-    const exerciseSelect = page.locator('[data-testid="template-exercise-select"]');
-    const optionsCount = await exerciseSelect.locator('option').count();
+    // Pick an exercise via ExercisePicker
+    await page.locator('[data-testid="open-exercise-picker"]').click();
+    await expect(page.locator('[data-testid="exercise-picker-sheet"]')).toBeVisible({ timeout: 10000 });
 
-    if (optionsCount > 1) {
-      await exerciseSelect.selectOption({ index: 1 });
-      await page.click('[data-testid="add-template-exercise-btn"]');
+    const exerciseRows = page.locator('[data-testid^="exercise-row-"]');
+    await expect(exerciseRows.first()).toBeVisible({ timeout: 10000 });
+    await exerciseRows.first().click();
 
-      // Verify sequence item added
-      await expect(page.locator('text=Exercise Sequence (1):')).toBeVisible();
+    await page.locator('[data-testid="picker-confirm-add-btn"]').click();
+    await expect(page.locator('[data-testid="sets-input-0"]')).toBeVisible();
 
-      // Click save
-      const saveBtn = page.locator('[data-testid="save-template-btn"]');
-      await expect(saveBtn).toBeEnabled();
-      await saveBtn.click();
+    // Click save in EditTemplateSheet
+    const saveBtn = page.locator('[data-testid="save-template-btn"]');
+    await expect(saveBtn).toBeEnabled();
+    await saveBtn.click();
 
-      // Assert confirmation message or saved template
-      await expect(page.locator('span').filter({ hasText: 'Template saved' })).toBeVisible();
-    }
+    // Assert modal closes and template appears in list
+    await expect(page.locator('[data-testid="edit-template-modal"]')).not.toBeVisible({ timeout: 10000 });
+    await expect(page.locator(`text=${templateName}`).first()).toBeVisible({ timeout: 10000 });
   });
 });

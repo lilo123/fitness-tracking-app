@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useId, useEffect, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useCoach } from '../../hooks/useCoach';
@@ -7,12 +7,15 @@ import type { Exercise, RoutineTemplate, UserProfile } from '../../types/databas
 import { DEFAULT_EXERCISES_LIST, normalizeDateStr } from '../../utils/ghostSets';
 import { getDayBounds } from '../../utils/date';
 import { WORKOUT_WITH_SETS_PROJECTION, COACH_SETS_PER_WORKOUT_LIMIT, warnIfCoachSetsTruncated } from '../workout/useWorkoutQueries';
-import { Shield, AlertCircle, RotateCcw, Layers, Plus, Trash2, CheckCircle2 } from 'lucide-react';
+import { Shield, AlertCircle, RotateCcw, Layers, Plus } from 'lucide-react';
 import { CoachAthleteSwitcher } from './CoachAthleteSwitcher';
 import { CoachAthleteTimeline, type CoachWorkoutSet } from './CoachAthleteTimeline';
 import { CoachAthleteMacros } from './CoachAthleteMacros';
 import { EditTemplateSheet } from '../exercises/EditTemplateSheet';
 import { StatusBanner } from '../common/StatusBanner';
+import { ConfirmDialog } from '../common/ConfirmDialog';
+import { SegmentedTabs } from '../common/SegmentedTabs';
+import { Skeleton } from '../common/Skeleton';
 import { groupTimelineDays, resolveAthleteTimeZone, getTimelineDaysAgoStr } from '../../utils/timelineGrouping';
 import { nutritionRowLimitForRange } from '../../utils/coachQueryBounds';
 import { resolveExerciseLabel } from '../../utils/exerciseLabel';
@@ -49,15 +52,9 @@ export const CoachCockpit: React.FC = () => {
   const toggleExercise = (key: string) => setExpandedExercises((prev) => ({ ...prev, [key]: !prev[key] }));
   const daysAgoStr = useMemo(() => getTimelineDaysAgoStr(daysRange, athleteTimeZone), [daysRange, athleteTimeZone]);
 
-  // Template Builder State & EditTemplateSheet
-  const [templateName, setTemplateName] = useState('');
-  const [isMaster, setIsMaster] = useState(false);
-  const [selectedExercises, setSelectedExercises] = useState<{ exerciseId: string; exerciseName: string; targetSets: number; targetReps: number }[]>([]);
-  const [exerciseToAdd, setExerciseToAdd] = useState('');
-  const [status, setStatus] = useState('');
+  // Routine Templates & EditTemplateSheet (D-P8-2)
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<RoutineTemplate | null>(null);
-  const templateNameId = useId();
 
   // Fetch exercises library (P7b Conductor Addendum: body_parts)
   const {
@@ -74,12 +71,11 @@ export const CoachCockpit: React.FC = () => {
 
   // Fetch routine templates created by coach
   const {
-    data: templates = [], isError: isTemplatesError,
+    data: templates = [], isLoading: isTemplatesLoading, isError: isTemplatesError,
     error: templatesError, refetch: refetchTemplates,
   } = useQuery({
     queryKey: ['routine_templates', user?.id, 'coach'],
     queryFn: async () => {
-      // payload-gate: accepted-list — standing watch item W-1, measured 54223 B on /coach
       const { data, error } = await supabase.from('routine_templates')
         .select('id, user_id, name, is_master, assigned_to, days_of_week, created_at, exercises:template_exercises(id, template_id, exercise_id, order_index, target_sets, target_reps)')
         .order('created_at', { ascending: false }).limit(100);
@@ -90,7 +86,7 @@ export const CoachCockpit: React.FC = () => {
 
   // Fetch athlete workouts with sets (single round-trip PostgREST resource embedding DIR-B3, bounded to daysRange)
   const {
-    data: athleteWorkoutsWithSets = [], isError: isWorkoutsError,
+    data: athleteWorkoutsWithSets = [], isLoading: isWorkoutsLoading, isError: isWorkoutsError,
     error: workoutsError, refetch: refetchWorkouts,
   } = useQuery({
     queryKey: ['coach_athlete_timeline_workouts', selectedAthleteId, daysRange, athleteTimeZone],
@@ -160,9 +156,12 @@ export const CoachCockpit: React.FC = () => {
       const rowLimit = nutritionRowLimitForRange(daysRange);
       const { data, error } = await supabase.from('nutrition_logs')
         .select('id, user_id, food_name, calories, protein, carbs, fat, fiber, logged_at, logged_date')
-        .eq('user_id', selectedAthleteId).gte('logged_at', startOfDay).order('logged_at', { ascending: false }).limit(rowLimit);
+        .eq('user_id', selectedAthleteId)
+        .gte('logged_at', startOfDay)
+        .order('logged_at', { ascending: false })
+        .limit(rowLimit);
       if (error) throw error;
-      return data || [];
+      return (data || []) as any[];
     },
   });
 
@@ -223,74 +222,32 @@ export const CoachCockpit: React.FC = () => {
     }
   };
 
-  // Create template mutation: single atomic save_routine_template RPC call with p_assigned_to (Item 1 / L9)
-  const createTemplateMutation = useMutation({
-    mutationFn: async () => {
-      if (!templateName.trim()) throw new Error('Template name is required');
-      if (!user?.id) throw new Error('Authenticated coach required');
+  const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [disconnectStatus, setDisconnectStatus] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
 
-      const exPayloads = selectedExercises.map((ex, idx) => {
-        const matched = exercises.find((e) => e.name === ex.exerciseName || e.id === ex.exerciseId);
-        return {
-          exercise_id: matched ? matched.id : ex.exerciseId,
-          order_index: idx,
-          target_sets: ex.targetSets,
-          target_reps: ex.targetReps,
-        };
-      });
-
-      const { data: tplId, error: tplErr } = await supabase.rpc('save_routine_template', {
-        p_name: templateName.trim(),
-        p_is_master: isMaster,
-        p_assigned_to: isMaster || !selectedAthleteId ? undefined : selectedAthleteId,
-        p_days_of_week: [],
-        p_exercises: exPayloads,
-      });
-
-      if (tplErr || !tplId) throw new Error(tplErr?.message || 'Failed to create template');
-      return tplId;
-    },
-    onSuccess: () => {
-      setStatus('Template saved');
-      void invalidateExerciseDomain(queryClient, user?.id);
-      queryClient.invalidateQueries({ queryKey: ['routine_templates'] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.routineCatalog.all });
-      setTemplateName('');
-      setSelectedExercises([]);
-    },
-    onError: (err: unknown) => {
-      const message = err instanceof Error ? err.message : (err as { message?: string })?.message || 'Failed to create template';
-      setStatus('Error: ' + message);
-    },
-  });
-
-  const handleAddExerciseToTemplate = () => {
-    if (!exerciseToAdd) return;
-    const ex = exercises.find((e) => e.name === exerciseToAdd || e.id === exerciseToAdd);
-    if (!ex) return;
-    setSelectedExercises((prev) => [...prev, { exerciseId: ex.id, exerciseName: ex.name, targetSets: 3, targetReps: 10 }]);
-    setExerciseToAdd('');
+  const handleDisconnectAthlete = () => {
+    setShowDisconnectConfirm(true);
   };
 
-  const removeExerciseFromTemplate = (idx: number) => setSelectedExercises((prev) => prev.filter((_, i) => i !== idx));
-  const updateTargetSets = (idx: number, val: number) => setSelectedExercises((prev) => prev.map((item, i) => (i === idx ? { ...item, targetSets: val } : item)));
-  const updateTargetReps = (idx: number, val: number) => setSelectedExercises((prev) => prev.map((item, i) => (i === idx ? { ...item, targetReps: val } : item)));
-
-  const handleDisconnectAthlete = async () => {
-    /* oxlint-disable no-alert */
-    if (window.confirm(`Disconnect athlete "${selectedAthlete?.name || 'this athlete'}"?`)) {
-      try {
-        const { error } = await supabase.rpc('disconnect_coach', { target_athlete_id: selectedAthleteId });
-        if (error) throw error;
-        queryClient.invalidateQueries({ queryKey: ['coach_athletes'] });
-        switchAthlete('');
-      } catch (err: unknown) {
-        console.error('Failed to disconnect athlete:', err);
-        const message = err instanceof Error ? err.message : (err as { message?: string })?.message || 'Failed to disconnect athlete';
-        alert(message);
-      }
+  const handleConfirmDisconnect = async () => {
+    if (!selectedAthleteId) return;
+    setIsDisconnecting(true);
+    setDisconnectStatus(null);
+    try {
+      const { error } = await supabase.rpc('disconnect_coach', { target_athlete_id: selectedAthleteId });
+      if (error) throw error;
+      setShowDisconnectConfirm(false);
+      queryClient.invalidateQueries({ queryKey: ['coach_athletes'] });
+      switchAthlete('');
+    } catch (err: unknown) {
+      console.error('Failed to disconnect athlete:', err);
+      const message = err instanceof Error ? err.message : (err as { message?: string })?.message || 'Failed to disconnect athlete';
+      setDisconnectStatus({ type: 'error', message });
+      setShowDisconnectConfirm(false);
+    } finally {
+      setIsDisconnecting(false);
     }
-    /* oxlint-enable no-alert */
   };
 
   const isCoachReadError = isExercisesError || isTemplatesError || isAthleteNutritionError || isAthleteProfileError;
@@ -304,11 +261,20 @@ export const CoachCockpit: React.FC = () => {
       <div className="bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-transparent border border-cyan-500/20 rounded-3xl p-5 shadow-2xl space-y-4">
         <div className="flex items-center gap-2">
           <Shield className="w-5 h-5 text-cyan-400" />
-          <h2 className="text-base font-black text-white uppercase tracking-wider">Coach Dashboard</h2>
+          <h2 className="text-base font-bold text-white uppercase tracking-wider">Coach Dashboard</h2>
         </div>
         <p className="text-xs text-zinc-400">Manage athletes, track training progress & nutrition compliance, and build workout templates.</p>
         <CoachAthleteSwitcher selectedAthleteId={selectedAthleteId} selectedAthlete={selectedAthlete} athletes={athletes} onSwitchAthlete={switchAthlete} onDisconnectAthlete={handleDisconnectAthlete} />
       </div>
+
+      {disconnectStatus && (
+        <StatusBanner
+          tone={disconnectStatus.type}
+          message={disconnectStatus.message}
+          testId="coach-disconnect-status"
+          className="mb-4"
+        />
+      )}
 
       {/* Coach Read Error Banner */}
       <StatusBanner
@@ -323,216 +289,99 @@ export const CoachCockpit: React.FC = () => {
         }
       />
 
-      {/* Segmented Tab Controls (Visible only on mobile <640px) */}
-      <div className="flex sm:hidden bg-zinc-900 p-1 rounded-2xl border border-zinc-800 gap-1">
-        {(['activity', 'macros', 'templates'] as const).map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setCoachTab(tab)}
-            data-testid={`coach-tab-${tab}`}
-            aria-label={tab === 'activity' ? 'Activity & Progress' : tab === 'macros' ? 'Macro Targets' : 'Workout Templates'}
-            className={`flex-1 min-h-[44px] px-3 py-2 text-xs font-bold rounded-xl transition touch-manipulation flex items-center justify-center ${coachTab === tab ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' : 'text-zinc-400 hover:text-white'}`}
-          >
-            <span className="hidden min-[420px]:inline">{tab === 'activity' ? 'Activity & Progress' : tab === 'macros' ? 'Macro Targets' : 'Workout Templates'}</span>
-            <span className="min-[420px]:hidden capitalize">{tab}</span>
-          </button>
-        ))}
-      </div>
+      {/* Mobile Tab Control */}
+      <SegmentedTabs<CoachMobileTab>
+        className="sm:hidden mb-4"
+        tabs={[
+          { id: 'activity', label: 'Activity', testId: 'coach-tab-activity', activeClassName: 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30' },
+          { id: 'macros', label: 'Macros', testId: 'coach-tab-macros', activeClassName: 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30' },
+          { id: 'templates', label: 'Templates', testId: 'coach-tab-templates', activeClassName: 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30' },
+        ]}
+        activeTab={coachTab}
+        onChange={setCoachTab}
+        ariaLabel="Coach dashboard tabs"
+      />
 
-      {/* Section 1: Athlete Activity & Progress Timeline */}
-      <div className={`${coachTab === 'activity' ? 'block' : 'hidden'} sm:block space-y-4`}>
+      {/* Section 1: Athlete Activity Timeline */}
+      <div className={`${coachTab === 'activity' ? 'block' : 'hidden'} sm:block`}>
         <CoachAthleteTimeline
-          selectedAthleteId={selectedAthleteId} selectedAthlete={selectedAthlete} timelineDays={timelineDays}
-          athleteWorkoutsWithSets={athleteWorkoutsWithSets} athleteProfile={athleteProfile} exercises={exercises}
-          expandedExercises={expandedExercises} onToggleExercise={toggleExercise} onLoadOlderDays={() => setDaysRange((prev) => prev + 14)}
-          isWorkoutsError={isWorkoutsError} workoutsError={workoutsError} onRetryWorkouts={() => refetchWorkouts()}
+          selectedAthleteId={selectedAthleteId} selectedAthlete={selectedAthlete}
+          timelineDays={timelineDays} athleteWorkoutsWithSets={athleteWorkoutsWithSets}
+          athleteProfile={athleteProfile} exercises={exercises} expandedExercises={expandedExercises}
+          onToggleExercise={toggleExercise} onLoadOlderDays={() => setDaysRange((prev) => prev + 14)}
+          isWorkoutsError={isWorkoutsError} workoutsError={workoutsError} onRetryWorkouts={refetchWorkouts}
+          isWorkoutsLoading={isWorkoutsLoading}
         />
       </div>
 
-      {/* Section 2: Selected Athlete Nutrition Targets Form */}
-      {selectedAthleteId && (
-        <div className={`${coachTab === 'macros' ? 'block' : 'hidden'} sm:block`}>
-          <CoachAthleteMacros
-            selectedAthlete={selectedAthlete} athleteCal={athleteCal} setAthleteCal={setCal} athletePro={athletePro}
-            setAthletePro={setPro} athleteCarb={athleteCarb} setAthleteCarb={setCarb} athleteFat={athleteFat}
-            setAthleteFat={setFat} athleteFiber={athleteFiber} setAthleteFiber={setFiber} isUpdatingMacros={isUpdatingMacros}
-            macroStatus={macroStatus} onUpdateAthleteMacros={handleUpdateAthleteMacros}
-          />
-        </div>
-      )}
+      {/* Section 2: Athlete Macro Goals Editor */}
+      <div className={`${coachTab === 'macros' ? 'block' : 'hidden'} sm:block`}>
+        <CoachAthleteMacros
+          selectedAthlete={selectedAthlete}
+          athleteCal={athleteCal} setAthleteCal={setCal}
+          athletePro={athletePro} setAthletePro={setPro}
+          athleteCarb={athleteCarb} setAthleteCarb={setCarb}
+          athleteFat={athleteFat} setAthleteFat={setFat}
+          athleteFiber={athleteFiber} setAthleteFiber={setFiber}
+          onUpdateAthleteMacros={handleUpdateAthleteMacros}
+          isUpdatingMacros={isUpdatingMacros}
+          macroStatus={macroStatus}
+        />
+      </div>
 
-      {/* Section 3: Routine Template Builder & Library (Item 1 & Conductor Addendum) */}
+      {/* Section 3: Routine Templates (Item 1 & D-P8-2) */}
       <div className={`${coachTab === 'templates' ? 'block' : 'hidden'} sm:block space-y-6 min-w-0`}>
-        {/* Routine Template Builder */}
-        <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-4 sm:p-5 shadow-2xl space-y-4 min-w-0">
-          <div className="flex items-center justify-between border-b border-zinc-800 pb-3 min-w-0">
-            <div className="flex items-center gap-2 min-w-0">
+        <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-4 sm:p-5 shadow-2xl space-y-3 min-w-0">
+          <div className="flex items-center justify-between border-b border-zinc-800 pb-3 min-w-0 gap-3">
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 min-w-0">
               <Layers className="w-4 h-4 text-cyan-400 shrink-0" />
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider truncate">Workout Template Builder</h3>
-            </div>
+              <span className="truncate">Workout Templates ({templates.length})</span>
+            </h3>
             <button
               type="button"
               onClick={() => { setEditingTemplate(null); setIsSheetOpen(true); }}
               data-testid="coach-open-new-template-sheet-btn"
-              className="px-3 py-1.5 min-h-[36px] bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs rounded-xl shadow-neon-cyan transition active:scale-95 flex items-center gap-1.5 touch-manipulation cursor-pointer shrink-0"
+              className="px-3.5 py-2 min-h-[44px] bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs rounded-xl shadow-neon-cyan transition active:scale-95 flex items-center gap-1.5 touch-manipulation cursor-pointer shrink-0"
             >
               <Plus className="w-4 h-4" /><span>+ New Template</span>
             </button>
           </div>
 
-          <div className="space-y-3">
-            <div>
-              <label htmlFor={templateNameId} className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Template Name</label>
-              <input
-                id={templateNameId}
-                type="text"
-                value={templateName}
-                onChange={(e) => setTemplateName(e.target.value)}
-                placeholder="e.g. Hypertrophy Upper Body A"
-                className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none"
-              />
+          {isTemplatesLoading ? (
+            <div data-testid="templates-loading-skeleton" className="space-y-2">
+              <Skeleton variant="card" count={2} ariaLabel="Loading workout templates..." />
             </div>
-
-            <label htmlFor="isMasterCheckbox" className="flex items-center gap-2 min-h-[44px] cursor-pointer">
-              <input
-                type="checkbox"
-                id="isMasterCheckbox"
-                checked={isMaster}
-                onChange={(e) => setIsMaster(e.target.checked)}
-                className="rounded bg-zinc-950 border-border-interactive text-cyan-500 focus:ring-0 w-5 h-5 shrink-0"
-              />
-              <span className="text-xs text-zinc-300 font-bold select-none">Master Template (Available to all athletes)</span>
-            </label>
-
-            {/* Exercise Add Selector */}
-            <div className="flex gap-2 w-full min-w-0">
-              <select
-                value={exerciseToAdd}
-                onChange={(e) => setExerciseToAdd(e.target.value)}
-                aria-label="Choose exercise to add"
-                className="flex-1 min-w-0 max-w-full truncate cursor-pointer bg-zinc-950 border border-border-interactive text-white rounded-xl px-3 py-2 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none min-h-[44px]"
-                data-testid="template-exercise-select"
-              >
-                <option value="">-- Choose Exercise to Add --</option>
-                {exercises.map((ex) => (
-                  <option key={ex.id} value={ex.name}>{ex.name} ({(ex as any).body_parts?.[0] || 'Body'})</option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={handleAddExerciseToTemplate}
-                disabled={!exerciseToAdd}
-                className="bg-zinc-800 hover:bg-zinc-700 text-cyan-300 font-bold px-4 py-2 min-h-[44px] rounded-xl text-xs flex items-center gap-1 border border-border-interactive disabled:opacity-50 touch-manipulation shrink-0"
-                data-testid="add-template-exercise-btn"
-              >
-                <Plus className="w-4 h-4 shrink-0" /><span className="shrink-0">Add</span>
-              </button>
-            </div>
-
-            {/* Added Exercises List */}
-            {selectedExercises.length > 0 && (
-              <div className="space-y-2 pt-2">
-                <span className="text-xs font-bold uppercase text-zinc-400 tracking-wider block">
-                  Exercise Sequence ({selectedExercises.length}):
-                </span>
-                {selectedExercises.map((ex, idx) => (
-                  <div key={idx} className="bg-zinc-950 border border-zinc-800/80 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 min-w-0">
-                    <div className="flex items-center gap-2 min-w-0 flex-1 truncate">
-                      <span className="w-5 h-5 rounded-md bg-zinc-800 text-cyan-400 text-xs font-bold flex items-center justify-center shrink-0">{idx + 1}</span>
-                      <span className="text-xs font-bold text-white truncate min-w-0 flex-1">{ex.exerciseName}</span>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
-                      <div className="flex items-center gap-1.5 text-xs text-zinc-400">
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            min="1"
-                            max="20"
-                            value={ex.targetSets}
-                            onChange={(e) => updateTargetSets(idx, Number(e.target.value) || 1)}
-                            className="w-12 min-h-[44px] bg-zinc-900 border border-border-interactive text-white rounded-lg px-1 py-0.5 text-center text-base sm:text-xs font-bold shrink-0"
-                            title="Target Sets"
-                            data-testid={`template-target-sets-${idx}`}
-                          />
-                          <span className="text-xs shrink-0 text-zinc-400">sets</span>
-                        </div>
-                        <span className="shrink-0">×</span>
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            min="1"
-                            max="100"
-                            value={ex.targetReps}
-                            onChange={(e) => updateTargetReps(idx, Number(e.target.value) || 1)}
-                            className="w-14 min-h-[44px] bg-zinc-900 border border-border-interactive text-white rounded-lg px-1 py-0.5 text-center text-base sm:text-xs font-bold shrink-0"
-                            title="Target Reps"
-                            data-testid={`template-target-reps-${idx}`}
-                          />
-                          <span className="text-xs shrink-0 text-zinc-400">reps</span>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeExerciseFromTemplate(idx)}
-                        className="text-zinc-400 hover:text-rose-400 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center touch-manipulation shrink-0"
-                        title="Remove exercise"
-                        data-testid={`template-remove-ex-${idx}`}
-                      >
-                        <Trash2 className="w-4 h-4 shrink-0" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => createTemplateMutation.mutate()}
-              disabled={createTemplateMutation.isPending || !templateName.trim() || selectedExercises.length === 0}
-              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-3 min-h-[44px] rounded-xl uppercase tracking-wider text-xs shadow-neon-cyan active:scale-95 transition disabled:opacity-50"
-              data-testid="save-template-btn"
-            >
-              {createTemplateMutation.isPending ? 'Saving Template...' : 'Save Template'}
-            </button>
-
+          ) : isTemplatesError ? (
             <StatusBanner
-              message={status || null}
-              tone={status.startsWith('Error:') ? 'error' : 'success'}
-              icon={status.startsWith('Error:') ? undefined : <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />}
+              tone="error"
+              testId="templates-error-banner"
+              message={templatesError instanceof Error ? templatesError.message : 'Failed to load templates'}
+              action={
+                <button
+                  type="button"
+                  onClick={() => refetchTemplates()}
+                  className="px-3 py-1.5 min-h-[44px] text-xs font-bold text-rose-200 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 rounded-xl cursor-pointer"
+                >
+                  Retry
+                </button>
+              }
             />
-          </div>
-        </div>
-
-        {/* Existing Routine Templates */}
-        <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-4 sm:p-5 shadow-2xl space-y-3 min-w-0">
-          <div className="flex items-center justify-between border-b border-zinc-800 pb-3 min-w-0">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 min-w-0">
-              <Layers className="w-4 h-4 text-cyan-400 shrink-0" />
-              <span className="truncate">Workout Templates ({templates.length})</span>
-            </h3>
-          </div>
-
-          {isTemplatesError ? null : templates.length === 0 ? (
-            <div className="p-4 text-center text-zinc-400 text-xs">No workout templates created yet. Use the builder above to create one.</div>
+          ) : templates.length === 0 ? (
+            <div className="p-4 text-center text-zinc-400 text-xs">No templates yet. Create one with New template.</div>
           ) : (
             <div className="space-y-2">
               {templates.map((tpl) => (
                 <div key={tpl.id} className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-3 flex items-center justify-between shadow-sm gap-2 min-w-0">
                   <div className="min-w-0 flex-1">
-                    <div className="font-extrabold text-white text-xs flex items-center gap-2 min-w-0">
+                    <div className="font-bold text-white text-xs flex items-center gap-2 min-w-0">
                       <span className="truncate">{tpl.name}</span>
                       {tpl.is_master && <span className="bg-cyan-500/20 text-cyan-300 text-xs px-1.5 py-0.5 rounded font-bold shrink-0">Master</span>}
                     </div>
-                    {tpl.exercises && <div className="text-xs text-zinc-400 mt-0.5 truncate">{tpl.exercises.length} exercises configured</div>}
                   </div>
                   <button
                     type="button"
                     onClick={() => { setEditingTemplate(tpl); setIsSheetOpen(true); }}
-                    className="text-xs text-cyan-400 hover:text-cyan-300 px-2.5 py-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 min-h-[36px] font-bold touch-manipulation shrink-0"
+                    className="text-xs text-cyan-400 hover:text-cyan-300 px-3 py-2 rounded-xl border border-cyan-500/30 bg-cyan-500/10 min-h-[44px] font-bold touch-manipulation shrink-0 flex items-center justify-center cursor-pointer"
                   >
                     Edit
                   </button>
@@ -542,12 +391,26 @@ export const CoachCockpit: React.FC = () => {
           )}
         </div>
 
-        {/* Edit / New Template Sheet */}
         <EditTemplateSheet
           isOpen={isSheetOpen}
           onClose={() => { setIsSheetOpen(false); setEditingTemplate(null); }}
           template={editingTemplate}
           assignToAthleteId={selectedAthleteId || undefined}
+          onSaved={() => {
+            void invalidateExerciseDomain(queryClient, user?.id);
+            queryClient.invalidateQueries({ queryKey: ['routine_templates'] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.routineCatalog.all });
+            void refetchTemplates();
+          }}
+          exercises={exercises}
+        />
+
+        <ConfirmDialog
+          isOpen={showDisconnectConfirm}
+          title={`Disconnect ${selectedAthlete?.name || 'this athlete'}?`}
+          consequence={`Are you sure you want to disconnect from ${selectedAthlete?.name || 'this athlete'}? They will no longer appear in your roster and you will lose access to their training and nutrition data.`}
+          confirmLabel="Disconnect" cancelLabel="Cancel" isDestructive={true} isLoading={isDisconnecting}
+          testId="disconnect-athlete-confirm-dialog" onCancel={() => setShowDisconnectConfirm(false)} onConfirm={handleConfirmDisconnect}
         />
       </div>
     </div>

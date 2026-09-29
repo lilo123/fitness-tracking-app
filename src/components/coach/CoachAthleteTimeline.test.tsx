@@ -205,4 +205,17 @@ describe('CoachAthleteTimeline accessibility (NEW-15)', () => {
     // Set row: 5 reps × 225 lbs
     expect(container.textContent).toContain('5 reps × 225 lbs');
   });
+
+  it('renders skeleton while athlete workouts query is fetching (C23)', () => {
+    const { container } = render(
+      <CoachAthleteTimeline
+        {...defaultProps}
+        isLoading={true}
+      />
+    );
+    expect(container.querySelector('[data-testid="timeline-loading-skeleton"]')).not.toBeNull();
+    // Empty state is not rendered
+    expect(container.textContent).not.toContain('No workouts or nutrition logged for this athlete yet');
+  });
+
 });
