@@ -1,4 +1,3 @@
-import { usePrMode } from '../../hooks/usePrMode';
 import { useMemo, useContext } from 'react';
 import { AuthContext } from '../../context/AuthContextTypes';
 import type { PrMode } from '../../lib/prComparator';

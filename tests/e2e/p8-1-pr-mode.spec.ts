@@ -39,7 +39,7 @@ interface SeedData {
 
 let seedData: SeedData;
 
-function cleanupUsers() {
+async function cleanupUsers() {
   const sql = `
     DELETE FROM public.coach_athlete_links WHERE athlete_id IN (
       SELECT id FROM auth.users WHERE email = '${ATHLETE_EMAIL}'
@@ -60,6 +60,7 @@ function cleanupUsers() {
     DELETE FROM public.workouts WHERE user_id IN (
       SELECT id FROM auth.users WHERE email = '${ATHLETE_EMAIL}'
     );
+    UPDATE public.users SET pr_mode = 'weight' WHERE email = '${ATHLETE_EMAIL}';
     DELETE FROM public.users WHERE email = '${ATHLETE_EMAIL}';
     DELETE FROM auth.users WHERE email = '${ATHLETE_EMAIL}';
   `;
@@ -73,7 +74,7 @@ function cleanupUsers() {
 }
 
 async function seedDataAndUser(): Promise<SeedData> {
-  cleanupUsers();
+  await cleanupUsers();
 
   const resAthlete = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
     method: 'POST',
@@ -162,15 +163,14 @@ async function loginAsAthlete(page: Page) {
   await page.waitForURL('**/workout');
 }
 
-test.use({ baseURL: process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:5247' });
-
 test.describe('P8.1 PR Mode Setting E2E', () => {
   test.beforeAll(async () => {
+    await cleanupUsers();
     seedData = await seedDataAndUser();
   });
 
-  test.afterAll(() => {
-    cleanupUsers();
+  test.afterAll(async () => {
+    await cleanupUsers();
   });
 
   test('Settings toggle switches PR mode between Max weight and Estimated 1RM across History and /workout', async ({
@@ -241,10 +241,10 @@ test.describe('P8.1 PR Mode Setting E2E', () => {
     await expect(sheetPrSummary).toContainText('e1RM 240 lbs');
 
     // Close sheet
-    const closeBtn = page.locator('[data-testid="sheet-close-btn"]');
-    if (await closeBtn.isVisible()) {
-      await closeBtn.click();
-    }
+    const closeBtn = page.getByRole('button', { name: /^Close/i });
+    await expect(closeBtn).toBeVisible({ timeout: 10000 });
+    await closeBtn.click();
+    await expect(sheetPrSummary).not.toBeVisible();
 
     // 4. Verify /workout ExerciseCard trophy chip updated to e1RM
     await page.goto('/workout?routine=P81%20PR%20Test%20Routine');

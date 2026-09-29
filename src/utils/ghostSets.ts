@@ -107,22 +107,9 @@ export function getExerciseBenchmarks(
   allSets: (WorkoutSet & { workout_date?: string; date?: string })[],
   currentDateStr?: string,
   unit: WeightUnit = 'lb',
-  mode?: PrMode
+  mode: PrMode = 'weight'
 ): ExerciseBenchmarks {
-  let resolvedMode: PrMode = mode || 'weight';
-  if (!mode && typeof window !== 'undefined' && window.localStorage) {
-    try {
-      const stored = localStorage.getItem('cybergym_user');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed?.pr_mode === 'e1rm') {
-          resolvedMode = 'e1rm';
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }
+  const resolvedMode: PrMode = mode;
   const normCurrentDate = currentDateStr ? normalizeDateStr(currentDateStr) : '';
 
   const validSets = allSets.filter((s) => {
@@ -318,22 +305,9 @@ export const DEFAULT_WORKOUT_TEMPLATES: WorkoutTemplateDefinition[] = [
 export function mergeBenchmarks(
   benchmarks: Record<string, ExerciseBenchmarks>,
   todaySets: Array<WorkoutSet & { workout_date?: string; date?: string }>,
-  mode?: PrMode
+  mode: PrMode = 'weight'
 ): Record<string, ExerciseBenchmarks> {
-  let resolvedMode: PrMode = mode || 'weight';
-  if (!mode && typeof window !== 'undefined' && window.localStorage) {
-    try {
-      const stored = localStorage.getItem('cybergym_user');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed?.pr_mode === 'e1rm') {
-          resolvedMode = 'e1rm';
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }
+  const resolvedMode: PrMode = mode;
   const result: Record<string, ExerciseBenchmarks> = {};
 
   // Clone existing benchmarks

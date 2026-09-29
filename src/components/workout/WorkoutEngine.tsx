@@ -415,7 +415,7 @@ export const WorkoutEngine: React.FC = () => {
                 const exerciseSetsToday = rawSets.filter(
                   (s) => s.id !== pendingSetId && (!s.id || !pendingDeletedSetIds.has(s.id))
                 );
-                const benchmarks = getExerciseBenchmarks(exName, userLogs, workoutDate, unit);
+                const benchmarks = getExerciseBenchmarks(exName, userLogs, workoutDate, unit, profile?.pr_mode || 'weight');
                 const isExpanded = expandedExercises.has(exName);
                 const targetCount = targetSetCounts[exName] || 3;
                 const ghostValues = computeGhostSets(exName, targetCount, userLogs, workoutDate, unit);
