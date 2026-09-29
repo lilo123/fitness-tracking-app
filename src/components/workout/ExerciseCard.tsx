@@ -177,7 +177,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
             onToggleAccordion(exName);
           }
         }}
-        className="w-full flex items-center justify-between cursor-pointer select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 rounded-xl touch-manipulation text-left"
+        className="w-full flex items-center justify-between cursor-pointer select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 rounded-xl touch-manipulation text-left relative before:absolute before:inset-x-0 before:-inset-y-1.5 before:min-w-[44px] before:min-h-[44px] before:content-['']"
         aria-label={`${exName}, ${isExpanded ? 'collapse' : 'expand'} exercise`}
       >
         <div className="flex items-center gap-2 min-w-0 pr-2">
@@ -255,24 +255,24 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
       {/* LINE 3: Control Row (W32, W33, STD-INT-9) */}
       <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-zinc-800/60">
         {/* Stepper for target sets */}
-        <div className="flex items-center bg-zinc-800/90 border border-zinc-700/70 rounded-xl h-9 px-1 text-xs">
+        <div className="flex items-center bg-zinc-800/90 border border-zinc-700/70 rounded-xl h-11 px-0.5 text-xs">
           <button
             type="button"
             onClick={() => onAdjustTargetSets(exName, -1)}
             disabled={targetCount <= Math.max(1, setsToday.length)}
-            className="relative h-9 w-7 flex items-center justify-center text-zinc-300 hover:text-white disabled:opacity-30 disabled:hover:text-zinc-300 font-bold touch-manipulation cursor-pointer before:absolute before:-inset-y-1 before:-inset-x-1.5 before:content-[''] select-none"
+            className="relative h-11 w-11 flex items-center justify-center text-zinc-300 hover:text-white disabled:opacity-30 disabled:hover:text-zinc-300 font-bold touch-manipulation cursor-pointer select-none text-sm"
             title="Decrease target sets"
             aria-label={`Decrease target sets for ${exName}`}
           >
             −
           </button>
-          <span className="font-semibold text-white px-1.5 text-xs tabular-nums select-none">
+          <span className="font-semibold text-white px-1 text-xs tabular-nums select-none">
             {targetCount}
           </span>
           <button
             type="button"
             onClick={() => onAdjustTargetSets(exName, 1)}
-            className="relative h-9 w-7 flex items-center justify-center text-zinc-300 hover:text-white font-bold touch-manipulation cursor-pointer before:absolute before:-inset-y-1 before:-inset-x-1.5 before:content-[''] select-none"
+            className="relative h-11 w-11 flex items-center justify-center text-zinc-300 hover:text-white font-bold touch-manipulation cursor-pointer select-none text-sm"
             title="Increase target sets"
             aria-label={`Increase target sets for ${exName}`}
           >
@@ -286,7 +286,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
             <button
               type="button"
               onClick={() => onMoveExercise(exIndex, -1)}
-              className="relative h-9 w-9 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 border border-border-interactive flex items-center justify-center text-zinc-300 hover:text-cyan-400 transition touch-manipulation cursor-pointer before:absolute before:-inset-1 before:content-['']"
+              className="relative h-11 w-11 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 border border-border-interactive flex items-center justify-center text-zinc-300 hover:text-cyan-400 transition touch-manipulation cursor-pointer"
               title="Move up"
               aria-label={`Move ${exName} up`}
             >
@@ -298,7 +298,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
             <button
               type="button"
               onClick={() => onMoveExercise(exIndex, 1)}
-              className="relative h-9 w-9 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 border border-border-interactive flex items-center justify-center text-zinc-300 hover:text-cyan-400 transition touch-manipulation cursor-pointer before:absolute before:-inset-1 before:content-['']"
+              className="relative h-11 w-11 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 border border-border-interactive flex items-center justify-center text-zinc-300 hover:text-cyan-400 transition touch-manipulation cursor-pointer"
               title="Move down"
               aria-label={`Move ${exName} down`}
             >
@@ -309,7 +309,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
           <button
             type="button"
             onClick={() => onRemoveExercise(exIndex)}
-            className="relative h-9 w-9 rounded-xl bg-zinc-800/80 hover:bg-rose-500/20 border border-border-interactive flex items-center justify-center text-zinc-400 hover:text-rose-400 transition touch-manipulation cursor-pointer before:absolute before:-inset-1 before:content-['']"
+            className="relative h-11 w-11 rounded-xl bg-zinc-800/80 hover:bg-rose-500/20 border border-border-interactive flex items-center justify-center text-zinc-400 hover:text-rose-400 transition touch-manipulation cursor-pointer"
             title="Remove from workout"
             aria-label={`Remove ${exName} from workout`}
           >
@@ -322,14 +322,14 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
       {isExpanded && (
         <div id={`exercise-card-body-${exIndex}`} className="pt-1 space-y-1">
           {/* 5-Column Table Header */}
-          <div className="grid grid-cols-12 gap-1 text-xs font-bold uppercase tracking-wider text-zinc-400 px-2 pb-1 text-center">
+          <div className="grid grid-cols-12 gap-1 text-xs font-bold uppercase tracking-wider text-zinc-400 px-1.5 pb-1 text-center">
             <div className="col-span-2">Set</div>
-            <div className="col-span-3">Previous</div>
+            <div className="col-span-2">Previous</div>
             <div className="col-span-3">
               <span className="sr-only">Weight</span>
               <span aria-hidden="true" className="capitalize">{weightUnitLabel(unit)}</span>
             </div>
-            <div className="col-span-2">Reps</div>
+            <div className="col-span-3">Reps</div>
             <div className="col-span-2 text-right pr-1">
               <span className="sr-only">Action</span>
               <span aria-hidden="true">Log</span>
@@ -421,7 +421,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
                 type="button"
                 onClick={() => onBatchLogExercise(exName, targetCount, ghostValues, setsToday)}
                 disabled={isBatchPending}
-                className="min-h-[40px] px-3.5 text-xs font-bold text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 rounded-xl transition flex items-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-50 touch-manipulation cursor-pointer relative before:absolute before:-inset-y-0.5 before:-inset-x-0.5 before:content-['']"
+                className="min-h-[44px] px-3.5 text-xs font-bold text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 rounded-xl transition flex items-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-50 touch-manipulation cursor-pointer"
                 data-testid={`batch-log-exercise-btn-${exIndex}`}
               >
                 <Check className="w-4 h-4 text-cyan-400 stroke-[2.5]" />

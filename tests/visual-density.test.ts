@@ -5959,6 +5959,8 @@ test.describe("P8 Route-Wide Density & Tap Grid", () => {
       }
 
       function hasPseudoOverlay44(el: Element): boolean {
+        const replacedTags = ["INPUT", "SELECT", "TEXTAREA", "IMG", "VIDEO"];
+        if (replacedTags.includes(el.tagName)) return false;
         for (const pseudo of ["::before", "::after"]) {
           const ps = window.getComputedStyle(el, pseudo);
           if (ps.content && ps.content !== "none" && ps.content !== "normal") {
@@ -6084,15 +6086,88 @@ test.describe("P8 Route-Wide Density & Tap Grid", () => {
         await page.click('button[type="submit"]');
         await page.waitForURL("**/workout");
 
-        await page.goto(route);
-        await page.waitForLoadState("domcontentloaded");
-        await page.waitForTimeout(500);
+        if (route === "/workout") {
+          const testWorkoutId = 'e8000000-0000-0000-0000-000000000095';
+          const testSetId = 'e8000000-0000-0000-0000-000000000096';
+          const psqlCmd = getPsqlCommand();
 
-        const offenders = await checkRouteTapGrid(page, route);
-        expect(
-          offenders,
-          `Tap grid offenders on ${route} at 320px:\n${JSON.stringify(offenders, null, 2)}`
-        ).toHaveLength(0);
+          // Fresh-seed hygiene: clean up any existing test row before test
+          execSync(psqlCmd, {
+            input: `
+              DELETE FROM public.sets WHERE id = '${testSetId}';
+              DELETE FROM public.workouts WHERE id = '${testWorkoutId}';
+            `,
+            encoding: 'utf8',
+          });
+
+          try {
+            // --- Phase 1: Planning State (controls visible, card 0 expanded with ghost sets & batch-log) ---
+            await page.goto('/workout?routine=' + encodeURIComponent('Workout A (Push, Quads & Core)'));
+            await page.waitForLoadState('domcontentloaded');
+            await expect(page.locator('[data-testid="exercise-card-0"]')).toBeVisible();
+            await expect(page.locator('#exercise-card-body-0')).toBeVisible();
+
+            const planningOffenders = await checkRouteTapGrid(page, route);
+            expect(
+              planningOffenders,
+              `Tap grid offenders on ${route} at 320px (planning state):\n${JSON.stringify(planningOffenders, null, 2)}`
+            ).toHaveLength(0);
+
+            // --- Phase 2: Active-Logging State (seeded user-scoped set on today date) ---
+            const seedSql = `
+              DO $$
+              DECLARE
+                v_athlete_id uuid;
+                v_ex_id uuid;
+                v_workout_id uuid;
+              BEGIN
+                SELECT id INTO v_athlete_id FROM public.users WHERE email = 'athlete@cybergym.io' LIMIT 1;
+                SELECT id INTO v_ex_id FROM public.exercises WHERE name = 'Incline Bench Press' LIMIT 1;
+
+                INSERT INTO public.workouts (id, user_id, name, date, workout_date, created_at)
+                VALUES ('${testWorkoutId}', v_athlete_id, 'Workout A (Push, Quads & Core)', CURRENT_DATE, CURRENT_DATE, now())
+                ON CONFLICT (user_id, workout_date) DO UPDATE SET name = public.workouts.name
+                RETURNING id INTO v_workout_id;
+
+                INSERT INTO public.sets (id, workout_id, exercise_id, weight, reps, set_index, set_type, created_at)
+                VALUES ('${testSetId}', v_workout_id, v_ex_id, 135, 10, 1, 'working', now())
+                ON CONFLICT (id) DO UPDATE SET weight = 135, reps = 10;
+              END $$;
+            `;
+            execSync(psqlCmd, { input: seedSql, encoding: 'utf8' });
+
+            await page.goto('/workout?routine=' + encodeURIComponent('Workout A (Push, Quads & Core)'));
+            await page.waitForLoadState('domcontentloaded');
+            await expect(page.locator('[data-testid="logged-set-row-0-0"]')).toBeVisible();
+
+            const activeLoggingOffenders = await checkRouteTapGrid(page, route);
+            expect(
+              activeLoggingOffenders,
+              `Tap grid offenders on ${route} at 320px (active-logging state):\n${JSON.stringify(activeLoggingOffenders, null, 2)}`
+            ).toHaveLength(0);
+          } finally {
+            try {
+              const cleanupSql = `
+                DELETE FROM public.sets WHERE id = '${testSetId}';
+                DELETE FROM public.workouts WHERE id = '${testWorkoutId}';
+              `;
+              execSync(psqlCmd, { input: cleanupSql, encoding: 'utf8' });
+            } catch (cleanupErr) {
+              console.error('[visual-density workout cleanup error]:', cleanupErr);
+              throw cleanupErr;
+            }
+          }
+        } else {
+          await page.goto(route);
+          await page.waitForLoadState('domcontentloaded');
+          await page.waitForTimeout(500);
+
+          const offenders = await checkRouteTapGrid(page, route);
+          expect(
+            offenders,
+            `Tap grid offenders on ${route} at 320px:\n${JSON.stringify(offenders, null, 2)}`
+          ).toHaveLength(0);
+        }
       } finally {
         await page.close();
       }
