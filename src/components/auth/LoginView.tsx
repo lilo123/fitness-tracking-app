@@ -98,12 +98,12 @@ export const LoginView: React.FC = () => {
       {/* Brand card */}
       <div className="text-center mb-8">
         <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-[0_0_25px_rgba(6,182,212,0.4)] mx-auto mb-3">
-          <Zap className="w-8 h-8 text-zinc-950 fill-zinc-950 font-black" />
+          <Zap className="w-8 h-8 text-zinc-950 fill-zinc-950" />
         </div>
-        <h1 className="text-2xl font-black tracking-wider uppercase bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
+        <h1 className="text-2xl font-bold tracking-wider uppercase bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
           CyberGym
         </h1>
-        <p className="text-xs text-zinc-400 font-mono tracking-widest mt-1 uppercase">
+        <p className="text-xs text-zinc-400 tracking-wider mt-1 uppercase">
           Fitness & Nutrition
         </p>
       </div>
@@ -117,7 +117,7 @@ export const LoginView: React.FC = () => {
                 setMode('signin');
                 setError('');
               }}
-              className={`flex-1 py-2 min-h-[44px] text-xs font-black uppercase tracking-wider rounded-xl transition flex items-center justify-center touch-manipulation ${
+              className={`flex-1 py-2 min-h-[44px] text-xs font-bold uppercase tracking-wider rounded-xl transition flex items-center justify-center touch-manipulation ${
                 mode === 'signin'
                   ? 'bg-cyan-500 text-black shadow-neon-cyan'
                   : 'text-zinc-400 hover:text-white bg-transparent'
@@ -131,7 +131,7 @@ export const LoginView: React.FC = () => {
                 setMode('register');
                 setError('');
               }}
-              className={`flex-1 py-2 min-h-[44px] text-xs font-black uppercase tracking-wider rounded-xl transition flex items-center justify-center touch-manipulation ${
+              className={`flex-1 py-2 min-h-[44px] text-xs font-bold uppercase tracking-wider rounded-xl transition flex items-center justify-center touch-manipulation ${
                 mode === 'register'
                   ? 'bg-cyan-500 text-black shadow-neon-cyan'
                   : 'text-zinc-400 hover:text-white bg-transparent'
@@ -229,7 +229,7 @@ export const LoginView: React.FC = () => {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    className="absolute right-1 top-1/2 -translate-y-1/2 min-h-[44px] min-w-[44px] flex items-center justify-center text-zinc-500 hover:text-zinc-300 transition touch-manipulation"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 min-h-[44px] min-w-[44px] flex items-center justify-center text-zinc-400 hover:text-zinc-200 transition touch-manipulation"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -260,7 +260,7 @@ export const LoginView: React.FC = () => {
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
-                    className="absolute right-1 top-1/2 -translate-y-1/2 min-h-[44px] min-w-[44px] flex items-center justify-center text-zinc-500 hover:text-zinc-300 transition touch-manipulation"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 min-h-[44px] min-w-[44px] flex items-center justify-center text-zinc-400 hover:text-zinc-200 transition touch-manipulation"
                   >
                     {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -287,7 +287,7 @@ export const LoginView: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black py-3 min-h-[44px] rounded-xl uppercase tracking-wider text-xs shadow-[0_0_15px_rgba(6,182,212,0.3)] active:scale-95 transition disabled:opacity-50"
+              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-3 min-h-[44px] rounded-xl uppercase tracking-wider text-xs shadow-[0_0_15px_rgba(6,182,212,0.3)] active:scale-95 transition disabled:opacity-50"
             >
               {loading ? (mode === 'register' ? 'Creating Account...' : mode === 'signin' ? 'Signing in...' : 'Processing...') : (
                 mode === 'register' ? 'Create Account' : mode === 'signin' ? 'Sign In' : 'Send Reset Link'

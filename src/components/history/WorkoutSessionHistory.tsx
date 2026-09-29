@@ -299,17 +299,17 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
         <div className="flex items-center justify-between border-b border-zinc-800 pb-3 gap-2">
           {/* H21: min-w-0 flex-1 truncate session title at 320px */}
           <div className="min-w-0 flex-1">
-            <h3 className="text-sm font-black text-white truncate">{session.name || 'Workout Session'}</h3>
-            <div className="text-xs font-mono text-cyan-400 mt-0.5">
+            <h3 className="text-sm font-bold text-white truncate">{session.name || 'Workout Session'}</h3>
+            <div className="text-xs text-cyan-400 tabular-nums mt-0.5">
               {formatShortDate(civilDate)}
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <div className="text-right">
-              <div className="text-xs font-mono font-bold text-amber-400">
+              <div className="text-xs font-bold text-amber-400 tabular-nums">
                 {totalVolume > 0 ? formatVolume(totalVolume, unit) : `0 ${weightUnitLabel(unit)} (BW)`}
               </div>
-              <div className="text-xs text-zinc-400 font-mono">
+              <div className="text-xs text-zinc-400 tabular-nums">
                 {setCount} sets completed
               </div>
             </div>
@@ -367,7 +367,7 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
                 {sets.length >= 500 && (
                   <div
                     data-testid={`session-truncation-warning-${session.id}`}
-                    className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2 text-amber-400 text-xs font-mono"
+                    className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2 text-amber-400 text-xs"
                   >
                     Note: Reached maximum display limit of 500 sets for this workout.
                   </div>
@@ -380,14 +380,14 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
                     <div className="flex items-center justify-between border-b border-zinc-800/60 pb-2">
                       <div className="flex items-center gap-2 min-w-0">
                         <Dumbbell className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                        <span className="font-extrabold text-white text-xs truncate">
+                        <span className="font-bold text-white text-xs truncate">
                           {group.exerciseName}
                         </span>
                         <span className="px-1.5 py-0.5 rounded text-xs font-bold bg-zinc-800/90 text-zinc-300 border border-zinc-700/60 shrink-0">
                           {group.bodyPart}
                         </span>
                       </div>
-                      <div className="text-xs font-mono font-bold text-amber-400/90 shrink-0 ml-2">
+                      <div className="text-xs font-bold text-amber-400/90 tabular-nums shrink-0 ml-2">
                         {group.totalVolume > 0 ? formatVolume(group.totalVolume, unit) : `0 ${weightUnitLabel(unit)} (BW)`}
                       </div>
                     </div>
@@ -400,11 +400,11 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
                             key={set.id || sIdx}
                             className="bg-zinc-900/90 border border-zinc-800/60 rounded-xl px-2.5 py-1.5 flex items-center justify-between text-xs"
                           >
-                            <div className="font-mono text-xs text-zinc-400 font-bold">
+                            <div className="text-xs text-zinc-400 font-bold tabular-nums">
                               SET {setNumber}
                             </div>
                             <div className="flex items-center gap-2">
-                              <div className="font-mono font-bold text-cyan-300">
+                              <div className="font-bold text-cyan-300 tabular-nums">
                                 {formatWeight(set.weight, unit, { showUnit: true })} × {set.reps} reps
                                 {set.rpe != null && (
                                   <span className="text-zinc-400 ml-1 text-xs">@{set.rpe}</span>
@@ -474,7 +474,7 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
           {displayedSessions.length > FALLBACK_WINDOW && (
             <div
               data-testid="virtualizer-fallback-notice"
-              className="text-xs text-zinc-400 text-center py-2 font-mono"
+              className="text-xs text-zinc-400 text-center py-2"
             >
               Showing first {FALLBACK_WINDOW} of {displayedSessions.length} (virtualization disabled)
             </div>

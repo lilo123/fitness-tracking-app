@@ -30,7 +30,7 @@ const HistoryView = React.lazy(() =>
 );
 
 const LazyFallback: React.FC = () => (
-  <div className="min-h-[60vh] flex items-center justify-center p-12 text-cyan-400 font-mono text-xs">
+  <div className="min-h-[60vh] flex items-center justify-center p-12 text-cyan-400 text-xs">
     Loading...
   </div>
 );
@@ -59,7 +59,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center space-y-4">
         <div className="w-8 h-8 rounded-full border-2 border-cyan-500/20 border-t-cyan-400 animate-spin" />
-        <div className="text-cyan-400 font-mono text-xs tracking-wider">Connecting to CyberGym...</div>
+        <div className="text-cyan-400 text-xs tracking-wider">Connecting to CyberGym...</div>
         {showRetry && (
           <button
             type="button"

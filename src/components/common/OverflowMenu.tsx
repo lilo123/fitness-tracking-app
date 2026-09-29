@@ -61,7 +61,7 @@ export const OverflowMenu: React.FC<OverflowMenuProps> = ({ ariaLabel, items, te
         aria-expanded={open}
         data-testid={testId}
         onClick={() => setOpen((v) => !v)}
-        className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-zinc-500 hover:text-cyan-400 hover:bg-cyan-500/10 transition touch-manipulation"
+        className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-zinc-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition touch-manipulation"
       >
         <MoreHorizontal className="w-4 h-4" />
       </button>

@@ -75,7 +75,7 @@ export const MacroRing: React.FC<MacroRingProps> = ({
           <span className={`text-sm font-bold tabular-nums leading-none tracking-tight ${colorClass}`}>
             {formattedCurrent}
           </span>
-          <span className="text-xs font-normal text-zinc-500 tabular-nums leading-none tracking-tight mt-0.5">
+          <span className="text-xs font-normal text-zinc-400 tabular-nums leading-none tracking-tight mt-0.5">
             /{formattedTarget}
           </span>
         </div>
@@ -96,7 +96,7 @@ export const MacroRing: React.FC<MacroRingProps> = ({
           </div>
         )}
         {!subtitle && (
-          <div className="text-xs font-normal text-zinc-500 tabular-nums">
+          <div className="text-xs font-normal text-zinc-400 tabular-nums">
             {displayPercentage}%
           </div>
         )}

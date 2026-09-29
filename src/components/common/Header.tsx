@@ -1,15 +1,19 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
-import { Zap, Shield, LogOut } from 'lucide-react';
+import { Zap, Shield, LogOut, LayoutDashboard } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const { user, profile, role, signOut, switchRole } = useAuth();
   const isOnline = useOnlineStatus();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const isVerifiedCoach = profile?.role === 'coach';
+  const isCoachMode = role === 'coach';
+  const isOffCoach = location.pathname.replace(/\/$/, '') !== '/coach';
+  const showCoachDashboard = Boolean(user && isVerifiedCoach && isCoachMode && isOffCoach);
 
   const handleToggleRole = () => {
     const nextRole = role === 'coach' ? 'athlete' : 'coach';
@@ -27,13 +31,13 @@ export const Header: React.FC = () => {
         {/* Brand */}
         <Link to="/workout" className="flex items-center gap-2.5 min-w-0 group">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-[0_0_15px_rgba(6,182,212,0.4)] shrink-0 group-hover:scale-105 transition-transform">
-            <Zap className="w-4 h-4 text-zinc-950 fill-zinc-950 font-black" />
+            <Zap className="w-4 h-4 text-zinc-950 fill-zinc-950" />
           </div>
           <div className="min-w-0">
-            <h1 className="font-black tracking-wider text-base uppercase bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent truncate">
+            <h1 className="font-bold tracking-wider text-base uppercase bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent truncate">
               CyberGym
             </h1>
-            <div className="text-[10px] font-mono tracking-widest uppercase text-cyan-400 font-semibold -mt-1 truncate">
+            <div className="text-xs font-semibold tracking-wider text-cyan-400 -mt-1 truncate">
               Fitness & Nutrition
             </div>
           </div>
@@ -41,6 +45,17 @@ export const Header: React.FC = () => {
 
         {/* Right Action Badges */}
         <div className="flex items-center gap-2 shrink-0">
+          {showCoachDashboard && (
+            <Link
+              to="/coach"
+              data-testid="coach-dashboard-link"
+              aria-label="Coach dashboard"
+              title="Coach dashboard"
+              className="text-cyan-300 bg-cyan-500/15 border border-cyan-500/40 hover:bg-cyan-500/25 min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center transition touch-manipulation focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-zinc-900"
+            >
+              <LayoutDashboard className="w-4 h-4 text-cyan-400" aria-hidden="true" />
+            </Link>
+          )}
           {/* Online / Offline Status Badge */}
           {/* oxlint-disable-next-line jsx-a11y/prefer-tag-over-role */}
           <div

@@ -9,15 +9,19 @@ import { expectNoA11yViolations } from '../../test/a11y';
 
 import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory } from '../../test/supabaseBuilderMock';
 
+const { mockUserProfile } = vi.hoisted(() => ({
+  mockUserProfile: {
+    id: 'test-user',
+    role: 'coach',
+    email: 'coach@cybergym.io',
+  },
+}));
+
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: vi.fn((table: string) => {
       if (table === 'users') {
-        return createSupabaseBuilder('users', {
-          id: 'test-user',
-          role: 'coach',
-          email: 'coach@cybergym.io',
-        });
+        return createSupabaseBuilder('users', mockUserProfile);
       }
       return createSupabaseBuilder(table, []);
     }),
@@ -38,6 +42,10 @@ describe('Header connection status badge', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearMockHistory();
+    localStorage.clear();
+    mockUserProfile.id = 'test-user';
+    mockUserProfile.role = 'coach';
+    mockUserProfile.email = 'coach@cybergym.io';
     queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     Object.defineProperty(navigator, 'onLine', {
       configurable: true,
@@ -173,5 +181,80 @@ describe('Header connection status badge', () => {
     expect(screen.getByTestId('connection-status')).toBe(badge);
     expect(badge.textContent).toContain('Offline');
   });
-});
 
+  it('satisfies STD-TYP with no banned font weight or family tokens in brand header', () => {
+    const { container } = renderHeader();
+    const h1 = container.querySelector('h1');
+    expect(h1?.className).toContain('font-bold');
+    expect(h1?.className).not.toContain('font-' + 'black');
+
+    const tag = container.querySelector('header h1 + div');
+    expect(tag?.className).toContain('text-xs');
+    expect(tag?.className).toContain('font-semibold');
+    expect(tag?.className).not.toContain('font-' + 'mono');
+    expect(tag?.className).not.toContain('text-[10' + 'px]');
+  });
+
+  describe('Header coach-dashboard link visibility matrix (D-P8-1, L41)', () => {
+    it('(a) athlete off /coach: link is not rendered', async () => {
+      mockUserProfile.role = 'athlete';
+      window.history.pushState({}, '', '/workout');
+      renderHeader();
+
+      await waitFor(() => {
+        expect(screen.getByText('CyberGym')).toBeDefined();
+      });
+
+      expect(screen.queryByTestId('coach-dashboard-link')).toBeNull();
+    });
+
+    it('(b) coach in athlete mode off /coach: link is not rendered', async () => {
+      mockUserProfile.role = 'coach';
+      localStorage.setItem('cybergym_view_mode', 'athlete');
+      window.history.pushState({}, '', '/workout');
+      renderHeader();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('role-switch-button')).toBeDefined();
+      });
+
+      const roleBtn = screen.getByTestId('role-switch-button');
+      expect(roleBtn.getAttribute('aria-label')).toContain('Athlete mode active');
+      expect(screen.queryByTestId('coach-dashboard-link')).toBeNull();
+    });
+
+    it('(c) coach mode on /coach: link is not rendered', async () => {
+      mockUserProfile.role = 'coach';
+      localStorage.setItem('cybergym_view_mode', 'coach');
+      window.history.pushState({}, '', '/coach');
+      renderHeader();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('role-switch-button')).toBeDefined();
+      });
+
+      const roleBtn = screen.getByTestId('role-switch-button');
+      expect(roleBtn.getAttribute('aria-label')).toContain('Coach mode active');
+      expect(screen.queryByTestId('coach-dashboard-link')).toBeNull();
+    });
+
+    it('(d) coach mode elsewhere (off /coach): link is rendered (44x44, aria-label, href /coach)', async () => {
+      mockUserProfile.role = 'coach';
+      localStorage.setItem('cybergym_view_mode', 'coach');
+      window.history.pushState({}, '', '/workout');
+      const { container } = renderHeader();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('coach-dashboard-link')).toBeDefined();
+      });
+
+      const link = screen.getByTestId('coach-dashboard-link');
+      expect(link.getAttribute('aria-label')).toBe('Coach dashboard');
+      expect(link.getAttribute('href')).toBe('/coach');
+      expect(link.className).toContain('min-h-[44px]');
+      expect(link.className).toContain('min-w-[44px]');
+
+      await expectNoA11yViolations(container);
+    });
+  });
+});

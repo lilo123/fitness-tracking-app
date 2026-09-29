@@ -14,76 +14,76 @@ export const BottomNav: React.FC = () => {
         <NavLink
           to="/workout"
           className={({ isActive }) =>
-            `flex flex-col items-center justify-center min-w-[60px] py-1 px-2 rounded-xl transition ${
+            `flex flex-col items-center justify-center min-w-[60px] min-h-[44px] py-1 px-2 rounded-xl transition touch-manipulation ${
               isActive
-                ? 'text-cyan-400 font-extrabold shadow-[0_0_12px_rgba(6,182,212,0.25)]'
-                : 'text-zinc-500 hover:text-zinc-300 font-medium'
+                ? 'text-cyan-400 font-bold shadow-[0_0_12px_rgba(6,182,212,0.25)]'
+                : 'text-zinc-400 hover:text-zinc-200 font-normal'
             }`
           }
           data-testid="nav-workout"
         >
           <Dumbbell className="w-5 h-5 mb-0.5" />
-          <span className="text-[10px] tracking-wider uppercase">Workout</span>
+          <span className="text-xs tracking-wider">Workout</span>
         </NavLink>
 
         <NavLink
           to="/nutrition"
           className={({ isActive }) =>
-            `flex flex-col items-center justify-center min-w-[60px] py-1 px-2 rounded-xl transition ${
+            `flex flex-col items-center justify-center min-w-[60px] min-h-[44px] py-1 px-2 rounded-xl transition touch-manipulation ${
               isActive
-                ? 'text-cyan-400 font-extrabold shadow-[0_0_12px_rgba(6,182,212,0.25)]'
-                : 'text-zinc-500 hover:text-zinc-300 font-medium'
+                ? 'text-cyan-400 font-bold shadow-[0_0_12px_rgba(6,182,212,0.25)]'
+                : 'text-zinc-400 hover:text-zinc-200 font-normal'
             }`
           }
           data-testid="nav-nutrition"
         >
           <Utensils className="w-5 h-5 mb-0.5" />
-          <span className="text-[10px] tracking-wider uppercase">Nutrition</span>
+          <span className="text-xs tracking-wider">Nutrition</span>
         </NavLink>
 
         <NavLink
           to="/exercises"
           className={({ isActive }) =>
-            `flex flex-col items-center justify-center min-w-[60px] py-1 px-2 rounded-xl transition ${
+            `flex flex-col items-center justify-center min-w-[60px] min-h-[44px] py-1 px-2 rounded-xl transition touch-manipulation ${
               isActive
-                ? 'text-cyan-400 font-extrabold shadow-[0_0_12px_rgba(6,182,212,0.25)]'
-                : 'text-zinc-500 hover:text-zinc-300 font-medium'
+                ? 'text-cyan-400 font-bold shadow-[0_0_12px_rgba(6,182,212,0.25)]'
+                : 'text-zinc-400 hover:text-zinc-200 font-normal'
             }`
           }
           data-testid="nav-exercises"
         >
           <BookOpen className="w-5 h-5 mb-0.5" />
-          <span className="text-[10px] tracking-wider uppercase">Library</span>
+          <span className="text-xs tracking-wider">Library</span>
         </NavLink>
 
         <NavLink
           to="/history"
           className={({ isActive }) =>
-            `flex flex-col items-center justify-center min-w-[60px] py-1 px-2 rounded-xl transition ${
+            `flex flex-col items-center justify-center min-w-[60px] min-h-[44px] py-1 px-2 rounded-xl transition touch-manipulation ${
               isActive
-                ? 'text-cyan-400 font-extrabold shadow-[0_0_12px_rgba(6,182,212,0.25)]'
-                : 'text-zinc-500 hover:text-zinc-300 font-medium'
+                ? 'text-cyan-400 font-bold shadow-[0_0_12px_rgba(6,182,212,0.25)]'
+                : 'text-zinc-400 hover:text-zinc-200 font-normal'
             }`
           }
           data-testid="nav-history"
         >
           <History className="w-5 h-5 mb-0.5" />
-          <span className="text-[10px] tracking-wider uppercase">History</span>
+          <span className="text-xs tracking-wider">History</span>
         </NavLink>
 
         <NavLink
           to="/settings"
           className={({ isActive }) =>
-            `flex flex-col items-center justify-center min-w-[60px] py-1 px-2 rounded-xl transition ${
+            `flex flex-col items-center justify-center min-w-[60px] min-h-[44px] py-1 px-2 rounded-xl transition touch-manipulation ${
               isActive
-                ? 'text-cyan-400 font-extrabold shadow-[0_0_12px_rgba(6,182,212,0.25)]'
-                : 'text-zinc-500 hover:text-zinc-300 font-medium'
+                ? 'text-cyan-400 font-bold shadow-[0_0_12px_rgba(6,182,212,0.25)]'
+                : 'text-zinc-400 hover:text-zinc-200 font-normal'
             }`
           }
           data-testid="nav-settings"
         >
           <Settings className="w-5 h-5 mb-0.5" />
-          <span className="text-[10px] tracking-wider uppercase">Settings</span>
+          <span className="text-xs tracking-wider">Settings</span>
         </NavLink>
       </div>
     </nav>

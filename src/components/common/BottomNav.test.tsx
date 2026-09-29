@@ -15,12 +15,14 @@ describe('BottomNav', () => {
     vi.clearAllMocks();
   });
 
-  const renderNav = () =>
-    render(
+  const renderNav = (initialRoute = '/workout') => {
+    window.history.pushState({}, '', initialRoute);
+    return render(
       <BrowserRouter>
         <BottomNav />
       </BrowserRouter>
     );
+  };
 
   it('renders nothing when user is not authenticated', () => {
     mockUseAuth.mockReturnValue({
@@ -99,5 +101,69 @@ describe('BottomNav', () => {
     expect(totalRequiredFloorWidth).toBeLessThanOrEqual(320);
 
     await expectNoA11yViolations(container);
+  });
+
+  it('renders 12px sentence-case labels with no uppercase transform and no sub-12px classes (RD-12)', () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: 'athlete-user-id' },
+      isCoachMode: false,
+    });
+
+    const { container } = renderNav();
+
+    const expectedLabels = ['Workout', 'Nutrition', 'Library', 'History', 'Settings'];
+    const spans = container.querySelectorAll('nav a span');
+    expect(spans).toHaveLength(5);
+
+    spans.forEach((span, idx) => {
+      expect(span.textContent?.trim()).toBe(expectedLabels[idx]);
+      expect(span.className).toContain('text-xs');
+      expect(span.className).not.toContain('uppercase');
+      expect(span.className).not.toContain('text-[10' + 'px]');
+      expect(span.className).not.toContain('text-[11' + 'px]');
+    });
+  });
+
+  it('renders aria-current="page" on the active tab and aria-current=null on inactive tabs (RD-12)', () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: 'athlete-user-id' },
+      isCoachMode: false,
+    });
+
+    renderNav('/workout');
+
+    const workoutTab = screen.getByTestId('nav-workout');
+    expect(workoutTab.getAttribute('aria-current')).toBe('page');
+
+    const otherTabs = ['nav-nutrition', 'nav-exercises', 'nav-history', 'nav-settings'];
+    for (const testId of otherTabs) {
+      expect(screen.getByTestId(testId).getAttribute('aria-current')).toBeNull();
+    }
+  });
+
+  it('meets 44px minimum target height and AA text contrast on inactive tabs (STD-INT-9, STD-COL-2)', () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: 'athlete-user-id' },
+      isCoachMode: false,
+    });
+
+    renderNav('/workout');
+
+    const tabs = screen.getAllByTestId(/^nav-/);
+    tabs.forEach((tab) => {
+      expect(tab.className).toContain('min-h-[44px]');
+      expect(tab.className).toContain('min-w-[60px]');
+      expect(tab.className).not.toContain('text-zinc-' + '500');
+    });
+
+    // Inactive tab uses text-zinc-400
+    const inactiveTab = screen.getByTestId('nav-nutrition');
+    expect(inactiveTab.className).toContain('text-zinc-400');
+
+    // Active tab uses text-cyan-400 and font-bold (no font-extrabold per STD-TYP-2)
+    const activeTab = screen.getByTestId('nav-workout');
+    expect(activeTab.className).toContain('text-cyan-400');
+    expect(activeTab.className).toContain('font-bold');
+    expect(activeTab.className).not.toContain('font-extrabold');
   });
 });
