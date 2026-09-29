@@ -1,3 +1,6 @@
+import { useContext } from 'react';
+import { AuthContext } from '../../context/AuthContextTypes';
+import type { PrMode } from '../../lib/prComparator';
 import { useMemo, useCallback } from 'react';
 import {
   useInfiniteQuery,
@@ -35,6 +38,7 @@ export interface RawExerciseStat {
   max_weight: number;
   pr_reps: number;
   pr_date?: string | null;
+  pr_e1rm?: number | null;
   recent_sets: any;
 }
 
@@ -87,15 +91,19 @@ export async function fetchSessionSets(workoutId: string): Promise<HistorySet[]>
     }));
 }
 
-export function useExerciseStats(targetUserId: string, enabled: boolean) {
+export function useExerciseStats(targetUserId: string, enabled: boolean, mode?: PrMode) {
+  const auth = useContext(AuthContext);
+  const prMode: PrMode = mode || (auth?.profile?.pr_mode === 'e1rm' ? 'e1rm' : 'weight');
   return useQuery({
-    queryKey: ['exercise_stats', targetUserId],
+    queryKey: ['exercise_stats', targetUserId, prMode],
     enabled: Boolean(targetUserId) && enabled,
     queryFn: async () => {
       if (!targetUserId || typeof supabase.rpc !== 'function') return [];
-      const { data, error } = await supabase.rpc('get_exercise_stats', {
-        p_user_id: targetUserId,
-      });
+      const rpcParams: Record<string, any> = { p_user_id: targetUserId };
+      if (prMode && prMode !== 'weight') {
+        rpcParams.p_pr_mode = prMode;
+      }
+      const { data, error } = await (supabase as any).rpc('get_exercise_stats', rpcParams);
       if (error) throw error;
       return (data || []) as RawExerciseStat[];
     },

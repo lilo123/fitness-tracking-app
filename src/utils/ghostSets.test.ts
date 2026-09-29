@@ -876,6 +876,68 @@ describe('Ghost Sets Algorithm & Benchmarks', () => {
       expect(masterBm.lastSession?.sets[0].exercise_id).toBe(masterExId);
     });
 
+    it('getExerciseBenchmarks in e1rm mode ranks by e1rm (90x10 beats 100x3) and computes e1rm', () => {
+      const exId = 'ex-bench-e1rm';
+      const sets = [
+        {
+          id: 's1',
+          exercise_id: exId,
+          weight: 100,
+          reps: 3,
+          set_type: 'working' as const,
+          workout_date: '2026-03-01',
+        },
+        {
+          id: 's2',
+          exercise_id: exId,
+          weight: 90,
+          reps: 10,
+          set_type: 'working' as const,
+          workout_date: '2026-03-02',
+        },
+      ];
+
+      const bmWeight = getExerciseBenchmarks(exId, sets as any, '2026-03-05', 'lb', 'weight');
+      expect(bmWeight.pr?.weight).toBe(100);
+      expect(bmWeight.pr?.reps).toBe(3);
+
+      const bmE1rm = getExerciseBenchmarks(exId, sets as any, '2026-03-05', 'lb', 'e1rm');
+      expect(bmE1rm.pr?.weight).toBe(90);
+      expect(bmE1rm.pr?.reps).toBe(10);
+      expect((bmE1rm.pr as any)?.e1rm).toBe(120);
+    });
+
+    it('mergeBenchmarks in e1rm mode updates PR when higher e1rm set is logged', () => {
+      const exId = 'ex-merge-e1rm';
+      const initialBenchmarks: Record<string, any> = {
+        [exId]: {
+          lastSession: null,
+          pr: { weight: 100, reps: 3, date: '2026-03-01' },
+        },
+      };
+
+      const todaySets = [
+        {
+          id: 's-today',
+          exercise_id: exId,
+          weight: 90,
+          reps: 10,
+          set_type: 'working' as const,
+          workout_date: '2026-03-02',
+        },
+      ];
+
+      // In weight mode: 90x10 does NOT beat 100x3
+      const mergedWeight = mergeBenchmarks(initialBenchmarks, todaySets as any, 'weight');
+      expect(mergedWeight[exId].pr?.weight).toBe(100);
+
+      // In e1rm mode: 90x10 beats 100x3
+      const mergedE1rm = mergeBenchmarks(initialBenchmarks, todaySets as any, 'e1rm');
+      expect(mergedE1rm[exId].pr?.weight).toBe(90);
+      expect(mergedE1rm[exId].pr?.reps).toBe(10);
+      expect((mergedE1rm[exId].pr as any)?.e1rm).toBe(120);
+    });
+
     it('formats ghost hint in active unit (102.1 kg × 5) and benchmark summary in kg (P6, W3)', () => {
       const history = [
         {

@@ -1,4 +1,7 @@
-import { useMemo } from 'react';
+import { usePrMode } from '../../hooks/usePrMode';
+import { useMemo, useContext } from 'react';
+import { AuthContext } from '../../context/AuthContextTypes';
+import type { PrMode } from '../../lib/prComparator';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import type { WorkoutSet, Exercise, RoutineTemplate, TemplateExercise } from '../../types/database';
@@ -112,6 +115,7 @@ export const workoutExercisesQueryOptions = {
   staleTime: 5 * 60 * 1000,
 };
 
+// usePrMode added for D-P8.1-8
 export function useWorkoutQueries(targetUserId: string, workoutDate: string) {
   const queryClient = useQueryClient();
   const {
@@ -358,6 +362,9 @@ export function useWorkoutQueries(targetUserId: string, workoutDate: string) {
     },
   });
 
+  const auth = useContext(AuthContext);
+  const prMode: PrMode = auth?.profile?.pr_mode === 'e1rm' ? 'e1rm' : 'weight';
+
   const todaySets = useMemo(() => {
     return userLogs.filter((s) => normalizeDateStr(s.workout_date) === workoutDate);
   }, [userLogs, workoutDate]);
@@ -375,7 +382,7 @@ export function useWorkoutQueries(targetUserId: string, workoutDate: string) {
     isError: isBenchmarksError,
     error: benchmarksError,
   } = useQuery({
-    queryKey: ['exercise_benchmarks', targetUserId, workoutDate, exerciseIds],
+    queryKey: ['exercise_benchmarks', targetUserId, workoutDate, exerciseIds, prMode],
     enabled: Boolean(targetUserId && isValidUUID(targetUserId) && exerciseIds.length > 0),
     queryFn: async (): Promise<Record<string, ExerciseBenchmarks>> => {
       if (!targetUserId || !isValidUUID(targetUserId) || exerciseIds.length === 0) {
@@ -388,6 +395,7 @@ export function useWorkoutQueries(targetUserId: string, workoutDate: string) {
         p_user_id: targetUserId,
         p_date: workoutDate,
         p_exercise_ids: exerciseIds,
+        p_pr_mode: prMode,
       });
       if (!res) return {};
       const { data, error } = res;
@@ -405,6 +413,7 @@ export function useWorkoutQueries(targetUserId: string, workoutDate: string) {
                 weight: Number(row.pr_weight),
                 reps: Number(row.pr_reps),
                 date: row.pr_date || '',
+                e1rm: row.pr_e1rm != null ? Number(row.pr_e1rm) : undefined,
               }
             : null;
 
@@ -439,8 +448,8 @@ export function useWorkoutQueries(targetUserId: string, workoutDate: string) {
   });
 
   const benchmarks = useMemo(() => {
-    return mergeBenchmarks(rawBenchmarks, todaySets);
-  }, [rawBenchmarks, todaySets]);
+    return mergeBenchmarks(rawBenchmarks, todaySets, prMode);
+  }, [rawBenchmarks, todaySets, prMode]);
 
   const resolvedTemplateId = useMemo(() => {
     if (!rawTemplatesFetched || !logsFetched) return null;

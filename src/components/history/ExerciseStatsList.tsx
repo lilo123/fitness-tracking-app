@@ -6,6 +6,8 @@ import { normalizeSearch } from '../../utils/normalizeSearch';
 import { resolveExerciseLabel } from '../../utils/exerciseLabel';
 import { useAuth } from '../../hooks/useAuth';
 import { useWeightUnit } from '../../hooks/useWeightUnit';
+import { usePrMode } from '../../hooks/usePrMode';
+import { e1rm } from '../../lib/prComparator';
 import { formatWeight } from '../../utils/weight';
 import { Tag } from '../common/Tag';
 import { ExerciseSparkline } from './ExerciseSparkline';
@@ -21,6 +23,7 @@ export interface ExerciseStat {
   prReps: number;
   setCount?: number;
   prDate?: string | null;
+  prE1rm?: number | null;
 }
 
 export interface ExerciseStatsListProps {
@@ -68,6 +71,7 @@ export const ExerciseStatsList: React.FC<ExerciseStatsListProps> = ({
 }) => {
   const { user } = useAuth();
   const unit = useWeightUnit();
+  const { mode: prMode } = usePrMode();
   const effectiveUserId = userId || user?.id || '';
   const effectiveReadOnly = isReadOnly ?? isInspectingAthlete;
 
@@ -120,6 +124,7 @@ export const ExerciseStatsList: React.FC<ExerciseStatsListProps> = ({
         match.maxWeight = Number(row.max_weight) || 0;
         match.prReps = Number(row.pr_reps) || 0;
         match.prDate = row.pr_date || null;
+        match.prE1rm = row.pr_e1rm != null ? Number(row.pr_e1rm) : null;
         match.sets = Array.isArray(row.recent_sets) ? row.recent_sets : [];
         if (row.exercise_name && (!match.exercise.name || match.exercise.name === match.exercise.id)) {
           match.exercise.name = row.exercise_name;
@@ -132,6 +137,7 @@ export const ExerciseStatsList: React.FC<ExerciseStatsListProps> = ({
           maxWeight: Number(row.max_weight) || 0,
           prReps: Number(row.pr_reps) || 0,
           prDate: row.pr_date || null,
+          prE1rm: row.pr_e1rm != null ? Number(row.pr_e1rm) : null,
           setCount: Number(row.set_count) || 0,
         };
       }
@@ -243,15 +249,27 @@ export const ExerciseStatsList: React.FC<ExerciseStatsListProps> = ({
             )}
 
             {/* H47: PR line shows formatted pr_date */}
-            {totalSets > 0 ? (
-              <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-2xl text-amber-400 text-xs font-bold shrink-0">
-                <Trophy className="w-3.5 h-3.5 shrink-0" />
-                <span>
-                  PR: {stat.maxWeight > 0 ? formatWeight(stat.maxWeight, unit, { showUnit: true }) : 'Bodyweight'} × {stat.prReps}
-                  {stat.prDate ? ` · ${formatExerciseSetDate(stat.prDate)}` : ''}
-                </span>
-              </div>
-            ) : (
+            {totalSets > 0 ? (() => {
+              const prE1rm =
+                stat.prE1rm ??
+                (stat.maxWeight > 0 && stat.prReps <= 12
+                  ? e1rm(stat.maxWeight, stat.prReps)
+                  : null);
+              const e1rmSuffix =
+                prMode === 'e1rm' && prE1rm != null && prE1rm > 0
+                  ? ` · e1RM ${formatWeight(prE1rm, unit, { showUnit: true })}`
+                  : '';
+              return (
+                <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-2xl text-amber-400 text-xs font-bold shrink-0">
+                  <Trophy className="w-3.5 h-3.5 shrink-0" />
+                  <span>
+                    PR: {stat.maxWeight > 0 ? formatWeight(stat.maxWeight, unit, { showUnit: true }) : 'Bodyweight'} × {stat.prReps}
+                    {e1rmSuffix}
+                    {stat.prDate ? ` · ${formatExerciseSetDate(stat.prDate)}` : ''}
+                  </span>
+                </div>
+              );
+            })() : (
               <span className="text-xs text-zinc-400 shrink-0">No logs yet</span>
             )}
           </div>
@@ -366,6 +384,7 @@ export const ExerciseStatsList: React.FC<ExerciseStatsListProps> = ({
         prDate={selectedStatForSheet?.prDate}
         prWeight={selectedStatForSheet?.maxWeight}
         prReps={selectedStatForSheet?.prReps}
+        prE1rm={selectedStatForSheet?.prE1rm}
         isReadOnly={effectiveReadOnly}
         timeZone={timeZone}
         onEditSet={effectiveReadOnly ? undefined : onEditSet}

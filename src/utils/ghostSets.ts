@@ -1,3 +1,4 @@
+import { comparePrSets, pickPrSet, e1rm, type PrMode } from '../lib/prComparator';
 import { formatSet, formatWeight, type WeightUnit } from './weight';
 import type { WorkoutSet, GhostSetValues, ExerciseBenchmarks } from '../types/database';
 import {
@@ -105,8 +106,23 @@ export function getExerciseBenchmarks(
   exerciseId: string,
   allSets: (WorkoutSet & { workout_date?: string; date?: string })[],
   currentDateStr?: string,
-  unit: WeightUnit = 'lb'
+  unit: WeightUnit = 'lb',
+  mode?: PrMode
 ): ExerciseBenchmarks {
+  let resolvedMode: PrMode = mode || 'weight';
+  if (!mode && typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const stored = localStorage.getItem('cybergym_user');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed?.pr_mode === 'e1rm') {
+          resolvedMode = 'e1rm';
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
   const normCurrentDate = currentDateStr ? normalizeDateStr(currentDateStr) : '';
 
   const validSets = allSets.filter((s) => {
@@ -160,28 +176,15 @@ export function getExerciseBenchmarks(
     };
   }
 
-  // Compute PR from allTimeSets (max weight, tie-break max reps)
-  let bestSet: (WorkoutSet & { workout_date?: string; date?: string }) | null = null;
-  for (const s of allTimeSets) {
-    const weight = Number(s.weight) || 0;
-    const reps = Number(s.reps) || 0;
-    if (!bestSet) {
-      bestSet = s;
-      continue;
-    }
-    const bestWeight = Number(bestSet.weight) || 0;
-    const bestReps = Number(bestSet.reps) || 0;
-
-    if (weight > bestWeight || (weight === bestWeight && reps > bestReps)) {
-      bestSet = s;
-    }
-  }
+  // Compute PR from allTimeSets using shared comparator
+  const bestSet = pickPrSet(allTimeSets, resolvedMode);
 
   const pr = bestSet
     ? {
         weight: Number(bestSet.weight),
         reps: Number(bestSet.reps),
         date: normalizeDateStr(bestSet.workout_date || bestSet.date || bestSet.created_at),
+        ...(resolvedMode === 'e1rm' ? { e1rm: e1rm(Number(bestSet.weight), Number(bestSet.reps)) } : {}),
       }
     : null;
 
@@ -314,8 +317,23 @@ export const DEFAULT_WORKOUT_TEMPLATES: WorkoutTemplateDefinition[] = [
  */
 export function mergeBenchmarks(
   benchmarks: Record<string, ExerciseBenchmarks>,
-  todaySets: Array<WorkoutSet & { workout_date?: string; date?: string }>
+  todaySets: Array<WorkoutSet & { workout_date?: string; date?: string }>,
+  mode?: PrMode
 ): Record<string, ExerciseBenchmarks> {
+  let resolvedMode: PrMode = mode || 'weight';
+  if (!mode && typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const stored = localStorage.getItem('cybergym_user');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed?.pr_mode === 'e1rm') {
+          resolvedMode = 'e1rm';
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
   const result: Record<string, ExerciseBenchmarks> = {};
 
   // Clone existing benchmarks
@@ -349,20 +367,34 @@ export function mergeBenchmarks(
     }
 
     const currentPR = result[exId].pr;
+    const candidatePR = {
+      id: s.id,
+      weight,
+      reps,
+      date: setDate,
+      created_at: s.created_at,
+      set_index: s.set_index,
+    };
+
     if (!currentPR) {
       result[exId].pr = {
         weight,
         reps,
         date: setDate,
+        ...(resolvedMode === 'e1rm' ? { e1rm: e1rm(weight, reps) } : {}),
       };
     } else {
-      const curWeight = Number(currentPR.weight) || 0;
-      const curReps = Number(currentPR.reps) || 0;
-      if (weight > curWeight || (weight === curWeight && reps > curReps)) {
+      const currentCandidate = {
+        weight: currentPR.weight,
+        reps: currentPR.reps,
+        date: currentPR.date,
+      };
+      if (comparePrSets(candidatePR, currentCandidate, resolvedMode) < 0) {
         result[exId].pr = {
           weight,
           reps,
           date: setDate,
+          ...(resolvedMode === 'e1rm' ? { e1rm: e1rm(weight, reps) } : {}),
         };
       }
     }

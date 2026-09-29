@@ -1,9 +1,9 @@
 BEGIN;
-SELECT plan(10);
+SELECT plan(12);
 
 -- 1. Function existence assertions
-SELECT has_function('public', 'get_exercise_benchmarks', ARRAY['uuid', 'date', 'uuid[]'], 'get_exercise_benchmarks RPC exists');
-SELECT has_function('public', 'get_exercise_stats', ARRAY['uuid'], 'get_exercise_stats RPC exists');
+SELECT has_function('public', 'get_exercise_benchmarks', ARRAY['uuid', 'date', 'uuid[]', 'text'], 'get_exercise_benchmarks RPC exists with p_pr_mode');
+SELECT has_function('public', 'get_exercise_stats', ARRAY['uuid', 'text'], 'get_exercise_stats RPC exists with p_pr_mode');
 
 -- 2. Core benchmarks test: >90-day gap, warmup/drop ignored, master vs custom same name, PR date, RLS / coach auth
 DO $$
@@ -196,6 +196,22 @@ BEGIN
   IF v_stats_count < 220 THEN
     RAISE EXCEPTION 'Expected get_exercise_stats v2 to return > 200 rows, got: %', v_stats_count;
   END IF;
+
+  -- 6. Verify e1rm mode returns pr_e1rm numeric
+  SELECT * INTO v_benchmarks
+  FROM public.get_exercise_benchmarks(v_athlete, '2026-09-27'::date, ARRAY[v_ex_master], 'e1rm');
+
+  IF v_benchmarks.pr_e1rm IS NULL OR v_benchmarks.pr_e1rm <= 0 THEN
+    RAISE EXCEPTION 'Expected non-null pr_e1rm in e1rm mode, got %', v_benchmarks.pr_e1rm;
+  END IF;
+
+  SELECT * INTO v_stats
+  FROM public.get_exercise_stats(v_athlete, 'e1rm')
+  WHERE exercise_id = v_ex_master;
+
+  IF v_stats.pr_e1rm IS NULL OR v_stats.pr_e1rm <= 0 THEN
+    RAISE EXCEPTION 'Expected non-null pr_e1rm in e1rm mode for stats, got %', v_stats.pr_e1rm;
+  END IF;
 END;
 $$;
 
@@ -207,6 +223,8 @@ SELECT pass('Unlinked authenticated user querying athlete gets 0 rows via RLS');
 SELECT pass('Ended coach link querying athlete gets 0 rows via RLS');
 SELECT pass('get_exercise_stats v2 returns >200 rows without LIMIT 200 truncation');
 SELECT pass('PR date is correctly populated in benchmarks and stats v2');
+SELECT pass('get_exercise_benchmarks supports p_pr_mode e1rm mode');
+SELECT pass('get_exercise_stats supports p_pr_mode e1rm mode');
 
 SELECT * FROM finish();
 ROLLBACK;

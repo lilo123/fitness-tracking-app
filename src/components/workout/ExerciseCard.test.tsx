@@ -5,9 +5,9 @@ import type { WorkoutSet } from '../../types/database';
 import { expectNoA11yViolations } from '../../test/a11y';
 import { AuthContext, type AuthContextType } from '../../context/AuthContextTypes';
 
-const createAuthContextValue = (weightUnit: 'lb' | 'kg' = 'lb'): AuthContextType => ({
+const createAuthContextValue = (weightUnit: 'lb' | 'kg' = 'lb', prMode: 'weight' | 'e1rm' = 'weight'): AuthContextType => ({
   user: { id: 'test-user-id' } as any,
-  profile: { id: 'test-user-id', weight_unit: weightUnit } as any,
+  profile: { id: 'test-user-id', weight_unit: weightUnit, pr_mode: prMode } as any,
   role: 'athlete',
   viewMode: 'athlete',
   isCoachMode: false,
@@ -23,9 +23,9 @@ const createAuthContextValue = (weightUnit: 'lb' | 'kg' = 'lb'): AuthContextType
   resetPassword: vi.fn(),
 });
 
-function renderWithAuth(ui: React.ReactElement, weightUnit: 'lb' | 'kg' = 'lb') {
+function renderWithAuth(ui: React.ReactElement, weightUnit: 'lb' | 'kg' = 'lb', prMode: 'weight' | 'e1rm' = 'weight') {
   return render(
-    <AuthContext.Provider value={createAuthContextValue(weightUnit)}>
+    <AuthContext.Provider value={createAuthContextValue(weightUnit, prMode)}>
       {ui}
     </AuthContext.Provider>
   );
@@ -305,5 +305,64 @@ describe('ExerciseCard', () => {
     );
     expect(screen.getByRole('alert')).toBeInTheDocument();
     await expectNoA11yViolations(container);
+  });
+  it('displays e1RM suffix on PR chip when pr_mode is e1rm (D-P8.1-8)', () => {
+    const prProps: ExerciseCardProps = {
+      ...defaultProps,
+      benchmarks: {
+        lastSession: null,
+        pr: { weight: 225, reps: 5, date: '2026-08-15' },
+      },
+    };
+
+    renderWithAuth(<ExerciseCard {...prProps} />, 'lb', 'e1rm');
+    const prChip = screen.getByTestId('pr-chip-0');
+    // 225 * (1 + 5/30) = 262.5 lbs
+    expect(prChip).toHaveTextContent('PR: 225×5 · e1RM 262.5 lbs');
+  });
+
+  it('displays converted e1RM suffix in kg mode when pr_mode is e1rm', () => {
+    const prProps: ExerciseCardProps = {
+      ...defaultProps,
+      benchmarks: {
+        lastSession: null,
+        pr: { weight: 225, reps: 5, date: '2026-08-15' },
+      },
+    };
+
+    renderWithAuth(<ExerciseCard {...prProps} />, 'kg', 'e1rm');
+    const prChip = screen.getByTestId('pr-chip-0');
+    // 225 lb = 102.1 kg; 262.5 lb = 119.1 kg
+    expect(prChip).toHaveTextContent('PR: 102.1×5 · e1RM 119.1 kg');
+  });
+
+  it('omits e1RM suffix for bodyweight sets even when pr_mode is e1rm', () => {
+    const bwProps: ExerciseCardProps = {
+      ...defaultProps,
+      benchmarks: {
+        lastSession: null,
+        pr: { weight: 0, reps: 15, date: '2026-08-01' },
+      },
+    };
+
+    renderWithAuth(<ExerciseCard {...bwProps} />, 'lb', 'e1rm');
+    const prChip = screen.getByTestId('pr-chip-0');
+    expect(prChip).toHaveTextContent('PR: BW×15');
+    expect(prChip.textContent).not.toContain('e1RM');
+  });
+
+  it('omits e1RM suffix for ineligible sets (reps > 12) in e1rm mode', () => {
+    const highRepProps: ExerciseCardProps = {
+      ...defaultProps,
+      benchmarks: {
+        lastSession: null,
+        pr: { weight: 100, reps: 15, date: '2026-08-01' },
+      },
+    };
+
+    renderWithAuth(<ExerciseCard {...highRepProps} />, 'lb', 'e1rm');
+    const prChip = screen.getByTestId('pr-chip-0');
+    expect(prChip).toHaveTextContent('PR: 100×15');
+    expect(prChip.textContent).not.toContain('e1RM');
   });
 });

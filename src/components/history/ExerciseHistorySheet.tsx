@@ -10,6 +10,8 @@ import { Skeleton } from '../common/Skeleton';
 import { StatusBanner } from '../common/StatusBanner';
 import { ExerciseSparkline } from './ExerciseSparkline';
 import { useWeightUnit } from '../../hooks/useWeightUnit';
+import { usePrMode } from '../../hooks/usePrMode';
+import { e1rm } from '../../lib/prComparator';
 import { formatWeight } from '../../utils/weight';
 import {
   fetchExerciseHistoryPage,
@@ -31,6 +33,7 @@ export interface ExerciseHistorySheetProps {
   prDate?: string | null;
   prWeight?: number | null;
   prReps?: number | null;
+  prE1rm?: number | null;
   isReadOnly?: boolean; // coach
   timeZone?: string;
   onEditSet?: (set: WorkoutSet & { workout_date?: string; workout_name?: string }) => void;
@@ -82,12 +85,14 @@ export const ExerciseHistorySheet: React.FC<ExerciseHistorySheetProps> = ({
   prDate,
   prWeight,
   prReps,
+  prE1rm,
   isReadOnly = false,
   timeZone,
   onEditSet,
   testId = 'exercise-history-sheet',
 }) => {
   const unit = useWeightUnit();
+  const { mode: prMode } = usePrMode();
   const [range, setRange] = useState<HistoryRange>('all');
 
   const since = useMemo(() => computeHistorySince(range, timeZone), [range, timeZone]);
@@ -172,7 +177,7 @@ export const ExerciseHistorySheet: React.FC<ExerciseHistorySheetProps> = ({
 
   // RD-4: Exact PR set determination with tie-breaking (more reps then earliest date, then earliest set)
   const prSetId = useMemo(() => {
-    if (prWeight == null || prWeight <= 0 || prReps == null || prReps <= 0) return null;
+    if (prWeight == null || prWeight < 0 || prReps == null || prReps <= 0) return null;
     const matches: Array<{
       setId: string;
       civilDate: string;
@@ -231,18 +236,30 @@ export const ExerciseHistorySheet: React.FC<ExerciseHistorySheetProps> = ({
               </span>
             )}
           </div>
-          {hasPrInfo && (
-            <div
-              data-testid="exercise-sheet-pr-summary"
-              className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded-2xl text-amber-400 text-xs font-bold shrink-0"
-            >
-              <Trophy className="w-3.5 h-3.5 shrink-0" />
-              <span>
-                PR: {prWeight && prWeight > 0 ? formatWeight(prWeight, unit, { showUnit: true }) : 'Bodyweight'} × {prReps ?? 0}
-                {prDate ? ` · ${formatPrDate(prDate)}` : ''}
-              </span>
-            </div>
-          )}
+          {hasPrInfo && (() => {
+            const calculatedE1rm =
+              prE1rm ??
+              (prWeight != null && prWeight > 0 && prReps != null && prReps <= 12
+                ? e1rm(prWeight, prReps)
+                : null);
+            const e1rmSuffix =
+              prMode === 'e1rm' && calculatedE1rm != null && calculatedE1rm > 0
+                ? ` · e1RM ${formatWeight(calculatedE1rm, unit, { showUnit: true })}`
+                : '';
+            return (
+              <div
+                data-testid="exercise-sheet-pr-summary"
+                className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded-2xl text-amber-400 text-xs font-bold shrink-0"
+              >
+                <Trophy className="w-3.5 h-3.5 shrink-0" />
+                <span>
+                  PR: {prWeight && prWeight > 0 ? formatWeight(prWeight, unit, { showUnit: true }) : 'Bodyweight'} × {prReps ?? 0}
+                  {e1rmSuffix}
+                  {prDate ? ` · ${formatPrDate(prDate)}` : ''}
+                </span>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Range Selector Chips (D2) */}

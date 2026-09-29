@@ -400,6 +400,7 @@ export function serializeToExportCsvFiles(bundle: ExportBundle, dateStamp: strin
         'target_fiber_g',
         'auto_rest_timer',
         'weight_unit',
+        'pr_mode',
       ];
       const rows: string[] = [headers.join(',')];
       const p = bundle.data.profile;
@@ -415,6 +416,7 @@ export function serializeToExportCsvFiles(bundle: ExportBundle, dateStamp: strin
         p?.target_fiber ?? '',
         p?.auto_rest_timer !== undefined ? p.auto_rest_timer : '',
         p?.weight_unit ?? '',
+        p?.pr_mode ?? '',
       ];
       rows.push(cells.map(escapeCsvCell).join(','));
 

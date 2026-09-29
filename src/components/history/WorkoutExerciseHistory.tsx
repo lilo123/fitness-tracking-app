@@ -6,6 +6,8 @@ import { formatShortDate, normalizeDateStr } from '../../utils/date';
 import { Tag } from '../common/Tag';
 import { FALLBACK_WINDOW } from './virtualizationConstants';
 import { useWeightUnit } from '../../hooks/useWeightUnit';
+import { usePrMode } from '../../hooks/usePrMode';
+import { e1rm } from '../../lib/prComparator';
 import { formatWeight } from '../../utils/weight';
 
 const CATEGORIES = ['All', 'Chest', 'Back', 'Arms', 'Shoulders', 'Legs', 'Core'];
@@ -17,6 +19,7 @@ export interface ExerciseStat {
   prReps: number;
   setCount?: number;
   prDate?: string | null;
+  prE1rm?: number | null;
 }
 
 interface WorkoutExerciseHistoryProps {
@@ -53,6 +56,7 @@ export const WorkoutExerciseHistory: React.FC<WorkoutExerciseHistoryProps> = ({
   onEditSet,
 }) => {
   const unit = useWeightUnit();
+  const { mode: prMode } = usePrMode();
   const parentRef = React.useRef<HTMLDivElement | null>(null);
   const [scrollMargin, setScrollMargin] = React.useState(0);
 
@@ -134,15 +138,27 @@ export const WorkoutExerciseHistory: React.FC<WorkoutExerciseHistoryProps> = ({
           </div>
 
           {/* H47: PR line shows formatted pr_date */}
-          {totalSets > 0 ? (
-            <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-2xl text-amber-400 text-xs font-bold shrink-0">
-              <Trophy className="w-3.5 h-3.5 shrink-0" />
-              <span>
-                PR: {stat.maxWeight > 0 ? formatWeight(stat.maxWeight, unit, { showUnit: true }) : 'Bodyweight'} × {stat.prReps}
-                {stat.prDate ? ` · ${formatExerciseSetDate(stat.prDate)}` : ''}
-              </span>
-            </div>
-          ) : (
+          {totalSets > 0 ? (() => {
+            const calculatedE1rm =
+              stat.prE1rm ??
+              (stat.maxWeight > 0 && stat.prReps <= 12
+                ? e1rm(stat.maxWeight, stat.prReps)
+                : null);
+            const e1rmSuffix =
+              prMode === 'e1rm' && calculatedE1rm != null && calculatedE1rm > 0
+                ? ` · e1RM ${formatWeight(calculatedE1rm, unit, { showUnit: true })}`
+                : '';
+            return (
+              <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-2xl text-amber-400 text-xs font-bold shrink-0">
+                <Trophy className="w-3.5 h-3.5 shrink-0" />
+                <span>
+                  PR: {stat.maxWeight > 0 ? formatWeight(stat.maxWeight, unit, { showUnit: true }) : 'Bodyweight'} × {stat.prReps}
+                  {e1rmSuffix}
+                  {stat.prDate ? ` · ${formatExerciseSetDate(stat.prDate)}` : ''}
+                </span>
+              </div>
+            );
+          })() : (
             <span className="text-xs text-zinc-400 shrink-0">No logs yet</span>
           )}
         </div>

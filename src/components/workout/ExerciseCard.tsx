@@ -6,6 +6,9 @@ import { Card } from '../common/Card';
 import { Chip } from '../common/Chip';
 import { formatSet, weightUnitLabel, toDisplayWeight } from '../../utils/weight';
 import { useWeightUnit } from '../../hooks/useWeightUnit';
+import { usePrMode } from '../../hooks/usePrMode';
+import { e1rm } from '../../lib/prComparator';
+import { formatWeight } from '../../utils/weight';
 
 export interface ExerciseCardProps {
   exName: string;
@@ -52,7 +55,7 @@ function areBenchmarksEqual(prev: any, next: any): boolean {
     if (
       prevPr.weight !== nextPr.weight ||
       prevPr.reps !== nextPr.reps ||
-      prevPr.date !== nextPr.date
+      prevPr.date !== nextPr.date || (prevPr as any).e1rm !== (nextPr as any).e1rm
     ) {
       return false;
     }
@@ -159,6 +162,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
   } = props;
 
   const unit = useWeightUnit();
+  const { mode: prMode } = usePrMode();
   const isCompleted = setsToday.length >= targetCount;
   const unloggedCount = Math.max(0, targetCount - setsToday.length);
   const totalRows = Math.max(targetCount, setsToday.length);
@@ -213,16 +217,27 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
           <span className="text-xs text-zinc-400 font-normal">No prior session</span>
         )}
 
-        {benchmarks.pr && (
-          <Chip
-            size="sm"
-            variant="default"
-            icon={<Trophy className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
-            label={`PR: ${formatSet(benchmarks.pr.weight, benchmarks.pr.reps, unit)}`}
-            className="bg-amber-500/10 border-amber-500/30 text-amber-400 font-semibold tabular-nums"
-            testId={`pr-chip-${exIndex}`}
-          />
-        )}
+        {benchmarks.pr && (() => {
+          const prE1rm =
+            (benchmarks.pr as any)?.e1rm ??
+            (benchmarks.pr.weight > 0 && benchmarks.pr.reps <= 12
+              ? e1rm(benchmarks.pr.weight, benchmarks.pr.reps)
+              : null);
+          const e1rmSuffix =
+            prMode === 'e1rm' && prE1rm != null && prE1rm > 0
+              ? ` · e1RM ${formatWeight(prE1rm, unit, { showUnit: true })}`
+              : '';
+          return (
+            <Chip
+              size="sm"
+              variant="default"
+              icon={<Trophy className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+              label={`PR: ${formatSet(benchmarks.pr.weight, benchmarks.pr.reps, unit)}${e1rmSuffix}`}
+              className="bg-amber-500/10 border-amber-500/30 text-amber-400 font-semibold tabular-nums"
+              testId={`pr-chip-${exIndex}`}
+            />
+          );
+        })()}
 
         {isCompleted ? (
           <Chip
