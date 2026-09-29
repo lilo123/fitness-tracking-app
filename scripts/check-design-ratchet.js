@@ -4,8 +4,8 @@
  * CyberGym V2 — Design Standards Ratchet & Gate (P3a)
  *
  * Enforces typography and interaction design standards across src:
- * 1. STD-CMP-7 / STD-INT-3: No `window.confirm(` or bare `confirm(` calls.
- *    - Hard rule (zero allowed): src/components/workout, src/components/sets, src/components/common.
+ * 1. STD-CMP-7 / STD-INT-3: No `window.confirm(`, bare `confirm(`, `window.alert(`, or bare `alert(` calls.
+ *    - Hard rule (zero allowed): all of src/.
  *      Any legacy occurrences at the P3a base are explicitly flagged in `design-ratchet-baseline.json`
  *      and ratcheted down to zero.
  * 2. STD-TYP-3: No `font-mono` (one family: system sans + tabular-nums on numbers).
@@ -13,6 +13,7 @@
  * 4. STD-TYP-1: No sub-12px text (sizes 16px, 14px, 12px; nothing below 12px).
  *    Detects arbitrary text classes (`text-[10px]`, `text-[11px]`, `text-[9px]`, `text-[0.6..0.7rem]`,
  *    `text-[<length>] < 12px`), named sub-12px tokens (`text-2xs`, `text-3xs`), and inline style `fontSize < 12`.
+ * 5. STD-COL-2: No `text-zinc-500` (AA text color: use text-zinc-400 / text-zinc-300 / opacity-50).
  *
  * Ratchet Policy:
  * - Violations per file can only stay the same or decrease over time.
@@ -32,13 +33,9 @@ export const rootDir = path.resolve(__dirname, '..');
 export const srcDir = path.resolve(rootDir, 'src');
 export const defaultBaselinePath = path.resolve(__dirname, 'design-ratchet-baseline.json');
 
-export const RULES = ['confirm', 'font-mono', 'font-black', 'sub-12px'];
+export const RULES = ['confirm', 'font-mono', 'font-black', 'sub-12px', 'zinc-500'];
 
-export const HARD_RULE_DIRECTORIES = [
-  'src/components/workout',
-  'src/components/sets',
-  'src/components/common',
-];
+export const HARD_RULE_DIRECTORIES = ['src'];
 
 /**
  * Strips single-line and multi-line comments from JS/TS source code,
@@ -160,9 +157,9 @@ export function isHardRuleDir(relPath) {
 export function scanFileContent(rawContent) {
   const content = stripComments(rawContent);
 
-  // 1. confirm: window.confirm( or bare confirm(
+  // 1. confirm: window.confirm(, bare confirm(, window.alert(, bare alert(
   // Must be preceded by start of line or non-word/non-dot char, not followed by word chars before (
-  const confirmMatches = content.match(/(?:^|[^.\w$])(?:window\s*\.\s*)?confirm\s*\(/g) || [];
+  const confirmMatches = content.match(/(?:^|[^.\w$])(?:window\s*\.\s*)?(?:confirm|alert)\s*\(/g) || [];
 
   // 2. font-mono: class name (allows variant prefixes like sm:font-mono)
   const monoMatches = content.match(/(?:^|[^\w-])(?:[a-zA-Z0-9_-]+:)*font-mono(?=[^\w-]|$)/g) || [];
@@ -198,11 +195,15 @@ export function scanFileContent(rawContent) {
     }
   }
 
+  // 5. zinc-500: class token text-zinc-500 (allows variant prefixes like placeholder:text-zinc-500, disabled:text-zinc-500)
+  const zinc500Matches = content.match(/(?:^|[^\w-])(?:[a-zA-Z0-9_-]+:)*text-zinc-500(?=[^\w-]|$)/g) || [];
+
   return {
     confirm: confirmMatches.length,
     'font-mono': monoMatches.length,
     'font-black': blackMatches.length,
     'sub-12px': sub12,
+    'zinc-500': zinc500Matches.length,
   };
 }
 
@@ -258,8 +259,8 @@ export function compareWithBaseline(currentCounts, baseline, _options = {}) {
   const baselineFiles = baseline?.files || {};
   const flaggedConfirm = baseline?.flaggedConfirm || {};
 
-  const currentTotals = { confirm: 0, 'font-mono': 0, 'font-black': 0, 'sub-12px': 0 };
-  const baselineTotals = { confirm: 0, 'font-mono': 0, 'font-black': 0, 'sub-12px': 0 };
+  const currentTotals = { confirm: 0, 'font-mono': 0, 'font-black': 0, 'sub-12px': 0, 'zinc-500': 0 };
+  const baselineTotals = { confirm: 0, 'font-mono': 0, 'font-black': 0, 'sub-12px': 0, 'zinc-500': 0 };
 
   // Calculate baseline totals
   for (const f of Object.keys(baselineFiles)) {
@@ -272,8 +273,8 @@ export function compareWithBaseline(currentCounts, baseline, _options = {}) {
   const allFiles = new Set([...Object.keys(currentCounts), ...Object.keys(baselineFiles)]);
 
   for (const file of Array.from(allFiles).sort()) {
-    const current = currentCounts[file] || { confirm: 0, 'font-mono': 0, 'font-black': 0, 'sub-12px': 0 };
-    const base = baselineFiles[file] || { confirm: 0, 'font-mono': 0, 'font-black': 0, 'sub-12px': 0 };
+    const current = currentCounts[file] || { confirm: 0, 'font-mono': 0, 'font-black': 0, 'sub-12px': 0, 'zinc-500': 0 };
+    const base = baselineFiles[file] || { confirm: 0, 'font-mono': 0, 'font-black': 0, 'sub-12px': 0, 'zinc-500': 0 };
 
     if (currentCounts[file]) {
       for (const rule of RULES) {
@@ -296,7 +297,7 @@ export function compareWithBaseline(currentCounts, baseline, _options = {}) {
             file,
             count: confirmCount,
             allowed: 0,
-            message: `Hard rule violation: ${file} has ${confirmCount} confirm() call(s). Zero allowed in ${file.split('/')[0]}/${file.split('/')[1]}/${file.split('/')[2]} (no baseline permitted for unflagged files).`,
+            message: `Hard rule violation: ${file} has ${confirmCount} confirm()/alert() call(s). Zero allowed in src (no baseline permitted for unflagged files).`,
           });
         } else if (confirmCount > allowedFlagged) {
           // File is flagged, but count increased above flagged baseline
@@ -304,7 +305,7 @@ export function compareWithBaseline(currentCounts, baseline, _options = {}) {
             file,
             count: confirmCount,
             allowed: allowedFlagged,
-            message: `Hard rule violation: ${file} has ${confirmCount} confirm() call(s), exceeding flagged baseline of ${allowedFlagged}.`,
+            message: `Hard rule violation: ${file} has ${confirmCount} confirm()/alert() call(s), exceeding flagged baseline of ${allowedFlagged}.`,
           });
         } else {
           flaggedActive.push({
@@ -379,7 +380,7 @@ export function updateBaseline(currentCounts, oldBaseline, options = {}) {
     rules: [...RULES],
     hardRuleDirectories: [...HARD_RULE_DIRECTORIES],
     flaggedConfirm: {},
-    totals: { confirm: 0, 'font-mono': 0, 'font-black': 0, 'sub-12px': 0 },
+    totals: { confirm: 0, 'font-mono': 0, 'font-black': 0, 'sub-12px': 0, 'zinc-500': 0 },
     files: {},
   };
 
@@ -388,7 +389,7 @@ export function updateBaseline(currentCounts, oldBaseline, options = {}) {
     const increases = [];
     for (const file of Object.keys(currentCounts)) {
       const current = currentCounts[file];
-      const old = oldFiles[file] || { confirm: 0, 'font-mono': 0, 'font-black': 0, 'sub-12px': 0 };
+      const old = oldFiles[file] || { confirm: 0, 'font-mono': 0, 'font-black': 0, 'sub-12px': 0, 'zinc-500': 0 };
 
       for (const rule of RULES) {
         const curVal = current[rule] || 0;
@@ -423,6 +424,7 @@ export function updateBaseline(currentCounts, oldBaseline, options = {}) {
         'font-mono': counts['font-mono'] || 0,
         'font-black': counts['font-black'] || 0,
         'sub-12px': counts['sub-12px'] || 0,
+        'zinc-500': counts['zinc-500'] || 0,
       };
     }
   }
@@ -479,10 +481,11 @@ Options:
   --help, -h         Show this help message.
 
 Rules Enforced:
-  - confirm:   zero window.confirm() / bare confirm(). Hard rule in workout/sets/common.
+  - confirm:   zero window.confirm() / bare confirm() / alert(). Hard rule across all of src.
   - font-mono: zero font-mono classes (STD-TYP-3).
   - font-black: zero font-black classes (STD-TYP-2).
   - sub-12px:  zero text-[<12px], text-2xs/3xs, or inline fontSize < 12 (STD-TYP-1).
+  - zinc-500:  zero text-zinc-500 classes (STD-COL-2).
 `);
     process.exit(0);
   }
@@ -558,7 +561,7 @@ Rules Enforced:
   }
 
   if (comparison.hardRuleViolations.length > 0) {
-    console.error('🚫 HARD RULE VIOLATIONS (zero confirm() allowed in workout/sets/common):');
+    console.error('🚫 HARD RULE VIOLATIONS (zero confirm() or alert() allowed in src):');
     for (const h of comparison.hardRuleViolations) {
       console.error(`   ❌ ${h.message}`);
     }

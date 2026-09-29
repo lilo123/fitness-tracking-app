@@ -269,4 +269,66 @@ test.describe('Mobile Viewport & Ergonomics', () => {
       expect(box!.height).toBeGreaterThanOrEqual(43);
     }
   });
+
+  test("BottomNav at 320px: all 5 labels visible, scrollWidth <= clientWidth, tabs >= 44px tall, aria-current on active tab", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 844 });
+    await page.goto("/login");
+    await page.fill('input[type="email"]', "athlete@cybergym.io");
+    await page.fill('input[type="password"]', "password123");
+    await page.click('button[type="submit"]');
+    await page.waitForURL("**/workout");
+
+    const nav = page.locator("nav.fixed.bottom-0");
+    await expect(nav).toBeVisible();
+
+    const tabs = [
+      { id: "nav-workout", label: "Workout", path: "/workout" },
+      { id: "nav-nutrition", label: "Nutrition", path: "/nutrition" },
+      { id: "nav-exercises", label: "Library", path: "/exercises" },
+      { id: "nav-history", label: "History", path: "/history" },
+      { id: "nav-settings", label: "Settings", path: "/settings" },
+    ];
+
+    // Verify all 5 tabs in BottomNav at 320px
+    for (const tab of tabs) {
+      const tabLocator = page.locator(`[data-testid="${tab.id}"]`);
+      await expect(tabLocator).toBeVisible();
+
+      // Tab height >= 44px
+      const box = await tabLocator.boundingBox();
+      expect(box, `Tab ${tab.id} bounding box`).toBeTruthy();
+      expect(box!.height, `Tab ${tab.id} height >= 44px`).toBeGreaterThanOrEqual(44);
+
+      // Label visible, 12px sentence-case, no overflow: scrollWidth <= clientWidth
+      const labelSpan = tabLocator.locator("span");
+      await expect(labelSpan).toBeVisible();
+      await expect(labelSpan).toHaveText(tab.label);
+
+      const metrics = await labelSpan.evaluate((span) => {
+        const cs = window.getComputedStyle(span);
+        return {
+          scrollWidth: span.scrollWidth,
+          clientWidth: span.clientWidth,
+          fontSize: parseFloat(cs.fontSize),
+        };
+      });
+
+      expect(metrics.fontSize, `Tab ${tab.id} label font size == 12px`).toBe(12);
+      expect(
+        metrics.scrollWidth,
+        `Tab ${tab.id} label scrollWidth (${metrics.scrollWidth}px) <= clientWidth (${metrics.clientWidth}px)`
+      ).toBeLessThanOrEqual(metrics.clientWidth);
+    }
+
+    // Verify aria-current="page" on the active tab (/workout)
+    const workoutTab = page.locator('[data-testid="nav-workout"]');
+    await expect(workoutTab).toHaveAttribute("aria-current", "page");
+
+    // Navigate to /nutrition and verify aria-current moves
+    await page.locator('[data-testid="nav-nutrition"]').click();
+    await page.waitForURL("**/nutrition");
+    const nutritionTab = page.locator('[data-testid="nav-nutrition"]');
+    await expect(nutritionTab).toHaveAttribute("aria-current", "page");
+    await expect(workoutTab).not.toHaveAttribute("aria-current", "page");
+  });
 });

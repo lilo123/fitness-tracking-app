@@ -3568,8 +3568,11 @@ test.describe('D41 floating toast', () => {
 // D43: Nutrition Type Scale Density Guard
 // ---------------------------------------------------------------------------
 
-async function checkTypeScale(surface: Locator) {
-  return await surface.evaluate((root) => {
+async function checkTypeScale(
+  surface: Locator,
+  options?: { includeHeaderAndNav?: boolean; allowSizes16Plus?: boolean }
+) {
+  return await surface.evaluate((root, opts) => {
     const ALLOWED_SIZES = new Set([12, 14]);
     const ALLOWED_WEIGHTS = new Set([400, 600, 700]);
     const violations: Array<{ selector: string; text: string; issue: string }> = [];
@@ -3597,7 +3600,7 @@ async function checkTypeScale(surface: Locator) {
       );
       if (!hasDirectText) continue;
 
-      if (el.closest('nav') || el.closest('header')) continue;
+      if (!opts?.includeHeaderAndNav && (el.closest('nav') || el.closest('header'))) continue;
 
       const cs = window.getComputedStyle(el);
       const size = Math.round(parseFloat(cs.fontSize));
@@ -3615,6 +3618,8 @@ async function checkTypeScale(surface: Locator) {
       if (!ALLOWED_SIZES.has(size)) {
         if (size === 16 && isInput) {
           // Allowed: inputs are 16px to prevent iOS auto-zoom (D18/D26)
+        } else if (opts?.allowSizes16Plus && size >= 16) {
+          // Allowed: page headings/titles on full routes when allowSizes16Plus is enabled
         } else {
           violations.push({ selector: sel, text, issue: `Font size ${size}px not in {12, 14} (16 only on inputs)` });
         }
@@ -3639,7 +3644,7 @@ async function checkTypeScale(surface: Locator) {
     }
 
     return violations;
-  });
+  }, options);
 }
 
 test.describe('D43 nutrition type scale', () => {
@@ -5903,6 +5908,293 @@ test.describe("P7b Template Builder", () => {
         return res.violations;
       });
       expect(violations, `Template sheet axe violations: ${JSON.stringify(violations, null, 2)}`).toHaveLength(0);
+    } finally {
+      await page.close();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// P8: Route-Wide Density & Tap Grid Acceptance (D-P8-3, D-P8-4, D-P8-7, D-P8-8)
+// ---------------------------------------------------------------------------
+
+test.describe("P8 Route-Wide Density & Tap Grid", () => {
+  const ATHLETE_ROUTES = ["/workout", "/nutrition", "/exercises", "/history", "/settings"] as const;
+
+  // Helper to check tap grid on an active page
+  async function checkRouteTapGrid(page: any, routeName: string) {
+    return await page.evaluate((rName: string) => {
+      function isVisible(el: Element): boolean {
+        if (!(el instanceof HTMLElement || el instanceof SVGElement)) return false;
+        const s = window.getComputedStyle(el);
+        if (s.display === "none" || s.visibility === "hidden" || s.opacity === "0") return false;
+        if (s.clip === "rect(0px, 0px, 0px, 0px)" || s.clipPath === "inset(50%)") return false;
+        if (el.classList.contains("sr-only")) return false;
+        if (el.closest('[aria-hidden="true"]')) return false;
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      }
+
+      function hasPseudoOverlay44(el: Element): boolean {
+        for (const pseudo of ["::before", "::after"]) {
+          const ps = window.getComputedStyle(el, pseudo);
+          if (ps.content && ps.content !== "none" && ps.content !== "normal") {
+            const minW = parseFloat(ps.minWidth) || 0;
+            const minH = parseFloat(ps.minHeight) || 0;
+            const w = parseFloat(ps.width) || 0;
+            const h = parseFloat(ps.height) || 0;
+            if (Math.max(minW, w) >= 43.5 && Math.max(minH, h) >= 43.5) {
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+
+      const interactiveSelector = 'button, a[href], input, select, textarea, [role="button"], [role="tab"], [role="radio"], [role="checkbox"]';
+      const elements = Array.from(document.querySelectorAll(interactiveSelector));
+      const list: Array<{ route: string; tag: string; testId: string; box: { width: number; height: number }; className: string }> = [];
+
+      for (const el of elements) {
+        if (!isVisible(el)) continue;
+
+        const isInput = el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT";
+        const r = el.getBoundingClientRect();
+
+        // Exclude full-width inputs
+        if (isInput && r.width >= 200 && r.height >= 40) {
+          continue;
+        }
+
+        const passesSelf = r.width >= 43.5 && r.height >= 43.5;
+        const passesOverlay = hasPseudoOverlay44(el);
+
+        if (!passesSelf && !passesOverlay) {
+          const testId = el.getAttribute("data-testid") || el.getAttribute("aria-label") || el.textContent?.trim().slice(0, 25) || el.tagName.toLowerCase();
+          list.push({
+            route: rName,
+            tag: el.tagName.toLowerCase(),
+            testId,
+            box: { width: Math.round(r.width * 10) / 10, height: Math.round(r.height * 10) / 10 },
+            className: el.className ? String(el.className).slice(0, 60) : "",
+          });
+        }
+      }
+      return list;
+    }, routeName);
+  }
+
+  // 1. D43 Route Walker on every route at 320px and 390px (including Header and BottomNav)
+  for (const width of [320, 390] as const) {
+    for (const route of ATHLETE_ROUTES) {
+      test(`D43 type scale on ${route} at ${width}px`, async ({ browser }) => {
+        const page = await browser.newPage({
+          viewport: { width, height: 844 },
+          deviceScaleFactor: 1,
+        });
+        try {
+          await page.goto("/login");
+          await page.fill('input[type="email"]', "athlete@cybergym.io");
+          await page.fill('input[type="password"]', "password123");
+          await page.click('button[type="submit"]');
+          await page.waitForURL("**/workout");
+
+          await page.goto(route);
+          await page.waitForLoadState("domcontentloaded");
+          await page.waitForTimeout(500);
+
+          const violations = await checkTypeScale(page.locator("body"), {
+            includeHeaderAndNav: true,
+            allowSizes16Plus: true,
+          });
+
+          expect(
+            violations,
+            `D43 type scale violations on ${route} at ${width}px:\n${JSON.stringify(violations, null, 2)}`
+          ).toHaveLength(0);
+        } finally {
+          await page.close();
+        }
+      });
+    }
+
+    test(`D43 type scale on /coach at ${width}px`, async ({ browser }) => {
+      const page = await browser.newPage({
+        viewport: { width, height: 844 },
+        deviceScaleFactor: 1,
+      });
+      try {
+        await page.goto("/login");
+        await page.fill('input[type="email"]', "coach@cybergym.io");
+        await page.fill('input[type="password"]', "password123");
+        await page.click('button[type="submit"]');
+        await page.waitForURL("**/coach");
+        await page.waitForLoadState("domcontentloaded");
+        await page.waitForTimeout(500);
+
+        const violations = await checkTypeScale(page.locator("body"), {
+          includeHeaderAndNav: true,
+          allowSizes16Plus: true,
+        });
+
+        expect(
+          violations,
+          `D43 type scale violations on /coach at ${width}px:\n${JSON.stringify(violations, null, 2)}`
+        ).toHaveLength(0);
+      } finally {
+        await page.close();
+      }
+    });
+  }
+
+  // 2. Tap Grid on every route at 320px
+  for (const route of ATHLETE_ROUTES) {
+    test(`Tap grid on ${route} at 320px`, async ({ browser }) => {
+      const page = await browser.newPage({
+        viewport: { width: 320, height: 844 },
+        deviceScaleFactor: 1,
+      });
+      try {
+        await page.goto("/login");
+        await page.fill('input[type="email"]', "athlete@cybergym.io");
+        await page.fill('input[type="password"]', "password123");
+        await page.click('button[type="submit"]');
+        await page.waitForURL("**/workout");
+
+        await page.goto(route);
+        await page.waitForLoadState("domcontentloaded");
+        await page.waitForTimeout(500);
+
+        const offenders = await checkRouteTapGrid(page, route);
+        expect(
+          offenders,
+          `Tap grid offenders on ${route} at 320px:\n${JSON.stringify(offenders, null, 2)}`
+        ).toHaveLength(0);
+      } finally {
+        await page.close();
+      }
+    });
+  }
+
+  test("Tap grid on /coach at 320px", async ({ browser }) => {
+    const page = await browser.newPage({
+      viewport: { width: 320, height: 844 },
+      deviceScaleFactor: 1,
+    });
+    try {
+      await page.goto("/login");
+      await page.fill('input[type="email"]', "coach@cybergym.io");
+      await page.fill('input[type="password"]', "password123");
+      await page.click('button[type="submit"]');
+      await page.waitForURL("**/coach");
+      await page.waitForLoadState("domcontentloaded");
+      await page.waitForTimeout(500);
+
+      const offenders = await checkRouteTapGrid(page, "/coach");
+      expect(
+        offenders,
+        `Tap grid offenders on /coach at 320px:\n${JSON.stringify(offenders, null, 2)}`
+      ).toHaveLength(0);
+    } finally {
+      await page.close();
+    }
+  });
+
+  // 3. Nutrition row heights remain unchanged at 320px (meal row 94px, component row 59px, dish row 44px)
+  test("Nutrition row heights at 320px remain unchanged (meal row 94px, component row 59px, dish row 44px)", async ({ browser }) => {
+    const page = await browser.newPage({
+      viewport: { width: 320, height: 844 },
+      deviceScaleFactor: 1,
+    });
+    try {
+      const todayStr = new Date().toISOString().split("T")[0];
+      const deterministicLogs = [
+        {
+          id: "log-timeline-p8",
+          user_id: "test-user",
+          food_name: "Grilled Salmon with Rice",
+          meal_type: "Dinner",
+          calories: 550,
+          protein: 45,
+          carbs: 50,
+          fat: 18,
+          fiber: 4,
+          serving_size: 1,
+          serving_unit: "serving",
+          logged_at: new Date().toISOString(),
+          logged_date: todayStr,
+          created_at: new Date().toISOString(),
+          has_components: false,
+        },
+      ];
+
+      await page.route("**/rest/v1/nutrition_logs*", async (route: any) => {
+        return route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          headers: { "access-control-allow-origin": "*" },
+          body: JSON.stringify(deterministicLogs),
+        });
+      });
+
+      await page.goto("/login");
+      await page.fill('input[type="email"]', "athlete@cybergym.io");
+      await page.fill('input[type="password"]', "password123");
+      await page.click('button[type="submit"]');
+      await page.waitForURL("**/workout");
+
+      await page.goto("/nutrition");
+      await page.waitForURL("**/nutrition");
+      await page.waitForSelector("text=Today's Nutrition");
+
+      // 1. MealLogRow height at 320px: 94px
+      const mealLogItem = page.locator('[data-testid="meal-log-item"]').first();
+      await expect(mealLogItem).toBeVisible();
+      const mealBox = await mealLogItem.boundingBox();
+      expect(mealBox, "Meal log item bounding box").toBeTruthy();
+      expect(Math.round(mealBox!.height), "Meal row height at 320px is 94px").toBe(94);
+
+      // 2. ComponentRow in staged meal card at 320px: 59px
+      const firstFavBtn = page.locator('[data-testid^="favorite-row-"] button').first();
+      await expect(firstFavBtn).toBeVisible();
+      await firstFavBtn.click();
+      const stagedCard = page.locator('[data-testid="staged-meal-card"]');
+      await expect(stagedCard).toBeVisible();
+
+      const componentRow = stagedCard.locator('[data-testid="component-row"]').first();
+      await expect(componentRow).toBeVisible();
+      const compBox = await componentRow.boundingBox();
+      expect(compBox, "Component row bounding box").toBeTruthy();
+      expect(Math.round(compBox!.height), "Component row height at 320px is 59px").toBe(59);
+
+      // 3. Dish row in CustomDishesModal at 320px: action buttons have 44px hit targets and no row height inflation
+      const createDishBtn = page.locator('[data-testid="create-custom-dish-btn"]');
+      await expect(createDishBtn).toBeVisible();
+      await createDishBtn.click();
+      await page.waitForSelector("text=Saved Dishes");
+
+      const savedDishRows = page.locator(".max-h-48 > div");
+      const dishCount = await savedDishRows.count();
+      expect(dishCount, "Saved dishes exist in modal").toBeGreaterThan(0);
+
+      const firstDishRow = savedDishRows.first();
+      const dishBox = await firstDishRow.boundingBox();
+      expect(dishBox, "Dish row bounding box").toBeTruthy();
+      expect(dishBox!.height, "Dish row height >= 44px").toBeGreaterThanOrEqual(44);
+      expect(dishBox!.height, "Dish row height <= 76px (no layout growth)").toBeLessThanOrEqual(76);
+
+      // Verify Edit and Delete buttons inside the dish row have 44px hit targets
+      const editBtn = firstDishRow.locator("button").first();
+      const deleteBtn = firstDishRow.locator("button").nth(1);
+      await expect(editBtn).toBeVisible();
+      await expect(deleteBtn).toBeVisible();
+
+      const editBox = await editBtn.boundingBox();
+      const deleteBox = await deleteBtn.boundingBox();
+      expect(editBox!.height, "Dish row edit button height >= 44px").toBeGreaterThanOrEqual(44);
+      expect(editBox!.width, "Dish row edit button width >= 44px").toBeGreaterThanOrEqual(44);
+      expect(deleteBox!.height, "Dish row delete button height >= 44px").toBeGreaterThanOrEqual(44);
+      expect(deleteBox!.width, "Dish row delete button width >= 44px").toBeGreaterThanOrEqual(44);
     } finally {
       await page.close();
     }

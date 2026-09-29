@@ -2,10 +2,11 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import path from 'node:path';
 
 interface RatchetScanCounts {
-  confirm: number;
-  'font-mono': number;
-  'font-black': number;
-  'sub-12px': number;
+  confirm?: number;
+  'font-mono'?: number;
+  'font-black'?: number;
+  'sub-12px'?: number;
+  'zinc-500'?: number;
 }
 
 interface RatchetBaseline {
@@ -103,8 +104,8 @@ describe('Design Ratchet Checker (scripts/check-design-ratchet.js)', () => {
   const mockBaseline: RatchetBaseline = {
     version: 1,
     description: 'Test Baseline',
-    rules: ['confirm', 'font-mono', 'font-black', 'sub-12px'],
-    hardRuleDirectories: ['src/components/workout', 'src/components/sets', 'src/components/common'],
+    rules: ['confirm', 'font-mono', 'font-black', 'sub-12px', 'zinc-500'],
+    hardRuleDirectories: ['src'],
     flaggedConfirm: {
       'src/components/workout/EditSetModal.tsx': {
         count: 1,
@@ -116,6 +117,7 @@ describe('Design Ratchet Checker (scripts/check-design-ratchet.js)', () => {
       'font-mono': 4,
       'font-black': 2,
       'sub-12px': 5,
+      'zinc-500': 0,
     },
     files: {
       'src/components/workout/EditSetModal.tsx': {
@@ -123,12 +125,14 @@ describe('Design Ratchet Checker (scripts/check-design-ratchet.js)', () => {
         'font-mono': 2,
         'font-black': 1,
         'sub-12px': 2,
+        'zinc-500': 0,
       },
       'src/components/history/HistoryView.tsx': {
         confirm: 0,
         'font-mono': 2,
         'font-black': 1,
         'sub-12px': 3,
+        'zinc-500': 0,
       },
     },
   };
@@ -192,6 +196,22 @@ describe('Design Ratchet Checker (scripts/check-design-ratchet.js)', () => {
       expect(result.ok).toBe(false);
       expect(result.violations.some((v) => v.rule === 'sub-12px' && v.delta === 2)).toBe(true);
     });
+
+    it('fails when an existing file increases count for zinc-500', () => {
+      const current = {
+        'src/components/history/HistoryView.tsx': {
+          confirm: 0,
+          'font-mono': 2,
+          'font-black': 1,
+          'sub-12px': 3,
+          'zinc-500': 2, // Increased from 0 to 2
+        },
+      };
+
+      const result = compareWithBaseline(current, mockBaseline);
+      expect(result.ok).toBe(false);
+      expect(result.violations.some((v) => v.rule === 'zinc-500' && v.delta === 2)).toBe(true);
+    });
   });
 
   describe('2. Decrease Passes', () => {
@@ -252,14 +272,40 @@ describe('Design Ratchet Checker (scripts/check-design-ratchet.js)', () => {
   });
 
   describe('3. New File With Violation Fails', () => {
-    it('fails when a new unrecorded file introduces a non-zero count', () => {
+    it('fails when a new unrecorded file introduces a non-zero count for zinc-500', () => {
+      const current = {
+        ...mockBaseline.files,
+        'src/components/nutrition/ZincViolator.tsx': {
+          confirm: 0,
+          'font-mono': 0,
+          'font-black': 0,
+          'sub-12px': 0,
+          'zinc-500': 1, // New violation with text-zinc-500
+        },
+      };
+
+      const result = compareWithBaseline(current, mockBaseline);
+      expect(result.ok).toBe(false);
+      expect(result.violations).toHaveLength(1);
+      expect(result.violations[0]).toMatchObject({
+        file: 'src/components/nutrition/ZincViolator.tsx',
+        rule: 'zinc-500',
+        old: 0,
+        new: 1,
+        delta: 1,
+        isNewFile: true,
+      });
+    });
+
+    it('fails when a new unrecorded file introduces a non-zero count for font-mono', () => {
       const current = {
         ...mockBaseline.files,
         'src/components/nutrition/NewFeatureCard.tsx': {
           confirm: 0,
-          'font-mono': 1, // New violation
+          'font-mono': 1,
           'font-black': 0,
           'sub-12px': 0,
+          'zinc-500': 0,
         },
       };
 
@@ -345,6 +391,40 @@ describe('Design Ratchet Checker (scripts/check-design-ratchet.js)', () => {
       expect(result.hardRuleViolations.some((h) => h.file === 'src/components/common/ConfirmDialog.tsx')).toBe(true);
     });
 
+    it('fails when an unflagged file in src/components/nutrition contains confirm()', () => {
+      const current = {
+        ...mockBaseline.files,
+        'src/components/nutrition/NutritionEngine.tsx': {
+          confirm: 1,
+          'font-mono': 0,
+          'font-black': 0,
+          'sub-12px': 0,
+          'zinc-500': 0,
+        },
+      };
+
+      const result = compareWithBaseline(current, mockBaseline);
+      expect(result.ok).toBe(false);
+      expect(result.hardRuleViolations.some((h) => h.file === 'src/components/nutrition/NutritionEngine.tsx')).toBe(true);
+    });
+
+    it('fails when an unflagged file anywhere in src contains alert()', () => {
+      const current = {
+        ...mockBaseline.files,
+        'src/components/history/HistoryView.tsx': {
+          confirm: 1,
+          'font-mono': 2,
+          'font-black': 1,
+          'sub-12px': 3,
+          'zinc-500': 0,
+        },
+      };
+
+      const result = compareWithBaseline(current, mockBaseline);
+      expect(result.ok).toBe(false);
+      expect(result.hardRuleViolations.some((h) => h.file === 'src/components/history/HistoryView.tsx')).toBe(true);
+    });
+
     it('fails when a flagged file increases confirm calls above its allowed baseline count', () => {
       const current = {
         ...mockBaseline.files,
@@ -376,12 +456,14 @@ describe('Design Ratchet Checker (scripts/check-design-ratchet.js)', () => {
       expect(result.flaggedActive.some((f) => f.file === 'src/components/workout/EditSetModal.tsx')).toBe(true);
     });
 
-    it('correctly classifies hard rule directories', () => {
+    it('correctly classifies hard rule directories across all of src', () => {
       expect(isHardRuleDir('src/components/workout/WorkoutEngine.tsx')).toBe(true);
       expect(isHardRuleDir('src/components/sets/EditSetSheet.tsx')).toBe(true);
       expect(isHardRuleDir('src/components/common/Header.tsx')).toBe(true);
-      expect(isHardRuleDir('src/components/nutrition/NutritionEngine.tsx')).toBe(false);
-      expect(isHardRuleDir('src/components/history/HistoryView.tsx')).toBe(false);
+      expect(isHardRuleDir('src/components/nutrition/NutritionEngine.tsx')).toBe(true);
+      expect(isHardRuleDir('src/components/history/HistoryView.tsx')).toBe(true);
+      expect(isHardRuleDir('src/App.tsx')).toBe(true);
+      expect(isHardRuleDir('scripts/check-design-ratchet.js')).toBe(false);
     });
   });
 
@@ -402,6 +484,7 @@ describe('Design Ratchet Checker (scripts/check-design-ratchet.js)', () => {
         'font-mono': 1,
         'font-black': 0,
         'sub-12px': 2,
+        'zinc-500': 0,
       });
       expect(updated.totals['font-mono']).toBe(1);
     });
@@ -439,18 +522,31 @@ describe('Design Ratchet Checker (scripts/check-design-ratchet.js)', () => {
   });
 
   describe('6. Parser & Scanner Accuracy', () => {
-    it('detects window.confirm( and bare confirm(', () => {
+    it('detects window.confirm(, bare confirm(, window.alert(, and bare alert(', () => {
       const code = `
         function removeSet() {
           if (window.confirm("Delete?")) { doDelete(); }
           if (confirm("Sure?")) { doSure(); }
+          window.alert("Alert 1");
+          alert("Alert 2");
           const confirmPassword = "123";
           if (confirmPassword === "123") {}
           dialog.confirm("Custom method");
+          dialog.alert("Custom method");
         }
       `;
       const counts = scanFileContent(code);
-      expect(counts.confirm).toBe(2);
+      expect(counts.confirm).toBe(4);
+    });
+
+    it('detects text-zinc-500 with variant prefixes (placeholder:, disabled:, etc.)', () => {
+      const code = `
+        <span className="text-zinc-500">Muted text</span>
+        <input className="placeholder:text-zinc-500 disabled:text-zinc-500 sm:text-zinc-500" />
+        <div className="not-text-zinc-500 text-zinc-400">Valid</div>
+      `;
+      const counts = scanFileContent(code);
+      expect(counts['zinc-500']).toBe(4);
     });
 
     it('detects font-mono and variant-prefixed font-mono', () => {
@@ -528,12 +624,14 @@ describe('Design Ratchet Checker (scripts/check-design-ratchet.js)', () => {
     it('ignores violations inside comments', () => {
       const code = `
         // window.confirm("In line comment");
-        // className="font-mono font-black text-[10px]"
+        // className="font-mono font-black text-[10px] text-zinc-500"
         /*
           confirm("In block comment");
           font-mono
           font-black
           text-[11px]
+          text-zinc-500
+          alert("Comment alert");
         */
         const x = 1;
       `;
