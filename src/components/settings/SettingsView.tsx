@@ -14,6 +14,7 @@ import { MacroGoalsCard } from './MacroGoalsCard';
 import { DataExportCard } from './DataExportCard';
 import { useToast } from '../../hooks/useToast';
 import { WeightUnitCard } from './WeightUnitCard';
+import { PrModeCard } from './PrModeCard';
 
 interface SettingsFormProps {
   profile: UserProfile | null;
@@ -227,6 +228,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
 
       {/* Weight Unit Preference */}
       <WeightUnitCard />
+      <PrModeCard />
 
       {/* Target Macros Form */}
       <MacroGoalsCard
