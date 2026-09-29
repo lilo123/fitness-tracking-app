@@ -26,6 +26,9 @@ test.describe('Coach-Athlete Code Linking & Lifecycle E2E', () => {
 
     if (await disconnectBtn.isVisible()) {
       await disconnectBtn.click();
+      const confirmBtn = page.locator('[data-testid="disconnect-coach-confirm-dialog-confirm"]');
+      await expect(confirmBtn).toBeVisible();
+      await confirmBtn.click();
       await expect(codeInput).toBeVisible();
     }
 
@@ -34,6 +37,7 @@ test.describe('Coach-Athlete Code Linking & Lifecycle E2E', () => {
     await codeInput.fill('CYBER-DEMO01');
 
     const linkBtn = page.locator('[data-testid="link-coach-btn"]');
+    await expect(linkBtn).toBeEnabled();
     await linkBtn.click({ force: true });
 
     // Verify link confirmation & assigned coach display
@@ -111,12 +115,16 @@ test.describe('Coach-Athlete Code Linking & Lifecycle E2E', () => {
     const finalDisconnectBtn = page.locator('[data-testid="disconnect-coach-btn"]');
     await expect(finalDisconnectBtn).toBeVisible();
     await finalDisconnectBtn.click();
+    const confirmBtn = page.locator('[data-testid="disconnect-coach-confirm-dialog-confirm"]');
+    await expect(confirmBtn).toBeVisible();
+    await confirmBtn.click();
 
     await expect(page.locator('[data-testid="link-coach-status"]')).toContainText('Successfully disconnected from coach.');
     await expect(page.locator('[data-testid="link-coach-code-input"]')).toBeVisible();
 
     // 13. Re-link at the end to leave DB in seeded state for other test suites
     await codeInput.fill('CYBER-DEMO01');
+    await expect(linkBtn).toBeEnabled();
     await linkBtn.click({ force: true });
     await expect(page.locator('[data-testid="link-coach-status"]')).toContainText('Successfully linked to coach!');
   });

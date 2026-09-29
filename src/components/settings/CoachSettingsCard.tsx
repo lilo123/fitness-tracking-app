@@ -10,6 +10,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { StatusBanner } from '../common/StatusBanner';
+import { Button } from '../common/Button';
 
 interface CoachSettingsCardProps {
   profile: UserProfile | null;
@@ -25,22 +26,23 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
   const vanityCodeId = useId();
 
   // Coach active athlete count
-  const { data: activeAthleteCount = 0 } = useQuery({
+  const {
+    data: activeAthleteCount = 0,
+    isError: isActiveAthletesError,
+    error: activeAthletesError,
+    refetch: refetchActiveAthletes,
+  } = useQuery({
     queryKey: ['coach_active_athletes_count', profile?.id],
     enabled: Boolean(profile?.id && hasCoachCapability),
     queryFn: async () => {
-      try {
-        const { data, error } = await supabase
-          .from('coach_athlete_links')
-          .select('id')
-          .eq('coach_id', profile!.id)
-          .eq('status', 'active')
-          .limit(100);
-        if (error || !data) return 0;
-        return Array.isArray(data) ? data.length : 0;
-      } catch {
-        return 0;
-      }
+      const { data, error } = await supabase
+        .from('coach_athlete_links')
+        .select('id')
+        .eq('coach_id', profile!.id)
+        .eq('status', 'active')
+        .limit(100);
+      if (error) throw error;
+      return Array.isArray(data) ? data.length : 0;
     },
   });
 
@@ -90,7 +92,7 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
       <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-5 shadow-2xl space-y-4">
         <div className="flex items-center gap-2 border-b border-zinc-800 pb-3">
           <Shield className="w-4 h-4 text-cyan-400" />
-          <h3 className="text-sm font-black text-white uppercase tracking-wider">
+          <h3 className="text-sm font-bold text-white uppercase tracking-wider">
             Coach Mode
           </h3>
         </div>
@@ -105,7 +107,7 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
               onChange={(e) => setCustomCoachCode(e.target.value.toUpperCase())}
               placeholder="Enter vanity code (e.g. COACH-PRO)"
               maxLength={20}
-              className="flex-1 bg-zinc-950 border border-border-interactive text-white rounded-xl px-3 py-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none uppercase min-h-[44px]"
+              className="flex-1 bg-zinc-950 border border-border-interactive text-white rounded-xl px-3 py-2 text-base font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none uppercase min-h-[44px]"
               required
             />
             <button
@@ -113,7 +115,7 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
               disabled={isSavingCode || !customCoachCode.trim()}
               className="bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 text-cyan-300 font-bold px-4 py-2 min-h-[44px] rounded-xl text-xs flex items-center gap-1.5 disabled:opacity-50 transition touch-manipulation"
             >
-              {isSavingCode ? 'Activating...' : 'Activate Mode'}
+              {isSavingCode ? 'Activating...' : 'Activate mode'}
             </button>
           </div>
           <StatusBanner
@@ -137,26 +139,46 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
       <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
         <div className="flex items-center gap-2">
           <Shield className="w-4 h-4 text-cyan-400" />
-          <h3 className="text-sm font-black text-white uppercase tracking-wider">
+          <h3 className="text-sm font-bold text-white uppercase tracking-wider">
             Coach Mode & Roster
           </h3>
         </div>
         <span
-          className="text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 px-2.5 py-1 rounded-full border border-cyan-500/30"
+          className="text-xs font-bold tabular-nums bg-cyan-500/20 text-cyan-300 px-2.5 py-1 rounded-full border border-cyan-500/30"
           data-testid="coach-capacity-badge"
         >
           {activeAthleteCount} / {profile?.max_athletes ?? 3} Athletes ({profile?.coach_tier || 'free'})
         </span>
       </div>
 
+      {isActiveAthletesError && (
+        <StatusBanner
+          testId="coach-roster-error"
+          tone="error"
+          message={activeAthletesError instanceof Error ? activeAthletesError.message : 'Failed to load active athlete count.'}
+          icon={<AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />}
+          action={
+            <Button
+              type="button"
+              variant="secondary"
+              size="md"
+              onClick={() => refetchActiveAthletes()}
+              testId="coach-roster-retry-btn"
+            >
+              Retry
+            </Button>
+          }
+        />
+      )}
+
       <div className="space-y-3">
         <div className="bg-zinc-950/80 border border-zinc-800 rounded-2xl p-4 flex items-center justify-between">
           <div>
-            <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+            <div className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
               Your Coach Code
             </div>
             <div
-              className="text-lg font-mono font-black text-cyan-400 tracking-wider mt-0.5"
+              className="text-lg font-bold text-cyan-400 tracking-wider tabular-nums mt-0.5"
               data-testid="active-coach-code"
             >
               {profile?.coach_code || 'None'}
@@ -171,13 +193,13 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
               data-testid="copy-coach-code-btn"
             >
               {copiedCode ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-              <span>{copiedCode ? 'Copied!' : 'Copy Code'}</span>
+              <span>{copiedCode ? 'Copied!' : 'Copy code'}</span>
             </button>
           )}
         </div>
 
         <form onSubmit={handleSaveVanityCode} className="space-y-2">
-          <label htmlFor={vanityCodeId} className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+          <label htmlFor={vanityCodeId} className="block text-xs font-bold text-zinc-400 uppercase tracking-wider">
             Custom Vanity Code
           </label>
           <div className="flex gap-2">
@@ -188,7 +210,7 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
               onChange={(e) => setCustomCoachCode(e.target.value.toUpperCase())}
               placeholder="e.g. COACH-PRO"
               maxLength={20}
-              className="flex-1 bg-zinc-950 border border-border-interactive text-white rounded-xl px-3 py-2 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none uppercase min-h-[44px]"
+              className="flex-1 bg-zinc-950 border border-border-interactive text-white rounded-xl px-3 py-2 text-base font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none uppercase min-h-[44px]"
               data-testid="vanity-code-input"
             />
             <button
@@ -197,7 +219,7 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
               className="bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 text-cyan-300 font-bold px-4 py-2 min-h-[44px] rounded-xl text-xs flex items-center gap-1.5 disabled:opacity-50 transition touch-manipulation"
               data-testid="save-vanity-code-btn"
             >
-              {isSavingCode ? 'Saving...' : 'Save Code'}
+              {isSavingCode ? 'Saving...' : 'Save code'}
             </button>
           </div>
 

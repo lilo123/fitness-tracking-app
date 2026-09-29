@@ -357,8 +357,6 @@ describe('SettingsView', () => {
       return createSupabaseBuilder(table, { data: linkedCoachData, error: null });
     });
 
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-
     renderComponent();
     await screen.findByDisplayValue('Coach Duy');
 
@@ -367,6 +365,9 @@ describe('SettingsView', () => {
 
     const disconnectBtn = screen.getByTestId('disconnect-coach-btn');
     fireEvent.click(disconnectBtn);
+
+    const confirmBtn = await screen.findByTestId('disconnect-coach-confirm-dialog-confirm');
+    fireEvent.click(confirmBtn);
 
     await waitFor(() => {
       expect(supabase.rpc).toHaveBeenCalledWith('disconnect_coach');

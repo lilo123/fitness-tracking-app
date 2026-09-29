@@ -47,14 +47,14 @@ export const MacroGoalsCard: React.FC<MacroGoalsCardProps> = ({
     >
       <div className="flex items-center gap-2 border-b border-zinc-800 pb-3">
         <Target className="w-4 h-4 text-cyan-400" />
-        <h3 className="text-sm font-black text-white uppercase tracking-wider">
+        <h3 className="text-sm font-bold text-white uppercase tracking-wider">
           Daily Macro Goals
         </h3>
       </div>
 
-      <div className="grid grid-cols-6 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div className="col-span-2 sm:col-span-1">
-          <label htmlFor={caloriesId} className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">
+          <label htmlFor={caloriesId} className="block text-xs font-bold text-amber-400 uppercase tracking-wider mb-1">
             Calories (kcal)
           </label>
           <input
@@ -63,12 +63,12 @@ export const MacroGoalsCard: React.FC<MacroGoalsCardProps> = ({
             inputMode="numeric"
             value={targetCalories}
             onChange={(e) => setTargetCalories(Number(e.target.value))}
-            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
+            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base font-bold tabular-nums focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
             required
           />
         </div>
-        <div className="col-span-2 sm:col-span-1">
-          <label htmlFor={proteinId} className="block text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-1">
+        <div className="col-span-1 sm:col-span-1">
+          <label htmlFor={proteinId} className="block text-xs font-bold text-cyan-400 uppercase tracking-wider mb-1">
             Protein (g)
           </label>
           <input
@@ -77,12 +77,12 @@ export const MacroGoalsCard: React.FC<MacroGoalsCardProps> = ({
             inputMode="decimal"
             value={targetProtein}
             onChange={(e) => setTargetProtein(Number(e.target.value))}
-            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
+            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base font-bold tabular-nums focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
             required
           />
         </div>
-        <div className="col-span-2 sm:col-span-1">
-          <label htmlFor={carbsId} className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">
+        <div className="col-span-1 sm:col-span-1">
+          <label htmlFor={carbsId} className="block text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">
             Carbs (g)
           </label>
           <input
@@ -91,12 +91,12 @@ export const MacroGoalsCard: React.FC<MacroGoalsCardProps> = ({
             inputMode="decimal"
             value={targetCarbs}
             onChange={(e) => setTargetCarbs(Number(e.target.value))}
-            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
+            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base font-bold tabular-nums focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
             required
           />
         </div>
-        <div className="col-span-3 sm:col-span-1">
-          <label htmlFor={fatId} className="block text-[10px] font-bold text-violet-400 uppercase tracking-wider mb-1">
+        <div className="col-span-1 sm:col-span-1">
+          <label htmlFor={fatId} className="block text-xs font-bold text-violet-400 uppercase tracking-wider mb-1">
             Fat (g)
           </label>
           <input
@@ -105,12 +105,12 @@ export const MacroGoalsCard: React.FC<MacroGoalsCardProps> = ({
             inputMode="decimal"
             value={targetFat}
             onChange={(e) => setTargetFat(Number(e.target.value))}
-            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
+            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base font-bold tabular-nums focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
             required
           />
         </div>
-        <div className="col-span-3 sm:col-span-1">
-          <label htmlFor={fiberId} className="block text-[10px] font-bold text-teal-400 uppercase tracking-wider mb-1">
+        <div className="col-span-1 sm:col-span-1">
+          <label htmlFor={fiberId} className="block text-xs font-bold text-teal-400 uppercase tracking-wider mb-1">
             Fiber (g)
           </label>
           <input
@@ -119,7 +119,7 @@ export const MacroGoalsCard: React.FC<MacroGoalsCardProps> = ({
             inputMode="decimal"
             value={targetFiber}
             onChange={(e) => setTargetFiber(Number(e.target.value))}
-            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base sm:text-xs font-mono font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
+            className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base font-bold tabular-nums focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none text-center"
             required
           />
         </div>
@@ -128,9 +128,9 @@ export const MacroGoalsCard: React.FC<MacroGoalsCardProps> = ({
       <button
         type="submit"
         disabled={loading}
-        className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black py-3 min-h-[44px] rounded-xl uppercase tracking-wider text-xs shadow-neon-cyan active:scale-95 transition disabled:opacity-50"
+        className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-3 min-h-[44px] rounded-xl text-xs shadow-neon-cyan active:scale-95 transition disabled:opacity-50"
       >
-        {loading ? 'Saving...' : 'Save Goals'}
+        {loading ? 'Saving...' : 'Save goals'}
       </button>
 
       <StatusBanner

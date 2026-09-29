@@ -1,9 +1,10 @@
-import { describe, it, expect, vi , beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CoachSettingsCard } from './CoachSettingsCard';
 import { expectNoA11yViolations } from '../../test/a11y';
 import type { UserProfile } from '../../types/database';
+import { supabase } from '../../lib/supabase';
 import { createSupabaseBuilder, clearMockHistory, getRecordedTables, getRecordedSelects } from '../../test/supabaseBuilderMock';
 
 vi.mock('../../lib/supabase', () => ({
@@ -128,6 +129,46 @@ describe('CoachSettingsCard accessibility', () => {
     expect(getRecordedSelects()).toContainEqual({
       table: 'coach_athlete_links',
       projection: 'id',
+    });
+  });
+
+  it('surfaces error banner with Retry when athlete count query fails', async () => {
+    let shouldFail = true;
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'coach_athlete_links') {
+        if (shouldFail) {
+          return createSupabaseBuilder('coach_athlete_links', {
+            data: null,
+            error: new Error('Failed to load roster count'),
+          });
+        }
+        return createSupabaseBuilder('coach_athlete_links', {
+          data: [{ id: 'link-1' }, { id: 'link-2' }],
+          error: null,
+        });
+      }
+      return createSupabaseBuilder(table, { data: [], error: null });
+    });
+
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <CoachSettingsCard profile={mockProfile} hasCoachCapability={true} />
+      </QueryClientProvider>
+    );
+
+    const errorBanner = await screen.findByTestId('coach-roster-error');
+    expect(errorBanner.textContent).toContain('Failed to load roster count');
+
+    const retryBtn = screen.getByTestId('coach-roster-retry-btn');
+    expect(retryBtn).toBeDefined();
+
+    shouldFail = false;
+    const { fireEvent } = await import('@testing-library/react');
+    fireEvent.click(retryBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('coach-roster-error')).toBeNull();
     });
   });
 });

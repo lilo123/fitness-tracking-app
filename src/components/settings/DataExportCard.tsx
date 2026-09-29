@@ -167,7 +167,7 @@ export const DataExportCard: React.FC<DataExportCardProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <Download className="w-4 h-4 text-cyan-400" />
-            <h3 className="text-sm font-black text-white uppercase tracking-wider">
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider">
               Data Extract
             </h3>
           </div>
@@ -200,7 +200,7 @@ export const DataExportCard: React.FC<DataExportCardProps> = ({
               <div className="flex-1 min-w-[200px]">
                 <label
                   htmlFor={targetSelectId}
-                  className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1"
+                  className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1"
                 >
                   Target Account
                 </label>
@@ -209,7 +209,7 @@ export const DataExportCard: React.FC<DataExportCardProps> = ({
                   data-testid="export-target-select"
                   value={targetAccount}
                   onChange={(e) => handleTargetChange(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2.5 text-xs font-semibold focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
+                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2.5 text-base font-semibold focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
                 >
                   <option value="self">My Personal Data</option>
                   {availableAthletes.map((a) => (
@@ -223,7 +223,7 @@ export const DataExportCard: React.FC<DataExportCardProps> = ({
             ) : null}
 
             <div>
-              <span className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
+              <span className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">
                 Format
               </span>
               <div className="flex items-center gap-1.5 bg-zinc-950 p-1 border border-zinc-800 rounded-xl">
@@ -232,7 +232,7 @@ export const DataExportCard: React.FC<DataExportCardProps> = ({
                   data-testid="export-format-json"
                   aria-pressed={format === 'json'}
                   onClick={() => setFormat('json')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center ${
                     format === 'json'
                       ? 'bg-cyan-500 text-black shadow-sm'
                       : 'text-zinc-400 hover:text-white'
@@ -245,7 +245,7 @@ export const DataExportCard: React.FC<DataExportCardProps> = ({
                   data-testid="export-format-csv"
                   aria-pressed={format === 'csv'}
                   onClick={() => setFormat('csv')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center ${
                     format === 'csv'
                       ? 'bg-cyan-500 text-black shadow-sm'
                       : 'text-zinc-400 hover:text-white'
@@ -260,16 +260,16 @@ export const DataExportCard: React.FC<DataExportCardProps> = ({
           {/* Domain Checkboxes */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+              <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
                 Data Domains
               </span>
               <button
                 type="button"
                 data-testid="export-select-all-btn"
                 onClick={handleSelectAll}
-                className="text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 transition"
+                className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 transition min-h-[44px] px-2 flex items-center"
               >
-                Select All
+                Select all
               </button>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -286,7 +286,7 @@ export const DataExportCard: React.FC<DataExportCardProps> = ({
                     aria-pressed={isSelected}
                     disabled={isDisabled}
                     onClick={() => handleToggleDomain(id)}
-                    className={`p-2.5 rounded-xl border text-left flex items-center justify-between text-xs font-semibold transition ${
+                    className={`min-h-[44px] p-2.5 rounded-xl border text-left flex items-center justify-between text-xs font-semibold transition ${
                       isDisabled
                         ? 'bg-zinc-950/40 border-zinc-900 text-zinc-600 cursor-not-allowed'
                         : isSelected
@@ -296,13 +296,13 @@ export const DataExportCard: React.FC<DataExportCardProps> = ({
                   >
                     <span>{label}</span>
                     {isDisabled && (
-                      <span className="text-[9px] font-bold text-amber-500/80 bg-amber-500/10 px-1.5 py-0.5 rounded uppercase">
+                      <span className="text-xs font-bold text-amber-500/80 bg-amber-500/10 px-1.5 py-0.5 rounded uppercase">
                         Owner-only
                       </span>
                     )}
                     {!isDisabled && (
                       <span
-                        className={`w-3.5 h-3.5 rounded border flex items-center justify-center text-[10px] ${
+                        className={`w-4 h-4 rounded border flex items-center justify-center text-xs ${
                           isSelected
                             ? 'bg-cyan-500 border-cyan-500 text-black font-bold'
                             : 'border-zinc-700'
@@ -319,7 +319,7 @@ export const DataExportCard: React.FC<DataExportCardProps> = ({
 
           {/* Date Range Presets */}
           <div>
-            <span className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1.5">
+            <span className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5">
               Date Range (Workouts & Nutrition)
             </span>
             <div className="flex flex-wrap items-center gap-1.5">
@@ -333,7 +333,7 @@ export const DataExportCard: React.FC<DataExportCardProps> = ({
                     data-testid={`export-preset-${p}`}
                     aria-pressed={isSelected}
                     onClick={() => setPreset(p)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center ${
                       isSelected
                         ? 'bg-cyan-500/15 border border-cyan-500/60 text-cyan-300'
                         : 'bg-zinc-950 border border-zinc-800 text-zinc-400 hover:text-zinc-300'
@@ -350,7 +350,7 @@ export const DataExportCard: React.FC<DataExportCardProps> = ({
                 <div>
                   <label
                     htmlFor={customStartId}
-                    className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1"
+                    className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1"
                   >
                     Start Date
                   </label>
@@ -360,13 +360,13 @@ export const DataExportCard: React.FC<DataExportCardProps> = ({
                     data-testid="export-custom-start"
                     value={customStartDate}
                     onChange={(e) => setCustomStartDate(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-xs font-semibold focus:border-cyan-500 outline-none"
+                    className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base font-semibold focus:border-cyan-500 outline-none"
                   />
                 </div>
                 <div>
                   <label
                     htmlFor={customEndId}
-                    className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1"
+                    className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1"
                   >
                     End Date
                   </label>
@@ -376,7 +376,7 @@ export const DataExportCard: React.FC<DataExportCardProps> = ({
                     data-testid="export-custom-end"
                     value={customEndDate}
                     onChange={(e) => setCustomEndDate(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-xs font-semibold focus:border-cyan-500 outline-none"
+                    className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2 text-base font-semibold focus:border-cyan-500 outline-none"
                   />
                 </div>
               </div>
@@ -400,12 +400,12 @@ export const DataExportCard: React.FC<DataExportCardProps> = ({
               onClick={handleDownload}
               className={`min-h-[44px] px-5 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition ${
                 selectedDomains.length === 0 || isExporting
-                  ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+                  ? 'bg-zinc-800 text-zinc-400 cursor-not-allowed opacity-50'
                   : 'bg-cyan-500 hover:bg-cyan-400 text-black shadow-neon-cyan active:scale-[0.98]'
               }`}
             >
               <Download className="w-4 h-4" />
-              <span>{isExporting ? 'Exporting...' : 'Download Export'}</span>
+              <span>{isExporting ? 'Exporting...' : 'Download export'}</span>
             </button>
           </div>
         </div>

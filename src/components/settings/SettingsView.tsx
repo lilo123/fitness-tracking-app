@@ -90,7 +90,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
       <div className="bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-transparent border border-cyan-500/20 rounded-3xl p-5 shadow-2xl">
         <div className="flex items-center gap-2 mb-2">
           <Settings className="w-5 h-5 text-cyan-400" />
-          <h2 className="text-base font-black text-white uppercase tracking-wider">
+          <h2 className="text-base font-bold text-white uppercase tracking-wider">
             Settings
           </h2>
         </div>
@@ -103,23 +103,23 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
       <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-5 shadow-2xl space-y-4">
         <div className="flex items-center gap-2 border-b border-zinc-800 pb-3">
           <User className="w-4 h-4 text-cyan-400" />
-          <h3 className="text-sm font-black text-white uppercase tracking-wider">
+          <h3 className="text-sm font-bold text-white uppercase tracking-wider">
             Profile & Mode
           </h3>
         </div>
 
         <div className="space-y-3">
           <dl>
-            <dt className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
+            <dt className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">
               Email Address
             </dt>
-            <dd className="text-sm font-mono text-zinc-300 ml-0 py-1">
+            <dd className="text-sm text-zinc-300 ml-0 py-1">
               {profile?.email || ''}
             </dd>
           </dl>
 
           <div>
-            <label htmlFor={displayNameId} className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
+            <label htmlFor={displayNameId} className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">
               Display Name
             </label>
             <input
@@ -127,12 +127,12 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base sm:text-xs font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none"
+              className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-2.5 text-base font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
+            <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">
               {profile?.role === 'coach' ? 'Preview Mode (Coach Only)' : 'Account Role'}
             </label>
             {profile?.role === 'coach' ? (
@@ -146,7 +146,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
                       : 'bg-zinc-950 border-border-interactive text-zinc-400 hover:border-zinc-700'
                   }`}
                 >
-                  <Dumbbell className="w-4 h-4" /> Athlete View
+                  <Dumbbell className="w-4 h-4" /> Athlete view
                 </button>
                 <button
                   type="button"
@@ -157,14 +157,14 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
                       : 'bg-zinc-950 border-border-interactive text-zinc-400 hover:border-zinc-700'
                   }`}
                 >
-                  <Shield className="w-4 h-4" /> Coach View
+                  <Shield className="w-4 h-4" /> Coach view
                 </button>
               </div>
             ) : (
               <div className="p-3 min-h-[44px] bg-zinc-950/50 border border-zinc-800 rounded-xl text-xs font-bold text-zinc-400 flex items-center gap-2">
                 <Dumbbell className="w-4 h-4 text-cyan-400" />
                 <span className="capitalize">{profile?.role || 'Athlete'}</span>
-                <span className="text-[10px] text-zinc-500 ml-auto">(Managed by Coach)</span>
+                <span className="text-xs text-zinc-400 ml-auto">(Managed by Coach)</span>
               </div>
             )}
           </div>
@@ -188,7 +188,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
       <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-5 shadow-2xl space-y-4">
         <div className="flex items-center gap-2 border-b border-zinc-800 pb-3">
           <Timer className="w-4 h-4 text-cyan-400" />
-          <h3 className="text-sm font-black text-white uppercase tracking-wider">
+          <h3 className="text-sm font-bold text-white uppercase tracking-wider">
             Workout Preferences
           </h3>
         </div>
@@ -196,7 +196,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
         <div className="flex items-center justify-between gap-4 p-3 bg-zinc-950/80 border border-zinc-800/80 rounded-2xl">
           <div className="space-y-0.5">
             <div id={restTimerLabelId} className="text-xs font-bold text-white">Auto-start Rest Timer on Set Log</div>
-            <div className="text-[11px] text-zinc-400 leading-relaxed">
+            <div className="text-xs text-zinc-400 leading-relaxed">
               Automatically start the 90s countdown timer when logging any set.
             </div>
           </div>

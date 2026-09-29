@@ -1,9 +1,10 @@
-import { describe, it, expect, vi , beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MyCoachCard } from './MyCoachCard';
 import { expectNoA11yViolations } from '../../test/a11y';
 import type { UserProfile } from '../../types/database';
+import { supabase } from '../../lib/supabase';
 import { createSupabaseBuilder, clearMockHistory, getRecordedTables, getRecordedSelects } from '../../test/supabaseBuilderMock';
 
 vi.mock('../../lib/supabase', () => ({
@@ -91,7 +92,6 @@ describe('MyCoachCard accessibility and live regions', () => {
     // Trigger success by submitting VALID code
     fireEvent.change(input, { target: { value: 'COACH1' } });
     fireEvent.submit(form);
-    const { waitFor } = await import('@testing-library/react');
     await waitFor(() => {
       expect(screen.getByTestId('link-coach-status')).toHaveTextContent('Successfully linked to coach!');
     });
@@ -109,5 +109,116 @@ describe('MyCoachCard accessibility and live regions', () => {
       table: 'coach_athlete_links',
       projection: 'id, coach_id, linked_at, coach:users!coach_id(username, email, coach_code)',
     });
+  });
+
+  it('disconnect ConfirmDialog Cancel = zero writes, Confirm = one write', async () => {
+    const linkedCoachData = {
+      id: 'link-1',
+      coach_id: 'coach-99',
+      linked_at: '2026-09-15T10:00:00Z',
+      coach: {
+        username: 'Coach Mike',
+        email: 'coach@mike.com',
+        coach_code: 'MIKE-FIT',
+      },
+    };
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'coach_athlete_links') {
+        return createSupabaseBuilder('coach_athlete_links', { data: linkedCoachData, error: null });
+      }
+      return createSupabaseBuilder(table, { data: null, error: null });
+    });
+
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <MyCoachCard profile={mockProfile} />
+      </QueryClientProvider>
+    );
+
+    expect(await screen.findByText('Coach Mike')).toBeDefined();
+    expect(screen.getByText(/MIKE-FIT/)).toBeDefined();
+
+    // Click disconnect button to open ConfirmDialog
+    const disconnectBtn = screen.getByTestId('disconnect-coach-btn');
+    fireEvent.click(disconnectBtn);
+
+    // Confirm dialog is open and names the coach
+    const dialog = await screen.findByTestId('disconnect-coach-confirm-dialog');
+    expect(dialog).toBeDefined();
+    expect(dialog.textContent).toContain('Coach Mike');
+
+    // Clicking Cancel = zero writes (no rpc call)
+    const cancelBtn = screen.getByTestId('disconnect-coach-confirm-dialog-cancel');
+    fireEvent.click(cancelBtn);
+    expect(supabase.rpc).not.toHaveBeenCalledWith('disconnect_coach');
+
+    // Click disconnect again, then Confirm = one write
+    fireEvent.click(disconnectBtn);
+    const confirmBtn = await screen.findByTestId('disconnect-coach-confirm-dialog-confirm');
+    fireEvent.click(confirmBtn);
+
+    await waitFor(() => {
+      expect(supabase.rpc).toHaveBeenCalledWith('disconnect_coach');
+    });
+    expect((supabase.rpc as any).mock.calls.filter((c: any[]) => c[0] === 'disconnect_coach')).toHaveLength(1);
+  });
+
+  it('surfaces query error with StatusBanner and Retry refetches', async () => {
+    let shouldFail = true;
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'coach_athlete_links') {
+        if (shouldFail) {
+          return createSupabaseBuilder('coach_athlete_links', {
+            data: null,
+            error: new Error('Network timeout connecting to coach service'),
+          });
+        }
+        return createSupabaseBuilder('coach_athlete_links', {
+          data: {
+            id: 'link-1',
+            coach_id: 'coach-99',
+            linked_at: '2026-09-15T10:00:00Z',
+            coach: { username: 'Coach Mike', email: 'coach@mike.com', coach_code: 'MIKE-FIT' },
+          },
+          error: null,
+        });
+      }
+      return createSupabaseBuilder(table, { data: null, error: null });
+    });
+
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <MyCoachCard profile={mockProfile} />
+      </QueryClientProvider>
+    );
+
+    const errorBanner = await screen.findByTestId('coach-link-query-error');
+    expect(errorBanner.textContent).toContain('Network timeout connecting to coach service');
+
+    const retryBtn = screen.getByTestId('coach-link-retry-btn');
+    expect(retryBtn).toBeDefined();
+
+    // Now resolve query on retry
+    shouldFail = false;
+    fireEvent.click(retryBtn);
+
+    expect(await screen.findByText('Coach Mike')).toBeDefined();
+    expect(screen.queryByTestId('coach-link-query-error')).toBeNull();
+  });
+
+  it('renders skeleton loading card while coaching status is pending', () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <MyCoachCard profile={null} />
+      </QueryClientProvider>
+    );
+
+    const skeleton = screen.getByTestId('coach-link-loading');
+    expect(skeleton).toBeDefined();
+    expect(skeleton.getAttribute('aria-busy')).toBe('true');
   });
 });
