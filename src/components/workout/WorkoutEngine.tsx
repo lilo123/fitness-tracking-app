@@ -312,7 +312,7 @@ export const WorkoutEngine: React.FC = () => {
   const currentDayAbbr = getDayOfWeekAbbr(workoutDate);
 
   return (
-    <div className="space-y-6 pb-24 text-white">
+    <div className="space-y-6 pb-44 text-white">
       {/* Header controls & stats */}
       <WorkoutHeader
         mutationError={mutationError}
@@ -421,7 +421,7 @@ export const WorkoutEngine: React.FC = () => {
                 const ghostValues = computeGhostSets(exName, targetCount, userLogs, workoutDate, unit);
 
                 return (
-                  <div key={exName} data-card-for-exercise={exName}>
+                  <div key={exName} data-card-for-exercise={exName} className="scroll-mb-44">
                     <ExerciseCard
                     exName={exName}
                     exIndex={exIndex}
@@ -452,11 +452,11 @@ export const WorkoutEngine: React.FC = () => {
             </div>
           )}
 
-          <div className="pt-1">
+          <div className="pt-1 scroll-mb-44">
             <button
               type="button"
               onClick={handleOpenExercisePicker}
-              className="w-full py-3.5 px-4 rounded-2xl font-bold text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 shadow-xl min-h-[44px] bg-zinc-900/90 hover:bg-zinc-800/90 border border-zinc-800/80 hover:border-cyan-500/50 text-white active:scale-95"
+              className="w-full py-3.5 px-4 rounded-2xl font-bold text-xs transition flex items-center justify-center gap-2 shadow-xl min-h-[44px] bg-zinc-900/90 hover:bg-zinc-800/90 border border-zinc-800/80 hover:border-cyan-500/50 text-white active:scale-95"
               data-testid="add-exercise-btn"
             >
               <Plus className="w-4 h-4 text-cyan-400" />
@@ -465,12 +465,12 @@ export const WorkoutEngine: React.FC = () => {
           </div>
 
           {activeExercises.length > 0 && (
-            <div className="pt-2">
+            <div className="pt-2 scroll-mb-44">
               <button
                 type="button"
                 onClick={handleFinishWorkout}
                 disabled={batchLogSetsMutation.isPending || isWholeWorkoutCompleted}
-                className={`w-full py-3.5 px-4 rounded-2xl font-bold text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 shadow-2xl min-h-[44px] ${
+                className={`w-full py-3.5 px-4 rounded-2xl font-bold text-xs transition flex items-center justify-center gap-2 shadow-2xl min-h-[44px] ${
                   isWholeWorkoutCompleted
                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 cursor-default'
                     : 'bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white shadow-neon-cyan active:scale-95'

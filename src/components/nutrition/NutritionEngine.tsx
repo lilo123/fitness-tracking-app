@@ -75,7 +75,7 @@ export const NutritionEngine: React.FC = () => {
 
   const [dishFetchError, setDishFetchError] = useState<{ message: string; retry: () => void } | null>(null);
   const { show: showToast, dismiss: dismissToast } = useToast();
-  useToastOffset(stagedMeal ? 128 : isTimerActive ? 148 : undefined);
+  useToastOffset(isTimerActive ? (stagedMeal ? 190 : 148) : stagedMeal ? 128 : undefined);
 
   // RD-7: Deferred delete for NutritionLog (6s window with UndoToast)
   const deferredMealDelete = useDeferredDelete<NutritionLog>({

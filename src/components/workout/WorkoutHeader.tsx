@@ -45,7 +45,7 @@ export const WorkoutHeader: React.FC<WorkoutHeaderProps> = ({
       />
 
       {/* Routine & Date Control Banner */}
-      <div className="bg-gradient-to-b from-zinc-900 to-zinc-900/80 border border-zinc-800/80 rounded-2xl p-4 shadow-xl overflow-hidden">
+      <div className="bg-gradient-to-b from-zinc-900 to-zinc-900/80 border border-zinc-800/80 rounded-2xl p-3 sm:p-4 shadow-xl overflow-hidden">
         <h2 className="sr-only">Workout session</h2>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -75,21 +75,23 @@ export const WorkoutHeader: React.FC<WorkoutHeaderProps> = ({
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400 shrink-0">
-              Date:
-            </span>
-            <input
-              type="date"
-              aria-label="Workout date"
-              value={workoutDate}
-              onChange={(e) => {
-                workoutSessionStore.flushPendingWrites();
-                onDateChange(e.target.value);
-              }}
-              className="bg-zinc-950 border border-border-interactive text-cyan-400 rounded-xl px-2.5 h-11 min-h-[44px] text-base font-bold tabular-nums focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none shadow-inner cursor-pointer touch-manipulation"
-              data-testid="workout-date-input"
-            />
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xs font-bold uppercase tracking-wider text-zinc-400 shrink-0">
+                Date:
+              </span>
+              <input
+                type="date"
+                aria-label="Workout date"
+                value={workoutDate}
+                onChange={(e) => {
+                  workoutSessionStore.flushPendingWrites();
+                  onDateChange(e.target.value);
+                }}
+                className="bg-zinc-950 border border-border-interactive text-cyan-400 rounded-xl px-2 h-11 min-h-[44px] text-base font-bold tabular-nums focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none shadow-inner cursor-pointer touch-manipulation max-w-[145px] sm:max-w-none"
+                data-testid="workout-date-input"
+              />
+            </div>
             <button
               type="button"
               onClick={onClearWorkout}

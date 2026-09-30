@@ -6912,3 +6912,342 @@ test.describe("P8 Route-Wide Density & Tap Grid", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// P8.1 HF-B: Workout Shell & Overlays Acceptance (D-HF-B-1 .. D-HF-B-5)
+// ---------------------------------------------------------------------------
+
+test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
+  // (a) 320/390: page scrollWidth <= innerWidth on /workout and every control in routine/date card right <= card right
+  for (const width of [320, 390] as const) {
+    test(`HF-B: /workout routine/date card has zero control overflow and page scrollWidth <= innerWidth at ${width}px`, async ({ browser }) => {
+      const page = await browser.newPage({
+        viewport: { width, height: 844 },
+        deviceScaleFactor: 1,
+      });
+
+      try {
+        await page.goto("/login");
+        await page.fill('input[type="email"]', "athlete@cybergym.io");
+        await page.fill('input[type="password"]', "password123");
+        await page.click('button[type="submit"]');
+        await page.waitForURL("**/workout");
+
+        await page.goto('/workout?routine=' + encodeURIComponent('Workout A (Push, Quads & Core)'));
+        await page.waitForLoadState('domcontentloaded');
+        await page.locator('[data-testid="workout-date-input"]').waitFor({ state: 'visible', timeout: 10000 });
+
+        const measurement = await page.evaluate(() => {
+          const card = document.querySelector('[data-testid="workout-date-input"]')?.closest('.rounded-2xl');
+          const cardRect = card ? card.getBoundingClientRect() : null;
+          const controls = Array.from(card?.querySelectorAll('button, input, select') || []);
+          const overflows = controls.map((c) => {
+            const r = c.getBoundingClientRect();
+            return {
+              tag: c.tagName.toLowerCase(),
+              testId: c.getAttribute('data-testid') || c.getAttribute('aria-label') || c.textContent?.trim().slice(0, 15),
+              right: Math.round(r.right * 100) / 100,
+              cardRight: cardRect ? Math.round(cardRect.right * 100) / 100 : 0,
+              overflowPx: cardRect ? Math.round((r.right - cardRect.right) * 100) / 100 : 0,
+            };
+          }).filter((c) => c.overflowPx > 0.5);
+
+          return {
+            pageScrollWidth: document.documentElement.scrollWidth,
+            innerWidth: window.innerWidth,
+            overflows,
+          };
+        });
+
+        expect(
+          measurement.pageScrollWidth,
+          `page scrollWidth (${measurement.pageScrollWidth}px) <= innerWidth (${measurement.innerWidth}px) at ${width}px`
+        ).toBeLessThanOrEqual(measurement.innerWidth);
+
+        expect(
+          measurement.overflows,
+          `No controls in routine/date card may exceed card right boundary at ${width}px: ${JSON.stringify(measurement.overflows)}`
+        ).toHaveLength(0);
+      } finally {
+        await page.close();
+      }
+    });
+  }
+
+  // (b) With rest timer running and undo toast visible on /workout: toast rect does not intersect pill rect nor BottomNav rect
+  for (const width of [320, 390] as const) {
+    test(`HF-B: Toast stacks above rest-timer pill and BottomNav on /workout at ${width}px`, async ({ browser }) => {
+      const page = await browser.newPage({
+        viewport: { width, height: 844 },
+        deviceScaleFactor: 1,
+      });
+
+      try {
+        await page.goto("/login");
+        await page.fill('input[type="email"]', "athlete@cybergym.io");
+        await page.fill('input[type="password"]', "password123");
+        await page.click('button[type="submit"]');
+        await page.waitForURL("**/workout");
+
+        await page.goto('/workout?routine=' + encodeURIComponent('Workout A (Push, Quads & Core)'));
+        await page.waitForLoadState('domcontentloaded');
+        await page.locator('[data-testid="workout-date-input"]').waitFor({ state: 'visible', timeout: 10000 });
+
+        // Start rest timer
+        const restTimerBtn = page.locator('[data-testid="rest-timer-btn"]');
+        await restTimerBtn.click();
+        const pill = page.locator('[data-testid="rest-timer-pill"]');
+        await expect(pill).toBeVisible({ timeout: 5000 });
+
+        // Remove first exercise to trigger UndoToast
+        const removeBtn = page.locator('[data-testid="exercise-card-0"] button[aria-label^="Remove"], [data-testid="exercise-card-0"] button[title*="Remove"]').first();
+        await expect(removeBtn).toBeVisible({ timeout: 5000 });
+        await removeBtn.click();
+
+        const toast = page.locator('[data-testid="quick-log-toast"]');
+        await expect(toast).toBeVisible({ timeout: 5000 });
+
+        const geometry = await page.evaluate(() => {
+          const t = document.querySelector('[data-testid="quick-log-toast"]')?.getBoundingClientRect();
+          const p = document.querySelector('[data-testid="rest-timer-pill"]')?.getBoundingClientRect();
+          const nav = document.querySelector('nav')?.getBoundingClientRect();
+          if (!t || !p) return null;
+
+          const intersectPill = !(t.right <= p.left || t.left >= p.right || t.bottom <= p.top || t.top >= p.bottom);
+          const intersectNav = nav ? !(t.right <= nav.left || t.left >= nav.right || t.bottom <= nav.top || t.top >= nav.bottom) : false;
+
+          return {
+            toastBottom: Math.round(t.bottom * 10) / 10,
+            toastTop: Math.round(t.top * 10) / 10,
+            pillTop: Math.round(p.top * 10) / 10,
+            clearanceAbovePill: Math.round((p.top - t.bottom) * 10) / 10,
+            intersectPill,
+            intersectNav,
+          };
+        });
+
+        expect(geometry, 'toast and pill geometry must be measured').not.toBeNull();
+        expect(geometry.intersectPill, `toast must not intersect rest-timer pill at ${width}px`).toBe(false);
+        expect(geometry.intersectNav, `toast must not intersect BottomNav at ${width}px`).toBe(false);
+        expect(geometry.toastBottom, `toast bottom (${geometry.toastBottom}px) <= pill top (${geometry.pillTop}px) at ${width}px`).toBeLessThanOrEqual(geometry.pillTop);
+        expect(geometry.clearanceAbovePill, `clearance above pill (${geometry.clearanceAbovePill}px) >= 8px at ${width}px`).toBeGreaterThanOrEqual(8);
+
+        // Click undo to restore exercise
+        const undoBtn = page.locator('[data-testid="quick-log-toast"] button').filter({ hasText: 'Undo' }).first();
+        if (await undoBtn.isVisible()) {
+          await undoBtn.click();
+        }
+      } finally {
+        await page.close();
+      }
+    });
+  }
+
+  // (b-2) With rest timer running and staged bar on /nutrition: toast stacks above both with zero intersection
+  for (const width of [320, 390] as const) {
+    test(`HF-B: Toast stacks above rest-timer pill and staged bar on /nutrition at ${width}px`, async ({ browser }) => {
+      const height = width === 320 ? 568 : 844;
+      const page = await browser.newPage({
+        viewport: { width, height },
+        deviceScaleFactor: 1,
+      });
+
+      try {
+        await page.goto("/login");
+        await page.fill('input[type="email"]', "athlete@cybergym.io");
+        await page.fill('input[type="password"]', "password123");
+        await page.click('button[type="submit"]');
+        await page.waitForURL("**/workout");
+
+        // Start rest timer on workout
+        await page.click('[data-testid="rest-timer-btn"]');
+        await expect(page.locator('[data-testid="rest-timer-pill"]')).toBeVisible({ timeout: 5000 });
+
+        // Navigate to nutrition
+        await page.goto('/nutrition');
+        await page.waitForLoadState('domcontentloaded');
+        await page.waitForSelector("text=Today's Nutrition", { timeout: 15000 });
+        await expect(page.locator('[data-testid="rest-timer-pill"]')).toBeVisible({ timeout: 5000 });
+
+        // Stage a meal (tap favorite custom dish card)
+        const customDishes = page.locator('[data-testid^="custom-dish-card-"]');
+        await expect(customDishes.first()).toBeVisible({ timeout: 5000 });
+        await customDishes.first().click();
+        await expect(page.locator('[data-testid="staged-meal-card"]')).toBeVisible({ timeout: 5000 });
+
+        // Trigger floating UndoToast while staged via favorite quick-log button
+        const addFavBtn = page.locator('[data-testid^="quick-log-btn-"]').first();
+        if (await addFavBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+          await addFavBtn.click();
+        } else {
+          await customDishes.nth(1).click();
+        }
+
+        const toast = page.locator('[data-testid="quick-log-toast"]');
+        await expect(toast).toBeVisible({ timeout: 5000 });
+
+        const checkGeometry = async (scrollLabel: string) => {
+          return await page.evaluate(() => {
+            const t = document.querySelector('[data-testid="quick-log-toast"]')?.getBoundingClientRect();
+            const p = document.querySelector('[data-testid="rest-timer-pill"]')?.getBoundingClientRect();
+            const staged = document.querySelector('[data-testid="staged-card-actions"]')?.getBoundingClientRect();
+            const logBtn = document.querySelector('[data-testid="staged-card-actions"] button')?.getBoundingClientRect();
+            const nav = document.querySelector('nav')?.getBoundingClientRect();
+            if (!t || !p) return null;
+
+            const intersect = (r1: DOMRect, r2: DOMRect) =>
+              !(r1.right <= r2.left || r1.left >= r2.right || r1.bottom <= r2.top || r1.top >= r2.bottom);
+
+            const vHeight = window.innerHeight;
+            return {
+              toastTop: Math.round(t.top * 10) / 10,
+              toastBottom: Math.round(t.bottom * 10) / 10,
+              pillTop: Math.round(p.top * 10) / 10,
+              vHeight,
+              toastTopRatio: t.top / vHeight,
+              intersectPill: intersect(t, p),
+              intersectNav: nav ? intersect(t, nav) : false,
+              intersectStagedBar: staged ? intersect(t, staged) : false,
+              intersectLogBtn: logBtn ? intersect(t, logBtn) : false,
+              clearanceAbovePill: Math.round((p.top - t.bottom) * 10) / 10,
+            };
+          });
+        };
+
+        // 1. Initial state (staged card in viewport)
+        const geo1 = await checkGeometry("initial");
+        expect(geo1, 'toast geometry must be measured').not.toBeNull();
+        expect(geo1!.intersectPill, `toast must not intersect pill on /nutrition at ${width}px`).toBe(false);
+        expect(geo1!.intersectNav, `toast must not intersect nav on /nutrition at ${width}px`).toBe(false);
+        expect(geo1!.intersectLogBtn, `toast must not intersect Log Meal button on /nutrition at ${width}px`).toBe(false);
+        expect(geo1!.toastTopRatio, `toast top must stay in bottom zone (>= 50% vh, got ${geo1!.toastTopRatio}) at ${width}px`).toBeGreaterThanOrEqual(0.5);
+        expect(geo1!.toastBottom, `toast bottom (${geo1!.toastBottom}px) <= pill top (${geo1!.pillTop}px) at ${width}px`).toBeLessThanOrEqual(geo1!.pillTop);
+
+        // Toast overlays page content, so its background must be fully opaque
+        // (no list text bleeding through the toast).
+        const toastAlpha = await toast.evaluate((el) => {
+          const bg = window.getComputedStyle(el).backgroundColor;
+          const canvas = document.createElement('canvas');
+          canvas.width = canvas.height = 1;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return { bg, alpha: -1 };
+          ctx.fillStyle = bg;
+          ctx.fillRect(0, 0, 1, 1);
+          return { bg, alpha: ctx.getImageData(0, 0, 1, 1).data[3] };
+        });
+        expect(toastAlpha.alpha, `toast background must be opaque (got ${toastAlpha.bg}) at ${width}px`).toBe(255);
+
+        // 2. Scrolled state: scroll so staged card is mid-screen
+        await page.evaluate(() => window.scrollBy(0, 150));
+        await page.waitForTimeout(200);
+        const geo2 = await checkGeometry("mid-screen");
+        expect(geo2, 'toast geometry must be measured after mid-screen scroll').not.toBeNull();
+        expect(geo2!.intersectPill).toBe(false);
+        expect(geo2!.intersectNav).toBe(false);
+        expect(geo2!.intersectLogBtn).toBe(false);
+        expect(geo2!.toastTopRatio).toBeGreaterThanOrEqual(0.5);
+        expect(geo2!.toastBottom).toBeLessThanOrEqual(geo2!.pillTop);
+
+        // 3. Scrolled to bottom: staged card scrolled past or bottom-anchored
+        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+        await page.waitForTimeout(200);
+        const geo3 = await checkGeometry("bottom");
+        expect(geo3, 'toast geometry must be measured after scroll to bottom').not.toBeNull();
+        expect(geo3!.intersectPill).toBe(false);
+        expect(geo3!.intersectNav).toBe(false);
+        expect(geo3!.intersectLogBtn).toBe(false);
+        expect(geo3!.toastTopRatio).toBeGreaterThanOrEqual(0.5);
+        expect(geo3!.toastBottom).toBeLessThanOrEqual(geo3!.pillTop);
+      } finally {
+        await page.close();
+      }
+    });
+  }
+
+  // (c) Scrolled to bottom with rest timer running: 'Log All' / Finish button rect bottom <= pill top
+  for (const width of [320, 390] as const) {
+    test(`HF-B: Scrolled to bottom with rest timer running keeps finish button above pill at ${width}px`, async ({ browser }) => {
+      const page = await browser.newPage({
+        viewport: { width, height: 844 },
+        deviceScaleFactor: 1,
+      });
+
+      try {
+        await page.goto("/login");
+        await page.fill('input[type="email"]', "athlete@cybergym.io");
+        await page.fill('input[type="password"]', "password123");
+        await page.click('button[type="submit"]');
+        await page.waitForURL("**/workout");
+
+        await page.goto('/workout?routine=' + encodeURIComponent('Workout A (Push, Quads & Core)'));
+        await page.waitForLoadState('domcontentloaded');
+        await page.locator('[data-testid="workout-date-input"]').waitFor({ state: 'visible', timeout: 10000 });
+
+        // Start rest timer
+        await page.click('[data-testid="rest-timer-btn"]');
+        const pill = page.locator('[data-testid="rest-timer-pill"]');
+        await expect(pill).toBeVisible({ timeout: 5000 });
+
+        // Scroll completely to bottom
+        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+        await page.waitForTimeout(400);
+
+        const clearance = await page.evaluate(() => {
+          const p = document.querySelector('[data-testid="rest-timer-pill"]')?.getBoundingClientRect();
+          const f = document.querySelector('[data-testid="finish-workout-btn"]')?.getBoundingClientRect();
+          if (!p || !f) return null;
+          return {
+            pillTop: Math.round(p.top * 10) / 10,
+            finishBottom: Math.round(f.bottom * 10) / 10,
+            clearance: Math.round((p.top - f.bottom) * 10) / 10,
+          };
+        });
+
+        expect(clearance, 'clearance must be measured').not.toBeNull();
+        expect(clearance.finishBottom, `Finish button rect bottom (${clearance.finishBottom}px) <= pill top (${clearance.pillTop}px) at ${width}px`).toBeLessThanOrEqual(clearance.pillTop);
+        expect(clearance.clearance, `clearance above pill (${clearance.clearance}px) >= 8px at ${width}px`).toBeGreaterThanOrEqual(8);
+      } finally {
+        await page.close();
+      }
+    });
+  }
+
+  // (d) Rest-timer pill computed background alpha == 1
+  for (const width of [320, 390] as const) {
+    test(`HF-B: Rest-timer pill computed background is 100% opaque (alpha == 1) at ${width}px`, async ({ browser }) => {
+      const page = await browser.newPage({
+        viewport: { width, height: 844 },
+        deviceScaleFactor: 1,
+      });
+
+      try {
+        await page.goto("/login");
+        await page.fill('input[type="email"]', "athlete@cybergym.io");
+        await page.fill('input[type="password"]', "password123");
+        await page.click('button[type="submit"]');
+        await page.waitForURL("**/workout");
+
+        await page.click('[data-testid="rest-timer-btn"]');
+        const pill = page.locator('[data-testid="rest-timer-pill"]');
+        await expect(pill).toBeVisible({ timeout: 5000 });
+
+        const alphaResult = await pill.evaluate((el) => {
+          const bg = window.getComputedStyle(el).backgroundColor;
+          const canvas = document.createElement('canvas');
+          canvas.width = canvas.height = 1;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return { bg, alpha: null, isOpaque: false };
+          ctx.fillStyle = bg;
+          ctx.fillRect(0, 0, 1, 1);
+          const data = ctx.getImageData(0, 0, 1, 1).data;
+          const alpha = data[3] / 255;
+          return { bg, alpha, isOpaque: data[3] === 255 };
+        });
+
+        expect(alphaResult.isOpaque, `rest-timer pill background must be 100% opaque (alpha == 1, got ${alphaResult.alpha}) at ${width}px`).toBe(true);
+      } finally {
+        await page.close();
+      }
+    });
+  }
+});

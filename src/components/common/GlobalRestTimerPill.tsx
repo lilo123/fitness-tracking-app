@@ -18,7 +18,7 @@ export const GlobalRestTimerPill: React.FC = () => {
 
   return (
     <div
-      className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] left-4 right-4 z-[45] max-w-lg mx-auto bg-zinc-900/95 backdrop-blur-xl border border-cyan-500/50 rounded-2xl p-3 flex items-center justify-between shadow-[0_4px_25px_rgba(6,182,212,0.3)] animate-pulse motion-reduce:animate-none"
+      className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] left-4 right-4 z-[45] max-w-lg mx-auto bg-zinc-900 backdrop-blur-xl border border-cyan-500/50 rounded-2xl p-3 flex items-center justify-between shadow-[0_4px_25px_rgba(6,182,212,0.3)] animate-pulse motion-reduce:animate-none"
       data-testid="rest-timer-pill"
     >
       <div className="flex items-center gap-2.5">

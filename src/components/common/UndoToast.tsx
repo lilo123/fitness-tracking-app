@@ -180,7 +180,7 @@ export const UndoToast: React.FC<UndoToastProps> = ({
       testId={testId}
       style={{ bottom: `${effectiveBottom}px` }}
       rawLayout
-      className="fixed left-1/2 -translate-x-1/2 z-50 max-w-sm w-[calc(100%-2rem)] bg-zinc-900/95 border border-emerald-500/40 backdrop-blur-xl shadow-2xl shadow-emerald-500/20 rounded-2xl py-2 px-3 flex items-center justify-between gap-3 text-white transition-all duration-200 animate-in fade-in slide-in-from-bottom-3 select-none"
+      className="fixed left-1/2 -translate-x-1/2 z-50 max-w-sm w-[calc(100%-2rem)] bg-zinc-900! border border-emerald-500/40 backdrop-blur-xl shadow-2xl shadow-emerald-500/20 rounded-2xl py-2 px-3 flex items-center justify-between gap-3 text-white transition-all duration-200 animate-in fade-in slide-in-from-bottom-3 select-none"
     >
       {toast && (
         <>
