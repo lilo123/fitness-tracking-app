@@ -13,6 +13,7 @@ import {
 import { clearUserRqStore } from './db';
 import { setActiveUserForFlusher } from './flusher';
 import { loadIdMappings } from './idmap';
+import { getOutboxOps } from './outbox';
 
 let currentPersistingUserId: string | null = null;
 let currentPersistingQueryClient: QueryClient | null = null;
@@ -57,11 +58,12 @@ export async function initPersistForUser(
   currentPersistingQueryClient = queryClient;
   setActiveUserForFlusher(userId);
 
-  // Pre-load ID mappings for fast sync lookups
+  // Pre-load ID mappings and outbox cache for fast sync lookups and UI readiness
   try {
     await loadIdMappings(userId);
+    await getOutboxOps(userId);
   } catch (e) {
-    console.warn('[persistController] Failed to load ID mappings:', e);
+    console.warn('[persistController] Failed to load ID mappings / outbox:', e);
   }
 
   const persister = createIdbPersister(userId);

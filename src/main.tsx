@@ -11,8 +11,16 @@ export const queryClient = new QueryClient({
       staleTime: 60 * 1000, // 1 minute default stale time
       gcTime: 10 * 60 * 1000, // 10 minutes cache garbage collection
       refetchOnWindowFocus: false,
-      retry: 1,
+      retry: (failureCount) => {
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          return false;
+        }
+        return failureCount < 1;
+      },
       networkMode: 'offlineFirst',
+    },
+    mutations: {
+      networkMode: 'always',
     },
   },
 });

@@ -432,4 +432,86 @@ describe('useWorkoutMutations (P2 / W4 / W20 / W35 / H2)', () => {
       'set-to-delete-123'
     );
   });
+
+  it('Product Bug 1: with offline network and networkMode: "always", logSet mutation reaches enqueue', async () => {
+    const { onlineManager } = await import('@tanstack/react-query');
+    try {
+      onlineManager.setOnline(false);
+
+      const enqueueSpy = vi.spyOn(setsLib, 'insertSet').mockResolvedValue({
+        id: 'offline-set-1',
+        workout_id: 'w-123',
+        exercise_id: exerciseId,
+        weight: 225,
+        reps: 5,
+        set_index: 1,
+        set_type: 'working',
+        rpe: null,
+        created_at: new Date().toISOString(),
+      });
+      vi.spyOn(setsLib, 'getOrCreateWorkout').mockResolvedValue('w-123');
+
+      // 1. With buggy default (networkMode 'online'), mutation is paused and never executes
+      const onlineClient = new QueryClient({
+        defaultOptions: {
+          queries: { networkMode: 'offlineFirst' },
+          // mutations default to 'online'
+        },
+      });
+      const { result: pausedResult } = renderHook(
+        () =>
+          useWorkoutMutations({
+            targetUserId,
+            workoutDate,
+            activeRoutineName: 'Chest Day',
+            exercises: exercises as any,
+            autoRestTimer: false,
+          }),
+        { wrapper: ({ children }: { children: React.ReactNode }) => React.createElement(QueryClientProvider, { client: onlineClient }, children) }
+      );
+
+      // Mutate while offline with default options -> pauses, never calls insertSet
+      pausedResult.current.logSetMutation.mutate({
+        exerciseName: 'Bench Press',
+        weight: 225,
+        reps: 5,
+        setIndex: 1,
+      });
+      const mutation = onlineClient.getMutationCache().getAll()[0];
+      expect(mutation?.state.isPaused).toBe(true);
+      expect(enqueueSpy).not.toHaveBeenCalled();
+
+      // 2. With fixed default (networkMode 'always'), mutation executes immediately while offline
+      const alwaysClient = new QueryClient({
+        defaultOptions: {
+          queries: { networkMode: 'offlineFirst' },
+          mutations: { networkMode: 'always' },
+        },
+      });
+      const { result: activeResult } = renderHook(
+        () =>
+          useWorkoutMutations({
+            targetUserId,
+            workoutDate,
+            activeRoutineName: 'Chest Day',
+            exercises: exercises as any,
+            autoRestTimer: false,
+          }),
+        { wrapper: ({ children }: { children: React.ReactNode }) => React.createElement(QueryClientProvider, { client: alwaysClient }, children) }
+      );
+
+      await act(async () => {
+        await activeResult.current.logSetMutation.mutateAsync({
+          exerciseName: 'Bench Press',
+          weight: 225,
+          reps: 5,
+          setIndex: 1,
+        });
+      });
+
+      expect(enqueueSpy).toHaveBeenCalled();
+    } finally {
+      onlineManager.setOnline(true);
+    }
+  });
 });

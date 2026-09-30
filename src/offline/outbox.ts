@@ -180,6 +180,7 @@ export async function enqueue<K extends OpKind>(input: {
         await outboxStore.put(compaction.compactedOp);
       }
       await tx.done;
+      updateUserCache(userId, compaction.ops);
       notifyOutboxChanged();
       return compaction.compactedOp || incomingOp;
     }
@@ -193,6 +194,7 @@ export async function enqueue<K extends OpKind>(input: {
         }
       }
       await tx.done;
+      updateUserCache(userId, compaction.ops);
       notifyOutboxChanged();
       return incomingOp;
     }
@@ -208,6 +210,7 @@ export async function enqueue<K extends OpKind>(input: {
       await outboxStore.put(incomingOp);
       await metaStore.put(nextSeq, 'last_seq');
       await tx.done;
+      updateUserCache(userId, compaction.ops);
       notifyOutboxChanged();
       return incomingOp;
     }
@@ -220,7 +223,19 @@ export async function getOutboxOps(userId: string): Promise<OutboxOp[]> {
   const sorted = allOps
     .filter((op) => op.userId === userId)
     .sort((a, b) => a.seq - b.seq);
+
+  const current = userOpsCache.get(userId);
+  const isDifferent =
+    !current ||
+    current.length !== sorted.length ||
+    current.some((op, i) => op.opId !== sorted[i]?.opId || op.state !== sorted[i]?.state);
+
   updateUserCache(userId, sorted);
+
+  if (isDifferent) {
+    notifyOutboxChanged();
+  }
+
   return sorted;
 }
 
@@ -232,12 +247,27 @@ export async function getOutboxSummary(userId: string): Promise<OutboxSummary> {
 export async function updateOp(userId: string, op: OutboxOp): Promise<void> {
   const db = await getOfflineDb(userId);
   await db.put('outbox', op);
+  const current = userOpsCache.get(userId);
+  if (current) {
+    const idx = current.findIndex((o) => o.opId === op.opId);
+    if (idx !== -1) {
+      const next = [...current];
+      next[idx] = op;
+      updateUserCache(userId, next);
+    } else {
+      updateUserCache(userId, [...current, op]);
+    }
+  }
   notifyOutboxChanged();
 }
 
 export async function deleteOp(userId: string, opId: string): Promise<void> {
   const db = await getOfflineDb(userId);
   await db.delete('outbox', opId);
+  const current = userOpsCache.get(userId);
+  if (current) {
+    updateUserCache(userId, current.filter((op) => op.opId !== opId));
+  }
   notifyOutboxChanged();
 }
 
@@ -292,6 +322,7 @@ export async function blockDependentOps(userId: string, failedOp: OutboxOp): Pro
   }
 
   await tx.done;
+  updateUserCache(userId, allOps);
   notifyOutboxChanged();
 }
 
@@ -327,6 +358,7 @@ export async function retryOp(opId: string, userId: string): Promise<void> {
   }
 
   await tx.done;
+  updateUserCache(userId, allOps.filter((o) => o.userId === userId));
   notifyOutboxChanged();
 }
 
@@ -358,5 +390,6 @@ export async function discardOp(opId: string, userId: string): Promise<void> {
   }
 
   await tx.done;
+  updateUserCache(userId, allOps.filter((o) => o.userId === userId));
   notifyOutboxChanged();
 }

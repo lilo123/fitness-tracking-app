@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   enqueue,
   getOutboxOps,
@@ -7,6 +7,11 @@ import {
   retryOp,
   discardOp,
   updateOp,
+  deleteOp,
+  subscribeToOutbox,
+  getCachedOpsForUser,
+  getCachedOutboxSummary,
+  resetOutboxForTesting,
 } from '../outbox';
 import { closeAllOfflineDbs, deleteOfflineDb } from '../db';
 
@@ -336,5 +341,86 @@ describe('Outbox Storage, Ordering & Dependent Blocking (§A4, §D)', () => {
     const setOp = ops.find((o) => o.opId === set1.opId);
     expect(setOp?.state).toBe('pending');
     expect(setOp?.blockedBy).toBeUndefined();
+  });
+
+  it('7. enqueue immediately updates in-memory cache and notifies subscribers synchronously', async () => {
+    const subscriber = vi.fn();
+    const unsubscribe = subscribeToOutbox(subscriber);
+
+    expect(getCachedOpsForUser(userA)).toHaveLength(0);
+    expect(getCachedOutboxSummary(userA).pending).toBe(0);
+
+    const op = await enqueue({
+      userId: userA,
+      kind: 'workout.ensure',
+      payload: { clientWorkoutId: 'w-1', workout_date: '2026-09-30' },
+    });
+
+    expect(subscriber).toHaveBeenCalled();
+    const cachedOps = getCachedOpsForUser(userA);
+    expect(cachedOps).toHaveLength(1);
+    expect(cachedOps[0].opId).toBe(op.opId);
+
+    const cachedSummary = getCachedOutboxSummary(userA);
+    expect(cachedSummary.pending).toBe(1);
+
+    unsubscribe();
+  });
+
+  it('8. getOutboxOps notifies subscribers when cache was empty (e.g. on reload)', async () => {
+    await enqueue({
+      userId: userA,
+      kind: 'workout.ensure',
+      payload: { clientWorkoutId: 'w-1', workout_date: '2026-09-30' },
+    });
+
+    // Simulate page reload by resetting in-memory caches
+    resetOutboxForTesting();
+    expect(getCachedOpsForUser(userA)).toHaveLength(0);
+    expect(getCachedOutboxSummary(userA).pending).toBe(0);
+
+    const subscriber = vi.fn();
+    const unsubscribe = subscribeToOutbox(subscriber);
+
+    // Initial mount hook calls getOutboxOps
+    const loadedOps = await getOutboxOps(userA);
+    expect(loadedOps).toHaveLength(1);
+
+    // Subscriber must be notified that the cache has been populated
+    expect(subscriber).toHaveBeenCalled();
+    expect(getCachedOpsForUser(userA)).toHaveLength(1);
+    expect(getCachedOutboxSummary(userA).pending).toBe(1);
+
+    // Repeated call with identical data should NOT notify again
+    subscriber.mockClear();
+    await getOutboxOps(userA);
+    expect(subscriber).not.toHaveBeenCalled();
+
+    unsubscribe();
+  });
+
+  it('9. deleteOp and updateOp immediately update in-memory cache and notify subscribers', async () => {
+    const op = await enqueue({
+      userId: userA,
+      kind: 'workout.ensure',
+      payload: { clientWorkoutId: 'w-1', workout_date: '2026-09-30' },
+    });
+
+    expect(getCachedOpsForUser(userA)).toHaveLength(1);
+    expect(getCachedOutboxSummary(userA).pending).toBe(1);
+
+    // Update op state to attention
+    op.state = 'attention';
+    op.error = 'Temporary error';
+    await updateOp(userA, op);
+
+    expect(getCachedOutboxSummary(userA).pending).toBe(0);
+    expect(getCachedOutboxSummary(userA).attention).toBe(1);
+
+    // Delete op
+    await deleteOp(userA, op.opId);
+    expect(getCachedOpsForUser(userA)).toHaveLength(0);
+    expect(getCachedOutboxSummary(userA).pending).toBe(0);
+    expect(getCachedOutboxSummary(userA).attention).toBe(0);
   });
 });
