@@ -123,7 +123,14 @@ describe('GlobalRestTimerPill', () => {
     });
 
     const pill = screen.getByTestId('rest-timer-pill');
-    expect(pill.className).toContain('motion-reduce:animate-none');
+    // The container must not pulse (it faded page content through the pill);
+    // only the timer icon pulses, and it honours reduced motion.
+    expect(pill.className).not.toContain('animate-pulse');
+    const pulsing = pill.querySelectorAll('.animate-pulse');
+    expect(pulsing.length).toBeGreaterThan(0);
+    pulsing.forEach((el) => {
+      expect(el.getAttribute('class')).toContain('motion-reduce:animate-none');
+    });
   });
 
   it('passes axe accessibility audit with no violations', async () => {
