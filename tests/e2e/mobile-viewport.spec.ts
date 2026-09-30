@@ -155,6 +155,7 @@ test.describe('Mobile Viewport & Ergonomics', () => {
     await page.fill('input[type="password"]', "password123");
     await page.click('button[type="submit"]');
     await page.waitForURL("**/workout");
+    await expect(page.locator('[data-testid="workout-date-input"]')).toBeVisible();
 
     // 1. Navigate to /settings and verify WeightUnitCard has no horizontal overflow
     await page.goto("/settings");
@@ -166,7 +167,13 @@ test.describe('Mobile Viewport & Ergonomics', () => {
     expect(isCardOverflowing, "WeightUnitCard has no horizontal overflow").toBe(false);
 
     // Switch to kg
+    const lbBtn = page.locator('[data-testid="weight-unit-lb"]');
     const kgBtn = page.locator('[data-testid="weight-unit-kg"]');
+    await expect(lbBtn).toBeVisible();
+    await expect(kgBtn).toBeVisible();
+    await expect(lbBtn).toHaveAttribute("aria-pressed", "true");
+    await expect(kgBtn).toHaveAttribute("aria-pressed", "false");
+
     await kgBtn.click();
     await expect(kgBtn).toHaveAttribute("aria-pressed", "true");
 
@@ -174,6 +181,7 @@ test.describe('Mobile Viewport & Ergonomics', () => {
       // 2. Navigate to /workout in kg mode and verify no horizontal overflow
       await page.goto("/workout");
       await page.waitForURL("**/workout");
+      await expect(page.locator('[data-testid="workout-date-input"]')).toBeVisible();
 
       const isOverflowingWorkoutKg = await page.evaluate(() => {
         return document.documentElement.scrollWidth > window.innerWidth;
@@ -184,6 +192,7 @@ test.describe('Mobile Viewport & Ergonomics', () => {
       await page.goto("/settings");
       await page.waitForURL("**/settings");
       const lbBtn = page.locator('[data-testid="weight-unit-lb"]');
+      await expect(lbBtn).toBeVisible();
       await lbBtn.click();
       await expect(lbBtn).toHaveAttribute("aria-pressed", "true");
     }
