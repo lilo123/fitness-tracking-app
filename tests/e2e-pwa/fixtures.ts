@@ -169,17 +169,22 @@ export function cleanupPwaTestUser(user: { id?: string; email?: string }): void 
  */
 export async function signInUser(
   page: Page,
-  user: { email: string; password?: string }
+  user: { email: string; password?: string; role?: string }
 ): Promise<void> {
   await page.goto('/login');
   await page.fill('input[type="email"]', user.email);
   await page.fill('input[type="password"]', user.password || 'Password123!');
   await page.click('button[type="submit"]');
-  await page.waitForURL('**/workout');
-  const routineOrChoose = page
-    .locator('[data-testid="routine-select-btn"]')
-    .or(page.locator('button:has-text("Choose Routine")'));
-  await expect(routineOrChoose.first()).toBeVisible({ timeout: 15000 });
+  if (user.role === 'coach') {
+    await page.waitForURL('**/coach');
+    await expect(page.locator('text=Coach Cockpit').or(page.locator('text=Athletes')).first()).toBeVisible({ timeout: 15000 });
+  } else {
+    await page.waitForURL('**/workout');
+    const routineOrChoose = page
+      .locator('[data-testid="routine-select-btn"]')
+      .or(page.locator('button:has-text("Choose Routine")'));
+    await expect(routineOrChoose.first()).toBeVisible({ timeout: 15000 });
+  }
 }
 
 /**
@@ -220,8 +225,115 @@ export async function goOffline(context: BrowserContext): Promise<void> {
 }
 
 /**
- * Restores online network state on browser context.
+ * Restores online network state on browser context and notifies window.
  */
-export async function goOnline(context: BrowserContext): Promise<void> {
+export async function goOnline(context: BrowserContext, page?: Page): Promise<void> {
   await context.setOffline(false);
+  if (page) {
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event('online'));
+    });
+  }
+}
+
+/**
+ * Creates a unique coach test user for role verification.
+ */
+export async function createCoachPwaTestUser(prefix = 'pwa-coach'): Promise<PwaTestUser & { role: string }> {
+  const user = await createPwaTestUser(prefix);
+  execPsql(`
+    UPDATE public.users
+    SET role = 'coach', is_coach_mode = true
+    WHERE id = '${user.id}';
+  `);
+  return { ...user, role: 'coach' };
+}
+
+/**
+ * Seeds a prior workout session with sets for PR and ghost comparison.
+ */
+export function seedPriorWorkoutSession(
+  user: PwaTestUser,
+  date: string,
+  weight = 100,
+  reps = 10
+): { workoutId: string; setId: string } {
+  const sql = `
+    DO $$
+    DECLARE
+      v_wid uuid;
+      v_sid uuid;
+    BEGIN
+      INSERT INTO public.workouts (id, user_id, workout_date, date, name)
+      VALUES (gen_random_uuid(), '${user.id}', '${date}', '${date}T10:00:00Z', 'Prior PWA Routine')
+      ON CONFLICT (user_id, workout_date) DO UPDATE SET name = 'Prior PWA Routine'
+      RETURNING id INTO v_wid;
+
+      INSERT INTO public.sets (id, workout_id, exercise_id, weight, reps, set_index, set_type)
+      VALUES (gen_random_uuid(), v_wid, '${user.exerciseId}', ${weight}, ${reps}, 1, 'working')
+      RETURNING id INTO v_sid;
+
+      CREATE TEMP TABLE tmp_prior_seed AS SELECT v_wid::text AS wid, v_sid::text AS sid;
+    END $$;
+    SELECT wid || '|' || sid FROM tmp_prior_seed;
+  `;
+  const raw = execPsql(sql);
+  const [workoutId, setId] = raw.split('|').map((s) => s.trim());
+  return { workoutId, setId };
+}
+
+/**
+ * Creates a custom exercise in public.exercises for the user.
+ */
+export function createCustomExercise(userId: string, name: string): string {
+  const raw = execPsql(`
+    INSERT INTO public.exercises (id, user_id, name, is_master, body_parts, equipment)
+    VALUES (gen_random_uuid(), '${userId}', '${name}', false, '{"Chest"}', 'dumbbell')
+    RETURNING id;
+  `);
+  return raw.split('\n')[0].trim();
+}
+
+/**
+ * Deletes an exercise from public.exercises.
+ */
+export function deleteExercise(exerciseId: string): void {
+  execPsql(`DELETE FROM public.exercises WHERE id = '${exerciseId}';`);
+}
+
+/**
+ * Returns workout records for a user on a given date.
+ */
+export function getUserWorkouts(
+  userId: string,
+  date: string
+): { id: string; workout_date: string; name: string }[] {
+  return queryRows<{ id: string; workout_date: string; name: string }>(
+    `SELECT id, workout_date, name FROM public.workouts WHERE user_id = '${userId}' AND workout_date = '${date}'`
+  );
+}
+
+/**
+ * Returns set records for a user on a given date.
+ */
+export function getUserSets(
+  userId: string,
+  date: string
+): {
+  id: string;
+  workout_id: string;
+  exercise_id: string;
+  weight: number;
+  reps: number;
+  set_index: number;
+  set_type: string;
+  rpe: number | null;
+}[] {
+  return queryRows(
+    `SELECT s.id, s.workout_id, s.exercise_id, s.weight, s.reps, s.set_index, s.set_type, s.rpe
+     FROM public.sets s
+     JOIN public.workouts w ON s.workout_id = w.id
+     WHERE w.user_id = '${userId}' AND w.workout_date = '${date}'
+     ORDER BY s.set_index ASC`
+  );
 }

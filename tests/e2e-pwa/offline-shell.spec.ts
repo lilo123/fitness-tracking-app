@@ -18,7 +18,7 @@ test.describe('PWA Offline App Shell & Session Durability', () => {
 
   test.afterEach(async ({ context }) => {
     // Ensure network is restored for subsequent tests
-    await goOnline(context).catch(() => {});
+    await goOnline(context);
     if (user) {
       cleanupPwaTestUser(user);
     }
