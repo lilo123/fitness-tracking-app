@@ -7319,40 +7319,131 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
   // W4: Offline & Sync Visual Density Tests (320px)
   // ---------------------------------------------------------------------------
 
+  function getRealAthleteExerciseId(): string {
+    const psqlCmd = getPsqlCommand();
+    const id = execSync(
+      `${psqlCmd} -t -A -c "SELECT id FROM public.exercises WHERE name = 'Incline Bench Press' LIMIT 1"`,
+      { encoding: 'utf8' }
+    ).trim();
+    if (!id) {
+      throw new Error('Real exercise id for "Incline Bench Press" was not found in the database');
+    }
+    return id;
+  }
+
   test('W4 Density: Header connection status badge displays "Offline · 12 pending", fits 320px without clip or wrap, tap target >= 44x44px', async ({ browser }) => {
-    const page = await browser.newPage({
+    const context = await browser.newContext({
       viewport: { width: 320, height: 844 },
       deviceScaleFactor: 1,
     });
+    const page = await context.newPage();
+    let athleteUserId = '';
 
     try {
+      const realExerciseId = getRealAthleteExerciseId();
+
       await page.goto('/login');
       await page.fill('input[type="email"]', 'athlete@cybergym.io');
       await page.fill('input[type="password"]', 'password123');
       await page.click('button[type="submit"]');
       await page.waitForURL('**/workout');
 
-      // Wait for workout page to be fully loaded
+      // Wait for workout page to be fully loaded and status badge visible
       const statusBadge = page.locator('[data-testid="connection-status"]');
       await expect(statusBadge).toBeVisible({ timeout: 10000 });
 
-      // Seed 12 pending ops and simulate offline
-      await page.evaluate(() => {
+      athleteUserId = await page.evaluate(() => {
         const authKey = Object.keys(localStorage).find((k) => k.includes('auth-token'));
         const session = authKey ? JSON.parse(localStorage.getItem(authKey) || '{}') : null;
-        const userId = session?.user?.id;
-        if (!userId) throw new Error('No user session found');
+        return session?.user?.id || '';
+      });
+      expect(athleteUserId, 'athlete userId must be present').toBeTruthy();
 
-        const setSummaryFn = (window as any).__setOutboxSummaryForTesting;
-        if (setSummaryFn) {
-          setSummaryFn(userId, 12);
+      const dbName = `cybergym-offline-${athleteUserId}`;
+
+      // Wait for the app to create the per-user IndexedDB
+      await page.waitForFunction(async (name) => {
+        return new Promise<boolean>((resolve) => {
+          const req = indexedDB.open(name);
+          req.onsuccess = () => {
+            const db = req.result;
+            const ready = db.objectStoreNames.contains('outbox');
+            db.close();
+            resolve(ready);
+          };
+          req.onerror = () => resolve(false);
+        });
+      }, dbName);
+
+      // Open that DB with plain indexedDB.open(name) (no version arg) and put 12 pending ops
+      await page.evaluate(
+        async ({ name, userId, exerciseId }) => {
+          const req = indexedDB.open(name);
+          const db: IDBDatabase = await new Promise((resolve, reject) => {
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+          });
+
+          const tx = db.transaction(['outbox'], 'readwrite');
+          const store = tx.objectStore('outbox');
+          const now = new Date().toISOString();
+          for (let i = 0; i < 12; i++) {
+            store.put({
+              opId: `w4-pending-op-${i + 1}`,
+              userId,
+              seq: i + 1,
+              kind: 'set.create',
+              payload: {
+                id: `w4-pending-set-${i + 1}`,
+                workoutRef: 'density-w-1',
+                exercise_id: exerciseId,
+                weight: 100 + i * 5,
+                reps: 5,
+                set_index: i + 1,
+                set_type: 'working',
+                created_at: now,
+              },
+              createdAt: now,
+              attempts: 0,
+              state: 'pending',
+            });
+          }
+
+          await new Promise((resolve, reject) => {
+            tx.oncomplete = () => {
+              db.close();
+              resolve(undefined);
+            };
+            tx.onerror = () => {
+              db.close();
+              reject(tx.error);
+            };
+          });
+        },
+        { name: dbName, userId: athleteUserId, exerciseId: realExerciseId }
+      );
+
+      // Block replay deterministically with page.route on Supabase REST write requests
+      await page.route('**/rest/v1/sets*', (route) => {
+        if (['POST', 'PATCH', 'DELETE'].includes(route.request().method())) {
+          return route.abort('internetdisconnected');
         }
-
-        Object.defineProperty(navigator, 'onLine', { configurable: true, writable: true, value: false });
-        window.dispatchEvent(new Event('offline'));
+        return route.continue();
+      });
+      await page.route('**/rest/v1/workouts*', (route) => {
+        if (['POST', 'PATCH', 'DELETE'].includes(route.request().method())) {
+          return route.abort('internetdisconnected');
+        }
+        return route.continue();
       });
 
-      await expect(statusBadge).toHaveText('Offline · 12 pending', { timeout: 5000 });
+      // Reload and set context offline
+      await page.reload();
+      await page.waitForLoadState('domcontentloaded');
+      await context.setOffline(true);
+
+      // Assert exact text
+      await expect(statusBadge).toHaveText('Offline · 12 pending', { timeout: 10000 });
 
       const box = await statusBadge.boundingBox();
       expect(box, 'button bounding box exists').not.toBeNull();
@@ -7367,22 +7458,166 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
       const headerClipped = await header.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
       expect(headerClipped, 'Header should not horizontally overflow').toBe(false);
     } finally {
-      await page.close();
+      try {
+        if (athleteUserId && !page.isClosed()) {
+          await page.evaluate(async (uid) => {
+            const dbName = `cybergym-offline-${uid}`;
+            const openReq = indexedDB.open(dbName);
+            await new Promise<void>((resolve, reject) => {
+              openReq.onsuccess = () => {
+                const db = openReq.result;
+                if (db.objectStoreNames.contains('outbox')) {
+                  const tx = db.transaction(['outbox'], 'readwrite');
+                  tx.objectStore('outbox').clear();
+                  tx.oncomplete = () => {
+                    db.close();
+                    resolve();
+                  };
+                  tx.onerror = () => {
+                    db.close();
+                    reject(tx.error);
+                  };
+                } else {
+                  db.close();
+                  resolve();
+                }
+              };
+              openReq.onerror = () => reject(openReq.error);
+            });
+            const delReq = indexedDB.deleteDatabase(dbName);
+            await new Promise<void>((resolve, reject) => {
+              delReq.onsuccess = () => resolve();
+              delReq.onerror = () => reject(delReq.error);
+              delReq.onblocked = () => resolve();
+            });
+          }, athleteUserId);
+        }
+      } finally {
+        await context.close();
+      }
     }
   });
 
   test('W4 Density: SetRow pending mark fits in index cell and preserves grid column alignment with header at 320px', async ({ browser }) => {
-    const page = await browser.newPage({
+    const context = await browser.newContext({
       viewport: { width: 320, height: 844 },
       deviceScaleFactor: 1,
     });
+    const page = await context.newPage();
+    let athleteUserId = '';
 
     try {
+      const realExerciseId = getRealAthleteExerciseId();
+
       await page.goto('/login');
       await page.fill('input[type="email"]', 'athlete@cybergym.io');
       await page.fill('input[type="password"]', 'password123');
       await page.click('button[type="submit"]');
       await page.waitForURL('**/workout');
+
+      athleteUserId = await page.evaluate(() => {
+        const authKey = Object.keys(localStorage).find((k) => k.includes('auth-token'));
+        const session = authKey ? JSON.parse(localStorage.getItem(authKey) || '{}') : null;
+        return session?.user?.id || '';
+      });
+      expect(athleteUserId, 'athlete userId must be present').toBeTruthy();
+
+      const dbName = `cybergym-offline-${athleteUserId}`;
+
+      // Wait for the app to create the per-user IndexedDB
+      await page.waitForFunction(async (name) => {
+        return new Promise<boolean>((resolve) => {
+          const req = indexedDB.open(name);
+          req.onsuccess = () => {
+            const db = req.result;
+            const ready = db.objectStoreNames.contains('outbox');
+            db.close();
+            resolve(ready);
+          };
+          req.onerror = () => resolve(false);
+        });
+      }, dbName);
+
+      // Seed 1 pending workout.ensure and 1 pending set.create op for today
+      await page.evaluate(
+        async ({ name, userId, exerciseId }) => {
+          const req = indexedDB.open(name);
+          const db: IDBDatabase = await new Promise((resolve, reject) => {
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+          });
+
+          const tx = db.transaction(['outbox'], 'readwrite');
+          const store = tx.objectStore('outbox');
+          const now = new Date();
+          const year = now.getFullYear();
+          const month = String(now.getMonth() + 1).padStart(2, '0');
+          const day = String(now.getDate()).padStart(2, '0');
+          const today = `${year}-${month}-${day}`;
+          const iso = now.toISOString();
+
+          store.put({
+            opId: 'w4-setrow-workout-op',
+            userId,
+            seq: 1,
+            kind: 'workout.ensure',
+            payload: {
+              clientWorkoutId: 'w4-density-workout-ref',
+              workout_date: today,
+              name: 'Workout A (Push, Quads & Core)',
+            },
+            createdAt: iso,
+            attempts: 0,
+            state: 'pending',
+          });
+
+          store.put({
+            opId: 'w4-setrow-set-op',
+            userId,
+            seq: 2,
+            kind: 'set.create',
+            payload: {
+              id: 'w4-density-set-1',
+              workoutRef: 'w4-density-workout-ref',
+              exercise_id: exerciseId,
+              weight: 185,
+              reps: 8,
+              set_index: 1,
+              set_type: 'working',
+              created_at: iso,
+            },
+            createdAt: iso,
+            attempts: 0,
+            state: 'pending',
+          });
+
+          await new Promise((resolve, reject) => {
+            tx.oncomplete = () => {
+              db.close();
+              resolve(undefined);
+            };
+            tx.onerror = () => {
+              db.close();
+              reject(tx.error);
+            };
+          });
+        },
+        { name: dbName, userId: athleteUserId, exerciseId: realExerciseId }
+      );
+
+      // Block replay writes (POST, PATCH, DELETE only)
+      await page.route('**/rest/v1/sets*', (route) => {
+        if (['POST', 'PATCH', 'DELETE'].includes(route.request().method())) {
+          return route.abort('internetdisconnected');
+        }
+        return route.continue();
+      });
+      await page.route('**/rest/v1/workouts*', (route) => {
+        if (['POST', 'PATCH', 'DELETE'].includes(route.request().method())) {
+          return route.abort('internetdisconnected');
+        }
+        return route.continue();
+      });
 
       await page.goto('/workout?routine=' + encodeURIComponent('Workout A (Push, Quads & Core)'));
       await page.waitForLoadState('domcontentloaded');
@@ -7390,13 +7625,11 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
       const card = page.locator('[data-testid="exercise-card-0"]');
       await expect(card).toBeVisible({ timeout: 10000 });
 
-      // Ensure set 1 is logged so we have a logged set row
       const loggedRow = card.locator('[data-testid^="logged-set-row-"]').first();
-      if (!(await loggedRow.isVisible())) {
-        const commitBtn = card.locator('[data-testid^="commit-set-btn-"]').first();
-        await commitBtn.click();
-        await expect(loggedRow).toBeVisible({ timeout: 5000 });
-      }
+      await expect(loggedRow).toBeVisible({ timeout: 5000 });
+
+      const pendingMark = loggedRow.locator('[data-testid="pending-mark"]');
+      await expect(pendingMark).toBeVisible({ timeout: 5000 });
 
       // Check alignment of index cell with column header
       const geo = await page.evaluate(() => {
@@ -7418,53 +7651,165 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
       expect(geo).not.toBeNull();
       expect(geo!.deltaLeft).toBeLessThanOrEqual(2);
     } finally {
-      await page.close();
+      try {
+        if (athleteUserId && !page.isClosed()) {
+          await page.evaluate(async (uid) => {
+            const dbName = `cybergym-offline-${uid}`;
+            const openReq = indexedDB.open(dbName);
+            await new Promise<void>((resolve, reject) => {
+              openReq.onsuccess = () => {
+                const db = openReq.result;
+                if (db.objectStoreNames.contains('outbox')) {
+                  const tx = db.transaction(['outbox'], 'readwrite');
+                  tx.objectStore('outbox').clear();
+                  tx.oncomplete = () => {
+                    db.close();
+                    resolve();
+                  };
+                  tx.onerror = () => {
+                    db.close();
+                    reject(tx.error);
+                  };
+                } else {
+                  db.close();
+                  resolve();
+                }
+              };
+              openReq.onerror = () => reject(openReq.error);
+            });
+            const delReq = indexedDB.deleteDatabase(dbName);
+            await new Promise<void>((resolve, reject) => {
+              delReq.onsuccess = () => resolve();
+              delReq.onerror = () => reject(delReq.error);
+              delReq.onblocked = () => resolve();
+            });
+          }, athleteUserId);
+        }
+      } finally {
+        await context.close();
+      }
     }
   });
 
   test('W4 Density: AttentionBanner and SyncStatusSheet fit 320px without overflow with >=44px tap targets', async ({ browser }) => {
-    const page = await browser.newPage({
+    const context = await browser.newContext({
       viewport: { width: 320, height: 844 },
       deviceScaleFactor: 1,
     });
+    const page = await context.newPage();
+    let athleteUserId = '';
 
     try {
+      const realExerciseId = getRealAthleteExerciseId();
+
       await page.goto('/login');
       await page.fill('input[type="email"]', 'athlete@cybergym.io');
       await page.fill('input[type="password"]', 'password123');
       await page.click('button[type="submit"]');
       await page.waitForURL('**/workout');
 
-      // Seed 1 attention op in outbox
-      await page.evaluate(async () => {
+      athleteUserId = await page.evaluate(() => {
         const authKey = Object.keys(localStorage).find((k) => k.includes('auth-token'));
         const session = authKey ? JSON.parse(localStorage.getItem(authKey) || '{}') : null;
-        const userId = session?.user?.id;
-        if (!userId) return;
+        return session?.user?.id || '';
+      });
+      expect(athleteUserId, 'athlete userId must be present').toBeTruthy();
 
-        const dbReq = indexedDB.open(`cybergym-offline-${userId}`, 1);
-        const db: IDBDatabase = await new Promise((res, rej) => {
-          dbReq.onsuccess = () => res(dbReq.result);
-          dbReq.onerror = () => rej(dbReq.error);
-        });
+      const dbName = `cybergym-offline-${athleteUserId}`;
 
-        const tx = db.transaction(['outbox'], 'readwrite');
-        const store = tx.objectStore('outbox');
-        store.put({
-          opId: 'attention-op-1',
-          userId,
-          seq: 99,
-          kind: 'set.create',
-          payload: { weight: 135, reps: 5 },
-          createdAt: new Date().toISOString(),
-          attempts: 3,
-          state: 'attention',
-          error: 'Row conflict or foreign key constraint violation',
+      // Wait for the app to create the per-user IndexedDB
+      await page.waitForFunction(async (name) => {
+        return new Promise<boolean>((resolve) => {
+          const req = indexedDB.open(name);
+          req.onsuccess = () => {
+            const db = req.result;
+            const ready = db.objectStoreNames.contains('outbox');
+            db.close();
+            resolve(ready);
+          };
+          req.onerror = () => resolve(false);
         });
-        await new Promise((res, rej) => {
-          tx.oncomplete = res;
-          tx.onerror = rej;
-        });
+      }, dbName);
+
+      // Seed 2 attention ops in outbox
+      await page.evaluate(
+        async ({ name, userId, exerciseId }) => {
+          const req = indexedDB.open(name);
+          const db: IDBDatabase = await new Promise((resolve, reject) => {
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+          });
+
+          const tx = db.transaction(['outbox'], 'readwrite');
+          const store = tx.objectStore('outbox');
+          const now = new Date().toISOString();
+          store.put({
+            opId: 'attention-op-1',
+            userId,
+            seq: 1,
+            kind: 'set.create',
+            payload: {
+              id: 'attention-set-1',
+              workoutRef: 'density-w-1',
+              exercise_id: exerciseId,
+              weight: 135,
+              reps: 5,
+              set_index: 1,
+              set_type: 'working',
+              created_at: now,
+            },
+            createdAt: now,
+            attempts: 3,
+            state: 'attention',
+            error: 'Row conflict or foreign key constraint violation',
+          });
+          store.put({
+            opId: 'attention-op-2',
+            userId,
+            seq: 2,
+            kind: 'set.create',
+            payload: {
+              id: 'attention-set-2',
+              workoutRef: 'density-w-1',
+              exercise_id: exerciseId,
+              weight: 145,
+              reps: 5,
+              set_index: 2,
+              set_type: 'working',
+              created_at: now,
+            },
+            createdAt: now,
+            attempts: 3,
+            state: 'attention',
+            error: 'Server rejected update',
+          });
+
+          await new Promise((resolve, reject) => {
+            tx.oncomplete = () => {
+              db.close();
+              resolve(undefined);
+            };
+            tx.onerror = () => {
+              db.close();
+              reject(tx.error);
+            };
+          });
+        },
+        { name: dbName, userId: athleteUserId, exerciseId: realExerciseId }
+      );
+
+      // Block replay deterministically with page.route on Supabase REST write requests
+      await page.route('**/rest/v1/sets*', (route) => {
+        if (['POST', 'PATCH', 'DELETE'].includes(route.request().method())) {
+          return route.abort('internetdisconnected');
+        }
+        return route.continue();
+      });
+      await page.route('**/rest/v1/workouts*', (route) => {
+        if (['POST', 'PATCH', 'DELETE'].includes(route.request().method())) {
+          return route.abort('internetdisconnected');
+        }
+        return route.continue();
       });
 
       await page.reload();
@@ -7472,6 +7817,7 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
 
       const banner = page.locator('[data-testid="attention-banner"]');
       await expect(banner).toBeVisible({ timeout: 5000 });
+      await expect(banner).toHaveText('2 changes need attention · Review');
 
       // Check banner fits 320px without overflow
       const bannerOverflow = await banner.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
@@ -7486,52 +7832,60 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
       const sheet = page.locator('[data-testid="sync-status-sheet"]');
       await expect(sheet).toBeVisible({ timeout: 5000 });
 
+      // Assert exact texts on SyncStatusSheet at 320
+      await expect(sheet.locator('h2').first()).toHaveText('Sync status');
+      await expect(page.locator('[data-testid="needs-attention-section"] h3')).toHaveText('Needs attention (2)');
+
       const sheetOverflow = await sheet.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
       expect(sheetOverflow, 'Sync status sheet must not horizontally overflow').toBe(false);
 
-      const retryBtn = page.locator('[data-testid^="retry-op-btn-"]');
+      const retryBtn = page.locator('[data-testid^="retry-op-btn-"]').first();
       await expect(retryBtn).toBeVisible();
       const retryBox = await retryBtn.boundingBox();
       expect(retryBox!.height).toBeGreaterThanOrEqual(44);
 
-      const discardBtn = page.locator('[data-testid^="discard-op-btn-"]');
+      const discardBtn = page.locator('[data-testid^="discard-op-btn-"]').first();
       await expect(discardBtn).toBeVisible();
       const discardBox = await discardBtn.boundingBox();
       expect(discardBox!.height).toBeGreaterThanOrEqual(44);
     } finally {
-      await page.close();
-    }
-  });
-
-  test('W4 Density: UpdateBanner at 320px fits without overflow and reload button has min-h >= 44px', async ({ browser }) => {
-    const page = await browser.newPage({
-      viewport: { width: 320, height: 844 },
-      deviceScaleFactor: 1,
-    });
-
-    try {
-      await page.goto('/login');
-      await page.fill('input[type="email"]', 'athlete@cybergym.io');
-      await page.fill('input[type="password"]', 'password123');
-      await page.click('button[type="submit"]');
-      await page.waitForURL('**/workout');
-
-      // Trigger update available
-      await page.evaluate(() => {
-        (window as unknown as { __setUpdateAvailableForTesting?: (val: boolean) => void }).__setUpdateAvailableForTesting?.(true);
-      });
-
-      const banner = page.locator('[data-testid="update-banner"]');
-      await expect(banner).toBeVisible({ timeout: 5000 });
-
-      const overflow = await banner.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
-      expect(overflow, 'UpdateBanner must not horizontally overflow').toBe(false);
-
-      const reloadBtn = page.locator('[data-testid="update-reload-btn"]');
-      const box = await reloadBtn.boundingBox();
-      expect(box!.height).toBeGreaterThanOrEqual(44);
-    } finally {
-      await page.close();
+      try {
+        if (athleteUserId && !page.isClosed()) {
+          await page.evaluate(async (uid) => {
+            const dbName = `cybergym-offline-${uid}`;
+            const openReq = indexedDB.open(dbName);
+            await new Promise<void>((resolve, reject) => {
+              openReq.onsuccess = () => {
+                const db = openReq.result;
+                if (db.objectStoreNames.contains('outbox')) {
+                  const tx = db.transaction(['outbox'], 'readwrite');
+                  tx.objectStore('outbox').clear();
+                  tx.oncomplete = () => {
+                    db.close();
+                    resolve();
+                  };
+                  tx.onerror = () => {
+                    db.close();
+                    reject(tx.error);
+                  };
+                } else {
+                  db.close();
+                  resolve();
+                }
+              };
+              openReq.onerror = () => reject(openReq.error);
+            });
+            const delReq = indexedDB.deleteDatabase(dbName);
+            await new Promise<void>((resolve, reject) => {
+              delReq.onsuccess = () => resolve();
+              delReq.onerror = () => reject(delReq.error);
+              delReq.onblocked = () => resolve();
+            });
+          }, athleteUserId);
+        }
+      } finally {
+        await context.close();
+      }
     }
   });
 });

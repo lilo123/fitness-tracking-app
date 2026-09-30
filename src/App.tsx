@@ -15,45 +15,11 @@ import { recordLastRoute, getLastRoute } from './pwa/lastRoute';
 import { SyncToastBridge } from './components/sync/SyncToastBridge';
 import { AttentionBanner } from './components/sync/AttentionBanner';
 import { useOfflinePrefetch } from './offline-prefetch';
-import { registerOutboxUpdateBlocker, getOutboxOps, enqueue } from './offline';
-import { updateUserCache, notifyOutboxChanged } from './offline/outbox';
+import { registerOutboxUpdateBlocker } from './offline';
 import { registerUpdateBlocker } from './pwa/updateSafety';
 import './App.css';
-import { setUpdateAvailableForTesting } from './pwa/useAppUpdate';
 
 registerOutboxUpdateBlocker(registerUpdateBlocker);
-
-if (typeof window !== 'undefined') {
-  (window as unknown as { __setUpdateAvailableForTesting?: typeof setUpdateAvailableForTesting }).__setUpdateAvailableForTesting =
-    setUpdateAvailableForTesting;
-  (window as any).__getOutboxOpsForTesting = getOutboxOps;
-  (window as any).__enqueueForTesting = enqueue;
-  (window as any).__setOutboxSummaryForTesting = (userId: string, pendingCount: number) => {
-    const ops = [];
-    for (let i = 0; i < pendingCount; i++) {
-      ops.push({
-        opId: `test-op-${i}`,
-        userId,
-        seq: i + 1,
-        kind: 'set.create',
-        payload: {
-          id: `s-${i}`,
-          workoutRef: 'w1',
-          exercise_id: 'e1',
-          weight: 100,
-          reps: 5,
-          set_index: i + 1,
-          created_at: new Date().toISOString(),
-        },
-        createdAt: new Date().toISOString(),
-        attempts: 0,
-        state: 'pending',
-      });
-    }
-    updateUserCache(userId, ops as any);
-    notifyOutboxChanged();
-  };
-}
 
 const WorkoutEngine = React.lazy(() =>
   import('./components/workout/WorkoutEngine').then((m) => ({ default: m.WorkoutEngine }))
