@@ -189,7 +189,9 @@ export async function flushNow(targetUserId?: string, callerOpId?: string): Prom
 
             if (backoffTimer) clearTimeout(backoffTimer);
             backoffTimer = setTimeout(() => {
-              flushNow(userId).catch(() => {});
+              flushNow(userId).catch((e) => {
+                console.warn('[flusher] Background flush retry failed', e);
+              });
             }, delay);
 
             break; // Stop flushing on transient failure
@@ -302,7 +304,9 @@ export async function enqueueAndAwait<K extends OpKind>(
   }
 
   // Trigger flush immediately with callerOpId
-  flushNow(input.userId, enqueuedOp.opId).catch(() => {});
+  flushNow(input.userId, enqueuedOp.opId).catch((e) => {
+    console.warn('[flusher] Immediate flush failed', e);
+  });
 
   // Wait for op to be deleted (synced), put in attention, or timeout
   return new Promise<EnqueueAndAwaitResult>((resolve, reject) => {
@@ -346,6 +350,8 @@ export async function enqueueAndAwait<K extends OpKind>(
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {
     retryAttempts = 0;
-    flushNow().catch(() => {});
+    flushNow().catch((e) => {
+      console.warn('[flusher] Online reconnect flush failed', e);
+    });
   });
 }

@@ -74,8 +74,9 @@ test.describe('Exactly Once - Idempotency & Concurrency', () => {
     await context.route('**/rest/v1/sets*', async (route) => {
       if (route.request().method() === 'POST' && !killed) {
         killed = true;
-        // Upstream server commits the row
-        await route.fetch();
+        // Upstream server commits the row: verify response is success (201/200)
+        const upstreamRes = await route.fetch();
+        expect(upstreamRes.ok()).toBe(true);
         // Immediately close the page without fulfilling response (simulating hard tab termination)
         await page.close();
         return;
@@ -110,8 +111,7 @@ test.describe('Exactly Once - Idempotency & Concurrency', () => {
       await expect(newPage.locator('[data-testid="connection-status"]')).toContainText('Online');
 
       // 10. Verify in Postgres: exactly 3 sets exist, no duplicate rows!
-      const today = '2026-09-30';
-      const sets = getUserSets(user.id, today);
+      const sets = getUserSets(user.id);
       expect(sets.length).toBe(3);
       expect(sets.map((s) => s.set_index)).toEqual([1, 2, 3]);
       expect(Number(sets[0].weight)).toBe(100);
@@ -181,8 +181,7 @@ test.describe('Exactly Once - Idempotency & Concurrency', () => {
     await expect(page.locator('[data-testid="connection-status"]')).toContainText('Online', { timeout: 10000 });
 
     // 7. Verify in Postgres: exactly 2 sets exist, no duplicates!
-    const today = '2026-09-30';
-    const sets = getUserSets(user.id, today);
+    const sets = getUserSets(user.id);
     expect(sets.length).toBe(2);
     expect(sets.map((s) => s.set_index)).toEqual([1, 2]);
   });
@@ -236,8 +235,7 @@ test.describe('Exactly Once - Idempotency & Concurrency', () => {
       await expect(page2.locator('[data-testid="connection-status"]')).toContainText('Online', { timeout: 10000 });
 
       // 7. Verify in Postgres: Web Lock ensured single execution - exactly 1 row in DB!
-      const today = '2026-09-30';
-      const sets = getUserSets(user.id, today);
+      const sets = getUserSets(user.id);
       expect(sets.length).toBe(1);
       expect(sets[0].weight).toBe(140);
       expect(sets[0].reps).toBe(5);

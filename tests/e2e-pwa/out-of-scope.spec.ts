@@ -20,8 +20,20 @@ test.describe('Out of Scope - Offline Disabled Controls', () => {
 
   test.afterEach(async ({ context }) => {
     await goOnline(context);
-    if (athleteUser) cleanupPwaTestUser(athleteUser);
-    if (coachUser) cleanupPwaTestUser(coachUser);
+    let errAth: unknown;
+    let errCoach: unknown;
+    try {
+      if (athleteUser) cleanupPwaTestUser(athleteUser);
+    } catch (e) {
+      errAth = e;
+    }
+    try {
+      if (coachUser) cleanupPwaTestUser(coachUser);
+    } catch (e) {
+      errCoach = e;
+    }
+    if (errAth) throw errAth;
+    if (errCoach) throw errCoach;
   });
 
   test('custom exercise and template creation/editing are disabled offline with 0 network requests', async ({

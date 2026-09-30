@@ -5,6 +5,37 @@ import { compactIncomingOp } from './compaction';
 // Subscription listeners for outbox state updates
 const subscribers = new Set<() => void>();
 
+const BROADCAST_CHANNEL_NAME = 'cybergym_outbox_channel';
+let outboxBroadcastChannel: BroadcastChannel | null = null;
+
+if (typeof BroadcastChannel !== 'undefined') {
+  try {
+    outboxBroadcastChannel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
+    outboxBroadcastChannel.onmessage = (event) => {
+      if (event.data?.type === 'outbox_changed' && event.data.userId) {
+        getOutboxOps(event.data.userId).catch((e) => {
+          console.warn('[outbox] Failed to refresh outbox ops after channel broadcast', e);
+        });
+      }
+    };
+  } catch (e) {
+    console.warn('[outbox] BroadcastChannel setup failed:', e);
+  }
+}
+
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('storage', (event) => {
+    if (event.key?.startsWith('cybergym_outbox_pending_')) {
+      const uId = event.key.slice('cybergym_outbox_pending_'.length);
+      if (uId) {
+        getOutboxOps(uId).catch((e) => {
+          console.warn('[outbox] Failed to refresh outbox ops on storage event', e);
+        });
+      }
+    }
+  });
+}
+
 export function subscribeToOutbox(callback: () => void): () => void {
   subscribers.add(callback);
   return () => {
@@ -12,12 +43,19 @@ export function subscribeToOutbox(callback: () => void): () => void {
   };
 }
 
-export function notifyOutboxChanged(): void {
+export function notifyOutboxChanged(userId?: string): void {
   for (const sub of subscribers) {
     try {
       sub();
     } catch (e) {
       console.error('[outbox] subscriber error:', e);
+    }
+  }
+  if (userId && outboxBroadcastChannel) {
+    try {
+      outboxBroadcastChannel.postMessage({ type: 'outbox_changed', userId });
+    } catch (e) {
+      console.warn('[outbox] Failed to broadcast outbox update', e);
     }
   }
 }
@@ -29,11 +67,53 @@ let globalLastSyncedCount = 0;
 
 const userOpsCache = new Map<string, OutboxOp[]>();
 const userSummaryCache = new Map<string, OutboxSummary>();
+const enqueueMutexes = new Map<string, Promise<unknown>>();
+
+function runWithEnqueueMutex<T>(userId: string, fn: () => Promise<T>): Promise<T> {
+  const prev = enqueueMutexes.get(userId) || Promise.resolve();
+  let release: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  enqueueMutexes.set(
+    userId,
+    prev
+      .catch((e) => {
+        console.warn('[outbox] Previous enqueue task failed in mutex queue', e);
+      })
+      .then(() => current)
+  );
+
+  return prev
+    .catch((e) => {
+      console.warn('[outbox] Previous enqueue task failed in mutex queue', e);
+    })
+    .then(async () => {
+      try {
+        return await fn();
+      } finally {
+        release();
+      }
+    });
+}
 
 export function resetOutboxForTesting(): void {
   subscribers.clear();
   userOpsCache.clear();
   userSummaryCache.clear();
+  enqueueMutexes.clear();
+  if (typeof localStorage !== 'undefined') {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('cybergym_outbox_pending_')) {
+          localStorage.removeItem(k);
+        }
+      }
+    } catch (e) {
+      console.warn('[outbox] Failed to clear pending localStorage in resetOutboxForTesting', e);
+    }
+  }
   isSyncingGlobally = false;
   isAuthRequiredGlobally = false;
   globalLastSyncedCount = 0;
@@ -56,17 +136,33 @@ export function getCachedOutboxSummary(userId: string): OutboxSummary {
     };
   }
   const cached = userSummaryCache.get(userId);
+  let pending = cached?.pending ?? 0;
+  let attention = cached?.attention ?? 0;
+
+  // Cross-tab fallback: if in-memory cache has 0 pending, check localStorage
+  if (pending === 0 && typeof localStorage !== 'undefined') {
+    try {
+      const storedPending = parseInt(localStorage.getItem('cybergym_outbox_pending_' + userId) || '0', 10);
+      if (storedPending > 0) {
+        pending = storedPending;
+      }
+    } catch (e) {
+      console.warn('[outbox] Failed to read pending summary from localStorage', e);
+    }
+  }
+
   if (cached) {
     return {
       ...cached,
+      pending,
       syncing: isSyncingGlobally,
       authRequired: isAuthRequiredGlobally,
       lastSyncedCount: globalLastSyncedCount,
     };
   }
   return {
-    pending: 0,
-    attention: 0,
+    pending,
+    attention,
     syncing: isSyncingGlobally,
     authRequired: isAuthRequiredGlobally,
     lastSyncedCount: globalLastSyncedCount,
@@ -98,6 +194,15 @@ export function updateUserCache(userId: string, ops: OutboxOp[]): OutboxSummary 
     needsAttentionOps,
   };
   userSummaryCache.set(userId, summary);
+
+  if (typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem('cybergym_outbox_pending_' + userId, String(pending));
+    } catch (e) {
+      console.warn('[outbox] Failed to update pending summary in localStorage', e);
+    }
+  }
+
   return summary;
 }
 
@@ -142,6 +247,7 @@ export async function enqueue<K extends OpKind>(input: {
   payload: OpPayloadMap[K];
 }): Promise<OutboxOp> {
   const { userId, kind, payload } = input;
+  return runWithEnqueueMutex(userId, async () => {
   const db = await getOfflineDb(userId);
 
   const tx = db.transaction(['outbox', 'meta'], 'readwrite');
@@ -181,7 +287,7 @@ export async function enqueue<K extends OpKind>(input: {
       }
       await tx.done;
       updateUserCache(userId, compaction.ops);
-      notifyOutboxChanged();
+      notifyOutboxChanged(userId);
       return compaction.compactedOp || incomingOp;
     }
 
@@ -195,7 +301,7 @@ export async function enqueue<K extends OpKind>(input: {
       }
       await tx.done;
       updateUserCache(userId, compaction.ops);
-      notifyOutboxChanged();
+      notifyOutboxChanged(userId);
       return incomingOp;
     }
 
@@ -211,10 +317,11 @@ export async function enqueue<K extends OpKind>(input: {
       await metaStore.put(nextSeq, 'last_seq');
       await tx.done;
       updateUserCache(userId, compaction.ops);
-      notifyOutboxChanged();
+      notifyOutboxChanged(userId);
       return incomingOp;
     }
   }
+  });
 }
 
 export async function getOutboxOps(userId: string): Promise<OutboxOp[]> {
@@ -233,7 +340,7 @@ export async function getOutboxOps(userId: string): Promise<OutboxOp[]> {
   updateUserCache(userId, sorted);
 
   if (isDifferent) {
-    notifyOutboxChanged();
+    notifyOutboxChanged(userId);
   }
 
   return sorted;
@@ -257,8 +364,12 @@ export async function updateOp(userId: string, op: OutboxOp): Promise<void> {
     } else {
       updateUserCache(userId, [...current, op]);
     }
+  } else {
+    getOutboxOps(userId).catch((e) => {
+      console.warn('[outbox] Failed to refresh outbox ops after updateOp', e);
+    });
   }
-  notifyOutboxChanged();
+  notifyOutboxChanged(userId);
 }
 
 export async function deleteOp(userId: string, opId: string): Promise<void> {
@@ -267,8 +378,12 @@ export async function deleteOp(userId: string, opId: string): Promise<void> {
   const current = userOpsCache.get(userId);
   if (current) {
     updateUserCache(userId, current.filter((op) => op.opId !== opId));
+  } else {
+    getOutboxOps(userId).catch((e) => {
+      console.warn('[outbox] Failed to refresh outbox ops after deleteOp', e);
+    });
   }
-  notifyOutboxChanged();
+  notifyOutboxChanged(userId);
 }
 
 /**
@@ -323,7 +438,7 @@ export async function blockDependentOps(userId: string, failedOp: OutboxOp): Pro
 
   await tx.done;
   updateUserCache(userId, allOps);
-  notifyOutboxChanged();
+  notifyOutboxChanged(userId);
 }
 
 /**
@@ -359,7 +474,7 @@ export async function retryOp(opId: string, userId: string): Promise<void> {
 
   await tx.done;
   updateUserCache(userId, allOps.filter((o) => o.userId === userId));
-  notifyOutboxChanged();
+  notifyOutboxChanged(userId);
 }
 
 /**
@@ -391,5 +506,5 @@ export async function discardOp(opId: string, userId: string): Promise<void> {
 
   await tx.done;
   updateUserCache(userId, allOps.filter((o) => o.userId === userId));
-  notifyOutboxChanged();
+  notifyOutboxChanged(userId);
 }

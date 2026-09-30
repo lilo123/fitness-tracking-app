@@ -423,4 +423,90 @@ describe('Outbox Storage, Ordering & Dependent Blocking (§A4, §D)', () => {
     expect(getCachedOutboxSummary(userA).pending).toBe(0);
     expect(getCachedOutboxSummary(userA).attention).toBe(0);
   });
+
+  it('10. concurrent enqueues preserve monotonic ordering and maintain in-memory cache coherence', async () => {
+    const promises = [
+      enqueue({
+        userId: userA,
+        kind: 'workout.ensure',
+        payload: { clientWorkoutId: 'w-1', workout_date: '2026-09-30' },
+      }),
+      enqueue({
+        userId: userA,
+        kind: 'set.create',
+        payload: {
+          id: 'set-1',
+          workoutRef: 'w-1',
+          exercise_id: 'ex-1',
+          weight: 100,
+          reps: 10,
+          set_index: 1,
+          created_at: new Date().toISOString(),
+        },
+      }),
+      enqueue({
+        userId: userA,
+        kind: 'set.create',
+        payload: {
+          id: 'set-2',
+          workoutRef: 'w-1',
+          exercise_id: 'ex-1',
+          weight: 105,
+          reps: 10,
+          set_index: 2,
+          created_at: new Date().toISOString(),
+        },
+      }),
+    ];
+
+    const results = await Promise.all(promises);
+    expect(results).toHaveLength(3);
+    expect(results.map((r) => r.seq)).toEqual([1, 2, 3]);
+
+    const cachedOps = getCachedOpsForUser(userA);
+    expect(cachedOps).toHaveLength(3);
+    expect(cachedOps.map((r) => r.seq)).toEqual([1, 2, 3]);
+    expect(getCachedOutboxSummary(userA).pending).toBe(3);
+  });
+
+  it('11. cross-tab cache coherence: pending counts in storage prevent stale 0 pending in other tabs', async () => {
+    // Tab B enqueues an operation
+    await enqueue({
+      userId: userA,
+      kind: 'workout.ensure',
+      payload: { clientWorkoutId: 'w-tab-b', workout_date: '2026-09-30' },
+    });
+
+    // Simulate Tab A where in-memory cache was not yet populated or reset
+    // but localStorage contains the cross-tab pending count from Tab B
+    resetOutboxForTesting();
+    // restore the localStorage key that Tab B wrote
+    localStorage.setItem(`cybergym_outbox_pending_${userA}`, '1');
+
+    const subscriber = vi.fn();
+    const unsubscribe = subscribeToOutbox(subscriber);
+
+    // Tab A's synchronous summary check should read the pending count from localStorage
+    // rather than incorrectly returning 0
+    const summary = getCachedOutboxSummary(userA);
+    expect(summary.pending).toBe(1);
+
+    // Simulate cross-tab storage event fired in Tab A
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: `cybergym_outbox_pending_${userA}`,
+        newValue: '1',
+      })
+    );
+
+    // Tab A loads ops from IDB and notifies local subscribers
+    await vi.waitFor(() => {
+      expect(subscriber).toHaveBeenCalled();
+    });
+
+    expect(getCachedOpsForUser(userA)).toHaveLength(1);
+    expect(getCachedOutboxSummary(userA).pending).toBe(1);
+
+    unsubscribe();
+  });
 });

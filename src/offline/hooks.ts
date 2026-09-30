@@ -27,7 +27,9 @@ export function usePendingOps(userId?: string): OutboxOp[] {
   // Trigger initial IDB fetch in background to populate memory cache
   useEffect(() => {
     if (target) {
-      getOutboxOps(target).catch(() => {});
+      getOutboxOps(target).catch((e) => {
+        console.warn('[outbox] usePendingOps background prewarm failed', e);
+      });
     }
   }, [target]);
 
@@ -46,7 +48,9 @@ export function useOutboxSummary(userId?: string): OutboxSummary {
 
   useEffect(() => {
     if (target) {
-      getOutboxOps(target).catch(() => {});
+      getOutboxOps(target).catch((e) => {
+        console.warn('[outbox] useOutboxSummary background prewarm failed', e);
+      });
     }
   }, [target]);
 

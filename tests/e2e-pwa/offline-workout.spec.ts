@@ -160,13 +160,12 @@ test.describe('PWA Offline Workout Acceptance Specs', () => {
     await expect(connectionStatus).toContainText('Online');
 
     // 10. Database assertions via psql:
-    // Exactly ONE workout row for today
-    const today = new Date().toISOString().slice(0, 10);
-    const workouts = getUserWorkouts(user.id, today);
+    // Exactly ONE workout row for this session (excluding prior seeded session)
+    const workouts = getUserWorkouts(user.id, { excludeDates: ['2026-09-28'] });
     expect(workouts).toHaveLength(1);
 
-    // Sets match final offline state exactly: 2 sets (set 3 deleted)
-    const sets = getUserSets(user.id, today);
+    // Sets match final offline state exactly: 2 sets (set 3 deleted, excluding prior session)
+    const sets = getUserSets(user.id, { excludeDates: ['2026-09-28'] });
     expect(sets).toHaveLength(2);
 
     // Set 1: 115 lb, 10 reps, set_type 'warmup'
@@ -251,11 +250,10 @@ test.describe('PWA Offline Workout Acceptance Specs', () => {
     await expect(page.locator('[data-testid="pending-mark"]')).toHaveCount(0);
 
     // 7. DB verification
-    const today = new Date().toISOString().slice(0, 10);
-    const workouts = getUserWorkouts(user.id, today);
+    const workouts = getUserWorkouts(user.id);
     expect(workouts).toHaveLength(1);
 
-    const sets = getUserSets(user.id, today);
+    const sets = getUserSets(user.id);
     expect(sets).toHaveLength(1);
     expect(Number(sets[0].weight)).toBe(135);
     expect(sets[0].reps).toBe(8);

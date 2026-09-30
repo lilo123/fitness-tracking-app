@@ -301,24 +301,41 @@ export function deleteExercise(exerciseId: string): void {
   execPsql(`DELETE FROM public.exercises WHERE id = '${exerciseId}';`);
 }
 
+export interface QueryUserRecordsOptions {
+  date?: string;
+  excludeDates?: string[];
+}
+
 /**
- * Returns workout records for a user on a given date.
+ * Returns workout records for a user, optionally filtered by date or excluding specific dates.
  */
 export function getUserWorkouts(
   userId: string,
-  date: string
+  dateOrOptions?: string | QueryUserRecordsOptions
 ): { id: string; workout_date: string; name: string }[] {
+  let where = `WHERE user_id = '${userId}'`;
+  if (typeof dateOrOptions === 'string') {
+    where += ` AND workout_date = '${dateOrOptions}'`;
+  } else if (dateOrOptions) {
+    if (dateOrOptions.date) {
+      where += ` AND workout_date = '${dateOrOptions.date}'`;
+    }
+    if (dateOrOptions.excludeDates && dateOrOptions.excludeDates.length > 0) {
+      const excluded = dateOrOptions.excludeDates.map((d) => `'${d}'`).join(', ');
+      where += ` AND workout_date NOT IN (${excluded})`;
+    }
+  }
   return queryRows<{ id: string; workout_date: string; name: string }>(
-    `SELECT id, workout_date, name FROM public.workouts WHERE user_id = '${userId}' AND workout_date = '${date}'`
+    `SELECT id, workout_date, name FROM public.workouts ${where} ORDER BY workout_date ASC`
   );
 }
 
 /**
- * Returns set records for a user on a given date.
+ * Returns set records for a user, optionally filtered by date or excluding specific dates.
  */
 export function getUserSets(
   userId: string,
-  date: string
+  dateOrOptions?: string | QueryUserRecordsOptions
 ): {
   id: string;
   workout_id: string;
@@ -329,11 +346,23 @@ export function getUserSets(
   set_type: string;
   rpe: number | null;
 }[] {
+  let where = `WHERE w.user_id = '${userId}'`;
+  if (typeof dateOrOptions === 'string') {
+    where += ` AND w.workout_date = '${dateOrOptions}'`;
+  } else if (dateOrOptions) {
+    if (dateOrOptions.date) {
+      where += ` AND w.workout_date = '${dateOrOptions.date}'`;
+    }
+    if (dateOrOptions.excludeDates && dateOrOptions.excludeDates.length > 0) {
+      const excluded = dateOrOptions.excludeDates.map((d) => `'${d}'`).join(', ');
+      where += ` AND w.workout_date NOT IN (${excluded})`;
+    }
+  }
   return queryRows(
     `SELECT s.id, s.workout_id, s.exercise_id, s.weight, s.reps, s.set_index, s.set_type, s.rpe
      FROM public.sets s
      JOIN public.workouts w ON s.workout_id = w.id
-     WHERE w.user_id = '${userId}' AND w.workout_date = '${date}'
+     ${where}
      ORDER BY s.set_index ASC`
   );
 }

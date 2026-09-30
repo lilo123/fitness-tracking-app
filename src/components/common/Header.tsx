@@ -75,8 +75,10 @@ export const Header: React.FC = () => {
         setUnsyncedSignOutCount(count);
         setShowSignOutConfirm(true);
       }
-    } catch {
-      await signOut();
+    } catch (e) {
+      console.warn('[Header] Error checking pending outbox before sign out', e);
+      setUnsyncedSignOutCount(1);
+      setShowSignOutConfirm(true);
     }
   };
 

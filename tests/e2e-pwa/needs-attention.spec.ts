@@ -22,8 +22,20 @@ test.describe('Needs Attention - Conflict & Permanent Error Handling', () => {
 
   test.afterEach(async ({ context }) => {
     await goOnline(context);
-    if (customExerciseId) deleteExercise(customExerciseId);
-    if (user) cleanupPwaTestUser(user);
+    let errEx: unknown;
+    let errUser: unknown;
+    try {
+      if (customExerciseId) deleteExercise(customExerciseId);
+    } catch (e) {
+      errEx = e;
+    }
+    try {
+      if (user) cleanupPwaTestUser(user);
+    } catch (e) {
+      errUser = e;
+    }
+    if (errEx) throw errEx;
+    if (errUser) throw errUser;
   });
 
   test('deleted custom exercise triggers 23503 error, attention badge, retry failure, and discard with confirmation', async ({

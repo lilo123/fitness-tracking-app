@@ -20,8 +20,20 @@ test.describe('Account Switch - Multi-User Outbox Isolation', () => {
 
   test.afterEach(async ({ context }) => {
     await goOnline(context);
-    if (userA) cleanupPwaTestUser(userA);
-    if (userB) cleanupPwaTestUser(userB);
+    let errA: unknown;
+    let errB: unknown;
+    try {
+      if (userA) cleanupPwaTestUser(userA);
+    } catch (e) {
+      errA = e;
+    }
+    try {
+      if (userB) cleanupPwaTestUser(userB);
+    } catch (e) {
+      errB = e;
+    }
+    if (errA) throw errA;
+    if (errB) throw errB;
   });
 
   test('user A offline pending sets -> sign out warning dialog -> user B isolated -> user A signs back in -> sync replay', async ({
@@ -97,9 +109,8 @@ test.describe('Account Switch - Multi-User Outbox Isolation', () => {
     await expect(page.locator('[data-testid="connection-status"]')).toContainText('Online', { timeout: 10000 });
 
     // Verify in database: User A's set is not committed yet, User B has 0 sets
-    const today = '2026-09-30';
-    expect(getUserSets(userA.id, today).length).toBe(0);
-    expect(getUserSets(userB.id, today).length).toBe(0);
+    expect(getUserSets(userA.id).length).toBe(0);
+    expect(getUserSets(userB.id).length).toBe(0);
 
     // 10. User B signs out (has 0 unsynced changes -> direct sign out without dialog)
     await page.locator('[data-testid="sign-out-button"]').click();
@@ -127,11 +138,11 @@ test.describe('Account Switch - Multi-User Outbox Isolation', () => {
     await expect(page.locator('[data-testid="connection-status"]')).toContainText('Online', { timeout: 10000 });
 
     // 14. Verify in Postgres: User A's set is saved in DB, User B has 0 sets
-    const userASets = getUserSets(userA.id, today);
+    const userASets = getUserSets(userA.id);
     expect(userASets.length).toBe(1);
     expect(userASets[0].weight).toBe(135);
     expect(userASets[0].reps).toBe(5);
 
-    expect(getUserSets(userB.id, today).length).toBe(0);
+    expect(getUserSets(userB.id).length).toBe(0);
   });
 });

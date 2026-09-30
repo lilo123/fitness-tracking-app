@@ -87,7 +87,11 @@ test.describe('PWA Service Worker Update Flow & Safety Blockers', () => {
     // 4. Blocker 1: Active workout session
     // On /workout, ensure an uncompleted active workout session pointer is active
     await page.evaluate((uid) => {
-      const today = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const today = `${year}-${month}-${day}`;
       localStorage.setItem(`cybergym_current_session_pointer_${uid}`, today);
       localStorage.setItem(
         `cybergym_active_session_${uid}_${today}`,
@@ -102,8 +106,8 @@ test.describe('PWA Service Worker Update Flow & Safety Blockers', () => {
           targetRepCounts: {},
           expandedExercises: [],
           inputDrafts: {},
-          startedAt: new Date().toISOString(),
-          lastModifiedAt: new Date().toISOString(),
+          startedAt: now.toISOString(),
+          lastModifiedAt: now.toISOString(),
           completedAt: null,
         })
       );
