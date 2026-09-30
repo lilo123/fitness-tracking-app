@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import { useDeferredDelete } from '../common/useDeferredDelete';
 import type { UndoToastItem } from '../common/UndoToast';
 import type { WorkoutSet } from '../../types/database';
@@ -54,8 +54,11 @@ export function useExerciseRemoval({
     loggedSetsCount: 0,
   });
 
+  const pendingItemRef = useRef<RemovedExerciseState | null>(null);
+
   const { pending, schedule, undo: undoDeferred, flush } = useDeferredDelete<RemovedExerciseState>({
     commit: async (item) => {
+      pendingItemRef.current = null;
       const setIds = item.sets.map((s) => s.id).filter(Boolean) as string[];
       if (setIds.length > 0) {
         await onCommitDeleteSets(setIds);
@@ -63,6 +66,7 @@ export function useExerciseRemoval({
     },
     durationMs: timeoutMs,
     onError: (err, item) => {
+      pendingItemRef.current = null;
       onRestoreExercise(item);
       onError?.(err, item);
     },
@@ -76,8 +80,9 @@ export function useExerciseRemoval({
   }, [pendingItem]);
 
   const handleUndo = useCallback(() => {
-    if (pendingItem) {
-      const itemToRestore = pendingItem;
+    const itemToRestore = pendingItemRef.current ?? pendingItem;
+    if (itemToRestore) {
+      pendingItemRef.current = null;
       undoDeferred();
       onRestoreExercise(itemToRestore);
     }
@@ -110,6 +115,7 @@ export function useExerciseRemoval({
     if (loggedSets.length === 0) {
       // 0 logged sets -> remove immediately + UndoToast
       onRemoveExerciseLocally(index);
+      pendingItemRef.current = stateToSave;
       schedule(stateToSave, `Removed ${exName}`);
       showToast({
         kind: 'undo',
@@ -117,7 +123,11 @@ export function useExerciseRemoval({
         subject: exName,
         detail: '0 sets logged',
         durationMs: timeoutMs,
-        onUndo: handleUndo,
+        onUndo: () => {
+          pendingItemRef.current = null;
+          undoDeferred();
+          onRestoreExercise(stateToSave);
+        },
         onCommit: flush,
         undoAriaLabel: `Undo remove ${exName}`,
         testId: 'quick-log-toast',
@@ -145,7 +155,8 @@ export function useExerciseRemoval({
     schedule,
     showToast,
     timeoutMs,
-    handleUndo,
+    undoDeferred,
+    onRestoreExercise,
     flush,
   ]);
 
@@ -174,6 +185,7 @@ export function useExerciseRemoval({
 
     setSheetState({ isOpen: false, exerciseName: '', index: -1, loggedSetsCount: 0 });
     onRemoveExerciseLocally(index);
+    pendingItemRef.current = stateToSave;
     schedule(stateToSave, `Removed ${exName}`);
     showToast({
       kind: 'undo',
@@ -184,7 +196,11 @@ export function useExerciseRemoval({
           ? '0 sets logged'
           : `${stateToSave.sets.length} set${stateToSave.sets.length === 1 ? '' : 's'} deleted`,
       durationMs: timeoutMs,
-      onUndo: handleUndo,
+      onUndo: () => {
+        pendingItemRef.current = null;
+        undoDeferred();
+        onRestoreExercise(stateToSave);
+      },
       onCommit: flush,
       undoAriaLabel: `Undo remove ${exName}`,
       testId: 'quick-log-toast',
@@ -203,7 +219,8 @@ export function useExerciseRemoval({
     schedule,
     showToast,
     timeoutMs,
-    handleUndo,
+    undoDeferred,
+    onRestoreExercise,
     flush,
   ]);
 
