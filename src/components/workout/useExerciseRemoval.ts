@@ -88,6 +88,12 @@ export function useExerciseRemoval({
     }
   }, [pendingItem, undoDeferred, onRestoreExercise]);
 
+  const currentLoggedSets = useMemo(() => {
+    if (!sheetState.isOpen || !sheetState.exerciseName) return 0;
+    const rawSets = getSetsForExercise(sheetState.exerciseName);
+    return rawSets.filter((s) => !s.id || !pendingDeletedSetIds.has(s.id)).length;
+  }, [sheetState.isOpen, sheetState.exerciseName, getSetsForExercise, pendingDeletedSetIds]);
+
   const requestRemoveExercise = useCallback((index: number) => {
     const exName = activeExercises[index];
     if (!exName) return;
@@ -249,8 +255,16 @@ export function useExerciseRemoval({
       }
     : null;
 
+  const effectiveSheetState = useMemo(
+    () => ({
+      ...sheetState,
+      loggedSetsCount: sheetState.isOpen ? currentLoggedSets : 0,
+    }),
+    [sheetState, currentLoggedSets]
+  );
+
   return {
-    sheetState,
+    sheetState: effectiveSheetState,
     requestRemoveExercise,
     handleConfirmRemoveAndDelete,
     handleKeepSetsAndCollapse,

@@ -3,6 +3,7 @@ import type {
   OutboxOpEnsure,
   OutboxOpRename,
   OutboxOpCreate,
+  OutboxOpBatchCreate,
   OutboxOpUpdate,
 } from './types';
 
@@ -36,9 +37,12 @@ export function compactIncomingOp(
     // Check if any op affecting this set is in attention
     const hasAttention = existingOps.some(
       (op) =>
-        (op.kind === 'set.create' || op.kind === 'set.update' || op.kind === 'set.delete') &&
-        (op.payload as { id: string }).id === setId &&
-        op.state === 'attention'
+        ((op.kind === 'set.create' || op.kind === 'set.update' || op.kind === 'set.delete') &&
+          (op.payload as { id: string }).id === setId &&
+          op.state === 'attention') ||
+        (op.kind === 'set.batchCreate' &&
+          op.payload.sets.some((s) => s.id === setId) &&
+          op.state === 'attention')
     );
 
     if (hasAttention) {
@@ -57,6 +61,14 @@ export function compactIncomingOp(
           targetIndex = i;
           break;
         }
+      } else if (
+        op.kind === 'set.batchCreate' &&
+        op.payload.sets.some((s) => s.id === setId)
+      ) {
+        if (op.state === 'pending') {
+          targetIndex = i;
+          break;
+        }
       }
     }
 
@@ -69,6 +81,25 @@ export function compactIncomingOp(
           payload: {
             ...targetOp.payload,
             ...incomingOp.payload.patch,
+          },
+        };
+        const nextOps = [...existingOps];
+        nextOps[targetIndex] = updatedOp;
+        return {
+          action: 'merged-create',
+          ops: nextOps,
+          compactedOp: updatedOp,
+        };
+      } else if (targetOp.kind === 'set.batchCreate') {
+        // Merge patch into batch item
+        const nextSets = targetOp.payload.sets.map((s) =>
+          s.id === setId ? { ...s, ...incomingOp.payload.patch } : s
+        );
+        const updatedOp: OutboxOpBatchCreate = {
+          ...targetOp,
+          payload: {
+            ...targetOp.payload,
+            sets: nextSets,
           },
         };
         const nextOps = [...existingOps];
@@ -109,13 +140,50 @@ export function compactIncomingOp(
     const setId = incomingOp.payload.id;
     const hasAttention = existingOps.some(
       (op) =>
-        (op.kind === 'set.create' || op.kind === 'set.update' || op.kind === 'set.delete') &&
-        (op.payload as { id: string }).id === setId &&
-        op.state === 'attention'
+        ((op.kind === 'set.create' || op.kind === 'set.update' || op.kind === 'set.delete') &&
+          (op.payload as { id: string }).id === setId &&
+          op.state === 'attention') ||
+        (op.kind === 'set.batchCreate' &&
+          op.payload.sets.some((s) => s.id === setId) &&
+          op.state === 'attention')
     );
 
     if (hasAttention) {
       return { action: 'appended', ops: [...existingOps, incomingOp] };
+    }
+
+    // Check if there is a pending batch containing this set
+    const pendingBatchIdx = existingOps.findIndex(
+      (op) =>
+        op.kind === 'set.batchCreate' &&
+        op.payload.sets.some((s) => s.id === setId) &&
+        op.state === 'pending'
+    );
+
+    if (pendingBatchIdx !== -1) {
+      const targetOp = existingOps[pendingBatchIdx] as OutboxOpBatchCreate;
+      const remainingSets = targetOp.payload.sets.filter((s) => s.id !== setId);
+      if (remainingSets.length === 0) {
+        // Drop the batch op completely, and any intermediate updates
+        const nextOps = existingOps.filter(
+          (op, idx) =>
+            idx !== pendingBatchIdx &&
+            !(op.kind === 'set.update' && op.payload.id === setId)
+        );
+        return { action: 'cancelled', ops: nextOps };
+      } else {
+        const updatedOp: OutboxOpBatchCreate = {
+          ...targetOp,
+          payload: {
+            ...targetOp.payload,
+            sets: remainingSets,
+          },
+        };
+        const nextOps = existingOps
+          .map((op, idx) => (idx === pendingBatchIdx ? updatedOp : op))
+          .filter((op) => !(op.kind === 'set.update' && op.payload.id === setId));
+        return { action: 'cancelled', ops: nextOps, compactedOp: updatedOp };
+      }
     }
 
     // Check if there is a pending create for this set

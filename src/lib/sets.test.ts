@@ -506,11 +506,9 @@ describe('sets data layer writers (src/lib/sets.ts)', () => {
   });
 
   describe('batchInsertSets', () => {
-    it('batch inserts sets routing each through enqueueAndAwait', async () => {
+    it('batch inserts sets routing as a single set.batchCreate through enqueueAndAwait', async () => {
       const mockClient: any = { ['from']: vi.fn() };
-      vi.mocked(enqueueAndAwait)
-        .mockResolvedValueOnce({ status: 'synced', opId: 'op-batch-1' })
-        .mockResolvedValueOnce({ status: 'synced', opId: 'op-batch-2' });
+      vi.mocked(enqueueAndAwait).mockResolvedValueOnce({ status: 'synced', opId: 'op-batch-1' });
 
       const results = await batchInsertSets(mockClient, 'w-1', [
         { exerciseId: 'ex-1', weight: 100, reps: 10, setIndex: 1 },
@@ -518,7 +516,19 @@ describe('sets data layer writers (src/lib/sets.ts)', () => {
       ]);
 
       expect(results).toHaveLength(2);
-      expect(enqueueAndAwait).toHaveBeenCalledTimes(2);
+      expect(enqueueAndAwait).toHaveBeenCalledTimes(1);
+      expect(enqueueAndAwait).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: 'set.batchCreate',
+          payload: expect.objectContaining({
+            workoutRef: 'w-1',
+            sets: expect.arrayContaining([
+              expect.objectContaining({ exercise_id: 'ex-1', weight: 100, reps: 10, set_index: 1 }),
+              expect.objectContaining({ exercise_id: 'ex-1', weight: 100, reps: 10, set_index: 2 }),
+            ]),
+          }),
+        })
+      );
       expect(mockClient['from']).not.toHaveBeenCalled();
     });
   });

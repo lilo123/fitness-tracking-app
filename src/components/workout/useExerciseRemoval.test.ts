@@ -189,4 +189,34 @@ describe('useExerciseRemoval (W8, RD-7)', () => {
       exerciseName: 'Bench Press',
     }));
   });
+
+  it('loggedSetsCount updates dynamically while sheet is open when underlying sets change', () => {
+    let sets = [mockSet1];
+    const { result, rerender } = renderHook(() =>
+      useExerciseRemoval({
+        ...defaultProps,
+        getSetsForExercise: () => sets,
+      })
+    );
+
+    // Open sheet when 1 set exists
+    act(() => {
+      result.current.requestRemoveExercise(0);
+    });
+
+    expect(result.current.sheetState.isOpen).toBe(true);
+    expect(result.current.sheetState.loggedSetsCount).toBe(1);
+
+    // Second set finishes syncing / arrives while sheet is open
+    const mockSet2: WorkoutSet = {
+      ...mockSet1,
+      id: 's2',
+      set_index: 2,
+    };
+    sets = [mockSet1, mockSet2];
+    rerender();
+
+    // loggedSetsCount must immediately reflect 2 sets while open
+    expect(result.current.sheetState.loggedSetsCount).toBe(2);
+  });
 });

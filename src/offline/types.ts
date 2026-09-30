@@ -4,6 +4,7 @@ export type OpKind =
   | 'workout.ensure'
   | 'workout.rename'
   | 'set.create'
+  | 'set.batchCreate'
   | 'set.update'
   | 'set.delete';
 
@@ -34,6 +35,22 @@ export interface SetCreatePayload {
   created_at: string; // ISO string
 }
 
+export interface BatchSetItem {
+  id: string;
+  exercise_id: string;
+  weight: number;
+  reps: number;
+  set_index: number;
+  set_type?: SetTypeKind;
+  rpe?: number | null;
+  created_at: string; // ISO string
+}
+
+export interface SetBatchCreatePayload {
+  workoutRef: string;
+  sets: BatchSetItem[];
+}
+
 export interface SetPatchFields {
   weight?: number;
   reps?: number;
@@ -57,6 +74,7 @@ export type OpPayloadMap = {
   'workout.ensure': WorkoutEnsurePayload;
   'workout.rename': WorkoutRenamePayload;
   'set.create': SetCreatePayload;
+  'set.batchCreate': SetBatchCreatePayload;
   'set.update': SetUpdatePayload;
   'set.delete': SetDeletePayload;
 };
@@ -87,6 +105,11 @@ export interface OutboxOpCreate extends BaseOp {
   payload: SetCreatePayload;
 }
 
+export interface OutboxOpBatchCreate extends BaseOp {
+  kind: 'set.batchCreate';
+  payload: SetBatchCreatePayload;
+}
+
 export interface OutboxOpUpdate extends BaseOp {
   kind: 'set.update';
   payload: SetUpdatePayload;
@@ -101,6 +124,7 @@ export type OutboxOp =
   | OutboxOpEnsure
   | OutboxOpRename
   | OutboxOpCreate
+  | OutboxOpBatchCreate
   | OutboxOpUpdate
   | OutboxOpDelete;
 

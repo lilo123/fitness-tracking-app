@@ -66,6 +66,37 @@ export function applyPendingToDaySets(
           result.push(newSet);
         }
       }
+    } else if (op.kind === 'set.batchCreate') {
+      const { workoutRef, sets } = op.payload;
+      for (const s of sets) {
+        const opDate = workoutDateMap.get(workoutRef) || s.created_at.slice(0, 10);
+        if (opDate === targetDate) {
+          const workoutName = workoutNameMap.get(workoutRef);
+          const newSet: WorkoutSet & { pending: boolean } = {
+            id: s.id,
+            workout_id: workoutRef,
+            exercise_id: s.exercise_id,
+            weight: s.weight,
+            reps: s.reps,
+            set_index: s.set_index,
+            set_type: s.set_type || 'working',
+            rpe: s.rpe ?? null,
+            created_at: s.created_at,
+            workout_date: targetDate,
+            workout_name: workoutName,
+            pending: true,
+          };
+          const existingIdx = result.findIndex((existing) => existing.id === s.id);
+          if (existingIdx !== -1) {
+            result[existingIdx] = {
+              ...result[existingIdx],
+              ...newSet,
+            };
+          } else {
+            result.push(newSet);
+          }
+        }
+      }
     } else if (op.kind === 'set.update') {
       const { id, patch } = op.payload;
       const idx = result.findIndex((s) => s.id === id);
@@ -136,6 +167,26 @@ export function pendingSetsBefore(
           workout_date: setDate,
           pending: true,
         });
+      }
+    } else if (op.kind === 'set.batchCreate') {
+      const { workoutRef, sets } = op.payload;
+      for (const s of sets) {
+        const setDate = workoutDateMap.get(workoutRef) || s.created_at.slice(0, 10);
+        if (setDate < targetDate) {
+          setMap.set(s.id, {
+            id: s.id,
+            workout_id: workoutRef,
+            exercise_id: s.exercise_id,
+            weight: s.weight,
+            reps: s.reps,
+            set_index: s.set_index,
+            set_type: s.set_type || 'working',
+            rpe: s.rpe ?? null,
+            created_at: s.created_at,
+            workout_date: setDate,
+            pending: true,
+          });
+        }
       }
     } else if (op.kind === 'set.update') {
       const { id, patch } = op.payload;
@@ -228,6 +279,18 @@ export function applyPendingToHistory(
         reps: op.payload.reps,
         set_type: op.payload.set_type || 'working',
       });
+    } else if (op.kind === 'set.batchCreate') {
+      const { workoutRef, sets } = op.payload;
+      for (const s of sets) {
+        const date = workoutDateMap.get(workoutRef) || s.created_at.slice(0, 10);
+        const summary = getSummary(date, workoutRef);
+        summary.createdSets.push({
+          id: s.id,
+          weight: s.weight,
+          reps: s.reps,
+          set_type: s.set_type || 'working',
+        });
+      }
     } else if (op.kind === 'set.update') {
       // Find which summary has this set
       for (const summary of daySummaries.values()) {

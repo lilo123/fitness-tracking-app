@@ -406,6 +406,10 @@ export async function blockDependentOps(userId: string, failedOp: OutboxOp): Pro
   const blockedSetIds = new Set<string>();
   if (failedOp.kind === 'set.create' || failedOp.kind === 'set.update') {
     blockedSetIds.add((failedOp.payload as { id: string }).id);
+  } else if (failedOp.kind === 'set.batchCreate') {
+    for (const s of failedOp.payload.sets) {
+      blockedSetIds.add(s.id);
+    }
   }
 
   for (const op of allOps) {
@@ -415,15 +419,25 @@ export async function blockDependentOps(userId: string, failedOp: OutboxOp): Pro
     let isDependent = false;
     if (
       (op.kind === 'workout.rename' && blockedWorkoutIds.has(op.payload.workoutRef)) ||
-      (op.kind === 'set.create' && blockedWorkoutIds.has(op.payload.workoutRef))
+      (op.kind === 'set.create' && blockedWorkoutIds.has(op.payload.workoutRef)) ||
+      (op.kind === 'set.batchCreate' && blockedWorkoutIds.has(op.payload.workoutRef))
     ) {
       isDependent = true;
       if (op.kind === 'set.create') {
         blockedSetIds.add(op.payload.id);
+      } else if (op.kind === 'set.batchCreate') {
+        for (const s of op.payload.sets) {
+          blockedSetIds.add(s.id);
+        }
       }
     } else if (
       (op.kind === 'set.update' || op.kind === 'set.delete') &&
       blockedSetIds.has((op.payload as { id: string }).id)
+    ) {
+      isDependent = true;
+    } else if (
+      op.kind === 'set.batchCreate' &&
+      op.payload.sets.some((s) => blockedSetIds.has(s.id))
     ) {
       isDependent = true;
     }

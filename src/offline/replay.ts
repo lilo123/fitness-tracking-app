@@ -106,6 +106,32 @@ export async function executeReplayOp(
       return {};
     }
 
+    case 'set.batchCreate': {
+      const { workoutRef, sets } = op.payload;
+      if (!sets || sets.length === 0) return {};
+      const workoutId = await resolveWorkoutRef(op.userId, workoutRef);
+
+      const rows = sets.map((s) => ({
+        id: s.id,
+        workout_id: workoutId,
+        exercise_id: s.exercise_id,
+        weight: s.weight,
+        reps: s.reps,
+        set_index: s.set_index,
+        set_type: s.set_type || 'working',
+        rpe: s.rpe ?? null,
+        created_at: s.created_at,
+      }));
+
+      const { error } = await (client.from('sets') as any).upsert(
+        rows,
+        { onConflict: 'id', ignoreDuplicates: true }
+      );
+
+      if (error) throw error;
+      return {};
+    }
+
     case 'set.update': {
       const { id, patch, expected } = op.payload;
 

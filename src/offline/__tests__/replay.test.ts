@@ -307,4 +307,78 @@ describe('Replay Executor & Idempotency (§A4, §D)', () => {
     await executeReplayOp(op, mockClient);
     expect(mockDelete).toHaveBeenCalledTimes(1);
   });
+
+  it('9. set.batchCreate: single op for N sets, replay once = one upsert call with N rows, idempotent replay, and remap', async () => {
+    const mockUpsert = vi.fn().mockResolvedValue({ data: null, error: null });
+    const mockClient: any = {
+      ['from']: vi.fn().mockReturnValue({
+        upsert: mockUpsert,
+      }),
+    };
+
+    // Pre-seed an ID mapping for client workout ref -> canonical id
+    await setIdMapping(userId, 'client-workout-ref-1', 'canonical-workout-uuid-1');
+
+    const op: OutboxOp = {
+      opId: 'op-batch-1',
+      userId,
+      seq: 1,
+      kind: 'set.batchCreate',
+      payload: {
+        workoutRef: 'client-workout-ref-1',
+        sets: [
+          {
+            id: 'set-uuid-1',
+            exercise_id: 'ex-1',
+            weight: 205,
+            reps: 8,
+            set_index: 1,
+            set_type: 'working',
+            created_at: '2026-09-30T10:00:00Z',
+          },
+          {
+            id: 'set-uuid-2',
+            exercise_id: 'ex-2',
+            weight: 155,
+            reps: 10,
+            set_index: 2,
+            set_type: 'working',
+            created_at: '2026-09-30T10:00:01Z',
+          },
+        ],
+      },
+      createdAt: '2026-09-30T10:00:00Z',
+      attempts: 0,
+      state: 'pending',
+    };
+
+    // First replay execution: exactly 1 upsert call with array of 2 rows, remapped workout_id
+    await executeReplayOp(op, mockClient);
+    expect(mockUpsert).toHaveBeenCalledTimes(1);
+    expect(mockUpsert).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          id: 'set-uuid-1',
+          workout_id: 'canonical-workout-uuid-1',
+          exercise_id: 'ex-1',
+          weight: 205,
+          reps: 8,
+          set_index: 1,
+        }),
+        expect.objectContaining({
+          id: 'set-uuid-2',
+          workout_id: 'canonical-workout-uuid-1',
+          exercise_id: 'ex-2',
+          weight: 155,
+          reps: 10,
+          set_index: 2,
+        }),
+      ],
+      { onConflict: 'id', ignoreDuplicates: true }
+    );
+
+    // Second replay execution (crash-after-success replay / retry): idempotent, no throw
+    await expect(executeReplayOp(op, mockClient)).resolves.not.toThrow();
+    expect(mockUpsert).toHaveBeenCalledTimes(2);
+  });
 });

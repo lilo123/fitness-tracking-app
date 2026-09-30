@@ -229,7 +229,14 @@ export function useWorkoutMutations({
         setMutationError(message);
       }
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: (_data, variables, context) => {
+      if (_data && context?.dateKey) {
+        queryClient.setQueryData(context.dateKey, (old: any) => {
+          const arr = Array.isArray(old) ? old : [];
+          if (arr.some((s: any) => s.id === _data.id)) return arr;
+          return [...arr, _data];
+        });
+      }
       if (variables.exerciseName) {
         clearExerciseError(variables.exerciseName);
       }
@@ -297,6 +304,15 @@ export function useWorkoutMutations({
       return await batchInsertSets(supabase, workoutId, payloads, effectiveUserId);
     },
     onSuccess: (_data, variables) => {
+      if (Array.isArray(_data)) {
+        const dateKey = ['workout_sets', targetUserId, workoutDate];
+        queryClient.setQueryData(dateKey, (old: any) => {
+          const arr = Array.isArray(old) ? old : [];
+          const existingIds = new Set(arr.map((s: any) => s.id));
+          const newSets = _data.filter((s: any) => !existingIds.has(s.id));
+          return [...arr, ...newSets];
+        });
+      }
       const effectiveUserId = targetUserId || "";
       for (const s of variables) {
         const exId = s.exerciseId || (s.exerciseName ? exercises.find(e => e.name.toLowerCase() === s.exerciseName?.toLowerCase())?.id : "");

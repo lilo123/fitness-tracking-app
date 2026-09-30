@@ -509,4 +509,55 @@ describe('Outbox Storage, Ordering & Dependent Blocking (§A4, §D)', () => {
 
     unsubscribe();
   });
+
+  it('12. blockDependentOps: if set.batchCreate goes to attention, subsequent ops on its set ids are blocked', async () => {
+    const batchOp = await enqueue({
+      userId: userA,
+      kind: 'set.batchCreate',
+      payload: {
+        workoutRef: 'w-fail',
+        sets: [
+          {
+            id: 'set-fail-1',
+            exercise_id: 'ex-1',
+            weight: 100,
+            reps: 10,
+            set_index: 1,
+            created_at: new Date().toISOString(),
+          },
+          {
+            id: 'set-fail-2',
+            exercise_id: 'ex-2',
+            weight: 200,
+            reps: 5,
+            set_index: 2,
+            created_at: new Date().toISOString(),
+          },
+        ],
+      },
+    });
+
+    // Mark batchOp as attention (failed op with permanent error)
+    batchOp.state = 'attention';
+    batchOp.error = 'Permanent constraint violation';
+    await updateOp(userA, batchOp);
+
+    // Enqueue an update targeting one of the sets in the batch
+    const updOp = await enqueue({
+      userId: userA,
+      kind: 'set.update',
+      payload: {
+        id: 'set-fail-2',
+        patch: { weight: 205 },
+      },
+    });
+
+    await blockDependentOps(userA, batchOp);
+
+    const ops = await getOutboxOps(userA);
+    const updated = ops.find((o) => o.opId === updOp.opId);
+    expect(updated).toBeDefined();
+    expect(updated?.state).toBe('attention');
+    expect(updated?.blockedBy).toBe(batchOp.opId);
+  });
 });

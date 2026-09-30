@@ -292,19 +292,19 @@ describe('WorkoutEngine', () => {
     fireEvent.click(batchExBtn);
 
     await waitFor(() => {
-      expect(mockEnqueueAndAwait).toHaveBeenCalledTimes(4);
+      expect(mockEnqueueAndAwait).toHaveBeenCalledTimes(1);
     });
 
-    const ops = mockEnqueueAndAwait.mock.calls.map((c: any[]) => c[0]);
-    expect(ops.length).toBe(4); // 4 sets for Incline Bench Press in Workout A
-    ops.forEach((op: any, idx: number) => {
-      expect(op.kind).toBe('set.create');
-      expect(op.payload.set_index).toBe(idx + 1);
-      expect(op.payload.weight).toBe(185);
-      expect(op.payload.reps).toBe(8);
+    const op = mockEnqueueAndAwait.mock.calls[0][0];
+    expect(op.kind).toBe('set.batchCreate');
+    expect(op.payload.sets.length).toBe(4); // 4 sets for Incline Bench Press in Workout A
+    op.payload.sets.forEach((s: any, idx: number) => {
+      expect(s.set_index).toBe(idx + 1);
+      expect(s.weight).toBe(185);
+      expect(s.reps).toBe(8);
       // Verify zero 100x10 fallbacks
-      expect(op.payload.weight).not.toBe(100);
-      expect(op.payload.reps).not.toBe(10);
+      expect(s.weight).not.toBe(100);
+      expect(s.reps).not.toBe(10);
     });
   });
 
@@ -354,13 +354,13 @@ describe('WorkoutEngine', () => {
       expect(mockEnqueueAndAwait).toHaveBeenCalled();
     });
 
-    const ops = mockEnqueueAndAwait.mock.calls.map((c: any[]) => c[0]);
-    expect(ops.length).toBeGreaterThanOrEqual(10); // Workout A has 6 exercises
-    ops.forEach((op: any) => {
-      expect(op.kind).toBe('set.create');
-      expect(op.payload.weight).toBeGreaterThan(0);
-      expect(op.payload.reps).toBeGreaterThan(0);
-      expect(op.payload.weight === 100 && op.payload.reps === 10).toBe(false);
+    const op = mockEnqueueAndAwait.mock.calls[0][0];
+    expect(op.kind).toBe('set.batchCreate');
+    expect(op.payload.sets.length).toBeGreaterThanOrEqual(10); // Workout A has 6 exercises
+    op.payload.sets.forEach((s: any) => {
+      expect(s.weight).toBeGreaterThan(0);
+      expect(s.reps).toBeGreaterThan(0);
+      expect(s.weight === 100 && s.reps === 10).toBe(false);
     });
   });
 

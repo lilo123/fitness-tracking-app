@@ -337,44 +337,54 @@ export async function batchInsertSets(
 
   const effectiveUserId = userId || payloads[0]?.targetUserId || getActiveUserId() || '';
 
-  const results = await Promise.all(
-    payloads.map(async (p) => {
-      const setId = p.id || newId();
-      const captureTime = p.createdAt || new Date().toISOString();
-      const res = await enqueueAndAwait({
-        userId: effectiveUserId,
-        kind: 'set.create',
-        payload: {
-          id: setId,
-          workoutRef: workoutId,
-          exercise_id: p.exerciseId,
-          weight: p.weight,
-          reps: p.reps,
-          set_index: p.setIndex ?? 1,
-          set_type: (p.setType as SetTypeKind) || 'working',
-          rpe: p.rpe ?? null,
-          created_at: captureTime,
-        },
-      });
+  const batchItems = payloads.map((p) => {
+    const setId = p.id || newId();
+    const captureTime = p.createdAt || new Date().toISOString();
+    return {
+      id: setId,
+      exercise_id: p.exerciseId,
+      weight: p.weight,
+      reps: p.reps,
+      set_index: p.setIndex ?? 1,
+      set_type: (p.setType as SetTypeKind) || 'working',
+      rpe: p.rpe ?? null,
+      created_at: captureTime,
+      workoutDate: p.workoutDate,
+    };
+  });
 
-      return {
-        id: setId,
-        workout_id: workoutId,
-        exercise_id: p.exerciseId,
-        weight: p.weight,
-        reps: p.reps,
-        set_index: p.setIndex ?? 1,
-        set_type: p.setType || 'working',
-        rpe: p.rpe ?? null,
-        created_at: captureTime,
-        pending: res.status === 'queued',
-        workout_date: p.workoutDate,
-        civil_date: p.workoutDate,
-      };
-    })
-  );
+  const res = await enqueueAndAwait({
+    userId: effectiveUserId,
+    kind: 'set.batchCreate',
+    payload: {
+      workoutRef: workoutId,
+      sets: batchItems.map((item) => ({
+        id: item.id,
+        exercise_id: item.exercise_id,
+        weight: item.weight,
+        reps: item.reps,
+        set_index: item.set_index,
+        set_type: item.set_type,
+        rpe: item.rpe,
+        created_at: item.created_at,
+      })),
+    },
+  });
 
-  return results;
+  return batchItems.map((item) => ({
+    id: item.id,
+    workout_id: workoutId,
+    exercise_id: item.exercise_id,
+    weight: item.weight,
+    reps: item.reps,
+    set_index: item.set_index,
+    set_type: item.set_type,
+    rpe: item.rpe,
+    created_at: item.created_at,
+    pending: res.status === 'queued',
+    workout_date: item.workoutDate,
+    civil_date: item.workoutDate,
+  }));
 }
 
 /**

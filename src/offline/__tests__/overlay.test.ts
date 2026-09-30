@@ -441,5 +441,69 @@ describe('overlay', () => {
       expect(updatedHistory[0].total_volume).toBe(5000); // 3000 + (200 * 10)
       expect(updatedHistory[0].pending).toBe(true);
     });
+
+    it('overlays set.batchCreate ops into today sets and pendingSetsBefore', () => {
+      const ops: OutboxOp[] = [
+        {
+          opId: 'batch-op-1',
+          userId: 'u1',
+          seq: 1,
+          createdAt: '2026-03-28T10:00:00Z',
+          kind: 'workout.ensure',
+          payload: {
+            clientWorkoutId: 'w-batch',
+            workout_date: '2026-03-28',
+            name: 'Batch Day',
+          },
+          state: 'pending',
+          attempts: 0,
+        },
+        {
+          opId: 'batch-op-2',
+          userId: 'u1',
+          seq: 2,
+          createdAt: '2026-03-28T10:05:00Z',
+          kind: 'set.batchCreate',
+          payload: {
+            workoutRef: 'w-batch',
+            sets: [
+              {
+                id: 'b-set-1',
+                exercise_id: 'bench',
+                weight: 205,
+                reps: 8,
+                set_index: 1,
+                set_type: 'working',
+                created_at: '2026-03-28T10:05:00Z',
+              },
+              {
+                id: 'b-set-2',
+                exercise_id: 'squat',
+                weight: 315,
+                reps: 5,
+                set_index: 2,
+                set_type: 'working',
+                created_at: '2026-03-28T10:06:00Z',
+              },
+            ],
+          },
+          state: 'pending',
+          attempts: 0,
+        },
+      ];
+
+      const daySets = applyPendingToDaySets([], ops, '2026-03-28');
+      expect(daySets).toHaveLength(2);
+      expect(daySets[0].id).toBe('b-set-1');
+      expect(daySets[0].weight).toBe(205);
+      expect(daySets[0].pending).toBe(true);
+      expect(daySets[1].id).toBe('b-set-2');
+      expect(daySets[1].weight).toBe(315);
+      expect(daySets[1].pending).toBe(true);
+
+      const beforeSets = pendingSetsBefore('2026-03-29', ops);
+      expect(beforeSets).toHaveLength(2);
+      expect(beforeSets.map((s) => s.id)).toEqual(['b-set-1', 'b-set-2']);
+    });
   });
 });
