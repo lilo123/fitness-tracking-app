@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Trophy } from 'lucide-react';
 import { usePrMode, type PrMode } from '../../hooks/usePrMode';
 import { SegmentedTabs, type TabItem } from '../common/SegmentedTabs';
 import { StatusBanner } from '../common/StatusBanner';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 
 /**
  * Settings card allowing user to toggle PR ranking mode between
@@ -12,6 +13,22 @@ import { StatusBanner } from '../common/StatusBanner';
 export const PrModeCard: React.FC = () => {
   const { mode, setMode, isSaving, error } = usePrMode();
   const [localError, setLocalError] = useState<string | null>(null);
+  const isOnline = useOnlineStatus();
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const buttons = containerRef.current.querySelectorAll('button');
+    buttons.forEach((btn) => {
+      if (!isOnline) {
+        btn.setAttribute('disabled', 'true');
+        btn.setAttribute('title', 'Available when online');
+      } else {
+        btn.removeAttribute('disabled');
+        btn.removeAttribute('title');
+      }
+    });
+  }, [isOnline]);
 
   const tabs: TabItem<PrMode>[] = [
     { id: 'weight', label: 'Max weight', testId: 'pr-mode-weight' },
@@ -19,7 +36,7 @@ export const PrModeCard: React.FC = () => {
   ];
 
   const handleTabChange = async (tabId: PrMode) => {
-    if (tabId === mode || isSaving) return;
+    if (!isOnline || tabId === mode || isSaving) return;
     setLocalError(null);
     try {
       await setMode(tabId);
@@ -58,13 +75,21 @@ export const PrModeCard: React.FC = () => {
         />
       ) : null}
 
-      <SegmentedTabs<PrMode>
-        ariaLabel="Personal record mode"
-        tabs={tabs}
-        activeTab={mode}
-        onChange={(tabId) => void handleTabChange(tabId)}
-        className="[&_button]:normal-case [&_button]:tracking-normal"
-      />
+      {!isOnline && (
+        <p className="text-xs text-amber-400 font-semibold" data-testid="offline-helper-text">
+          Available when online
+        </p>
+      )}
+
+      <div ref={containerRef} className={!isOnline ? 'opacity-60 cursor-not-allowed' : ''}>
+        <SegmentedTabs<PrMode>
+          ariaLabel="Personal record mode"
+          tabs={tabs}
+          activeTab={mode}
+          onChange={(tabId) => void handleTabChange(tabId)}
+          className="[&_button]:normal-case [&_button]:tracking-normal"
+        />
+      </div>
     </div>
   );
 };

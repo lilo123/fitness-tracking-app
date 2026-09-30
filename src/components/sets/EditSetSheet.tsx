@@ -8,6 +8,7 @@ import { Sheet } from "../common/Sheet";
 import { Button } from "../common/Button";
 import { StatusBanner } from "../common/StatusBanner";
 import { invalidateWorkoutDerived } from "../../lib/invalidate";
+import { updateSet } from "../../lib/sets";
 import { weightUnitLabel, toDisplayWeight, resolveWeightInput } from "../../utils/weight";
 import { useWeightUnit } from "../../hooks/useWeightUnit";
 
@@ -88,12 +89,27 @@ const EditSetForm: React.FC<EditSetFormProps> = ({
       set_type: SetType;
     }) => {
       const { id, ...updates } = payload;
-      const { data, error } = await supabase.from("sets").update(updates).eq("id", id).select();
-
-      if (error) {
-        throw error;
-      }
-      return data;
+      const expected = {
+        exercise_id: set.exercise_id,
+        weight: set.weight,
+        reps: set.reps,
+        set_type: (set.set_type as any) || "working",
+        rpe: set.rpe ?? null,
+      };
+      return await updateSet(
+        supabase,
+        id,
+        {
+          workoutId: set.workout_id,
+          exerciseId: updates.exercise_id,
+          weight: updates.weight,
+          reps: updates.reps,
+          rpe: updates.rpe,
+          setType: updates.set_type,
+        },
+        expected,
+        targetUserId
+      );
     },
     onSuccess: async (data, variables) => {
       await invalidateWorkoutDerived(queryClient, targetUserId);
@@ -102,6 +118,7 @@ const EditSetForm: React.FC<EditSetFormProps> = ({
         ...set,
         ...variables,
         ...(updatedRow || {}),
+        workout_id: updatedRow?.workout_id || set.workout_id,
       };
       onSaved(savedRow);
     },

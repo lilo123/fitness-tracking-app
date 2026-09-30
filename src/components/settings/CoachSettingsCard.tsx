@@ -12,6 +12,7 @@ import {
 import { StatusBanner } from '../common/StatusBanner';
 import { useToast } from '../../hooks/useToast';
 import { Button } from '../common/Button';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 
 interface CoachSettingsCardProps {
   profile: UserProfile | null;
@@ -25,6 +26,7 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
   refreshProfile,
 }) => {
   const vanityCodeId = useId();
+  const isOnline = useOnlineStatus();
 
   // Coach active athlete count
   const {
@@ -66,6 +68,13 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
 
   const handleSaveVanityCode = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isOnline) {
+      setCoachCodeStatus({
+        type: 'error',
+        message: 'Available when online',
+      });
+      return;
+    }
     const trimmed = customCoachCode.trim().toUpperCase();
     if (!/^[A-Z0-9_-]{4,20}$/.test(trimmed)) {
       setCoachCodeStatus({
@@ -103,6 +112,11 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
         <p className="text-xs text-zinc-400">
           Want to train athletes? Activate coach mode to generate your unique coach code.
         </p>
+        {!isOnline && (
+          <p className="text-xs text-amber-400 font-semibold" data-testid="offline-helper-text">
+            Available when online
+          </p>
+        )}
         <form onSubmit={handleSaveVanityCode} className="space-y-2">
           <div className="flex gap-2">
             <input
@@ -111,12 +125,15 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
               onChange={(e) => setCustomCoachCode(e.target.value.toUpperCase())}
               placeholder="Enter vanity code (e.g. COACH-PRO)"
               maxLength={20}
-              className="flex-1 min-w-0 bg-zinc-950 border border-border-interactive text-white rounded-xl px-3 py-2 text-base font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none uppercase min-h-[44px]"
+              disabled={!isOnline || isSavingCode}
+              title={!isOnline ? 'Available when online' : undefined}
+              className="flex-1 min-w-0 bg-zinc-950 border border-border-interactive text-white rounded-xl px-3 py-2 text-base font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none uppercase min-h-[44px] disabled:opacity-50"
               required
             />
             <button
               type="submit"
-              disabled={isSavingCode || !customCoachCode.trim()}
+              disabled={isSavingCode || !customCoachCode.trim() || !isOnline}
+              title={!isOnline ? 'Available when online' : undefined}
               className="shrink-0 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 text-cyan-300 font-bold px-4 py-2 min-h-[44px] rounded-xl text-xs flex items-center gap-1.5 disabled:opacity-50 transition touch-manipulation"
             >
               {isSavingCode ? 'Activating...' : 'Activate mode'}
@@ -202,6 +219,11 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
           )}
         </div>
 
+        {!isOnline && (
+          <p className="text-xs text-amber-400 font-semibold" data-testid="offline-helper-text">
+            Available when online
+          </p>
+        )}
         <form onSubmit={handleSaveVanityCode} className="space-y-2">
           <label htmlFor={vanityCodeId} className="block text-xs font-bold text-zinc-400 uppercase tracking-wider">
             Custom Vanity Code
@@ -214,12 +236,15 @@ export const CoachSettingsCard: React.FC<CoachSettingsCardProps> = ({
               onChange={(e) => setCustomCoachCode(e.target.value.toUpperCase())}
               placeholder="e.g. COACH-PRO"
               maxLength={20}
-              className="flex-1 min-w-0 bg-zinc-950 border border-border-interactive text-white rounded-xl px-3 py-2 text-base font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none uppercase min-h-[44px]"
+              disabled={!isOnline || isSavingCode}
+              title={!isOnline ? 'Available when online' : undefined}
+              className="flex-1 min-w-0 bg-zinc-950 border border-border-interactive text-white rounded-xl px-3 py-2 text-base font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none uppercase min-h-[44px] disabled:opacity-50"
               data-testid="vanity-code-input"
             />
             <button
               type="submit"
-              disabled={isSavingCode || !customCoachCode.trim()}
+              disabled={isSavingCode || !customCoachCode.trim() || !isOnline}
+              title={!isOnline ? 'Available when online' : undefined}
               className="shrink-0 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 text-cyan-300 font-bold px-4 py-2 min-h-[44px] rounded-xl text-xs flex items-center gap-1.5 disabled:opacity-50 transition touch-manipulation"
               data-testid="save-vanity-code-btn"
             >

@@ -199,11 +199,14 @@ test.describe('P3a Set Edit and Delete Workflows (p3a-set-edit)', () => {
     await page.route('**/rest/v1/sets*', async (route) => {
       const req = route.request();
       if (req.method() === 'GET') {
+        const url = new URL(req.url());
+        const idParam = url.searchParams.get('id')?.replace('eq.', '');
+        const responseData = idParam ? setsData.filter((s) => s.id === idParam) : setsData;
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           headers: { 'access-control-allow-origin': '*' },
-          body: JSON.stringify(setsData),
+          body: JSON.stringify(responseData),
         });
       } else if (req.method() === 'PATCH') {
         const body = req.postDataJSON() || {};

@@ -3,6 +3,7 @@ import type { WorkoutSet } from '../../types/database';
 import { ChevronDown, Trophy, Check, ArrowUp, ArrowDown, Trash2, AlertCircle, RotateCcw } from 'lucide-react';
 import { SetRow } from './SetRow';
 import { SET_GRID_TEMPLATE } from './setGrid';
+import { PendingMark } from '../sync/PendingMark';
 import { Card } from '../common/Card';
 import { Chip } from '../common/Chip';
 import { formatSet, weightUnitLabel, toDisplayWeight } from '../../utils/weight';
@@ -113,7 +114,8 @@ function areExerciseCardPropsEqual(prev: ExerciseCardProps, next: ExerciseCardPr
       prev.setsToday[i].id !== next.setsToday[i].id ||
       prev.setsToday[i].weight !== next.setsToday[i].weight ||
       prev.setsToday[i].reps !== next.setsToday[i].reps ||
-      prev.setsToday[i].set_index !== next.setsToday[i].set_index
+      prev.setsToday[i].set_index !== next.setsToday[i].set_index ||
+      (prev.setsToday[i] as any).pending !== (next.setsToday[i] as any).pending
     ) {
       return false;
     }
@@ -192,6 +194,9 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
           <span data-testid="exercise-title" className="text-white font-bold text-sm tracking-tight leading-snug break-words">
             {exName}
           </span>
+          {setsToday.some((s: any) => s.pending) && (
+            <PendingMark size="sm" className="shrink-0" />
+          )}
         </div>
 
         <div className="w-8 h-8 rounded-lg text-zinc-400 flex items-center justify-center shrink-0">

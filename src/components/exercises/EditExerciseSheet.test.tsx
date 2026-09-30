@@ -6,6 +6,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { expectNoA11yViolationsForRules } from '../../test/a11y';
 import { supabase } from '../../lib/supabase';
 import { createSupabaseBuilder, clearMockHistory, getRecordedTables } from '../../test/supabaseBuilderMock';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+
+vi.mock('../../hooks/useOnlineStatus');
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
@@ -55,6 +58,7 @@ describe('EditExerciseSheet', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearMockHistory();
+    vi.mocked(useOnlineStatus).mockReturnValue(true);
   });
 
   it('mounts edit-exercise-error live region empty while idle and retains same node on error (NEW-15)', async () => {
@@ -488,4 +492,19 @@ describe('EditExerciseSheet', () => {
     });
   });
 
+  it('disables save button and displays "Available when online" helper text when offline', () => {
+    vi.mocked(useOnlineStatus).mockReturnValue(false);
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <EditExerciseSheet {...mockProps} />
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByTestId('offline-helper-text').textContent).toBe('Available when online');
+
+    const saveBtn = screen.getByTestId('save-exercise-btn');
+    expect(saveBtn).toBeDisabled();
+    expect(saveBtn.getAttribute('title')).toBe('Available when online');
+  });
 });

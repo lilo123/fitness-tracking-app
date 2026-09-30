@@ -4,6 +4,7 @@ import { Check } from 'lucide-react';
 import { formatWeight, weightUnitLabel, toDisplayWeight, type WeightUnit } from '../../utils/weight';
 import { useWeightUnit } from '../../hooks/useWeightUnit';
 import { SET_GRID_TEMPLATE } from './setGrid';
+import { PendingMark } from '../sync/PendingMark';
 
 export interface SetRowProps {
   exName: string;
@@ -60,10 +61,13 @@ export const SetRow: React.FC<SetRowProps> = memo((props) => {
         data-testid={`logged-set-row-${exIndex}-${rowIdx}`}
         className={`w-full text-left grid ${SET_GRID_TEMPLATE} gap-1 py-0.5 px-1.5 rounded-xl items-center bg-cyan-500/10 border border-cyan-500/20 text-xs my-1 transition cursor-pointer min-h-[44px] hover:bg-cyan-500/15 focus:outline-none focus:ring-1 focus:ring-cyan-500/80 active:scale-[0.99] touch-manipulation select-none`}
       >
-        <div className="font-bold text-cyan-400 text-center flex items-center justify-center">
+        <div className="font-bold text-cyan-400 text-center flex items-center justify-center relative">
           <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-xs flex items-center justify-center font-bold tabular-nums">
             {displayedIndex}
           </span>
+          {Boolean((loggedSet as any)?.pending) && (
+            <PendingMark className="absolute -top-0.5 -right-0.5" />
+          )}
         </div>
         <div data-testid={`ghost-hint-${exIndex}-${rowIdx}`} className="text-zinc-400 text-center text-xs truncate tabular-nums">
           {ghost.hintText}

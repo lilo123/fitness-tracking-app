@@ -12,6 +12,7 @@ import {
   batchInsertSets,
   deleteSet,
 } from "../../lib/sets";
+import { newId } from "../../offline";
 import { isUUID } from "./workoutEngineHelpers";
 
 export interface ExerciseCardError {
@@ -168,14 +169,22 @@ export function useWorkoutMutations({
         activeRoutineName
       );
 
-      const loggedSet = await insertSet(supabase, workoutId, {
-        exerciseId,
-        weight: payload.weight,
-        reps: payload.reps,
-        setIndex: payload.setIndex,
-        setType: payload.setType || "working",
-        rpe: payload.rpe ?? null,
-      });
+      const setId = newId();
+      const loggedSet = await insertSet(
+        supabase,
+        workoutId,
+        {
+          id: setId,
+          exerciseId,
+          weight: payload.weight,
+          reps: payload.reps,
+          setIndex: payload.setIndex,
+          setType: payload.setType || "working",
+          rpe: payload.rpe ?? null,
+          workoutDate,
+          targetUserId: effectiveUserId,
+        }
+      );
 
       return loggedSet;
     },
@@ -195,39 +204,6 @@ export function useWorkoutMutations({
       const prevDateData = queryClient.getQueryData(dateKey);
       const prevNinetyData = queryClient.getQueryData(ninetyKey);
       const prevWorkoutsData = queryClient.getQueryData(workoutsKey);
-
-      let resolvedExId = newSetPayload.exerciseId;
-      if (!resolvedExId && newSetPayload.exerciseName) {
-        const matched = exercises.find(
-          (e) => e.id === newSetPayload.exerciseName || e.name.toLowerCase() === newSetPayload.exerciseName?.toLowerCase()
-        );
-        resolvedExId = matched?.id || "";
-      }
-
-      const optimisticRow = {
-        id: `optimistic-${Date.now()}`,
-        workout_id: "pending",
-        exercise_id: resolvedExId || "",
-        exercise_name: newSetPayload.exerciseName || "",
-        weight: newSetPayload.weight,
-        reps: newSetPayload.reps,
-        set_index: newSetPayload.setIndex,
-        set_type: newSetPayload.setType || "working",
-        rpe: newSetPayload.rpe ?? null,
-        created_at: new Date().toISOString(),
-        workout_date: workoutDate,
-        civil_date: workoutDate,
-      };
-
-      if (prevDateData && Array.isArray(prevDateData)) {
-        queryClient.setQueryData(dateKey, [...prevDateData, optimisticRow]);
-      }
-      if (prevNinetyData && Array.isArray(prevNinetyData)) {
-        queryClient.setQueryData(ninetyKey, [...prevNinetyData, optimisticRow]);
-      }
-      if (prevWorkoutsData && Array.isArray(prevWorkoutsData)) {
-        queryClient.setQueryData(workoutsKey, [...prevWorkoutsData, optimisticRow]);
-      }
 
       return { prevDateData, prevNinetyData, prevWorkoutsData, dateKey, ninetyKey, workoutsKey };
     },
@@ -305,17 +281,20 @@ export function useWorkoutMutations({
             ? s.exerciseId
             : await resolveExerciseId(s.exerciseName || "");
           return {
+            id: newId(),
             exerciseId,
             weight: s.weight,
             reps: s.reps,
             setIndex: s.setIndex,
             setType: s.setType || "working",
             rpe: s.rpe ?? null,
+            workoutDate,
+            targetUserId: effectiveUserId,
           };
         })
       );
 
-      return await batchInsertSets(supabase, workoutId, payloads);
+      return await batchInsertSets(supabase, workoutId, payloads, effectiveUserId);
     },
     onSuccess: (_data, variables) => {
       const effectiveUserId = targetUserId || "";

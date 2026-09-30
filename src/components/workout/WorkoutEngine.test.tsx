@@ -21,11 +21,41 @@ import { isValidUUID, resolveRoutineAndExercises } from './workoutEngineHelpers'
 import type { Exercise, RoutineTemplate } from '../../types/database';
 import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory } from '../../test/supabaseBuilderMock';
 
-const { mockSession } = vi.hoisted(() => ({
+const { mockSession, mockEnqueueAndAwait, mockGetOutboxOps } = vi.hoisted(() => ({
   mockSession: {
     user: { id: '00000000-0000-4000-8000-000000000001', email: 'athlete@example.com' },
   },
+  mockEnqueueAndAwait: vi.fn().mockImplementation(async () => ({
+    status: 'synced',
+    opId: 'test-op-1',
+  })),
+  mockGetOutboxOps: vi.fn().mockResolvedValue([]),
 }));
+
+vi.mock('../../offline', async () => {
+  const actual = await vi.importActual<any>('../../offline');
+  return {
+    ...actual,
+    enqueueAndAwait: mockEnqueueAndAwait,
+    getOutboxOps: mockGetOutboxOps,
+  };
+});
+
+vi.mock('../../offline/flusher', async () => {
+  const actual = await vi.importActual<any>('../../offline/flusher');
+  return {
+    ...actual,
+    enqueueAndAwait: mockEnqueueAndAwait,
+  };
+});
+
+vi.mock('../../offline/outbox', async () => {
+  const actual = await vi.importActual<any>('../../offline/outbox');
+  return {
+    ...actual,
+    getOutboxOps: mockGetOutboxOps,
+  };
+});
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
@@ -67,6 +97,14 @@ describe('WorkoutEngine', () => {
     (supabase.auth.getUser as any).mockResolvedValue({ data: { user: { id: '00000000-0000-4000-8000-000000000001' } } });
     (supabase.auth.getSession as any).mockResolvedValue({ data: { session: mockSession } });
     (supabase.auth.onAuthStateChange as any).mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } });
+
+    mockEnqueueAndAwait.mockReset();
+    mockEnqueueAndAwait.mockImplementation(async () => ({
+      status: 'synced',
+      opId: 'test-op-1',
+    }));
+    mockGetOutboxOps.mockReset();
+    mockGetOutboxOps.mockResolvedValue([]);
 
     // Mock supabase.from using full PostgREST builder test double
     (supabase.from as any).mockImplementation((table: string) =>
@@ -175,18 +213,7 @@ describe('WorkoutEngine', () => {
   });
 
   it('commits a ghost set on one-tap click with set_type: working and rpe: null', async () => {
-    const mockInsert = vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({ data: { id: 'set-1' }, error: null }),
-      }),
-    });
-
     (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'sets') {
-        const b = createSupabaseBuilder('sets', { data: [], error: null });
-        b.insert = mockInsert;
-        return b;
-      }
       if (table === 'workouts') {
         return createSupabaseBuilder('workouts', { data: [{ id: 'workout-1' }], error: null });
       }
@@ -208,24 +235,20 @@ describe('WorkoutEngine', () => {
     fireEvent.click(commitBtn);
 
     await waitFor(() => {
-      expect(mockInsert).toHaveBeenCalled();
+      expect(mockEnqueueAndAwait).toHaveBeenCalled();
     });
 
-    const payload = mockInsert.mock.calls[0][0][0];
-    expect(payload.weight).toBe(185);
-    expect(payload.reps).toBe(8);
-    expect(payload.set_index).toBe(1);
-    expect(payload.set_type).toBe('working');
-    expect(payload.rpe).toBeNull();
-    // sets is mutation-only (insert); NO_PROJECTION_APPLIES
-    expect(getRecordedTables()).toContain('sets');
+    const op = mockEnqueueAndAwait.mock.calls[0][0];
+    expect(op.kind).toBe('set.create');
+    expect(op.payload.weight).toBe(185);
+    expect(op.payload.reps).toBe(8);
+    expect(op.payload.set_index).toBe(1);
+    expect(op.payload.set_type).toBe('working');
+    expect(op.payload.rpe).toBeNull();
+    // sets is mutation-only (insert / outbox); NO_PROJECTION_APPLIES
   });
 
   it('allows batch logging all remaining sets for an exercise', async () => {
-    const mockInsert = vi.fn().mockReturnValue({
-      select: vi.fn().mockResolvedValue({ data: [{ id: 's1' }, { id: 's2' }, { id: 's3' }], error: null }),
-    });
-
     const pastWorkoutSets = [
       {
         id: 'ps-1',
@@ -241,9 +264,7 @@ describe('WorkoutEngine', () => {
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'sets') {
-        const b = createSupabaseBuilder('sets', { data: pastWorkoutSets, error: null });
-        b.insert = mockInsert;
-        return b;
+        return createSupabaseBuilder('sets', { data: pastWorkoutSets, error: null });
       }
       if (table === 'workouts') {
         return createSupabaseBuilder('workouts', {
@@ -271,26 +292,23 @@ describe('WorkoutEngine', () => {
     fireEvent.click(batchExBtn);
 
     await waitFor(() => {
-      expect(mockInsert).toHaveBeenCalled();
+      expect(mockEnqueueAndAwait).toHaveBeenCalledTimes(4);
     });
 
-    const insertedSets = mockInsert.mock.calls[0][0];
-    expect(insertedSets.length).toBe(4); // 4 sets for Incline Bench Press in Workout A
-    insertedSets.forEach((set: any, idx: number) => {
-      expect(set.set_index).toBe(idx + 1);
-      expect(set.weight).toBe(185);
-      expect(set.reps).toBe(8);
+    const ops = mockEnqueueAndAwait.mock.calls.map((c: any[]) => c[0]);
+    expect(ops.length).toBe(4); // 4 sets for Incline Bench Press in Workout A
+    ops.forEach((op: any, idx: number) => {
+      expect(op.kind).toBe('set.create');
+      expect(op.payload.set_index).toBe(idx + 1);
+      expect(op.payload.weight).toBe(185);
+      expect(op.payload.reps).toBe(8);
       // Verify zero 100x10 fallbacks
-      expect(set.weight).not.toBe(100);
-      expect(set.reps).not.toBe(10);
+      expect(op.payload.weight).not.toBe(100);
+      expect(op.payload.reps).not.toBe(10);
     });
   });
 
   it('allows finishing entire workout and logging all remaining sets with zero 100x10 fallbacks', async () => {
-    const mockInsert = vi.fn().mockReturnValue({
-      select: vi.fn().mockResolvedValue({ data: [{ id: 's1' }], error: null }),
-    });
-
     const pastWorkoutSets = [
       { id: 'ps-1', workout_id: 'prev-w1', exercise_id: 'e0000000-0000-0000-0000-000000000001', set_index: 1, set_type: 'working', weight: 185, reps: 8, workouts: { date: '2026-08-30' } },
       { id: 'ps-2', workout_id: 'prev-w1', exercise_id: 'e0000000-0000-0000-0000-000000000002', set_index: 1, set_type: 'working', weight: 35, reps: 12, workouts: { date: '2026-08-30' } },
@@ -302,9 +320,7 @@ describe('WorkoutEngine', () => {
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'sets') {
-        const b = createSupabaseBuilder('sets', { data: pastWorkoutSets, error: null });
-        b.insert = mockInsert;
-        return b;
+        return createSupabaseBuilder('sets', { data: pastWorkoutSets, error: null });
       }
       if (table === 'workouts') {
         return createSupabaseBuilder('workouts', {
@@ -335,15 +351,16 @@ describe('WorkoutEngine', () => {
     fireEvent.click(logReviewedBtn);
 
     await waitFor(() => {
-      expect(mockInsert).toHaveBeenCalled();
+      expect(mockEnqueueAndAwait).toHaveBeenCalled();
     });
 
-    const allLoggedSets = mockInsert.mock.calls[0][0];
-    expect(allLoggedSets.length).toBeGreaterThanOrEqual(10); // Workout A has 6 exercises
-    allLoggedSets.forEach((set: any) => {
-      expect(set.weight).toBeGreaterThan(0);
-      expect(set.reps).toBeGreaterThan(0);
-      expect(set.weight === 100 && set.reps === 10).toBe(false);
+    const ops = mockEnqueueAndAwait.mock.calls.map((c: any[]) => c[0]);
+    expect(ops.length).toBeGreaterThanOrEqual(10); // Workout A has 6 exercises
+    ops.forEach((op: any) => {
+      expect(op.kind).toBe('set.create');
+      expect(op.payload.weight).toBeGreaterThan(0);
+      expect(op.payload.reps).toBeGreaterThan(0);
+      expect(op.payload.weight === 100 && op.payload.reps === 10).toBe(false);
     });
   });
 
@@ -396,8 +413,8 @@ describe('WorkoutEngine', () => {
     const batchExBtn = screen.getByTestId('batch-log-exercise-btn-0');
     fireEvent.click(batchExBtn);
 
-    // Unperformed sets must be pruned: mockInsert must NOT have been called
-    expect(mockInsert).not.toHaveBeenCalled();
+    // Unperformed sets must be pruned: mockEnqueueAndAwait must NOT have been called
+    expect(mockEnqueueAndAwait).not.toHaveBeenCalled();
   });
 
   it('resolves exercise names for custom routine templates instead of displaying raw UUIDs', async () => {
@@ -488,19 +505,9 @@ describe('WorkoutEngine', () => {
   });
 
   it('displays mutation error notification when set logging fails', async () => {
+    mockEnqueueAndAwait.mockRejectedValueOnce(new Error('Database connection failed'));
+
     (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'sets') {
-        const b = createSupabaseBuilder('sets', {
-          data: null,
-          error: { message: 'Database connection failed' },
-        });
-        b.insert = vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({ data: null, error: { message: 'Database connection failed' } }),
-          }),
-        });
-        return b;
-      }
       if (table === 'workouts') {
         return createSupabaseBuilder('workouts', { data: [{ id: 'workout-1' }], error: null });
       }
@@ -521,22 +528,10 @@ describe('WorkoutEngine', () => {
     await waitFor(() => {
       expect(screen.getAllByText('Database connection failed').length).toBeGreaterThanOrEqual(1);
     });
-
   });
 
   it('supports decimal weight input precision (e.g. 22.5 lbs)', async () => {
-    const mockInsert = vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({ data: { id: 'set-decimal' }, error: null }),
-      }),
-    });
-
     (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'sets') {
-        const b = createSupabaseBuilder('sets', { data: [], error: null });
-        b.insert = mockInsert;
-        return b;
-      }
       if (table === 'workouts') {
         return createSupabaseBuilder('workouts', { data: [{ id: 'workout-1' }], error: null });
       }
@@ -555,25 +550,16 @@ describe('WorkoutEngine', () => {
     fireEvent.click(commitBtn);
 
     await waitFor(() => {
-      expect(mockInsert).toHaveBeenCalled();
+      expect(mockEnqueueAndAwait).toHaveBeenCalled();
     });
 
-    const payload = mockInsert.mock.calls[0][0][0];
-    expect(payload.weight).toBe(22.5);
-    expect(payload.reps).toBe(12);
+    const op = mockEnqueueAndAwait.mock.calls[0][0];
+    expect(op.kind).toBe('set.create');
+    expect(op.payload.weight).toBe(22.5);
+    expect(op.payload.reps).toBe(12);
   });
 
   it('rejects committing a set when reps is zero or blank without ghost values', async () => {
-    const mockInsert = vi.fn();
-    (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'sets') {
-        const b = createSupabaseBuilder('sets', { data: [], error: null });
-        b.insert = mockInsert;
-        return b;
-      }
-      return createSupabaseBuilder(table, { data: [], error: null });
-    });
-
     renderComponent();
     await selectWorkoutA();
 
@@ -585,7 +571,7 @@ describe('WorkoutEngine', () => {
     fireEvent.click(commitBtn);
 
     // Should NOT commit and show error
-    expect(mockInsert).not.toHaveBeenCalled();
+    expect(mockEnqueueAndAwait).not.toHaveBeenCalled();
     expect(screen.getAllByText('Please enter weight and reps or use previous set values.').length).toBeGreaterThanOrEqual(1);
   });
 
@@ -702,16 +688,7 @@ describe('WorkoutEngine', () => {
   });
 
   it('prunes input drafts when batch logging an exercise', async () => {
-    const mockInsert = vi.fn().mockReturnValue({
-      select: vi.fn().mockResolvedValue({ data: [{ id: 's1' }], error: null }),
-    });
-
     (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'sets') {
-        const b = createSupabaseBuilder('sets', { data: [], error: null });
-        b.insert = mockInsert;
-        return b;
-      }
       if (table === 'workouts') {
         return createSupabaseBuilder('workouts', { data: [{ id: 'workout-1' }], error: null });
       }
@@ -731,7 +708,7 @@ describe('WorkoutEngine', () => {
     fireEvent.click(batchBtn);
 
     await waitFor(() => {
-      expect(mockInsert).toHaveBeenCalled();
+      expect(mockEnqueueAndAwait).toHaveBeenCalled();
     });
   });
 
@@ -870,20 +847,6 @@ describe('WorkoutEngine', () => {
   it('respects auto_rest_timer=false preference: does not auto-start rest timer on set commit, but manual timer works', async () => {
     localStorage.setItem('cybergym_auto_rest_timer', 'false');
 
-    const mockInsert = vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({
-          data: {
-            id: 'logged-set-notimer',
-            set_index: 1,
-            weight: 225,
-            reps: 8,
-          },
-          error: null,
-        }),
-      }),
-    });
-
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'users') {
         return createSupabaseBuilder('users', {
@@ -896,11 +859,6 @@ describe('WorkoutEngine', () => {
           },
           error: null,
         });
-      }
-      if (table === 'sets') {
-        const b = createSupabaseBuilder('sets', { data: [], error: null });
-        b.insert = mockInsert;
-        return b;
       }
       if (table === 'workouts') {
         return createSupabaseBuilder('workouts', { data: [{ id: 'workout-1' }], error: null });
@@ -925,7 +883,7 @@ describe('WorkoutEngine', () => {
 
     // Set was logged
     await waitFor(() => {
-      expect(mockInsert).toHaveBeenCalled();
+      expect(mockEnqueueAndAwait).toHaveBeenCalled();
     });
 
     // Auto rest timer should NOT have started
@@ -1008,7 +966,7 @@ describe('WorkoutEngine', () => {
     fireEvent.change(repsInput, { target: { value: 'xyz' } });
     fireEvent.click(commitBtn);
 
-    expect(mockInsert).not.toHaveBeenCalled();
+    expect(mockEnqueueAndAwait).not.toHaveBeenCalled();
     expect(screen.getAllByText('Please enter weight and reps or use previous set values.').length).toBeGreaterThanOrEqual(1);
   });
 
@@ -1075,18 +1033,7 @@ describe('WorkoutEngine', () => {
   });
 
   it('sanitizes comma decimal separator to dot in weight input', async () => {
-    const mockInsert = vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({ data: { id: 'new-id' }, error: null }),
-      }),
-    });
-
     (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'sets') {
-        const b = createSupabaseBuilder('sets', { data: [], error: null });
-        b.insert = mockInsert;
-        return b;
-      }
       if (table === 'workouts') {
         return createSupabaseBuilder('workouts', { data: [{ id: 'workout-1' }], error: null });
       }
@@ -1106,27 +1053,17 @@ describe('WorkoutEngine', () => {
     fireEvent.click(commitBtn);
 
     await waitFor(() => {
-      expect(mockInsert).toHaveBeenCalled();
+      expect(mockEnqueueAndAwait).toHaveBeenCalled();
     });
 
-    const payload = mockInsert.mock.calls[0][0][0];
-    expect(payload.weight).toBe(45.5);
-    expect(payload.reps).toBe(10);
+    const op = mockEnqueueAndAwait.mock.calls[0][0];
+    expect(op.kind).toBe('set.create');
+    expect(op.payload.weight).toBe(45.5);
+    expect(op.payload.reps).toBe(10);
   });
 
   it('allows logging 0 lbs bodyweight sets with positive reps', async () => {
-    const mockInsert = vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({ data: { id: 'new-id' }, error: null }),
-      }),
-    });
-
     (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'sets') {
-        const b = createSupabaseBuilder('sets', { data: [], error: null });
-        b.insert = mockInsert;
-        return b;
-      }
       if (table === 'workouts') {
         return createSupabaseBuilder('workouts', { data: [{ id: 'workout-1' }], error: null });
       }
@@ -1145,23 +1082,17 @@ describe('WorkoutEngine', () => {
     fireEvent.click(commitBtn);
 
     await waitFor(() => {
-      expect(mockInsert).toHaveBeenCalled();
+      expect(mockEnqueueAndAwait).toHaveBeenCalled();
     });
 
-    const payload = mockInsert.mock.calls[0][0][0];
-    expect(payload.weight).toBe(0);
-    expect(payload.reps).toBe(15);
+    const op = mockEnqueueAndAwait.mock.calls[0][0];
+    expect(op.kind).toBe('set.create');
+    expect(op.payload.weight).toBe(0);
+    expect(op.payload.reps).toBe(15);
   });
 
   it('rejects logging set when weight is negative or reps <= 0', async () => {
-    const mockInsert = vi.fn();
-
     (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'sets') {
-        const b = createSupabaseBuilder('sets', { data: [], error: null });
-        b.insert = mockInsert;
-        return b;
-      }
       if (table === 'workouts') {
         return createSupabaseBuilder('workouts', { data: [{ id: 'workout-1' }], error: null });
       }
@@ -1181,8 +1112,7 @@ describe('WorkoutEngine', () => {
     await waitFor(() => {
       expect(screen.getAllByText('Please enter weight and reps or use previous set values.').length).toBeGreaterThanOrEqual(1);
     });
-    expect(mockInsert).not.toHaveBeenCalled();
-
+    expect(mockEnqueueAndAwait).not.toHaveBeenCalled();
   });
 
   it('renders 0 instead of lbs in placeholder and BW in PR badge when ghost set weight is 0', async () => {
@@ -3291,16 +3221,9 @@ describe('WorkoutEngine', () => {
 });
 
   it('W4: retains uncommitted draft in input field and session store when set insertion fails and surfaces error banner', async () => {
+    mockEnqueueAndAwait.mockRejectedValueOnce(new Error('Database insert failed: connection refused'));
+
     (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'sets') {
-        const b = createSupabaseBuilder('sets', { data: [], error: null });
-        b.insert = vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({ data: null, error: new Error('Database insert failed: connection refused') }),
-          }),
-        });
-        return b;
-      }
       if (table === 'workouts') {
         return createSupabaseBuilder('workouts', { data: [{ id: 'workout-w4' }], error: null });
       }

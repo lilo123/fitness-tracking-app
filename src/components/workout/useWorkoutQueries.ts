@@ -1,4 +1,4 @@
-import { useMemo, useContext } from 'react';
+import { useMemo, useContext, useEffect } from 'react';
 import { AuthContext } from '../../context/AuthContextTypes';
 import type { PrMode } from '../../lib/prComparator';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -16,6 +16,15 @@ import { formatSet } from '../../utils/weight';
 import type { ExerciseBenchmarks } from '../../types/database';
 import { isValidUUID } from './workoutEngineHelpers';
 import { fetchAllVisibleExercises } from '../../lib/exercises';
+import {
+  applyPendingToDaySets,
+  pendingSetsBefore,
+  onSynced,
+  offlineFallback,
+} from '../../offline';
+import { useWorkoutPendingOps } from './useWorkoutPendingOps';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+import { invalidateWorkoutDerived } from '../../lib/invalidate';
 
 export const WORKOUT_WITH_SETS_PROJECTION =
   'id, date, name, sets(id, reps, weight, set_index, created_at, exercise_id)';
@@ -117,6 +126,16 @@ export const workoutExercisesQueryOptions = {
 // usePrMode added for D-P8.1-8
 export function useWorkoutQueries(targetUserId: string, workoutDate: string) {
   const queryClient = useQueryClient();
+  const isOnline = useOnlineStatus();
+  const pendingOps = useWorkoutPendingOps(targetUserId);
+
+  useEffect(() => {
+    const unsubscribe = onSynced(() => {
+      invalidateWorkoutDerived(queryClient, targetUserId);
+    });
+    return unsubscribe;
+  }, [queryClient, targetUserId]);
+
   const {
     data: exercises = DEFAULT_EXERCISES_LIST,
     isFetched: exercisesFetched,
@@ -201,7 +220,7 @@ export function useWorkoutQueries(targetUserId: string, workoutDate: string) {
   });
 
   const {
-    data: userLogs = [],
+    data: rawUserLogs = [],
     isFetched: logsFetched,
     isError: isLogsError,
     error: logsError,
@@ -209,6 +228,13 @@ export function useWorkoutQueries(targetUserId: string, workoutDate: string) {
   } = useQuery({
     queryKey: ['workout_sets', targetUserId, workoutDate],
     enabled: Boolean(targetUserId),
+    placeholderData: () =>
+      typeof navigator !== 'undefined' && !navigator.onLine
+        ? offlineFallback<(WorkoutSet & { workout_date: string; workout_name?: string })[]>(
+            queryClient,
+            ['workout_sets', targetUserId]
+          )
+        : undefined,
     queryFn: async () => {
       if (!targetUserId || !isValidUUID(targetUserId)) return [];
 
@@ -365,8 +391,33 @@ export function useWorkoutQueries(targetUserId: string, workoutDate: string) {
   const prMode: PrMode = auth?.profile?.pr_mode === 'e1rm' ? 'e1rm' : 'weight';
 
   const todaySets = useMemo(() => {
-    return userLogs.filter((s) => normalizeDateStr(s.workout_date) === workoutDate);
-  }, [userLogs, workoutDate]);
+    const rawToday = rawUserLogs.filter((s) => normalizeDateStr(s.workout_date) === workoutDate);
+    const overlaid = applyPendingToDaySets(rawToday, pendingOps, workoutDate);
+    return overlaid.map((s) => ({
+      ...s,
+      workout_date: s.workout_date || workoutDate,
+      exercise_name:
+        s.exercise_name ||
+        (s as any).exercise?.name ||
+        exercises.find((e) => e.id === s.exercise_id || e.name === s.exercise_id)?.name ||
+        DEFAULT_EXERCISES_LIST.find((e) => e.id === s.exercise_id || e.name === s.exercise_id)?.name ||
+        s.exercise_id,
+    }));
+  }, [rawUserLogs, pendingOps, workoutDate, exercises]);
+
+  const userLogs = useMemo(() => {
+    const priorPending = pendingSetsBefore(workoutDate, pendingOps).map((s) => ({
+      ...s,
+      exercise_name:
+        s.exercise_name ||
+        (s as any).exercise?.name ||
+        exercises.find((e) => e.id === s.exercise_id || e.name === s.exercise_id)?.name ||
+        DEFAULT_EXERCISES_LIST.find((e) => e.id === s.exercise_id || e.name === s.exercise_id)?.name ||
+        s.exercise_id,
+    }));
+    const priorServer = rawUserLogs.filter((s) => normalizeDateStr(s.workout_date) !== workoutDate);
+    return [...todaySets, ...priorPending, ...priorServer];
+  }, [todaySets, workoutDate, pendingOps, rawUserLogs, exercises]);
 
   const exerciseIds = useMemo(() => {
     return exercises
@@ -383,6 +434,13 @@ export function useWorkoutQueries(targetUserId: string, workoutDate: string) {
   } = useQuery({
     queryKey: ['exercise_benchmarks', targetUserId, workoutDate, exerciseIds, prMode],
     enabled: Boolean(targetUserId && isValidUUID(targetUserId) && exerciseIds.length > 0),
+    placeholderData: () =>
+      typeof navigator !== 'undefined' && !navigator.onLine
+        ? offlineFallback<Record<string, ExerciseBenchmarks>>(queryClient, [
+            'exercise_benchmarks',
+            targetUserId,
+          ])
+        : undefined,
     queryFn: async (): Promise<Record<string, ExerciseBenchmarks>> => {
       if (!targetUserId || !isValidUUID(targetUserId) || exerciseIds.length === 0) {
         return {};
@@ -447,8 +505,8 @@ export function useWorkoutQueries(targetUserId: string, workoutDate: string) {
   });
 
   const benchmarks = useMemo(() => {
-    return mergeBenchmarks(rawBenchmarks, todaySets, prMode);
-  }, [rawBenchmarks, todaySets, prMode]);
+    return mergeBenchmarks(rawBenchmarks, userLogs, prMode);
+  }, [rawBenchmarks, userLogs, prMode]);
 
   const resolvedTemplateId = useMemo(() => {
     if (!rawTemplatesFetched || !logsFetched) return null;
@@ -528,10 +586,12 @@ export function useWorkoutQueries(targetUserId: string, workoutDate: string) {
     customTemplates,
     templatesFetched,
     userLogs,
+    todaySets,
     logsFetched,
     availableRoutines,
     isLogsError,
     logsError,
     refetchLogs,
+    isOnline,
   };
 }

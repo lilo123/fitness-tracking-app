@@ -106,3 +106,76 @@ export function extractTemplateDetails(
 
   return { resolvedExList, resolvedTargets, resolvedReps };
 }
+
+import {
+  DEFAULT_EXERCISES_LIST,
+  DEFAULT_WORKOUT_TEMPLATES,
+  getDayOfWeekAbbr,
+} from '../../utils/ghostSets';
+
+export function getInitialRoutineState(
+  initialSession: ActiveWorkoutSession | null | undefined,
+  workoutDate: string
+) {
+  const dayAbbr = getDayOfWeekAbbr(workoutDate);
+  const defTpl = DEFAULT_WORKOUT_TEMPLATES.find((t) =>
+    t.days.some((d) => d === dayAbbr || d.slice(0, 3) === dayAbbr)
+  );
+
+  const activeRoutineName = initialSession
+    ? initialSession.routineName
+    : defTpl ? defTpl.name : 'Rest Day';
+
+  const activeExercises = initialSession
+    ? initialSession.exercises
+    : defTpl ? [...defTpl.exercises] : [];
+
+  const targetSetCounts = initialSession
+    ? initialSession.targetSetCounts
+    : defTpl ? { ...defTpl.targetSets } : {};
+
+  const targetRepCounts = initialSession
+    ? initialSession.targetRepCounts
+    : defTpl?.targetReps ? { ...defTpl.targetReps } : {};
+
+  const expandedExercises = initialSession
+    ? new Set(initialSession.expandedExercises)
+    : defTpl && defTpl.exercises.length > 0 ? new Set([defTpl.exercises[0]]) : new Set<string>();
+
+  return {
+    activeRoutineName,
+    activeExercises,
+    targetSetCounts,
+    targetRepCounts,
+    expandedExercises,
+  };
+}
+
+export function filterSetsForExercise(
+  exName: string,
+  todaySets: WorkoutSet[],
+  exercises: Exercise[]
+): WorkoutSet[] {
+  const norm = exName.trim().toLowerCase();
+  return todaySets.filter((s) => {
+    if (s.exercise_id === exName) return true;
+    if (s.exercise?.name && s.exercise.name.trim().toLowerCase() === norm) return true;
+    if (s.exercise_name && s.exercise_name.trim().toLowerCase() === norm) return true;
+    const matchedEx = exercises.find((e) => e.name.toLowerCase() === norm || e.id === exName);
+    if (matchedEx && (s.exercise_id === matchedEx.id || s.exercise?.id === matchedEx.id)) return true;
+    const defEx = DEFAULT_EXERCISES_LIST.find((e) => e.name.toLowerCase() === norm || e.id === exName);
+    if (defEx && (s.exercise_id === defEx.id || s.exercise?.id === defEx.id)) return true;
+    return false;
+  });
+}
+
+export function sanitizeDraftValue(field: 'weight' | 'reps', value: string): string | null {
+  let sanitized = value;
+  if (field === 'weight') {
+    sanitized = sanitized.replace(',', '.');
+    if (sanitized !== '' && !/^\d*\.?\d*$/.test(sanitized)) return null;
+  } else if (field === 'reps') {
+    if (sanitized !== '' && !/^\d*$/.test(sanitized)) return null;
+  }
+  return sanitized;
+}

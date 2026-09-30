@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { useWorkoutQueries } from './useWorkoutQueries';
 import { supabase } from '../../lib/supabase';
+import * as pendingOpsModule from './useWorkoutPendingOps';
+import { AuthContext } from '../../context/AuthContextTypes';
 
 describe('useWorkoutQueries (P2 / W1 / W2 / W11 / W16 / W50 / L11)', () => {
   let queryClient: QueryClient;
@@ -424,5 +426,91 @@ describe('useWorkoutQueries (P2 / W1 / W2 / W11 / W16 / W50 / L11)', () => {
 
     expect(result.current.exercises).toHaveLength(210);
     expect(result.current.exercises[209].name).toBe('Zottman Curl');
+  });
+
+  it('overlays pending sets and updates PR benchmarks in weight and e1rm mode (c)', async () => {
+    vi.spyOn(pendingOpsModule, 'useWorkoutPendingOps').mockReturnValue([
+      {
+        opId: 'op-1',
+        seq: 1,
+        userId: targetUserId,
+        createdAt: '2026-09-27T10:00:00.000Z',
+        attempts: 0,
+        state: 'pending',
+        kind: 'workout.ensure',
+        payload: {
+          clientWorkoutId: 'offline-workout-2026-09-27',
+          workout_date: '2026-09-27',
+          name: 'Push Day',
+        },
+      },
+      {
+        opId: 'op-2',
+        seq: 2,
+        userId: targetUserId,
+        createdAt: '2026-09-27T10:05:00.000Z',
+        attempts: 0,
+        state: 'pending',
+        kind: 'set.create',
+        payload: {
+          id: 'set-offline-1',
+          workoutRef: 'offline-workout-2026-09-27',
+          exercise_id: 'ex-bench-uuid',
+          weight: 315,
+          reps: 5,
+          set_index: 1,
+          set_type: 'working',
+          created_at: '2026-09-27T10:05:00.000Z',
+        },
+      },
+    ]);
+
+    vi.spyOn(supabase, 'from').mockReturnValue({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      gte: vi.fn().mockReturnThis(),
+      lte: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+      range: vi.fn().mockResolvedValue({ data: [], error: null }),
+      or: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+    } as any);
+
+    // Test in weight mode
+    const { result } = renderHook(
+      () => useWorkoutQueries(targetUserId, '2026-09-27'),
+      { wrapper }
+    );
+
+    // Verify todaySets has the pending set
+    expect(result.current.todaySets.some((s) => s.id === 'set-offline-1')).toBe(true);
+    const pendingSet = result.current.todaySets.find((s) => s.id === 'set-offline-1');
+    expect(pendingSet?.weight).toBe(315);
+    expect(pendingSet?.reps).toBe(5);
+
+    // Verify benchmarks has the PR calculated from the pending set
+    expect(result.current.benchmarks['ex-bench-uuid']).toBeDefined();
+    expect(result.current.benchmarks['ex-bench-uuid'].pr?.weight).toBe(315);
+    expect(result.current.benchmarks['ex-bench-uuid'].pr?.reps).toBe(5);
+
+    // Test in e1rm mode via AuthContext
+    const authWrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        React.createElement(
+          AuthContext.Provider,
+          { value: { profile: { pr_mode: 'e1rm' } } as any },
+          children
+        )
+      );
+
+    const { result: e1rmResult } = renderHook(
+      () => useWorkoutQueries(targetUserId, '2026-09-27'),
+      { wrapper: authWrapper }
+    );
+
+    expect((e1rmResult.current.benchmarks['ex-bench-uuid'].pr as any)?.e1rm).toBeGreaterThan(315);
   });
 });

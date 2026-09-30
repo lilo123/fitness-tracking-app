@@ -2,16 +2,18 @@ import React, { useState, useRef } from 'react';
 import { Scale } from 'lucide-react';
 import { useWeightUnitPreference } from '../../hooks/useWeightUnit';
 import { StatusBanner } from '../common/StatusBanner';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import type { WeightUnit } from '../../utils/weight';
 
 export const WeightUnitCard: React.FC = () => {
   const { unit, setUnit, isSaving, error } = useWeightUnitPreference();
   const [localError, setLocalError] = useState<string | null>(null);
+  const isOnline = useOnlineStatus();
   const lbRef = useRef<HTMLButtonElement | null>(null);
   const kgRef = useRef<HTMLButtonElement | null>(null);
 
   const handleSelect = async (selectedUnit: WeightUnit) => {
-    if (selectedUnit === unit || isSaving) return;
+    if (!isOnline || selectedUnit === unit || isSaving) return;
     setLocalError(null);
     try {
       await setUnit(selectedUnit);
@@ -23,7 +25,7 @@ export const WeightUnitCard: React.FC = () => {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, currentOption: WeightUnit) => {
-    if (isSaving) return;
+    if (!isOnline || isSaving) return;
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
       e.preventDefault();
       void handleSelect('kg');
@@ -61,6 +63,12 @@ export const WeightUnitCard: React.FC = () => {
         />
       ) : null}
 
+      {!isOnline && (
+        <p className="text-xs text-amber-400 font-semibold" data-testid="offline-helper-text">
+          Available when online
+        </p>
+      )}
+
       <fieldset
         aria-label="Weight unit"
         aria-busy={isSaving}
@@ -70,12 +78,13 @@ export const WeightUnitCard: React.FC = () => {
           ref={lbRef}
           type="button"
           aria-pressed={unit === 'lb'}
-          disabled={isSaving}
+          disabled={isSaving || !isOnline}
+          title={!isOnline ? 'Available when online' : undefined}
           data-testid="weight-unit-lb"
           onClick={() => void handleSelect('lb')}
           onKeyDown={(e) => handleKeyDown(e, 'lb')}
           className={`min-h-[44px] flex-1 flex items-center justify-center rounded-xl text-xs font-bold transition touch-manipulation cursor-pointer ${
-            isSaving ? 'opacity-50 cursor-not-allowed ' : ''
+            isSaving || !isOnline ? 'opacity-50 cursor-not-allowed ' : ''
           }${
             unit === 'lb'
               ? 'bg-zinc-800 text-cyan-300 border border-border-interactive shadow-sm'
@@ -88,12 +97,13 @@ export const WeightUnitCard: React.FC = () => {
           ref={kgRef}
           type="button"
           aria-pressed={unit === 'kg'}
-          disabled={isSaving}
+          disabled={isSaving || !isOnline}
+          title={!isOnline ? 'Available when online' : undefined}
           data-testid="weight-unit-kg"
           onClick={() => void handleSelect('kg')}
           onKeyDown={(e) => handleKeyDown(e, 'kg')}
           className={`min-h-[44px] flex-1 flex items-center justify-center rounded-xl text-xs font-bold transition touch-manipulation cursor-pointer ${
-            isSaving ? 'opacity-50 cursor-not-allowed ' : ''
+            isSaving || !isOnline ? 'opacity-50 cursor-not-allowed ' : ''
           }${
             unit === 'kg'
               ? 'bg-zinc-800 text-cyan-300 border border-border-interactive shadow-sm'

@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useCoach } from '../../hooks/useCoach';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import type { Exercise, RoutineTemplate, UserProfile, NutritionLog } from '../../types/database';
 import { DEFAULT_EXERCISES_LIST, normalizeDateStr } from '../../utils/ghostSets';
 import { getDayBounds } from '../../utils/date';
@@ -29,6 +30,7 @@ export const CoachCockpit: React.FC = () => {
   const { user } = useAuth();
   const { selectedAthleteId, selectedAthlete, athletes, switchAthlete } = useCoach();
   const queryClient = useQueryClient();
+  const isOnline = useOnlineStatus();
 
   const {
     data: athleteProfile, isError: isAthleteProfileError,
@@ -202,6 +204,10 @@ export const CoachCockpit: React.FC = () => {
   const handleUpdateAthleteMacros = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedAthleteId) return;
+    if (!isOnline) {
+      setMacroStatus({ type: 'error', message: 'Coach features need a connection' });
+      return;
+    }
     setIsUpdatingMacros(true);
     setMacroStatus(null);
     try {
@@ -228,6 +234,10 @@ export const CoachCockpit: React.FC = () => {
   const [disconnectStatus, setDisconnectStatus] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
 
   const handleDisconnectAthlete = () => {
+    if (!isOnline) {
+      setDisconnectStatus({ type: 'error', message: 'Coach features need a connection' });
+      return;
+    }
     setShowDisconnectConfirm(true);
   };
 
@@ -267,6 +277,16 @@ export const CoachCockpit: React.FC = () => {
         <p className="text-xs text-zinc-400">Manage athletes, track training progress & nutrition compliance, and build workout templates.</p>
         <CoachAthleteSwitcher selectedAthleteId={selectedAthleteId} selectedAthlete={selectedAthlete} athletes={athletes} onSwitchAthlete={switchAthlete} onDisconnectAthlete={handleDisconnectAthlete} />
       </div>
+
+      {!isOnline && (
+        <StatusBanner
+          tone="error"
+          message="Coach features need a connection"
+          testId="coach-offline-banner"
+          icon={<AlertCircle className="w-5 h-5 shrink-0 text-rose-400" aria-hidden="true" />}
+          className="mb-4"
+        />
+      )}
 
       {disconnectStatus && (
         <StatusBanner

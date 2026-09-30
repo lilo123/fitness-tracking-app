@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Sheet } from '../common/Sheet';
 import { supabase } from '../../lib/supabase';
+import { useWorkoutPendingOps } from '../workout/useWorkoutPendingOps';
 
 export interface HistoryCalendarSheetProps {
   open: boolean;
@@ -90,7 +91,9 @@ export const HistoryCalendarSheet: React.FC<HistoryCalendarSheetProps> = ({
     enabled: open && Boolean(userId),
   });
 
-  // Union of sessionDates and queried workout dates
+  const pendingOps = useWorkoutPendingOps(userId);
+
+  // Union of sessionDates, queried workout dates, and pending outbox ops
   const workoutDatesSet = useMemo(() => {
     const set = new Set<string>();
     for (const d of sessionDates) {
@@ -101,8 +104,16 @@ export const HistoryCalendarSheet: React.FC<HistoryCalendarSheetProps> = ({
         if (w.workout_date) set.add(w.workout_date);
       }
     }
+    for (const op of pendingOps) {
+      if (op.kind === 'workout.ensure' && op.payload.workout_date) {
+        set.add(op.payload.workout_date);
+      } else if (op.kind === 'set.create') {
+        const d = op.payload.created_at?.slice(0, 10);
+        if (d) set.add(d);
+      }
+    }
     return set;
-  }, [sessionDates, monthWorkouts]);
+  }, [sessionDates, monthWorkouts, pendingOps]);
 
   const handlePrevMonth = () => {
     setFocusedDay(1);

@@ -468,6 +468,49 @@ describe('SetRow', () => {
       const weightInput = screen.getByTestId('ghost-weight-0-0');
       expect(weightInput).toHaveAttribute('placeholder', 'kg');
     });
+
+    it('renders pending mark when loggedSet carries pending: true', () => {
+      const pendingSet = { ...loggedSet, pending: true };
+      renderWithAuth(
+        <SetRow
+          exName="Bench Press"
+          exIndex={0}
+          rowIdx={0}
+          setIndex={3}
+          loggedSet={pendingSet as any}
+          ghost={defaultGhost}
+          draftWeight=""
+          draftReps=""
+          isMutating={false}
+          onUpdateDraft={vi.fn()}
+          onCommitSet={vi.fn()}
+        />
+      );
+
+      const pendingMark = screen.getByTestId('pending-mark');
+      expect(pendingMark).toBeInTheDocument();
+      expect(pendingMark).toHaveAttribute('aria-label', 'Not synced yet');
+    });
+
+    it('does not render pending mark when loggedSet carries pending: false or undefined', () => {
+      renderWithAuth(
+        <SetRow
+          exName="Bench Press"
+          exIndex={0}
+          rowIdx={0}
+          setIndex={3}
+          loggedSet={loggedSet}
+          ghost={defaultGhost}
+          draftWeight=""
+          draftReps=""
+          isMutating={false}
+          onUpdateDraft={vi.fn()}
+          onCommitSet={vi.fn()}
+        />
+      );
+
+      expect(screen.queryByTestId('pending-mark')).toBeNull();
+    });
   });
 });
 

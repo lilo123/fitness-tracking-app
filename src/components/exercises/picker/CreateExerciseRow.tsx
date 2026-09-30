@@ -3,6 +3,7 @@ import { Plus, AlertCircle, Loader2 } from 'lucide-react';
 import { normalizeSearch } from '../../../utils/normalizeSearch';
 import { getEquipmentLabel } from '../../../constants/muscleGroups';
 import type { CatalogExercise } from '../../../lib/exercises';
+import { useOnlineStatus } from '../../../hooks/useOnlineStatus';
 
 export interface CreateExerciseRowProps {
   query: string;
@@ -11,6 +12,7 @@ export interface CreateExerciseRowProps {
   catalog: CatalogExercise[];
   onCreate: (name: string) => void;
   isCreating: boolean;
+  isOnline?: boolean;
 }
 
 export const CreateExerciseRow: React.FC<CreateExerciseRowProps> = ({
@@ -20,7 +22,10 @@ export const CreateExerciseRow: React.FC<CreateExerciseRowProps> = ({
   catalog,
   onCreate,
   isCreating,
+  isOnline: isOnlineProp,
 }) => {
+  const onlineHook = useOnlineStatus();
+  const isOnline = isOnlineProp !== undefined ? isOnlineProp : onlineHook;
   const trimmed = query.trim();
   if (!trimmed) return null;
 
@@ -62,7 +67,7 @@ export const CreateExerciseRow: React.FC<CreateExerciseRowProps> = ({
     <button
       type="button"
       onClick={() => onCreate(trimmed)}
-      disabled={isCreating}
+      disabled={isCreating || !isOnline}
       data-testid="create-exercise-btn"
       className="w-full flex items-center justify-between gap-3 p-3 min-h-[44px] rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 active:scale-[0.99] border border-dashed border-cyan-500/40 text-cyan-300 transition select-none touch-manipulation cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
     >
@@ -76,11 +81,15 @@ export const CreateExerciseRow: React.FC<CreateExerciseRowProps> = ({
           <span className="text-sm font-semibold truncate">
             Create &ldquo;{trimmed}&rdquo;
           </span>
-          {metaDetail && (
+          {!isOnline ? (
+            <p className="text-xs text-zinc-400 truncate" data-testid="create-exercise-offline-helper">
+              Available when online
+            </p>
+          ) : metaDetail ? (
             <p className="text-xs text-cyan-400/80 truncate">
               {metaDetail}
             </p>
-          )}
+          ) : null}
         </div>
       </div>
       <span className="text-xs font-bold uppercase tracking-wider text-cyan-400 px-2 py-1 rounded-lg bg-cyan-500/20 shrink-0">

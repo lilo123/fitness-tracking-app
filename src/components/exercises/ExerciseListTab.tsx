@@ -16,6 +16,7 @@ import { Chip } from '../common/Chip';
 import { Button } from '../common/Button';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { useToast } from '../../hooks/useToast';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { useDeferredDelete } from '../common/useDeferredDelete';
 import { ExerciseListRow, type ExerciseRowItem } from './ExerciseListRow';
 import { CreateExerciseSheet } from './CreateExerciseSheet';
@@ -45,6 +46,7 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
     const { user } = useAuth();
     const { isCoach, selectedAthleteId, selectedAthlete, athletes = [] } = useCoach();
     const queryClient = useQueryClient();
+    const isOnline = useOnlineStatus();
     const currentUserId = propCurrentUserId ?? user?.id ?? '';
     const targetUserId = propTargetUserId ?? user?.id ?? '';
 
@@ -75,6 +77,9 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
     const { pending: pendingArchive, schedule: scheduleArchive, undo: undoArchive, flush: flushArchive } = useDeferredDelete<ExerciseRowItem>({
       durationMs: 6000,
       commit: async (item) => {
+        if (!isOnline) {
+          throw new Error('Available when online');
+        }
         const { data, error } = await supabase.from('exercises').update({ is_archived: true }).eq('id', item.id).select();
         if (error) throw error;
         if (!data || data.length === 0) throw new Error('Exercise could not be archived. You may not have permission to modify this exercise.');
@@ -89,6 +94,11 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
 
     const executeCoachHide = async () => {
       if (!hideConfirmTarget) return;
+      if (!isOnline) {
+        setHideError('Available when online');
+        setHideConfirmTarget(null);
+        return;
+      }
       setIsHidePending(true);
       setHideError(null);
       try {
@@ -101,6 +111,10 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
     };
 
     const handleAthleteHide = async (ex: ExerciseRowItem) => {
+      if (!isOnline) {
+        setHideError('Available when online');
+        return;
+      }
       setHideError(null);
       try {
         const { error } = await (supabase.from as any)('exercise_hides').insert({ hidden_by: currentUserId, exercise_id: ex.id });
@@ -129,6 +143,10 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
     };
 
     const handleUnhide = async (ex: ExerciseRowItem) => {
+      if (!isOnline) {
+        setHideError('Available when online');
+        return;
+      }
       setHideError(null);
       try {
         const { error } = await (supabase.from as any)('exercise_hides').delete().eq('exercise_id', ex.id).eq('hidden_by', currentUserId);
@@ -138,6 +156,10 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
     };
 
     const handleRestore = async (ex: ExerciseRowItem) => {
+      if (!isOnline) {
+        setArchiveError('Available when online');
+        return;
+      }
       setArchiveError(null);
       try {
         const { data, error } = await supabase.from('exercises').update({ is_archived: false }).eq('id', ex.id).select();
@@ -234,7 +256,27 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
             <BookOpen className="w-5 h-5 text-cyan-400 shrink-0" />
             <span className="truncate">Exercise Library ({displayedItems.length})</span>
           </h3>
-          <Button variant="primary" size="md" leftIcon={<Plus className="w-4 h-4" />} onClick={() => setIsCreateOpen(true)} testId="open-create-exercise-btn">New Exercise</Button>
+          <div className="flex flex-col items-end gap-1">
+            <Button
+              variant="primary"
+              size="md"
+              leftIcon={<Plus className="w-4 h-4" />}
+              onClick={() => {
+                if (!isOnline) return;
+                setIsCreateOpen(true);
+              }}
+              disabled={!isOnline}
+              title={!isOnline ? 'Available when online' : undefined}
+              testId="open-create-exercise-btn"
+            >
+              New Exercise
+            </Button>
+            {!isOnline && (
+              <span className="text-xs text-amber-400 font-semibold" data-testid="offline-new-exercise-helper">
+                Available when online
+              </span>
+            )}
+          </div>
         </div>
         <div className="text-xs text-zinc-400" data-testid="showing-exercises-count">{countText}</div>
 
@@ -273,7 +315,18 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
             <ExerciseListRow
               key={ex.id} exercise={ex} currentUserId={currentUserId} isCoach={isCoach}
               athleteFirstName={athletes?.find((a) => a.id === ex.user_id)?.name.split(' ')[0]}
-              onEdit={setEditingExercise} onArchive={(item) => {
+              onEdit={(item) => {
+                if (!isOnline) {
+                  setCreateExerciseError('Available when online');
+                  return;
+                }
+                setEditingExercise(item);
+              }}
+              onArchive={(item) => {
+                if (!isOnline) {
+                  setArchiveError('Available when online');
+                  return;
+                }
                 scheduleArchive(item, item.name);
                 showToast({
                   kind: 'undo',
@@ -287,7 +340,12 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
                   testId: 'undo-toast',
                   undoBtnTestId: 'toast-undo-btn',
                 });
-              }} onDelete={(item) => {
+              }}
+              onDelete={(item) => {
+                if (!isOnline) {
+                  setArchiveError('Available when online');
+                  return;
+                }
                 scheduleArchive(item, item.name);
                 showToast({
                   kind: 'undo',
@@ -301,8 +359,17 @@ export const ExerciseListTab = forwardRef<ExerciseListTabHandle, ExerciseListTab
                   testId: 'undo-toast',
                   undoBtnTestId: 'toast-undo-btn',
                 });
-              }} onRestore={handleRestore}
-              onHide={(item) => (isCoach ? setHideConfirmTarget(item) : void handleAthleteHide(item))} onUnhide={handleUnhide}
+              }}
+              onRestore={handleRestore}
+              onHide={(item) => {
+                if (!isOnline) {
+                  setHideError('Available when online');
+                  return;
+                }
+                if (isCoach) setHideConfirmTarget(item);
+                else void handleAthleteHide(item);
+              }}
+              onUnhide={handleUnhide}
             />
           ))}
           </div>

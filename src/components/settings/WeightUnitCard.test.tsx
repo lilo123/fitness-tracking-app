@@ -2,11 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { WeightUnitCard } from './WeightUnitCard';
 import { useAuth } from '../../hooks/useAuth';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { supabase } from '../../lib/supabase';
 import { expectNoA11yViolations } from '../../test/a11y';
 import type { UserProfile } from '../../types/database';
 
 vi.mock('../../hooks/useAuth');
+vi.mock('../../hooks/useOnlineStatus');
 
 describe('WeightUnitCard', () => {
   const userId = 'athlete-user-123';
@@ -17,6 +19,7 @@ describe('WeightUnitCard', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(useOnlineStatus).mockReturnValue(true);
     mockProfile = {
       id: userId,
       email: 'athlete@cybergym.io',
@@ -223,5 +226,27 @@ describe('WeightUnitCard', () => {
   it('passes axe accessibility audits with no violations', async () => {
     const { container } = render(<WeightUnitCard />);
     await expectNoA11yViolations(container);
+  });
+
+  it('disables lb and kg buttons and shows "Available when online" helper text when offline', () => {
+    vi.mocked(useOnlineStatus).mockReturnValue(false);
+
+    render(<WeightUnitCard />);
+
+    expect(screen.getByTestId('offline-helper-text').textContent).toBe('Available when online');
+
+    const lbBtn = screen.getByTestId('weight-unit-lb');
+    const kgBtn = screen.getByTestId('weight-unit-kg');
+
+    expect(lbBtn).toBeDisabled();
+    expect(kgBtn).toBeDisabled();
+    expect(lbBtn.getAttribute('title')).toBe('Available when online');
+    expect(kgBtn.getAttribute('title')).toBe('Available when online');
+
+    fireEvent.click(kgBtn);
+    expect(mockUpdate).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(lbBtn, { key: 'ArrowRight' });
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });

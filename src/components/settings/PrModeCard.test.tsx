@@ -2,11 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { PrModeCard } from './PrModeCard';
 import { useAuth } from '../../hooks/useAuth';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { supabase } from '../../lib/supabase';
 import { expectNoA11yViolations } from '../../test/a11y';
 import type { UserProfile } from '../../types/database';
 
 vi.mock('../../hooks/useAuth');
+vi.mock('../../hooks/useOnlineStatus');
 
 describe('PrModeCard', () => {
   const userId = 'athlete-user-123';
@@ -18,6 +20,7 @@ describe('PrModeCard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    vi.mocked(useOnlineStatus).mockReturnValue(true);
     mockProfile = {
       id: userId,
       email: 'athlete@cybergym.io',
@@ -136,5 +139,24 @@ describe('PrModeCard', () => {
 
     expect(weightBtn.className).toContain('min-h-[44px]');
     expect(e1rmBtn.className).toContain('min-h-[44px]');
+  });
+
+  it('disables tabs and displays "Available when online" helper text when offline', () => {
+    vi.mocked(useOnlineStatus).mockReturnValue(false);
+
+    render(<PrModeCard />);
+
+    expect(screen.getByTestId('offline-helper-text').textContent).toBe('Available when online');
+
+    const weightBtn = screen.getByTestId('pr-mode-weight');
+    const e1rmBtn = screen.getByTestId('pr-mode-e1rm');
+
+    expect(weightBtn.getAttribute('disabled')).toBe('true');
+    expect(weightBtn.getAttribute('title')).toBe('Available when online');
+    expect(e1rmBtn.getAttribute('disabled')).toBe('true');
+    expect(e1rmBtn.getAttribute('title')).toBe('Available when online');
+
+    fireEvent.click(e1rmBtn);
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });

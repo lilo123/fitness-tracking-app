@@ -7,6 +7,7 @@ import { workoutSessionStore } from '../../utils/workoutSessionStore';
 import { Sheet } from '../common/Sheet';
 import { Chip } from '../common/Chip';
 import { StatusBanner } from '../common/StatusBanner';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import {
   MUSCLE_GROUPS,
   EQUIPMENT,
@@ -56,6 +57,7 @@ export const EditExerciseSheet: React.FC<EditExerciseSheetProps> = ({
   const exerciseNameId = useId();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const isOnline = useOnlineStatus();
 
   const [name, setName] = useState('');
   const [selectedBodyParts, setSelectedBodyParts] = useState<string[]>([]);
@@ -96,6 +98,10 @@ export const EditExerciseSheet: React.FC<EditExerciseSheetProps> = ({
 
   const handleSave = async (e?: React.FormEvent) => {
     e?.preventDefault();
+    if (!isOnline) {
+      setError('Available when online');
+      return;
+    }
     const trimmedName = name.trim();
     if (!trimmedName) {
       setError('Exercise name cannot be blank.');
@@ -247,7 +253,7 @@ export const EditExerciseSheet: React.FC<EditExerciseSheetProps> = ({
   };
 
   const isWhitespaceOnly = name.length > 0 && !name.trim();
-  const isSubmitDisabled = !name.trim() || isSubmitting;
+  const isSubmitDisabled = !name.trim() || isSubmitting || !isOnline;
 
   return (
     <Sheet
@@ -389,25 +395,33 @@ export const EditExerciseSheet: React.FC<EditExerciseSheetProps> = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="pt-2 flex items-center justify-between gap-3">
-          <button
-            type="button"
-            data-testid="cancel-exercise-btn"
-            onClick={onClose}
-            disabled={isSubmitting}
-            className="px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition active:scale-95 touch-manipulation disabled:opacity-50 cursor-pointer"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            data-testid="save-exercise-btn"
-            disabled={isSubmitDisabled}
-            className="px-6 py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-neon-cyan transition active:scale-95 disabled:opacity-50 flex items-center gap-2 touch-manipulation cursor-pointer"
-          >
-            <Check className="w-4 h-4" />
-            <span>{isSubmitting ? 'Saving...' : 'Save Changes'}</span>
-          </button>
+        <div className="pt-2 flex flex-col gap-1.5">
+          {!isOnline && (
+            <p className="text-xs text-amber-400 font-semibold text-right" data-testid="offline-helper-text">
+              Available when online
+            </p>
+          )}
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              data-testid="cancel-exercise-btn"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition active:scale-95 touch-manipulation disabled:opacity-50 cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              data-testid="save-exercise-btn"
+              disabled={isSubmitDisabled}
+              title={!isOnline ? 'Available when online' : undefined}
+              className="px-6 py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-neon-cyan transition active:scale-95 disabled:opacity-50 flex items-center gap-2 touch-manipulation cursor-pointer"
+            >
+              <Check className="w-4 h-4" />
+              <span>{isSubmitting ? 'Saving...' : 'Save Changes'}</span>
+            </button>
+          </div>
         </div>
       </form>
     </Sheet>

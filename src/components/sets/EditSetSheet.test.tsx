@@ -37,6 +37,44 @@ vi.mock("../../lib/supabase", () => ({
   },
 }));
 
+vi.mock("../../lib/sets", async () => {
+  const actual = await vi.importActual<any>("../../lib/sets");
+  return {
+    ...actual,
+    updateSet: vi.fn().mockImplementation((_client, id, updates) => {
+      mockUpdate({
+        weight: updates.weight,
+        reps: updates.reps,
+        set_type: updates.setType,
+        rpe: updates.rpe,
+        exercise_id: updates.exerciseId,
+      });
+      const eqRes = mockUpdateEq("id", id);
+      if (eqRes) {
+        return Promise.resolve(eqRes).then((res: any) => {
+          if (res?.error) throw new Error(res.error.message || "Update failed");
+          return {
+            id,
+            exercise_id: updates.exerciseId || "ex-1",
+            weight: updates.weight ?? 185,
+            reps: updates.reps ?? 8,
+            rpe: updates.rpe ?? null,
+            set_type: updates.setType || "working",
+          };
+        });
+      }
+      return Promise.resolve({
+        id,
+        exercise_id: updates.exerciseId || "ex-1",
+        weight: updates.weight ?? 185,
+        reps: updates.reps ?? 8,
+        rpe: updates.rpe ?? null,
+        set_type: updates.setType || "working",
+      });
+    }),
+  };
+});
+
 const mockExercises: Exercise[] = [
   { id: "ex-1", name: "Incline Bench Press", body_parts: ["Chest"] },
   { id: "ex-2", name: "Pull-ups", body_parts: ["Back"] },
@@ -79,6 +117,24 @@ describe("EditSetSheet", () => {
     mockDbFrom.mockImplementation((table: string) => {
       if (table === "sets") {
         return {
+          ["select"]: () => {
+            const builder: any = {
+              eq: () => builder,
+              maybeSingle: () =>
+                Promise.resolve({
+                  data: {
+                    id: "set-123",
+                    exercise_id: "ex-1",
+                    weight: 185,
+                    reps: 8,
+                    rpe: 8.5,
+                    set_type: "working",
+                  },
+                  error: null,
+                }),
+            };
+            return builder;
+          },
           update: (...args: any[]) => {
             mockUpdate(...args);
             return {

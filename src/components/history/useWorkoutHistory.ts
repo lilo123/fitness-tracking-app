@@ -13,6 +13,9 @@ import { queryKeys } from '../../lib/queryKeys';
 import { invalidateWorkoutDerived } from '../../lib/invalidate';
 import type { WorkoutSet } from '../../types/database';
 import { getTimelineDaysAgoStr } from '../../utils/timelineGrouping';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+import { applyPendingToHistory } from '../../offline';
+import { useWorkoutPendingOps } from '../workout/useWorkoutPendingOps';
 
 export interface HistorySet extends WorkoutSet {
   workout_date: string;
@@ -205,7 +208,7 @@ export interface HistoryPage {
 }
 
 export interface UseWorkoutHistoryResult {
-  sessions: HistorySession[];
+  sessions: (HistorySession & { pending?: boolean })[];
   totalCount: number | null;
   hasMore: boolean;
   loadMore: () => void;
@@ -217,6 +220,8 @@ export interface UseWorkoutHistoryResult {
   refetchSessions: () => Promise<unknown>;
   deleteSession: (workoutId: string) => Promise<void>;
   isDeletingSession: boolean;
+  canDelete: boolean;
+  isOnline: boolean;
 }
 
 export function useWorkoutHistory(
@@ -225,6 +230,8 @@ export function useWorkoutHistory(
   userTimeZone?: string
 ): UseWorkoutHistoryResult {
   const queryClient = useQueryClient();
+  const isOnline = useOnlineStatus();
+  const pendingOps = useWorkoutPendingOps(targetUserId);
 
   const since = useMemo(() => computeHistorySince(range, userTimeZone), [range, userTimeZone]);
 
@@ -282,17 +289,26 @@ export function useWorkoutHistory(
     },
   });
 
-  const sessions = useMemo(() => {
+  const rawSessions = useMemo(() => {
     if (!data?.pages) return [];
     return data.pages.flatMap((page) => page.sessions);
   }, [data]);
 
+  const sessions = useMemo(() => {
+    return applyPendingToHistory(rawSessions, pendingOps);
+  }, [rawSessions, pendingOps]);
+
   const totalCount = useMemo(() => {
-    if (!data?.pages || data.pages.length === 0) return null;
-    if (data.pages[0]?.sessions.length === 0) return 0;
+    if (!data?.pages || data.pages.length === 0) {
+      return sessions.length > 0 ? sessions.length : null;
+    }
+    if (data.pages[0]?.sessions.length === 0) {
+      return sessions.length;
+    }
     const lastPage = data.pages[data.pages.length - 1];
-    return lastPage?.totalCount ?? 0;
-  }, [data]);
+    const serverTotal = lastPage?.totalCount ?? 0;
+    return Math.max(serverTotal, sessions.length);
+  }, [data, sessions]);
 
   const hasMore = Boolean(hasNextPage);
 
@@ -321,9 +337,10 @@ export function useWorkoutHistory(
 
   const deleteSession = useCallback(
     async (workoutId: string) => {
+      if (!isOnline) return;
       await deleteMutation.mutateAsync(workoutId);
     },
-    [deleteMutation]
+    [isOnline, deleteMutation]
   );
 
   return {
@@ -339,5 +356,7 @@ export function useWorkoutHistory(
     refetchSessions: refetch,
     deleteSession,
     isDeletingSession: deleteMutation.isPending,
+    canDelete: isOnline,
+    isOnline,
   };
 }

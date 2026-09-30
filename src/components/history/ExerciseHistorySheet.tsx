@@ -20,6 +20,7 @@ import {
   type ExerciseHistorySet,
 } from './useWorkoutHistory';
 import { formatShortDate, normalizeDateStr, getDayOfWeekAbbr } from '../../utils/date';
+import { useWorkoutPendingOps } from '../workout/useWorkoutPendingOps';
 
 export interface ExerciseHistorySheetProps {
   open: boolean;
@@ -136,9 +137,74 @@ export const ExerciseHistorySheet: React.FC<ExerciseHistorySheetProps> = ({
     },
   });
 
+  const pendingOps = useWorkoutPendingOps(userId);
+
   const allRows = useMemo(() => {
-    return data?.pages.flatMap((page) => page) ?? [];
-  }, [data]);
+    const serverRows = data?.pages.flatMap((page) => page) ?? [];
+    if (!exercise?.id) return serverRows;
+
+    const workoutRefDateMap = new Map<string, { date: string; name: string }>();
+    for (const op of pendingOps) {
+      if (op.kind === 'workout.ensure') {
+        workoutRefDateMap.set(op.payload.clientWorkoutId, {
+          date: op.payload.workout_date,
+          name: op.payload.name || 'Workout',
+        });
+      }
+    }
+
+    const pendingSets: ExerciseHistorySet[] = [];
+    const updatedSets = new Map<string, any>();
+    const deletedSetIds = new Set<string>();
+
+    for (const op of pendingOps) {
+      if (op.kind === 'set.create' && op.payload.exercise_id === exercise.id) {
+        const info = workoutRefDateMap.get(op.payload.workoutRef);
+        const civilDate = info?.date || op.payload.created_at?.slice(0, 10) || '';
+        pendingSets.push({
+          workout_id: op.payload.workoutRef,
+          civil_date: civilDate,
+          workout_name: info?.name || 'Workout',
+          set_id: op.payload.id,
+          set_index: op.payload.set_index ?? 0,
+          weight: Number(op.payload.weight) || 0,
+          reps: Number(op.payload.reps) || 0,
+          rpe: op.payload.rpe ?? null,
+          created_at: op.payload.created_at || new Date().toISOString(),
+          total_sessions: 0,
+        });
+      } else if (op.kind === 'set.update') {
+        updatedSets.set(op.payload.id, op.payload.patch);
+      } else if (op.kind === 'set.delete') {
+        deletedSetIds.add(op.payload.id);
+      }
+    }
+
+    let combined = [...pendingSets, ...serverRows].filter((s) => !deletedSetIds.has(s.set_id));
+    combined = combined.map((s) => {
+      const patch = updatedSets.get(s.set_id);
+      if (!patch) return s;
+      return {
+        ...s,
+        ...(patch.weight !== undefined ? { weight: Number(patch.weight) || 0 } : {}),
+        ...(patch.reps !== undefined ? { reps: Number(patch.reps) || 0 } : {}),
+        ...(patch.rpe !== undefined ? { rpe: patch.rpe } : {}),
+      };
+    });
+
+    if (since) {
+      combined = combined.filter((s) => !s.civil_date || s.civil_date >= since);
+    }
+
+    // Sort by civil_date descending, then set_index ascending
+    combined.sort((a, b) => {
+      const dateCmp = (b.civil_date || '').localeCompare(a.civil_date || '');
+      if (dateCmp !== 0) return dateCmp;
+      return (a.set_index ?? 0) - (b.set_index ?? 0);
+    });
+
+    return combined;
+  }, [data, exercise, pendingOps, since]);
 
   const sessionGroups = useMemo(() => {
     const groups: Array<{

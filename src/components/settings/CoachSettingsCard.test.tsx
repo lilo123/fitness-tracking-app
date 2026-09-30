@@ -6,6 +6,9 @@ import { expectNoA11yViolations } from '../../test/a11y';
 import type { UserProfile } from '../../types/database';
 import { supabase } from '../../lib/supabase';
 import { createSupabaseBuilder, clearMockHistory, getRecordedTables, getRecordedSelects } from '../../test/supabaseBuilderMock';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+
+vi.mock('../../hooks/useOnlineStatus');
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
@@ -20,6 +23,7 @@ describe('CoachSettingsCard accessibility', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearMockHistory();
+    vi.mocked(useOnlineStatus).mockReturnValue(true);
     queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
@@ -170,5 +174,21 @@ describe('CoachSettingsCard accessibility', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('coach-roster-error')).toBeNull();
     });
+  });
+
+  it('disables vanity code input and button and shows "Available when online" helper text when offline', () => {
+    vi.mocked(useOnlineStatus).mockReturnValue(false);
+
+    renderCard();
+
+    expect(screen.getByTestId('offline-helper-text').textContent).toBe('Available when online');
+
+    const input = screen.getByTestId('vanity-code-input');
+    const saveBtn = screen.getByTestId('save-vanity-code-btn');
+
+    expect(input).toBeDisabled();
+    expect(input.getAttribute('title')).toBe('Available when online');
+    expect(saveBtn).toBeDisabled();
+    expect(saveBtn.getAttribute('title')).toBe('Available when online');
   });
 });

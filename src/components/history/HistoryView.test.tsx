@@ -25,10 +25,68 @@ function openMealAction(logId: string, action: 'edit' | 'delete') {
 }
 
 
-const { mockSession } = vi.hoisted(() => ({
-  mockSession: {
-    user: { id: 'test-athlete-id', email: 'athlete@example.com' },
-  },
+const { mockSession, mockUpdate, mockUpdateEq } = vi.hoisted(() => {
+  const mockUpdateEq = vi.fn().mockReturnValue({
+    select: vi.fn().mockResolvedValue({ data: [], error: null }),
+  });
+  const mockUpdate = vi.fn().mockReturnValue({
+    eq: mockUpdateEq,
+  });
+  return {
+    mockSession: {
+      user: { id: 'test-athlete-id', email: 'athlete@example.com' },
+    },
+    mockUpdate,
+    mockUpdateEq,
+  };
+});
+
+vi.mock('../../lib/sets', async () => {
+  const actual = await vi.importActual<any>('../../lib/sets');
+  return {
+    ...actual,
+    updateSet: vi.fn().mockImplementation((_client, id, updates) => {
+      mockUpdate({
+        weight: updates.weight,
+        reps: updates.reps,
+        set_type: updates.setType,
+        rpe: updates.rpe,
+        exercise_id: updates.exerciseId,
+      });
+      const eqRes = mockUpdateEq('id', id);
+      if (eqRes) {
+        return Promise.resolve(eqRes).then((res: any) => {
+          if (res?.error) throw new Error(res.error.message || 'Update failed');
+          return {
+            id,
+            workout_id: updates.workoutId || 'w1',
+            exercise_id: updates.exerciseId || 'Bench Press',
+            weight: updates.weight ?? 225,
+            reps: updates.reps ?? 8,
+            rpe: updates.rpe ?? null,
+            set_type: updates.setType || 'working',
+          };
+        });
+      }
+      return Promise.resolve({
+        id,
+        workout_id: updates.workoutId || 'w1',
+        exercise_id: updates.exerciseId || 'Bench Press',
+        weight: updates.weight ?? 225,
+        reps: updates.reps ?? 8,
+        rpe: updates.rpe ?? null,
+        set_type: updates.setType || 'working',
+      });
+    }),
+  };
+});
+
+vi.mock('../../offline/persistController', () => ({
+  initPersistForUser: vi.fn().mockResolvedValue(undefined),
+  stopPersisting: vi.fn(),
+  setupQueryDefaults: vi.fn(),
+  clearUserReadCache: vi.fn(),
+  getCurrentPersistingUserId: vi.fn().mockReturnValue(null),
 }));
 
 vi.mock('../../lib/supabase', () => ({
@@ -46,12 +104,6 @@ vi.mock('../../lib/supabase', () => ({
 describe('HistoryView', () => {
   let queryClient: QueryClient;
   const mockDeleteEq = vi.fn().mockResolvedValue({ error: null });
-  const mockUpdateEq = vi.fn().mockReturnValue({
-    select: vi.fn().mockResolvedValue({ data: [], error: null }),
-  });
-  const mockUpdate = vi.fn().mockReturnValue({
-    eq: mockUpdateEq,
-  });
 
   const mockNutritionLogs = [
     {
@@ -122,6 +174,8 @@ describe('HistoryView', () => {
               weight: 225,
               reps: 8,
               set_index: 1,
+              set_type: 'working',
+              rpe: null,
               created_at: '2026-09-01T10:00:00Z',
               workouts: { date: '2026-09-01', name: 'Chest & Back' },
             },

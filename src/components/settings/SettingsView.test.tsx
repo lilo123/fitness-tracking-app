@@ -9,12 +9,15 @@ import { AuthProvider } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory } from '../../test/supabaseBuilderMock';
 import { expectNoA11yViolations } from '../../test/a11y';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 
 const { mockSession } = vi.hoisted(() => ({
   mockSession: {
     user: { id: 'test-coach-id', email: 'coach@cybergym.io' },
   },
 }));
+
+vi.mock('../../hooks/useOnlineStatus');
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
@@ -37,6 +40,7 @@ describe('SettingsView', () => {
     vi.clearAllMocks();
     clearMockHistory();
     localStorage.clear();
+    vi.mocked(useOnlineStatus).mockReturnValue(true);
     (supabase.auth.getSession as any).mockResolvedValue({ data: { session: mockSession } });
     (supabase.rpc as any).mockResolvedValue({ data: { success: true }, error: null });
     (supabase.from as any).mockImplementation((table: string) => {
@@ -446,6 +450,23 @@ describe('SettingsView', () => {
     ).toBeDefined();
     expect(screen.getByTestId('weight-unit-lb')).toBeDefined();
     expect(screen.getByTestId('weight-unit-kg')).toBeDefined();
+  });
+
+  it('disables auto rest timer toggle switch and renders helper text when offline', async () => {
+    vi.mocked(useOnlineStatus).mockReturnValue(false);
+
+    renderComponent();
+    await screen.findByDisplayValue('Coach Duy');
+
+    const toggleBtn = screen.getByTestId('toggle-auto-timer');
+    expect(toggleBtn).toBeDisabled();
+    expect(toggleBtn.getAttribute('title')).toBe('Available when online');
+    expect(screen.getAllByTestId('offline-helper-text').some(el => el.textContent === 'Available when online')).toBe(true);
+
+    const initialChecked = toggleBtn.getAttribute('aria-checked');
+    fireEvent.click(toggleBtn);
+    expect(toggleBtn.getAttribute('aria-checked')).toBe(initialChecked);
+    expect(mockUpsert).not.toHaveBeenCalled();
   });
 });
 

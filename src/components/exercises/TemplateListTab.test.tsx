@@ -7,6 +7,7 @@ import { ToastProvider } from '../../context/ToastContext';
 import { ToastHost } from '../common/ToastHost';
 import { supabase } from '../../lib/supabase';
 import { createSupabaseBuilder, clearMockHistory, getRecordedTables } from '../../test/supabaseBuilderMock';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import type { Exercise, RoutineTemplate } from '../../types/database';
 
 const mockNavigate = vi.fn();
@@ -30,6 +31,10 @@ vi.mock('../../hooks/useAuth', () => ({
 
 vi.mock('../../hooks/useCoach', () => ({
   useCoach: () => mockCoachState,
+}));
+
+vi.mock('../../hooks/useOnlineStatus', () => ({
+  useOnlineStatus: vi.fn(),
 }));
 
 vi.mock('../../lib/supabase', () => ({
@@ -115,6 +120,7 @@ describe('TemplateListTab - W3 Features', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearMockHistory();
+    vi.mocked(useOnlineStatus).mockReturnValue(true);
     (supabase.rpc as any).mockImplementation((fn: string) => {
       if (fn === 'get_routine_catalog') {
         return Promise.resolve({ data: mockTemplates, error: null });
@@ -427,6 +433,24 @@ describe('TemplateListTab - W3 Features', () => {
 
       const errorElements = await screen.findAllByText(/Catalog RPC failure/);
       expect(errorElements.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('disables New Routine button and delete button with helper text when offline', async () => {
+      vi.mocked(useOnlineStatus).mockReturnValue(false);
+
+      renderComponent();
+
+      await screen.findByText('Chest & Triceps Push');
+
+      expect(screen.getByTestId('offline-new-template-helper').textContent).toBe('Available when online');
+
+      const createBtn = screen.getByTestId('new-template-btn');
+      expect(createBtn).toBeDisabled();
+      expect(createBtn.getAttribute('title')).toBe('Available when online');
+
+      const deleteBtn = screen.getByTestId('delete-template-tpl-push');
+      expect(deleteBtn).toBeDisabled();
+      expect(deleteBtn.getAttribute('title')).toBe('Available when online');
     });
   });
 });

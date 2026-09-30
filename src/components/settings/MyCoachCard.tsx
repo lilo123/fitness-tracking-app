@@ -14,6 +14,7 @@ import { ConfirmDialog } from '../common/ConfirmDialog';
 import { Skeleton } from '../common/Skeleton';
 import { Button } from '../common/Button';
 import { formatShortDate } from '../../utils/date';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 
 interface CoachJoinedInfo {
   username?: string | null;
@@ -31,6 +32,7 @@ export const MyCoachCard: React.FC<MyCoachCardProps> = ({
   refreshProfile,
 }) => {
   const queryClient = useQueryClient();
+  const isOnline = useOnlineStatus();
 
   // Athlete: My Coach Link query
   const {
@@ -64,6 +66,10 @@ export const MyCoachCard: React.FC<MyCoachCardProps> = ({
 
   const handleLinkCoach = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isOnline) {
+      setLinkStatus({ type: 'error', message: 'Available when online' });
+      return;
+    }
     const trimmed = linkCodeInput.trim().toUpperCase();
     if (!trimmed) return;
 
@@ -95,7 +101,7 @@ export const MyCoachCard: React.FC<MyCoachCardProps> = ({
   };
 
   const handleConfirmDisconnect = async () => {
-    if (isDisconnecting) return;
+    if (!isOnline || isDisconnecting) return;
     setIsDisconnectConfirmOpen(false);
     setIsDisconnecting(true);
     setLinkStatus(null);
@@ -185,11 +191,18 @@ export const MyCoachCard: React.FC<MyCoachCardProps> = ({
               </div>
             </div>
 
+            {!isOnline && (
+              <p className="text-xs text-amber-400 font-semibold w-full" data-testid="offline-helper-text">
+                Available when online
+              </p>
+            )}
+
             <button
               type="button"
               onClick={() => setIsDisconnectConfirmOpen(true)}
-              disabled={isDisconnecting}
-              className="bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 min-h-[44px] touch-manipulation w-full sm:w-auto"
+              disabled={isDisconnecting || !isOnline}
+              title={!isOnline ? 'Available when online' : undefined}
+              className="bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 min-h-[44px] touch-manipulation w-full sm:w-auto disabled:opacity-50"
               data-testid="disconnect-coach-btn"
             >
               <UserMinus className="w-4 h-4" />
@@ -202,6 +215,11 @@ export const MyCoachCard: React.FC<MyCoachCardProps> = ({
           <p className="text-xs text-zinc-400">
             Enter your coach's code to link your account. Your coach will configure your workout routines and monitor nutrition targets.
           </p>
+          {!isOnline && (
+            <p className="text-xs text-amber-400 font-semibold" data-testid="offline-helper-text">
+              Available when online
+            </p>
+          )}
           <div className="flex gap-2">
             <input
               type="text"
@@ -209,13 +227,16 @@ export const MyCoachCard: React.FC<MyCoachCardProps> = ({
               onChange={(e) => setLinkCodeInput(e.target.value.toUpperCase())}
               placeholder="e.g. CYBER-DEMO01"
               maxLength={20}
-              className="flex-1 min-w-0 bg-zinc-950 border border-border-interactive text-white rounded-xl px-3 py-2 text-base font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none uppercase min-h-[44px]"
+              disabled={!isOnline || isLinking}
+              title={!isOnline ? 'Available when online' : undefined}
+              className="flex-1 min-w-0 bg-zinc-950 border border-border-interactive text-white rounded-xl px-3 py-2 text-base font-bold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none uppercase min-h-[44px] disabled:opacity-50"
               data-testid="link-coach-code-input"
               required
             />
             <button
               type="submit"
-              disabled={isLinking || !linkCodeInput.trim()}
+              disabled={isLinking || !linkCodeInput.trim() || !isOnline}
+              title={!isOnline ? 'Available when online' : undefined}
               className="shrink-0 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold px-4 py-2 min-h-[44px] rounded-xl text-xs shadow-neon-cyan transition disabled:opacity-50 touch-manipulation flex items-center gap-1.5"
               data-testid="link-coach-btn"
             >

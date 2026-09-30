@@ -5,6 +5,9 @@ import { CreateExerciseSheet } from './CreateExerciseSheet';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { expectNoA11yViolationsForRules } from '../../test/a11y';
 import * as exercisesLib from '../../lib/exercises';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+
+vi.mock('../../hooks/useOnlineStatus');
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
@@ -28,6 +31,7 @@ describe('CreateExerciseSheet', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(useOnlineStatus).mockReturnValue(true);
     queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   });
 
@@ -355,5 +359,27 @@ describe('CreateExerciseSheet', () => {
     const whitespaceError = screen.getByTestId('exercise-name-whitespace-error');
     expect(whitespaceError).toBeDefined();
     expect(whitespaceError.textContent).toBe('Exercise name cannot be blank or whitespace-only.');
+  });
+
+  it('disables save button and displays "Available when online" helper text when offline', () => {
+    vi.mocked(useOnlineStatus).mockReturnValue(false);
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CreateExerciseSheet {...mockProps} />
+      </QueryClientProvider>
+    );
+
+    const input = screen.getByLabelText(/exercise name/i);
+    fireEvent.change(input, { target: { value: 'Deadlift' } });
+
+    expect(screen.getByTestId('offline-helper-text').textContent).toBe('Available when online');
+
+    const saveBtn = screen.getByTestId('save-exercise-btn');
+    expect(saveBtn).toBeDisabled();
+    expect(saveBtn.getAttribute('title')).toBe('Available when online');
+
+    fireEvent.submit(saveBtn.closest('form')!);
+    expect(mockProps.onError).toHaveBeenCalledWith('Available when online');
   });
 });

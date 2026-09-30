@@ -1,11 +1,9 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { supabase } from '../../lib/supabase';
 import type { WorkoutSet, Exercise, RoutineTemplate } from '../../types/database';
 import {
   normalizeDateStr,
   getLocalDateStr,
   getDayOfWeekAbbr,
-  DEFAULT_EXERCISES_LIST,
   DEFAULT_WORKOUT_TEMPLATES,
 } from '../../utils/ghostSets';
 import { workoutSessionStore, type SetDraftInput } from '../../utils/workoutSessionStore';
@@ -15,8 +13,16 @@ import {
   checkIsScheduledRoutineDirty,
 } from './workoutEngineHelpers';
 import { fetchTemplateDetail } from './useWorkoutQueries';
-import { cleanSessionUUIDs, findMatchingTemplate, extractTemplateDetails } from './useWorkoutSessionHelpers';
+import {
+  cleanSessionUUIDs,
+  findMatchingTemplate,
+  extractTemplateDetails,
+  getInitialRoutineState,
+  filterSetsForExercise,
+  sanitizeDraftValue,
+} from './useWorkoutSessionHelpers';
 import { useWorkoutAccordion } from './useWorkoutAccordion';
+import { enqueueAndAwait } from '../../offline';
 
 export interface UseWorkoutSessionOptions {
   targetUserId: string;
@@ -47,52 +53,13 @@ export function useWorkoutSession({
   });
 
   const initialSession = workoutSessionStore.getActiveSession(targetUserId, workoutDate);
+  const initialState = getInitialRoutineState(initialSession, workoutDate);
 
-  const [activeRoutineName, setActiveRoutineName] = useState<string>(() => {
-    if (initialSession) return initialSession.routineName;
-    const dayAbbr = getDayOfWeekAbbr(workoutDate);
-    const defTpl = DEFAULT_WORKOUT_TEMPLATES.find((t) =>
-      t.days.some((d) => d === dayAbbr || d.slice(0, 3) === dayAbbr)
-    );
-    return defTpl ? defTpl.name : 'Rest Day';
-  });
-
-  const [activeExercises, setActiveExercises] = useState<string[]>(() => {
-    if (initialSession) return initialSession.exercises;
-    const dayAbbr = getDayOfWeekAbbr(workoutDate);
-    const defTpl = DEFAULT_WORKOUT_TEMPLATES.find((t) =>
-      t.days.some((d) => d === dayAbbr || d.slice(0, 3) === dayAbbr)
-    );
-    return defTpl ? [...defTpl.exercises] : [];
-  });
-
-  const [targetSetCounts, setTargetSetCounts] = useState<Record<string, number>>(() => {
-    if (initialSession) return initialSession.targetSetCounts;
-    const dayAbbr = getDayOfWeekAbbr(workoutDate);
-    const defTpl = DEFAULT_WORKOUT_TEMPLATES.find((t) =>
-      t.days.some((d) => d === dayAbbr || d.slice(0, 3) === dayAbbr)
-    );
-    return defTpl ? { ...defTpl.targetSets } : {};
-  });
-
-  const [targetRepCounts, setTargetRepCounts] = useState<Record<string, number>>(() => {
-    if (initialSession) return initialSession.targetRepCounts;
-    const dayAbbr = getDayOfWeekAbbr(workoutDate);
-    const defTpl = DEFAULT_WORKOUT_TEMPLATES.find((t) =>
-      t.days.some((d) => d === dayAbbr || d.slice(0, 3) === dayAbbr)
-    );
-    return defTpl?.targetReps ? { ...defTpl.targetReps } : {};
-  });
-
-  const [expandedExercises, setExpandedExercises] = useState<Set<string>>(() => {
-    if (initialSession) return new Set(initialSession.expandedExercises);
-    const dayAbbr = getDayOfWeekAbbr(workoutDate);
-    const defTpl = DEFAULT_WORKOUT_TEMPLATES.find((t) =>
-      t.days.some((d) => d === dayAbbr || d.slice(0, 3) === dayAbbr)
-    );
-    return defTpl && defTpl.exercises.length > 0 ? new Set([defTpl.exercises[0]]) : new Set();
-  });
-
+  const [activeRoutineName, setActiveRoutineName] = useState<string>(initialState.activeRoutineName);
+  const [activeExercises, setActiveExercises] = useState<string[]>(initialState.activeExercises);
+  const [targetSetCounts, setTargetSetCounts] = useState<Record<string, number>>(initialState.targetSetCounts);
+  const [targetRepCounts, setTargetRepCounts] = useState<Record<string, number>>(initialState.targetRepCounts);
+  const [expandedExercises, setExpandedExercises] = useState<Set<string>>(initialState.expandedExercises);
   const [inputDrafts, setInputDrafts] = useState<Record<string, SetDraftInput>>(
     () => initialSession?.inputDrafts ?? {}
   );
@@ -106,17 +73,7 @@ export function useWorkoutSession({
   }, [userLogs, workoutDate]);
 
   const getSetsForExerciseToday = useCallback((exName: string) => {
-    const norm = exName.trim().toLowerCase();
-    return todaySets.filter((s) => {
-      if (s.exercise_id === exName) return true;
-      if (s.exercise?.name && s.exercise.name.trim().toLowerCase() === norm) return true;
-      if (s.exercise_name && s.exercise_name.trim().toLowerCase() === norm) return true;
-      const matchedEx = exercises.find((e) => e.name.toLowerCase() === norm || e.id === exName);
-      if (matchedEx && (s.exercise_id === matchedEx.id || s.exercise?.id === matchedEx.id)) return true;
-      const defEx = DEFAULT_EXERCISES_LIST.find((e) => e.name.toLowerCase() === norm || e.id === exName);
-      if (defEx && (s.exercise_id === defEx.id || s.exercise?.id === defEx.id)) return true;
-      return false;
-    });
+    return filterSetsForExercise(exName, todaySets, exercises);
   }, [exercises, todaySets]);
 
   /* oxlint-disable react/set-state-in-effect */
@@ -275,11 +232,17 @@ export function useWorkoutSession({
     );
 
     if (todaySets.length > 0 && todaySets[0].workout_id) {
-      const workoutId = todaySets[0].workout_id;
-      Promise.resolve(supabase.from('workouts').update({ name: routineName }).eq('id', workoutId))
-        .catch((err: unknown) => {
-          console.error('Failed to update workout name:', err);
-        });
+      const workoutRef = todaySets[0].workout_id;
+      enqueueAndAwait({
+        userId: targetUserId,
+        kind: 'workout.rename',
+        payload: {
+          workoutRef,
+          name: routineName,
+        },
+      }).catch((err: unknown) => {
+        console.error('Failed to update workout name:', err);
+      });
     }
   };
 
@@ -482,13 +445,8 @@ export function useWorkoutSession({
     field: 'weight' | 'reps',
     value: string
   ) => {
-    let sanitized = value;
-    if (field === 'weight') {
-      sanitized = sanitized.replace(',', '.');
-      if (sanitized !== '' && !/^\d*\.?\d*$/.test(sanitized)) return;
-    } else if (field === 'reps') {
-      if (sanitized !== '' && !/^\d*$/.test(sanitized)) return;
-    }
+    const sanitized = sanitizeDraftValue(field, value);
+    if (sanitized === null) return;
 
     const draftKey = `${exName}_${setIndex}`;
     ensureSession();

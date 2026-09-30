@@ -8,6 +8,9 @@ import { expectNoA11yViolations } from '../../test/a11y';
 import type { UserProfile } from '../../types/database';
 import { supabase } from '../../lib/supabase';
 import { createSupabaseBuilder, clearMockHistory, getRecordedTables, getRecordedSelects } from '../../test/supabaseBuilderMock';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+
+vi.mock('../../hooks/useOnlineStatus');
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
@@ -32,6 +35,7 @@ describe('MyCoachCard accessibility and live regions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearMockHistory();
+    vi.mocked(useOnlineStatus).mockReturnValue(true);
   });
 
   const mockProfile: UserProfile = {
@@ -225,5 +229,56 @@ describe('MyCoachCard accessibility and live regions', () => {
     const skeleton = screen.getByTestId('coach-link-loading');
     expect(skeleton).toBeDefined();
     expect(skeleton.getAttribute('aria-busy')).toBe('true');
+  });
+
+  it('disables coach code input and button and shows "Available when online" helper text when offline', () => {
+    vi.mocked(useOnlineStatus).mockReturnValue(false);
+
+    renderCard();
+
+    expect(screen.getByTestId('offline-helper-text').textContent).toBe('Available when online');
+
+    const input = screen.getByTestId('link-coach-code-input');
+    const linkBtn = screen.getByTestId('link-coach-btn');
+
+    expect(input).toBeDisabled();
+    expect(input.getAttribute('title')).toBe('Available when online');
+    expect(linkBtn).toBeDisabled();
+    expect(linkBtn.getAttribute('title')).toBe('Available when online');
+  });
+
+  it('disables disconnect button and shows helper text when offline and coach is linked', async () => {
+    vi.mocked(useOnlineStatus).mockReturnValue(false);
+
+    const linkedCoachData = {
+      id: 'link-1',
+      coach_id: 'coach-99',
+      linked_at: '2026-09-15T10:00:00Z',
+      coach: {
+        username: 'Coach Mike',
+        email: 'coach@mike.com',
+        coach_code: 'MIKE-FIT',
+      },
+    };
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'coach_athlete_links') {
+        return createSupabaseBuilder('coach_athlete_links', { data: linkedCoachData, error: null });
+      }
+      return createSupabaseBuilder(table, { data: null, error: null });
+    });
+
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <MyCoachCard profile={mockProfile} />
+      </QueryClientProvider>
+    );
+
+    expect(await screen.findByText('Coach Mike')).toBeDefined();
+    const disconnectBtn = screen.getByTestId('disconnect-coach-btn');
+    expect(disconnectBtn).toBeDisabled();
+    expect(disconnectBtn.getAttribute('title')).toBe('Available when online');
+    expect(screen.getByTestId('offline-helper-text').textContent).toBe('Available when online');
   });
 });

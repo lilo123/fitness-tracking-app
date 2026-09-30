@@ -22,6 +22,7 @@ import {
 import { Sheet } from '../common/Sheet';
 import { Chip } from '../common/Chip';
 import { StatusBanner } from '../common/StatusBanner';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import type { Exercise } from '../../types/database';
 import type { InfiniteData } from '@tanstack/react-query';
 
@@ -51,6 +52,7 @@ export const CreateExerciseSheet: React.FC<CreateExerciseSheetProps> = ({
 }) => {
   const customExerciseNameId = useId();
   const queryClient = useQueryClient();
+  const isOnline = useOnlineStatus();
 
   const [exerciseName, setExerciseName] = useState('');
   const [selectedBodyParts, setSelectedBodyParts] = useState<string[]>([]);
@@ -87,6 +89,12 @@ export const CreateExerciseSheet: React.FC<CreateExerciseSheetProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isOnline) {
+      const msg = 'Available when online';
+      setError(msg);
+      onError?.(msg);
+      return;
+    }
     const trimmedName = exerciseName.trim();
     if (!trimmedName) {
       const msg = 'Exercise name cannot be blank or whitespace-only.';
@@ -201,7 +209,7 @@ export const CreateExerciseSheet: React.FC<CreateExerciseSheetProps> = ({
   };
 
   const isWhitespaceOnly = exerciseName.length > 0 && !exerciseName.trim();
-  const isSubmitDisabled = !exerciseName.trim() || isSubmitting;
+  const isSubmitDisabled = !exerciseName.trim() || isSubmitting || !isOnline;
 
   return (
     <Sheet
@@ -345,24 +353,32 @@ export const CreateExerciseSheet: React.FC<CreateExerciseSheetProps> = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="pt-2 flex items-center justify-between gap-3">
-          <button
-            type="button"
-            data-testid="cancel-create-exercise-btn"
-            onClick={handleClose}
-            disabled={isSubmitting}
-            className="px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition active:scale-95 touch-manipulation disabled:opacity-50 cursor-pointer"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            data-testid="save-exercise-btn"
-            disabled={isSubmitDisabled}
-            className="px-6 py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-neon-cyan transition active:scale-95 disabled:opacity-50 flex items-center gap-2 touch-manipulation cursor-pointer"
-          >
-            <span>{isSubmitting ? 'Saving...' : 'Save to Library'}</span>
-          </button>
+        <div className="pt-2 flex flex-col gap-1.5">
+          {!isOnline && (
+            <p className="text-xs text-amber-400 font-semibold text-right" data-testid="offline-helper-text">
+              Available when online
+            </p>
+          )}
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              data-testid="cancel-create-exercise-btn"
+              onClick={handleClose}
+              disabled={isSubmitting}
+              className="px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition active:scale-95 touch-manipulation disabled:opacity-50 cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              data-testid="save-exercise-btn"
+              disabled={isSubmitDisabled}
+              title={!isOnline ? 'Available when online' : undefined}
+              className="px-6 py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-neon-cyan transition active:scale-95 disabled:opacity-50 flex items-center gap-2 touch-manipulation cursor-pointer"
+            >
+              <span>{isSubmitting ? 'Saving...' : 'Save to Library'}</span>
+            </button>
+          </div>
         </div>
       </form>
     </Sheet>

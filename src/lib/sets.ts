@@ -1,5 +1,5 @@
 /**
- * Sets & Workouts Data Layer Writers (P2 / RD-4 / RD-5 / W19 / W40 / W41)
+ * Sets & Workouts Data Layer Writers (P2 / RD-4 / RD-5 / W19 / W40 / W41 / O1)
  *
  * Guarantees:
  * 1. Sets are always resolved and written by exercise_id UUID (never by name).
@@ -7,17 +7,39 @@
  * 3. Workouts are strictly scoped to the user's local civil date (YYYY-MM-DD).
  * 4. Concurrent getOrCreateWorkout calls safely resolve to a single row via
  *    the unique (user_id, workout_date) constraint and select-after-23505 recovery (W41).
+ * 5. O1: All production writes route through durable outbox (enqueueAndAwait)
+ *    with optimistic local representation and automatic background sync.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import {
+  enqueueAndAwait,
+  getOutboxOps,
+  newId,
+  getActiveUserId,
+  classifyError,
+  type SetTypeKind,
+  type SetPatchFields,
+} from '../offline';
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUUID(id: string): boolean {
+  return UUID_REGEX.test(id);
+}
 
 export interface InsertSetPayload {
+  id?: string;
+  workoutId?: string;
+  createdAt?: string;
   exerciseId: string;
   weight: number;
   reps: number;
   setIndex?: number;
   setType?: 'working' | 'warmup' | 'drop';
   rpe?: number | null;
+  workoutDate?: string;
+  targetUserId?: string;
 }
 
 export interface LoggedSetResult {
@@ -30,6 +52,9 @@ export interface LoggedSetResult {
   set_type: string;
   rpe: number | null;
   created_at: string;
+  pending?: boolean;
+  civil_date?: string;
+  workout_date?: string;
 }
 
 /**
@@ -49,6 +74,64 @@ export function getNextSetIndex(existingSets: Array<{ set_index?: number | null 
 }
 
 /**
+ * Resolves a stable workout reference (UUID) for a given user and civil date.
+ * If server workout ID is available in cache, returns it.
+ * Otherwise returns a client-generated workout UUID stored in localStorage and enqueues workout.ensure.
+ */
+export async function resolveWorkoutRefForDate(
+  userId: string,
+  workoutDate: string,
+  routineName: string = 'Free Workout',
+  cachedServerId?: string
+): Promise<string> {
+  if (cachedServerId && isUUID(cachedServerId)) {
+    return cachedServerId;
+  }
+
+  // 1. Check outbox for pending workout.ensure for this user & date
+  try {
+    const ops = await getOutboxOps(userId);
+    const ensureOp = ops.find(
+      (op) => op.kind === 'workout.ensure' && op.payload.workout_date === workoutDate
+    );
+    if (ensureOp && ensureOp.kind === 'workout.ensure' && ensureOp.payload.clientWorkoutId) {
+      return ensureOp.payload.clientWorkoutId;
+    }
+  } catch {}
+
+  // 2. Check localStorage for previously generated client workout id on this device
+  const storageKey = `cybergym_client_workout_${userId}_${workoutDate}`;
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored && isUUID(stored)) {
+        return stored;
+      }
+    } catch {}
+  }
+
+  // 3. Generate a new client workout id and enqueue workout.ensure op
+  const clientWorkoutId = newId();
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem(storageKey, clientWorkoutId);
+    } catch {}
+  }
+
+  await enqueueAndAwait({
+    userId,
+    kind: 'workout.ensure',
+    payload: {
+      clientWorkoutId,
+      workout_date: workoutDate,
+      name: routineName,
+    },
+  });
+
+  return clientWorkoutId;
+}
+
+/**
  * Gets or creates the unique workout session row for a user on a given civil date.
  * Handles concurrent insert races (PostgreSQL error 23505) by recovering the existing row (W41).
  */
@@ -61,10 +144,14 @@ export async function getOrCreateWorkout(
   if (!userId) throw new Error('Authenticated user required to log workout');
   if (!workoutDate) throw new Error('Workout date required');
 
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return resolveWorkoutRefForDate(userId, workoutDate, routineName);
+  }
+
+  // 1. Check if workout session already exists for this civil date (local day bounds)
   const startOfDay = `${workoutDate}T00:00:00.000Z`;
   const endOfDay = `${workoutDate}T23:59:59.999Z`;
 
-  // Helper to query workout session by civil date (M2 workout_date column with pre-M2 date-window fallback)
   async function findWorkoutSession(): Promise<{ data: { id: string } | null; error?: any }> {
     const primary = await client
       .from('workouts')
@@ -98,163 +185,261 @@ export async function getOrCreateWorkout(
     return primary;
   }
 
-  // 1. Check for existing workout row for this user on this civil date
-  const { data: existingWorkout } = await findWorkoutSession();
+  try {
+    const { data: existingWorkout, error: findError } = await findWorkoutSession();
+    if (findError) {
+      const classified = classifyError(findError);
+      if (classified.kind === 'TRANSIENT') {
+        return await resolveWorkoutRefForDate(userId, workoutDate, routineName);
+      }
+      throw findError;
+    }
 
-  if (existingWorkout?.id) {
-    return existingWorkout.id;
-  }
+    if (existingWorkout?.id) {
+      return existingWorkout.id;
+    }
 
-  // 2. Insert new workout session row
-  // Includes both M2 workout_date and legacy date column for expand-first compatibility
-  const insertPayload: Record<string, any> = {
-    user_id: userId,
-    name: routineName,
-    date: workoutDate,
-    workout_date: workoutDate,
-  };
+    // 2. Insert new workout row if none exists
+    const insertPayload: Record<string, any> = {
+      user_id: userId,
+      name: routineName,
+      date: workoutDate,
+      workout_date: workoutDate,
+    };
 
-  let { data: newWorkout, error: insertError } = await client
-    .from('workouts')
-    .insert([insertPayload])
-    .select('id')
-    .single();
-
-  // If workout_date column does not exist yet (pre-M2 local DB fallback)
-  if (
-    insertError &&
-    (insertError.code === 'PGRST204' ||
-      insertError.code === '42703' ||
-      String(insertError.code).includes('PGRST') ||
-      insertError.message?.includes('workout_date'))
-  ) {
-    delete insertPayload.workout_date;
-    const retry = await client
+    let { data: newWorkout, error: insertError } = await client
       .from('workouts')
       .insert([insertPayload])
       .select('id')
       .single();
-    newWorkout = retry.data;
-    insertError = retry.error;
-  }
 
-  // 3. Handle concurrent creation collision (23505 unique constraint violation)
-  if (insertError) {
-    const isConflict =
-      insertError.code === '23505' ||
-      insertError.message?.includes('duplicate key') ||
-      insertError.message?.includes('unique constraint');
-
-    if (isConflict) {
-      const { data: winningWorkout } = await findWorkoutSession();
-
-      if (winningWorkout?.id) {
-        return winningWorkout.id;
-      }
+    if (
+      insertError &&
+      (insertError.code === 'PGRST204' ||
+        insertError.code === '42703' ||
+        String(insertError.code).includes('PGRST') ||
+        insertError.message?.includes('workout_date'))
+    ) {
+      delete insertPayload.workout_date;
+      const retry = await client
+        .from('workouts')
+        .insert([insertPayload])
+        .select('id')
+        .single();
+      newWorkout = retry.data;
+      insertError = retry.error;
     }
-    throw new Error(insertError.message || 'Failed to create workout');
-  }
 
-  if (!newWorkout?.id) {
-    throw new Error('Failed to create workout: no ID returned');
-  }
+    // 3. Handle concurrent creation collision (23505 unique constraint violation)
+    if (insertError) {
+      const isConflict =
+        insertError.code === '23505' ||
+        insertError.message?.includes('duplicate key') ||
+        insertError.message?.includes('unique constraint');
 
-  return newWorkout.id;
+      if (isConflict) {
+        const { data: winningWorkout } = await findWorkoutSession();
+
+        if (winningWorkout?.id) {
+          return winningWorkout.id;
+        }
+      }
+
+      const classified = classifyError(insertError);
+      if (classified.kind === 'TRANSIENT') {
+        return await resolveWorkoutRefForDate(userId, workoutDate, routineName);
+      }
+
+      throw insertError;
+    }
+
+    if (!newWorkout?.id) {
+      throw new Error('Failed to create workout: no ID returned');
+    }
+
+    return newWorkout.id;
+  } catch (err: any) {
+    const classified = classifyError(err);
+    if (classified.kind === 'TRANSIENT') {
+      return await resolveWorkoutRefForDate(userId, workoutDate, routineName);
+    }
+    throw err;
+  }
 }
 
 /**
  * Inserts a single set record into the sets table, resolved strictly by exercise_id UUID.
+ * Routes through durable outbox (enqueueAndAwait) when offline or in standard client mode.
  */
 export async function insertSet(
-  client: SupabaseClient,
+  _client: SupabaseClient,
   workoutId: string,
-  payload: InsertSetPayload
+  payload: InsertSetPayload,
+  userId?: string
 ): Promise<LoggedSetResult> {
   if (!workoutId) throw new Error('workoutId is required');
   if (!payload.exerciseId) throw new Error('exerciseId UUID is required');
 
-  const { data, error } = await client
-    .from('sets')
-    .insert([
-      {
-        workout_id: workoutId,
-        exercise_id: payload.exerciseId,
-        weight: payload.weight,
-        reps: payload.reps,
-        set_index: payload.setIndex ?? 1,
-        set_type: payload.setType || 'working',
-        rpe: payload.rpe ?? null,
-      },
-    ])
-    .select()
-    .single();
+  const setId = payload.id || newId();
+  const captureTime = payload.createdAt || new Date().toISOString();
+  const effectiveUserId = userId || payload.targetUserId || getActiveUserId() || '';
 
-  if (error) throw error;
-  if (!data) throw new Error('Failed to insert set: no data returned');
-  return data as LoggedSetResult;
+  const result = await enqueueAndAwait({
+    userId: effectiveUserId,
+    kind: 'set.create',
+    payload: {
+      id: setId,
+      workoutRef: workoutId,
+      exercise_id: payload.exerciseId,
+      weight: payload.weight,
+      reps: payload.reps,
+      set_index: payload.setIndex ?? 1,
+      set_type: (payload.setType as SetTypeKind) || 'working',
+      rpe: payload.rpe ?? null,
+      created_at: captureTime,
+    },
+  });
+
+  return {
+    id: setId,
+    workout_id: workoutId,
+    exercise_id: payload.exerciseId,
+    weight: payload.weight,
+    reps: payload.reps,
+    set_index: payload.setIndex ?? 1,
+    set_type: payload.setType || 'working',
+    rpe: payload.rpe ?? null,
+    created_at: captureTime,
+    pending: result.status === 'queued',
+    workout_date: payload.workoutDate,
+    civil_date: payload.workoutDate,
+  };
 }
 
 /**
  * Batch inserts multiple sets into the sets table.
  */
 export async function batchInsertSets(
-  client: SupabaseClient,
+  _client: SupabaseClient,
   workoutId: string,
-  payloads: InsertSetPayload[]
+  payloads: InsertSetPayload[],
+  userId?: string
 ): Promise<LoggedSetResult[]> {
   if (!workoutId) throw new Error('workoutId is required');
   if (payloads.length === 0) return [];
 
-  const rows = payloads.map((p) => {
+  for (const p of payloads) {
     if (!p.exerciseId) throw new Error('exerciseId UUID is required for each set');
-    return {
-      workout_id: workoutId,
-      exercise_id: p.exerciseId,
-      weight: p.weight,
-      reps: p.reps,
-      set_index: p.setIndex ?? 1,
-      set_type: p.setType || 'working',
-      rpe: p.rpe ?? null,
-    };
-  });
+  }
 
-  const { data, error } = await client.from('sets').insert(rows).select();
-  if (error) throw error;
-  return (data || []) as LoggedSetResult[];
+  const effectiveUserId = userId || payloads[0]?.targetUserId || getActiveUserId() || '';
+
+  const results = await Promise.all(
+    payloads.map(async (p) => {
+      const setId = p.id || newId();
+      const captureTime = p.createdAt || new Date().toISOString();
+      const res = await enqueueAndAwait({
+        userId: effectiveUserId,
+        kind: 'set.create',
+        payload: {
+          id: setId,
+          workoutRef: workoutId,
+          exercise_id: p.exerciseId,
+          weight: p.weight,
+          reps: p.reps,
+          set_index: p.setIndex ?? 1,
+          set_type: (p.setType as SetTypeKind) || 'working',
+          rpe: p.rpe ?? null,
+          created_at: captureTime,
+        },
+      });
+
+      return {
+        id: setId,
+        workout_id: workoutId,
+        exercise_id: p.exerciseId,
+        weight: p.weight,
+        reps: p.reps,
+        set_index: p.setIndex ?? 1,
+        set_type: p.setType || 'working',
+        rpe: p.rpe ?? null,
+        created_at: captureTime,
+        pending: res.status === 'queued',
+        workout_date: p.workoutDate,
+        civil_date: p.workoutDate,
+      };
+    })
+  );
+
+  return results;
 }
 
 /**
  * Updates an existing set record.
  */
 export async function updateSet(
-  client: SupabaseClient,
+  _client: SupabaseClient,
   setId: string,
-  updates: Partial<InsertSetPayload>
+  updates: Partial<InsertSetPayload>,
+  expected?: SetPatchFields,
+  userId?: string
 ): Promise<LoggedSetResult> {
   if (!setId) throw new Error('setId is required');
-  const patch: Record<string, any> = {};
+  const patch: SetPatchFields = {};
   if (updates.weight !== undefined) patch.weight = updates.weight;
   if (updates.reps !== undefined) patch.reps = updates.reps;
   if (updates.setIndex !== undefined) patch.set_index = updates.setIndex;
-  if (updates.setType !== undefined) patch.set_type = updates.setType;
+  if (updates.setType !== undefined) patch.set_type = updates.setType as SetTypeKind;
   if (updates.rpe !== undefined) patch.rpe = updates.rpe;
+  if (updates.exerciseId !== undefined) patch.exercise_id = updates.exerciseId;
 
-  const { data, error } = await client
-    .from('sets')
-    .update(patch)
-    .eq('id', setId)
-    .select()
-    .single();
+  const effectiveUserId = userId || updates.targetUserId || getActiveUserId() || '';
 
-  if (error) throw error;
-  return data as LoggedSetResult;
+  const res = await enqueueAndAwait(
+    {
+      userId: effectiveUserId,
+      kind: 'set.update',
+      payload: {
+        id: setId,
+        patch,
+        expected,
+      },
+    },
+    { timeoutMs: 2500 }
+  );
+
+  return {
+    id: setId,
+    workout_id: updates.workoutId || '',
+    exercise_id: updates.exerciseId || '',
+    weight: updates.weight ?? 0,
+    reps: updates.reps ?? 0,
+    set_index: updates.setIndex ?? 1,
+    set_type: updates.setType || 'working',
+    rpe: updates.rpe ?? null,
+    created_at: new Date().toISOString(),
+    pending: res.status === 'queued',
+  };
 }
 
 /**
  * Deletes a set record by ID.
  */
-export async function deleteSet(client: SupabaseClient, setId: string): Promise<void> {
+export async function deleteSet(
+  _client: SupabaseClient,
+  setId: string,
+  optionsOrUserId?: string | { workoutDate?: string; targetUserId?: string }
+): Promise<void> {
   if (!setId) throw new Error('setId is required');
-  const { error } = await client.from('sets').delete().eq('id', setId);
-  if (error) throw error;
+
+  const targetUserId =
+    typeof optionsOrUserId === 'string'
+      ? optionsOrUserId
+      : optionsOrUserId?.targetUserId || getActiveUserId() || '';
+
+  await enqueueAndAwait({
+    userId: targetUserId,
+    kind: 'set.delete',
+    payload: { id: setId },
+  });
 }

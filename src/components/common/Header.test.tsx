@@ -6,6 +6,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../../context/AuthContext';
 import { CoachProvider } from '../../context/CoachContext';
 import { expectNoA11yViolations } from '../../test/a11y';
+import {
+  updateUserCache,
+  setSyncingStatus,
+  setAuthRequiredStatus,
+  resetOutboxForTesting,
+} from '../../offline/outbox';
 
 import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory } from '../../test/supabaseBuilderMock';
 
@@ -168,7 +174,10 @@ describe('Header connection status badge', () => {
     renderHeader();
 
     const badge = screen.getByTestId('connection-status');
-    expect(badge.getAttribute('role')).toBe('status');
+    expect(badge.tagName).toBe('BUTTON');
+    const liveRegion = badge.querySelector('[role="status"]');
+    expect(liveRegion).not.toBeNull();
+    expect(liveRegion?.getAttribute('aria-live')).toBe('polite');
 
     // Live region exists while online
     expect(badge.textContent).toContain('Online');
@@ -255,6 +264,165 @@ describe('Header connection status badge', () => {
       expect(link.className).toContain('min-w-[44px]');
 
       await expectNoA11yViolations(container);
+    });
+  });
+
+  describe('Header connection status badge states & A9 sign out confirm', () => {
+    beforeEach(() => {
+      localStorage.setItem('cybergym_user', JSON.stringify({ id: 'test-user', email: 'coach@cybergym.io' }));
+    });
+
+    afterEach(() => {
+      resetOutboxForTesting();
+      localStorage.removeItem('cybergym_user');
+    });
+
+    it('renders "Offline" when offline with 0 pending', async () => {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, writable: true, value: false });
+      updateUserCache('test-user', []);
+
+      renderHeader();
+      await waitFor(() => {
+        const badge = screen.getByTestId('connection-status');
+        expect(badge.textContent).toContain('Offline');
+        expect(badge.getAttribute('title')).toBe('Offline');
+      });
+    });
+
+    it('renders "Offline · 12 pending" when offline with 12 pending items', async () => {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, writable: true, value: false });
+      const ops = Array.from({ length: 12 }, (_, i) => ({
+        opId: `op-${i}`,
+        userId: 'test-user',
+        seq: i + 1,
+        createdAt: new Date().toISOString(),
+        attempts: 0,
+        state: 'pending' as const,
+        kind: 'set.create' as const,
+        payload: { id: `s-${i}`, workoutRef: 'w1', exercise_id: 'e1', weight: 100, reps: 5, set_index: i + 1, created_at: new Date().toISOString() },
+      }));
+      updateUserCache('test-user', ops);
+
+      renderHeader();
+      await waitFor(() => {
+        const badge = screen.getByTestId('connection-status');
+        expect(badge.textContent).toContain('Offline · 12 pending');
+        expect(badge.getAttribute('title')).toBe('Offline · 12 pending');
+      });
+    });
+
+    it('renders "Syncing · 3" when online and syncing with 3 pending', async () => {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, writable: true, value: true });
+      const ops = Array.from({ length: 3 }, (_, i) => ({
+        opId: `op-${i}`,
+        userId: 'test-user',
+        seq: i + 1,
+        createdAt: new Date().toISOString(),
+        attempts: 0,
+        state: 'pending' as const,
+        kind: 'set.create' as const,
+        payload: { id: `s-${i}`, workoutRef: 'w1', exercise_id: 'e1', weight: 100, reps: 5, set_index: i + 1, created_at: new Date().toISOString() },
+      }));
+      updateUserCache('test-user', ops);
+      setSyncingStatus(true);
+
+      renderHeader();
+      await waitFor(() => {
+        const badge = screen.getByTestId('connection-status');
+        expect(badge.textContent).toContain('Syncing · 3');
+        expect(badge.getAttribute('title')).toBe('Syncing · 3');
+      });
+    });
+
+    it('renders "2 need attention" with warning tone when attention items exist', async () => {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, writable: true, value: true });
+      const ops = [
+        {
+          opId: 'op-att-1',
+          userId: 'test-user',
+          seq: 1,
+          createdAt: new Date().toISOString(),
+          attempts: 1,
+          state: 'attention' as const,
+          error: 'FK constraint failed',
+          kind: 'set.create' as const,
+          payload: { id: 's-1', workoutRef: 'w1', exercise_id: 'e1', weight: 100, reps: 5, set_index: 1, created_at: new Date().toISOString() },
+        },
+        {
+          opId: 'op-att-2',
+          userId: 'test-user',
+          seq: 2,
+          createdAt: new Date().toISOString(),
+          attempts: 1,
+          state: 'attention' as const,
+          error: 'Row deleted',
+          kind: 'set.update' as const,
+          payload: { id: 's-2', patch: { reps: 8 } },
+        },
+      ];
+      updateUserCache('test-user', ops);
+
+      renderHeader();
+      await waitFor(() => {
+        const badge = screen.getByTestId('connection-status');
+        expect(badge.textContent).toContain('2 need attention');
+        expect(badge.getAttribute('title')).toBe('2 need attention');
+      });
+    });
+
+    it('renders "Sign in to sync" when authRequired is true', async () => {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, writable: true, value: true });
+      setAuthRequiredStatus(true);
+
+      renderHeader();
+      await waitFor(() => {
+        const badge = screen.getByTestId('connection-status');
+        expect(badge.textContent).toContain('Sign in to sync');
+        expect(badge.getAttribute('title')).toBe('Sign in to sync');
+      });
+    });
+
+    it('clicking connection status button opens SyncStatusSheet', async () => {
+      renderHeader();
+      const badge = screen.getByTestId('connection-status');
+      act(() => {
+        badge.click();
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('sync-status-sheet')).toBeDefined();
+        expect(screen.getByText('Sync status')).toBeDefined();
+      });
+    });
+
+    it('A9: asks for confirmation on sign-out when outbox has pending items', async () => {
+      const ops = [
+        {
+          opId: 'op-pending',
+          userId: 'test-user',
+          seq: 1,
+          createdAt: new Date().toISOString(),
+          attempts: 0,
+          state: 'pending' as const,
+          kind: 'set.create' as const,
+          payload: { id: 's-1', workoutRef: 'w1', exercise_id: 'e1', weight: 100, reps: 5, set_index: 1, created_at: new Date().toISOString() },
+        },
+      ];
+      updateUserCache('test-user', ops);
+
+      renderHeader();
+      await waitFor(() => {
+        expect(screen.getByTestId('sign-out-button')).toBeDefined();
+      });
+      const signOutBtn = screen.getByTestId('sign-out-button');
+      await act(async () => {
+        signOutBtn.click();
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('sign-out-confirm-dialog')).toBeDefined();
+        expect(screen.getByText(/1 unsynced changes stay on this device and sync the next time you sign in as coach@cybergym\.io\. Sign out\?/)).toBeDefined();
+      });
     });
   });
 });

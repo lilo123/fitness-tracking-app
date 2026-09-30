@@ -15,6 +15,7 @@ import { DataExportCard } from './DataExportCard';
 import { useToast } from '../../hooks/useToast';
 import { WeightUnitCard } from './WeightUnitCard';
 import { PrModeCard } from './PrModeCard';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 
 interface SettingsFormProps {
   profile: UserProfile | null;
@@ -34,6 +35,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
   refreshProfile,
 }) => {
   const { show: showToast } = useToast();
+  const isOnline = useOnlineStatus();
   const [username, setUsername] = useState(profile?.username || '');
   const [targetCalories, setTargetCalories] = useState(profile?.target_calories || 2200);
   const [targetProtein, setTargetProtein] = useState(profile?.target_protein || 160);
@@ -54,6 +56,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
   const hasCoachCapability = Boolean(profile?.role === 'coach' || profile?.is_coach_mode || isCoachMode);
 
   const handleToggleAutoTimer = async () => {
+    if (!isOnline) return;
     const nextVal = !autoRestTimer;
     setAutoRestTimer(nextVal);
     localStorage.setItem('cybergym_auto_rest_timer', String(nextVal));
@@ -203,6 +206,11 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
             <div className="text-xs text-zinc-400 leading-relaxed">
               Automatically start the 90s countdown timer when logging any set.
             </div>
+            {!isOnline && (
+              <p className="text-xs text-amber-400 font-semibold" data-testid="offline-helper-text">
+                Available when online
+              </p>
+            )}
           </div>
 
           <button
@@ -210,9 +218,13 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
             role="switch"
             aria-checked={autoRestTimer}
             aria-labelledby={restTimerLabelId}
+            disabled={!isOnline}
+            title={!isOnline ? 'Available when online' : undefined}
             data-testid="toggle-auto-timer"
             onClick={handleToggleAutoTimer}
-            className={`relative inline-flex before:absolute before:-inset-y-2.5 before:inset-x-0 before:inset-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:min-w-[44px] before:min-h-[44px] before:content-[''] h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none touch-manipulation ${
+            className={`relative inline-flex before:absolute before:-inset-y-2.5 before:inset-x-0 before:inset-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:min-w-[44px] before:min-h-[44px] before:content-[''] h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none touch-manipulation ${
+              !isOnline ? 'opacity-50 cursor-not-allowed ' : 'cursor-pointer '
+            }${
               autoRestTimer ? 'bg-cyan-500' : 'bg-zinc-800'
             }`}
           >

@@ -16,6 +16,7 @@ import { PickerFilterChips } from './picker/PickerFilterChips';
 import { CreateExerciseRow } from './picker/CreateExerciseRow';
 import { ExerciseSectionList } from './picker/ExerciseSectionList';
 import { useRecentFrequentExercises } from './picker/useRecentFrequentExercises';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 
 export interface ExercisePickerProps {
   isOpen: boolean;
@@ -44,6 +45,7 @@ export const ExercisePicker: React.FC<ExercisePickerProps> = ({
   testId = 'exercise-picker-sheet',
 }) => {
   const queryClient = useQueryClient();
+  const isOnline = useOnlineStatus();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -93,8 +95,22 @@ export const ExercisePicker: React.FC<ExercisePickerProps> = ({
   });
 
   const allCatalogExercises = useMemo(() => {
-    return flattenCatalogPages(catalogData);
-  }, [catalogData]);
+    const flattened = flattenCatalogPages(catalogData);
+    if (!isOnline && flattened.length === 0) {
+      const cached =
+        (targetUserId &&
+          queryClient.getQueryData<CatalogExercise[]>([
+            'exercise_catalog',
+            'offline_all',
+            targetUserId,
+          ])) ||
+        queryClient.getQueryData<CatalogExercise[]>(['exercise_catalog', 'offline_all']) ||
+        queryClient.getQueryData<CatalogExercise[]>(['exercises', 'workout']) ||
+        [];
+      return cached;
+    }
+    return flattened;
+  }, [catalogData, isOnline, targetUserId, queryClient]);
 
   const { recentNames, frequentNames } = useRecentFrequentExercises(targetUserId, userLogs);
 
@@ -280,7 +296,15 @@ export const ExercisePicker: React.FC<ExercisePickerProps> = ({
           />
         )}
 
-        {isCatalogError && (
+        {!isOnline && (
+          <StatusBanner
+            message="Offline — showing saved catalog"
+            tone="info"
+            testId="offline-catalog-banner"
+          />
+        )}
+
+        {isCatalogError && isOnline && (
           <StatusBanner
             title="Failed to load catalog"
             message={
@@ -306,6 +330,7 @@ export const ExercisePicker: React.FC<ExercisePickerProps> = ({
                 catalog={allCatalogExercises}
                 onCreate={handleCreateExercise}
                 isCreating={isCreating}
+                isOnline={isOnline}
               />
             )}
 

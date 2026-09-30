@@ -9,6 +9,7 @@ import { PlusCircle, RefreshCw, AlertCircle, Pencil, Copy, Trash2, ChevronDown, 
 import { StatusBanner } from '../common/StatusBanner';
 import { EditTemplateSheet } from './EditTemplateSheet';
 import { useDeferredDelete } from '../common/useDeferredDelete';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { useToast } from '../../hooks/useToast';
 import { Tag } from '../common/Tag';
 import { Button } from '../common/Button';
@@ -33,6 +34,7 @@ export const TemplateListTab: React.FC<TemplateListTabProps> = ({
   const { user } = useAuth();
   const { selectedAthleteId, isCoach } = useCoach();
   const queryClient = useQueryClient();
+  const isOnline = useOnlineStatus();
 
   const targetUserId = propTargetUserId ?? user?.id ?? '';
 
@@ -84,6 +86,9 @@ export const TemplateListTab: React.FC<TemplateListTabProps> = ({
     durationMs: effectiveDurationMs,
     commit: async (item: RoutineTemplate) => {
       setTemplateError(null);
+      if (!isOnline) {
+        throw new Error('Available when online');
+      }
       // 0-row delete: use .select() and treat [] as failure
       const { data, error } = await supabase
         .from('routine_templates')
@@ -135,19 +140,29 @@ export const TemplateListTab: React.FC<TemplateListTabProps> = ({
         <h3 className="font-bold text-white text-sm flex items-center gap-2">
           <RefreshCw className="w-4 h-4 text-violet-400" aria-hidden="true" /> Saved Templates ({catalogTemplates.length})
         </h3>
-        <button
-          type="button"
-          data-testid="new-template-btn"
-          onClick={() => {
-            setEditingTemplate(null);
-            setIsForking(false);
-            setIsTemplateModalOpen(true);
-          }}
-          className="px-4 py-2 min-h-[44px] bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-400 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-neon-violet transition active:scale-95 flex items-center gap-1.5 touch-manipulation cursor-pointer"
-        >
-          <PlusCircle className="w-4 h-4" aria-hidden="true" />
-          <span>+ New Routine</span>
-        </button>
+        <div className="flex flex-col items-end gap-1">
+          <button
+            type="button"
+            data-testid="new-template-btn"
+            disabled={!isOnline}
+            title={!isOnline ? 'Available when online' : undefined}
+            onClick={() => {
+              if (!isOnline) return;
+              setEditingTemplate(null);
+              setIsForking(false);
+              setIsTemplateModalOpen(true);
+            }}
+            className="px-4 py-2 min-h-[44px] bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-400 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-neon-violet transition active:scale-95 flex items-center gap-1.5 touch-manipulation cursor-pointer disabled:opacity-50"
+          >
+            <PlusCircle className="w-4 h-4" aria-hidden="true" />
+            <span>+ New Routine</span>
+          </button>
+          {!isOnline && (
+            <span className="text-xs text-amber-400 font-semibold" data-testid="offline-new-template-helper">
+              Available when online
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Day Filter Toolbar (L15: role=radiogroup/radio, aria-checked) */}
@@ -251,13 +266,18 @@ export const TemplateListTab: React.FC<TemplateListTabProps> = ({
                       <button
                         type="button"
                         onClick={() => {
+                          if (!isOnline) {
+                            setTemplateError('Available when online');
+                            return;
+                          }
                           setEditingTemplate(tpl);
                           setIsForking(false);
                           setIsTemplateModalOpen(true);
                         }}
+                        disabled={!isOnline}
+                        title={!isOnline ? 'Available when online' : 'Edit Template'}
                         data-testid={`edit-template-${tpl.id}`}
-                        className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-violet-400 transition touch-manipulation cursor-pointer"
-                        title="Edit Template"
+                        className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-violet-400 transition touch-manipulation cursor-pointer disabled:opacity-50"
                         aria-label={`Edit ${tpl.name}`}
                       >
                         <Pencil className="w-4 h-4" />
@@ -267,13 +287,18 @@ export const TemplateListTab: React.FC<TemplateListTabProps> = ({
                       <button
                         type="button"
                         onClick={() => {
+                          if (!isOnline) {
+                            setTemplateError('Available when online');
+                            return;
+                          }
                           setEditingTemplate(tpl);
                           setIsForking(true);
                           setIsTemplateModalOpen(true);
                         }}
+                        disabled={!isOnline}
+                        title={!isOnline ? 'Available when online' : 'Duplicate & Customize'}
                         data-testid={`fork-template-${tpl.id}`}
-                        className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-cyan-400 transition touch-manipulation cursor-pointer"
-                        title="Duplicate & Customize"
+                        className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-cyan-400 transition touch-manipulation cursor-pointer disabled:opacity-50"
                         aria-label={`Duplicate ${tpl.name}`}
                       >
                         <Copy className="w-4 h-4" />
@@ -283,6 +308,10 @@ export const TemplateListTab: React.FC<TemplateListTabProps> = ({
                       <button
                         type="button"
                         onClick={() => {
+                          if (!isOnline) {
+                            setTemplateError('Available when online');
+                            return;
+                          }
                           schedule(tpl, tpl.name);
                           showToast({
                             kind: 'undo',
@@ -294,9 +323,10 @@ export const TemplateListTab: React.FC<TemplateListTabProps> = ({
                             durationMs: effectiveDurationMs,
                           });
                         }}
+                        disabled={!isOnline}
+                        title={!isOnline ? 'Available when online' : 'Delete'}
                         data-testid={`delete-template-${tpl.id}`}
-                        className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-rose-400 transition touch-manipulation cursor-pointer"
-                        title="Delete"
+                        className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-rose-400 transition touch-manipulation cursor-pointer disabled:opacity-50"
                         aria-label={`Delete ${tpl.name}`}
                       >
                         <Trash2 className="w-4 h-4" />

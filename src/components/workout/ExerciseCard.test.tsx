@@ -371,4 +371,30 @@ describe('ExerciseCard', () => {
     expect(prChip).toHaveTextContent('PR: 100×15');
     expect(prChip.textContent).not.toContain('e1RM');
   });
+
+  it('renders pending mark in header when any set in setsToday is pending', () => {
+    const pendingProps: ExerciseCardProps = {
+      ...defaultProps,
+      setsToday: [
+        { id: 's1', exercise_id: 'e1', set_index: 1, weight: 100, reps: 10, set_type: 'working', pending: true } as any,
+      ],
+    };
+
+    const { rerender } = renderWithAuth(<ExerciseCard {...pendingProps} />);
+    const headerButton = screen.getByRole('button', { name: /Bench Press.*exercise/ });
+    expect(headerButton.querySelector('[data-testid="pending-mark"]')).toBeInTheDocument();
+
+    const syncedProps: ExerciseCardProps = {
+      ...defaultProps,
+      setsToday: [
+        { id: 's1', exercise_id: 'e1', set_index: 1, weight: 100, reps: 10, set_type: 'working', pending: false } as any,
+      ],
+    };
+    rerender(
+      <AuthContext.Provider value={createAuthContextValue()}>
+        <ExerciseCard {...syncedProps} />
+      </AuthContext.Provider>
+    );
+    expect(headerButton.querySelector('[data-testid="pending-mark"]')).toBeNull();
+  });
 });

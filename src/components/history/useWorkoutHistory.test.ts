@@ -396,6 +396,28 @@ describe('useWorkoutHistory Data Layer (P5a W2)', () => {
         queryKey: queryKeys.workoutSets.byUser('user-delete'),
       });
     });
+
+    it('disables deletion when offline and does not call supabase (g)', async () => {
+      const onlineSpy = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+
+      const deleteMock = vi.fn();
+      vi.mocked((supabase as any)['from']).mockReturnValue({
+        delete: deleteMock,
+      } as any);
+
+      const wrapper = createWrapper(queryClient);
+      const { result } = renderHook(() => useWorkoutHistory('user-delete', 'all'), { wrapper });
+
+      expect(result.current.canDelete).toBe(false);
+      expect(result.current.isOnline).toBe(false);
+
+      await act(async () => {
+        await result.current.deleteSession('w-to-delete');
+      });
+
+      expect(deleteMock).not.toHaveBeenCalled();
+      onlineSpy.mockRestore();
+    });
   });
 
   describe('7. loadMoreError surfaced', () => {

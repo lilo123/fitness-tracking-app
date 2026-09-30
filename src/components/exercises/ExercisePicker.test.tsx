@@ -264,4 +264,91 @@ describe('ExercisePicker', () => {
 
     await expectNoA11yViolations(container);
   });
+
+  it('falls back to cached catalog, renders offline banner, and disables create when offline (f)', async () => {
+    const user = userEvent.setup();
+    const origOnline = navigator.onLine;
+    Object.defineProperty(navigator, 'onLine', {
+      configurable: true,
+      writable: true,
+      value: false,
+    });
+    window.dispatchEvent(new Event('offline'));
+
+    (supabase.rpc as any).mockImplementation((fn: string) => {
+      if (fn === 'get_exercise_catalog') {
+        return Promise.reject(new Error('Network error'));
+      }
+      return Promise.resolve({ data: [], error: null });
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+
+    queryClient.setQueryData(['exercise_catalog', 'offline_all', 'test-user'], [
+      {
+        id: 'e-cached-1',
+        name: 'Saved Barbell Squat',
+        body_parts: ['Legs'],
+        equipment: 'barbell',
+        is_master: true,
+        user_id: null,
+        is_archived: false,
+        is_hidden: false,
+        total_count: 1,
+      },
+      {
+        id: 'e-cached-2',
+        name: 'Saved Bench Press',
+        body_parts: ['Chest'],
+        equipment: 'barbell',
+        is_master: true,
+        user_id: null,
+        is_archived: false,
+        is_hidden: false,
+        total_count: 1,
+      },
+    ]);
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ExercisePicker
+          isOpen={true}
+          onClose={vi.fn()}
+          onAdd={vi.fn()}
+          targetUserId="test-user"
+        />
+      </QueryClientProvider>
+    );
+
+    // 1. Shows offline banner
+    const offlineBanner = await screen.findByTestId('offline-catalog-banner');
+    expect(offlineBanner).toBeInTheDocument();
+    expect(offlineBanner).toHaveTextContent('Offline — showing saved catalog');
+
+    // 2. Shows cached exercises
+    expect(screen.getByText('Saved Barbell Squat')).toBeInTheDocument();
+    expect(screen.getByText('Saved Bench Press')).toBeInTheDocument();
+
+    // 3. Filters cached exercises
+    const searchInput = screen.getByTestId('exercise-search-input');
+    await user.type(searchInput, 'bench');
+    expect(screen.getByText('Saved Bench Press')).toBeInTheDocument();
+    expect(screen.queryByText('Saved Barbell Squat')).not.toBeInTheDocument();
+
+    // 4. Searching for custom exercise shows "Available when online" and button is disabled
+    await user.clear(searchInput);
+    await user.type(searchInput, 'New Custom Lift');
+    const createBtn = await screen.findByTestId('create-exercise-btn');
+    expect(createBtn).toBeDisabled();
+    expect(screen.getByText('Available when online')).toBeInTheDocument();
+
+    Object.defineProperty(navigator, 'onLine', {
+      configurable: true,
+      writable: true,
+      value: origOnline,
+    });
+    window.dispatchEvent(new Event('online'));
+  });
 });

@@ -7314,4 +7314,224 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
       }
     });
   }
+
+  // ---------------------------------------------------------------------------
+  // W4: Offline & Sync Visual Density Tests (320px)
+  // ---------------------------------------------------------------------------
+
+  test('W4 Density: Header connection status badge displays "Offline · 12 pending", fits 320px without clip or wrap, tap target >= 44x44px', async ({ browser }) => {
+    const page = await browser.newPage({
+      viewport: { width: 320, height: 844 },
+      deviceScaleFactor: 1,
+    });
+
+    try {
+      await page.goto('/login');
+      await page.fill('input[type="email"]', 'athlete@cybergym.io');
+      await page.fill('input[type="password"]', 'password123');
+      await page.click('button[type="submit"]');
+      await page.waitForURL('**/workout');
+
+      // Wait for workout page to be fully loaded
+      const statusBadge = page.locator('[data-testid="connection-status"]');
+      await expect(statusBadge).toBeVisible({ timeout: 10000 });
+
+      // Seed 12 pending ops and simulate offline
+      await page.evaluate(() => {
+        const authKey = Object.keys(localStorage).find((k) => k.includes('auth-token'));
+        const session = authKey ? JSON.parse(localStorage.getItem(authKey) || '{}') : null;
+        const userId = session?.user?.id;
+        if (!userId) throw new Error('No user session found');
+
+        const setSummaryFn = (window as any).__setOutboxSummaryForTesting;
+        if (setSummaryFn) {
+          setSummaryFn(userId, 12);
+        }
+
+        Object.defineProperty(navigator, 'onLine', { configurable: true, writable: true, value: false });
+        window.dispatchEvent(new Event('offline'));
+      });
+
+      await expect(statusBadge).toHaveText('Offline · 12 pending', { timeout: 5000 });
+
+      const box = await statusBadge.boundingBox();
+      expect(box, 'button bounding box exists').not.toBeNull();
+      expect(box!.width, `connection-status width (${box!.width}px) >= 44px`).toBeGreaterThanOrEqual(44);
+      expect(box!.height, `connection-status height (${box!.height}px) >= 44px`).toBeGreaterThanOrEqual(44);
+
+      // Verify no horizontal clipping on badge or header
+      const isClipped = await statusBadge.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
+      expect(isClipped, 'Badge should not be clipped').toBe(false);
+
+      const header = page.locator('header');
+      const headerClipped = await header.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
+      expect(headerClipped, 'Header should not horizontally overflow').toBe(false);
+    } finally {
+      await page.close();
+    }
+  });
+
+  test('W4 Density: SetRow pending mark fits in index cell and preserves grid column alignment with header at 320px', async ({ browser }) => {
+    const page = await browser.newPage({
+      viewport: { width: 320, height: 844 },
+      deviceScaleFactor: 1,
+    });
+
+    try {
+      await page.goto('/login');
+      await page.fill('input[type="email"]', 'athlete@cybergym.io');
+      await page.fill('input[type="password"]', 'password123');
+      await page.click('button[type="submit"]');
+      await page.waitForURL('**/workout');
+
+      await page.goto('/workout?routine=' + encodeURIComponent('Workout A (Push, Quads & Core)'));
+      await page.waitForLoadState('domcontentloaded');
+
+      const card = page.locator('[data-testid="exercise-card-0"]');
+      await expect(card).toBeVisible({ timeout: 10000 });
+
+      // Ensure set 1 is logged so we have a logged set row
+      const loggedRow = card.locator('[data-testid^="logged-set-row-"]').first();
+      if (!(await loggedRow.isVisible())) {
+        const commitBtn = card.locator('[data-testid^="commit-set-btn-"]').first();
+        await commitBtn.click();
+        await expect(loggedRow).toBeVisible({ timeout: 5000 });
+      }
+
+      // Check alignment of index cell with column header
+      const geo = await page.evaluate(() => {
+        const headerGrid = document.querySelector('#exercise-card-body-0 .grid');
+        const headerIndexCell = headerGrid?.firstElementChild;
+        const firstRow = document.querySelector('[data-testid^="logged-set-row-"]');
+        const firstRowIndex = firstRow?.firstElementChild;
+        if (!headerIndexCell || !firstRowIndex) return null;
+
+        const hRect = headerIndexCell.getBoundingClientRect();
+        const rRect = firstRowIndex.getBoundingClientRect();
+        return {
+          headerWidth: Math.round(hRect.width * 10) / 10,
+          rowWidth: Math.round(rRect.width * 10) / 10,
+          deltaLeft: Math.abs(hRect.left - rRect.left),
+        };
+      });
+
+      expect(geo).not.toBeNull();
+      expect(geo!.deltaLeft).toBeLessThanOrEqual(2);
+    } finally {
+      await page.close();
+    }
+  });
+
+  test('W4 Density: AttentionBanner and SyncStatusSheet fit 320px without overflow with >=44px tap targets', async ({ browser }) => {
+    const page = await browser.newPage({
+      viewport: { width: 320, height: 844 },
+      deviceScaleFactor: 1,
+    });
+
+    try {
+      await page.goto('/login');
+      await page.fill('input[type="email"]', 'athlete@cybergym.io');
+      await page.fill('input[type="password"]', 'password123');
+      await page.click('button[type="submit"]');
+      await page.waitForURL('**/workout');
+
+      // Seed 1 attention op in outbox
+      await page.evaluate(async () => {
+        const authKey = Object.keys(localStorage).find((k) => k.includes('auth-token'));
+        const session = authKey ? JSON.parse(localStorage.getItem(authKey) || '{}') : null;
+        const userId = session?.user?.id;
+        if (!userId) return;
+
+        const dbReq = indexedDB.open(`cybergym-offline-${userId}`, 1);
+        const db: IDBDatabase = await new Promise((res, rej) => {
+          dbReq.onsuccess = () => res(dbReq.result);
+          dbReq.onerror = () => rej(dbReq.error);
+        });
+
+        const tx = db.transaction(['outbox'], 'readwrite');
+        const store = tx.objectStore('outbox');
+        store.put({
+          opId: 'attention-op-1',
+          userId,
+          seq: 99,
+          kind: 'set.create',
+          payload: { weight: 135, reps: 5 },
+          createdAt: new Date().toISOString(),
+          attempts: 3,
+          state: 'attention',
+          error: 'Row conflict or foreign key constraint violation',
+        });
+        await new Promise((res, rej) => {
+          tx.oncomplete = res;
+          tx.onerror = rej;
+        });
+      });
+
+      await page.reload();
+      await page.waitForLoadState('domcontentloaded');
+
+      const banner = page.locator('[data-testid="attention-banner"]');
+      await expect(banner).toBeVisible({ timeout: 5000 });
+
+      // Check banner fits 320px without overflow
+      const bannerOverflow = await banner.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
+      expect(bannerOverflow, 'Attention banner must not horizontally overflow').toBe(false);
+
+      const reviewBtn = page.locator('[data-testid="review-attention-btn"]');
+      const reviewBox = await reviewBtn.boundingBox();
+      expect(reviewBox!.height).toBeGreaterThanOrEqual(44);
+
+      // Open SyncStatusSheet
+      await reviewBtn.click();
+      const sheet = page.locator('[data-testid="sync-status-sheet"]');
+      await expect(sheet).toBeVisible({ timeout: 5000 });
+
+      const sheetOverflow = await sheet.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
+      expect(sheetOverflow, 'Sync status sheet must not horizontally overflow').toBe(false);
+
+      const retryBtn = page.locator('[data-testid^="retry-op-btn-"]');
+      await expect(retryBtn).toBeVisible();
+      const retryBox = await retryBtn.boundingBox();
+      expect(retryBox!.height).toBeGreaterThanOrEqual(44);
+
+      const discardBtn = page.locator('[data-testid^="discard-op-btn-"]');
+      await expect(discardBtn).toBeVisible();
+      const discardBox = await discardBtn.boundingBox();
+      expect(discardBox!.height).toBeGreaterThanOrEqual(44);
+    } finally {
+      await page.close();
+    }
+  });
+
+  test('W4 Density: UpdateBanner at 320px fits without overflow and reload button has min-h >= 44px', async ({ browser }) => {
+    const page = await browser.newPage({
+      viewport: { width: 320, height: 844 },
+      deviceScaleFactor: 1,
+    });
+
+    try {
+      await page.goto('/login');
+      await page.fill('input[type="email"]', 'athlete@cybergym.io');
+      await page.fill('input[type="password"]', 'password123');
+      await page.click('button[type="submit"]');
+      await page.waitForURL('**/workout');
+
+      // Trigger update available
+      await page.evaluate(() => {
+        (window as unknown as { __setUpdateAvailableForTesting?: (val: boolean) => void }).__setUpdateAvailableForTesting?.(true);
+      });
+
+      const banner = page.locator('[data-testid="update-banner"]');
+      await expect(banner).toBeVisible({ timeout: 5000 });
+
+      const overflow = await banner.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
+      expect(overflow, 'UpdateBanner must not horizontally overflow').toBe(false);
+
+      const reloadBtn = page.locator('[data-testid="update-reload-btn"]');
+      const box = await reloadBtn.boundingBox();
+      expect(box!.height).toBeGreaterThanOrEqual(44);
+    } finally {
+      await page.close();
+    }
+  });
 });

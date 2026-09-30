@@ -2,6 +2,7 @@ import { useState, useEffect, useId, useRef, useCallback } from "react";
 import type { Exercise, RoutineTemplate } from "../../types/database";
 import { resolveExerciseLabel } from "../../utils/exerciseLabel";
 import { supabase } from "../../lib/supabase";
+import { useOnlineStatus } from "../../hooks/useOnlineStatus";
 import type { CatalogExercise } from "../../lib/exercises";
 
 export interface EditableTemplateExercise {
@@ -58,6 +59,7 @@ export function useTemplateEditor({
 }: UseTemplateEditorOptions) {
   const templateNameId = useId();
   const addExerciseBtnRef = useRef<HTMLButtonElement>(null);
+  const isOnline = useOnlineStatus();
 
   const [name, setName] = useState("");
   const [days, setDays] = useState<string[]>([]);
@@ -239,6 +241,10 @@ export function useTemplateEditor({
 
   const handleSave = async () => {
     if (saving || isSavingRef.current) return;
+    if (!isOnline) {
+      setError("Available when online");
+      return;
+    }
     if (!name.trim()) {
       setError("Template name is required.");
       return;

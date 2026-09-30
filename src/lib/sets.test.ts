@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   getNextSetIndex,
   getOrCreateWorkout,
@@ -6,9 +6,22 @@ import {
   batchInsertSets,
   updateSet,
   deleteSet,
+  resolveWorkoutRefForDate,
 } from './sets';
+import { enqueueAndAwait } from '../offline';
+
+vi.mock('../offline', async () => {
+  const actual = await vi.importActual<any>('../offline');
+  return {
+    ...actual,
+    enqueueAndAwait: vi.fn(),
+  };
+});
 
 describe('sets data layer writers (src/lib/sets.ts)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
   describe('getNextSetIndex (W19)', () => {
     it('returns 1 for an empty set list', () => {
       expect(getNextSetIndex([])).toBe(1);
@@ -336,52 +349,152 @@ describe('sets data layer writers (src/lib/sets.ts)', () => {
       expect(id2).toBe('w-concurrent-single-id');
       expect(id1).toBe(id2);
     });
-  });
 
-  describe('insertSet (resolves by exercise_id UUID, W35)', () => {
-    it('inserts set with exercise_id UUID and working set type', async () => {
-      const mockInsert = vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({
-            data: {
-              id: 'set-1',
-              workout_id: 'w-1',
-              exercise_id: 'ex-uuid-1',
-              weight: 185,
-              reps: 5,
-              set_index: 1,
-              set_type: 'working',
-              rpe: null,
-              created_at: '2026-09-27T01:00:00Z',
-            },
-            error: null,
-          }),
-        }),
-      });
-
+    it('transient network error in findWorkoutSession falls back to resolveWorkoutRefForDate', async () => {
       const mockClient: any = {
         ['from']: vi.fn().mockReturnValue({
-          insert: mockInsert,
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({
+            data: null,
+            error: new TypeError('Failed to fetch'),
+          }),
         }),
       };
 
-      const result = await insertSet(mockClient, 'w-1', {
+      const id = await getOrCreateWorkout(mockClient, 'user-1', '2026-09-27', 'Push Day');
+      expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    });
+
+    it('transient network error in insert falls back to resolveWorkoutRefForDate', async () => {
+      const mockClient: any = {
+        ['from']: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          insert: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({
+                data: null,
+                error: { status: 503, message: 'Service Unavailable' },
+              }),
+            }),
+          }),
+        }),
+      };
+
+      const id = await getOrCreateWorkout(mockClient, 'user-1', '2026-09-27', 'Leg Day');
+      expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    });
+
+    it('permanent error in insert throws as before', async () => {
+      const mockClient: any = {
+        ['from']: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          insert: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({
+                data: null,
+                error: { code: '23503', message: 'foreign_key_violation: user does not exist' },
+              }),
+            }),
+          }),
+        }),
+      };
+
+      await expect(
+        getOrCreateWorkout(mockClient, 'bad-user', '2026-09-27')
+      ).rejects.toThrow(/foreign_key_violation/);
+    });
+  });
+
+  describe('insertSet (resolves by exercise_id UUID, W35)', () => {
+    it('offline -> exactly one set.create op with client id and zero supabase calls', async () => {
+      const mockClient: any = { ['from']: vi.fn() };
+      vi.mocked(enqueueAndAwait).mockResolvedValueOnce({
+        status: 'queued',
+        opId: 'op-create-1',
+      });
+
+      const res = await insertSet(mockClient, 'w-1', {
         exerciseId: 'ex-uuid-1',
         weight: 185,
         reps: 5,
         setIndex: 1,
       });
 
-      expect(result.id).toBe('set-1');
-      expect(mockInsert).toHaveBeenCalledWith([
+      expect(enqueueAndAwait).toHaveBeenCalledTimes(1);
+      expect(enqueueAndAwait).toHaveBeenCalledWith(
         expect.objectContaining({
-          workout_id: 'w-1',
-          exercise_id: 'ex-uuid-1',
-          weight: 185,
+          kind: 'set.create',
+          payload: expect.objectContaining({
+            workoutRef: 'w-1',
+            exercise_id: 'ex-uuid-1',
+            weight: 185,
+            reps: 5,
+          }),
+        })
+      );
+      expect(mockClient['from']).not.toHaveBeenCalled();
+      expect(res.pending).toBe(true);
+      expect(res.id).toBeDefined();
+    });
+
+    it('online -> enqueueAndAwait called, synced result returned', async () => {
+      const mockClient: any = { ['from']: vi.fn() };
+      vi.mocked(enqueueAndAwait).mockResolvedValueOnce({
+        status: 'synced',
+        opId: 'op-create-2',
+      });
+
+      const res = await insertSet(mockClient, 'w-1', {
+        exerciseId: 'ex-uuid-1',
+        weight: 200,
+        reps: 8,
+      });
+
+      expect(enqueueAndAwait).toHaveBeenCalledTimes(1);
+      expect(res.pending).toBe(false);
+      expect(res.weight).toBe(200);
+      expect(res.reps).toBe(8);
+      expect(mockClient['from']).not.toHaveBeenCalled();
+    });
+
+    it('online PERMANENT -> error surfaces as before', async () => {
+      const mockClient: any = { ['from']: vi.fn() };
+      vi.mocked(enqueueAndAwait).mockRejectedValueOnce(
+        new Error('Referenced item no longer exists (e.g. exercise deleted)')
+      );
+
+      await expect(
+        insertSet(mockClient, 'w-1', {
+          exerciseId: 'ex-deleted',
+          weight: 100,
           reps: 5,
-          set_type: 'working',
-        }),
-      ]);
+        })
+      ).rejects.toThrow(/Referenced item no longer exists/);
+    });
+
+    it('transient -> resolves as queued with pending', async () => {
+      const mockClient: any = { ['from']: vi.fn() };
+      vi.mocked(enqueueAndAwait).mockResolvedValueOnce({
+        status: 'queued',
+        opId: 'op-create-transient',
+      });
+
+      const res = await insertSet(mockClient, 'w-1', {
+        exerciseId: 'ex-uuid-1',
+        weight: 150,
+        reps: 10,
+      });
+
+      expect(res.pending).toBe(true);
+      expect(res.id).toBeDefined();
     });
 
     it('throws error if exerciseId is missing', async () => {
@@ -393,20 +506,11 @@ describe('sets data layer writers (src/lib/sets.ts)', () => {
   });
 
   describe('batchInsertSets', () => {
-    it('batch inserts sets and returns result array', async () => {
-      const mockClient: any = {
-        ['from']: vi.fn().mockReturnValue({
-          insert: vi.fn().mockReturnValue({
-            select: vi.fn().mockResolvedValue({
-              data: [
-                { id: 's-1', workout_id: 'w-1', exercise_id: 'ex-1', weight: 100, reps: 10 },
-                { id: 's-2', workout_id: 'w-1', exercise_id: 'ex-1', weight: 100, reps: 10 },
-              ],
-              error: null,
-            }),
-          }),
-        }),
-      };
+    it('batch inserts sets routing each through enqueueAndAwait', async () => {
+      const mockClient: any = { ['from']: vi.fn() };
+      vi.mocked(enqueueAndAwait)
+        .mockResolvedValueOnce({ status: 'synced', opId: 'op-batch-1' })
+        .mockResolvedValueOnce({ status: 'synced', opId: 'op-batch-2' });
 
       const results = await batchInsertSets(mockClient, 'w-1', [
         { exerciseId: 'ex-1', weight: 100, reps: 10, setIndex: 1 },
@@ -414,42 +518,89 @@ describe('sets data layer writers (src/lib/sets.ts)', () => {
       ]);
 
       expect(results).toHaveLength(2);
+      expect(enqueueAndAwait).toHaveBeenCalledTimes(2);
+      expect(mockClient['from']).not.toHaveBeenCalled();
     });
   });
 
   describe('updateSet and deleteSet', () => {
-    it('updates set by id', async () => {
-      const mockClient: any = {
-        ['from']: vi.fn().mockReturnValue({
-          update: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              select: vi.fn().mockReturnValue({
-                single: vi.fn().mockResolvedValue({
-                  data: { id: 's-1', weight: 205, reps: 5 },
-                  error: null,
-                }),
-              }),
-            }),
+    it('online -> enqueueAndAwait called with set.update, synced result returned', async () => {
+      const mockClient: any = { ['from']: vi.fn() };
+      vi.mocked(enqueueAndAwait).mockResolvedValueOnce({
+        status: 'synced',
+        opId: 'op-update-1',
+      });
+
+      const res = await updateSet(mockClient, 's-1', { weight: 205, reps: 5 });
+      expect(enqueueAndAwait).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: 'set.update',
+          payload: expect.objectContaining({
+            id: 's-1',
+            patch: { weight: 205, reps: 5 },
           }),
         }),
-      };
-
-      const result = await updateSet(mockClient, 's-1', { weight: 205 });
-      expect(result.weight).toBe(205);
+        expect.anything()
+      );
+      expect(res.weight).toBe(205);
+      expect(res.pending).toBe(false);
+      expect(mockClient['from']).not.toHaveBeenCalled();
     });
 
-    it('deletes set by id', async () => {
-      const mockEq = vi.fn().mockResolvedValue({ error: null });
-      const mockClient: any = {
-        ['from']: vi.fn().mockReturnValue({
-          delete: vi.fn().mockReturnValue({
-            eq: mockEq,
-          }),
-        }),
-      };
+    it('online PERMANENT -> error surfaces as before on update', async () => {
+      const mockClient: any = { ['from']: vi.fn() };
+      vi.mocked(enqueueAndAwait).mockRejectedValueOnce(
+        new Error('changed elsewhere')
+      );
+
+      await expect(
+        updateSet(mockClient, 's-1', { weight: 215 }, { weight: 200 })
+      ).rejects.toThrow('changed elsewhere');
+    });
+
+    it('calls enqueueAndAwait with set.delete', async () => {
+      const mockClient: any = { ['from']: vi.fn() };
+      vi.mocked(enqueueAndAwait).mockResolvedValueOnce({
+        status: 'synced',
+        opId: 'op-delete-1',
+      });
 
       await deleteSet(mockClient, 's-1');
-      expect(mockEq).toHaveBeenCalledWith('id', 's-1');
+      expect(enqueueAndAwait).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: 'set.delete',
+          payload: { id: 's-1' },
+        })
+      );
+      expect(mockClient['from']).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('resolveWorkoutRefForDate (d & e)', () => {
+    const userId = '11111111-1111-4111-8111-111111111111';
+
+    beforeEach(() => {
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+      localStorage.clear();
+    });
+
+    it('(d) reuses the same workout ref for the same civil date across multiple calls', async () => {
+      const ref1 = await resolveWorkoutRefForDate(userId, '2026-09-27', 'Push Day');
+      const ref2 = await resolveWorkoutRefForDate(userId, '2026-09-27', 'Push Day');
+      expect(ref1).toBe(ref2);
+    });
+
+    it('(e) preserves the active session date across midnight rollover', async () => {
+      const sessionDate = '2026-09-27';
+      const refPreMidnight = await resolveWorkoutRefForDate(userId, sessionDate, 'Night Workout');
+
+      // Next set logged after midnight with sessionDate preserved
+      const refPostMidnight = await resolveWorkoutRefForDate(userId, sessionDate, 'Night Workout');
+      expect(refPostMidnight).toBe(refPreMidnight);
+
+      // Starting a new distinct session on next date gets a distinct ref
+      const refNextDay = await resolveWorkoutRefForDate(userId, '2026-09-28', 'Morning Workout');
+      expect(refNextDay).not.toBe(refPreMidnight);
     });
   });
 });

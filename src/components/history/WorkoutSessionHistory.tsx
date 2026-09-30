@@ -12,6 +12,8 @@ import { StatusBanner } from '../common/StatusBanner';
 import { OverflowMenu, type OverflowMenuItem } from '../common/OverflowMenu';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { useWeightUnit } from '../../hooks/useWeightUnit';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+import { PendingMark } from '../sync/PendingMark';
 import { formatVolume, formatWeight, weightUnitLabel } from '../../utils/weight';
 import type { HistorySession } from './useWorkoutHistory';
 
@@ -73,6 +75,7 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
   const routerNavigate = useNavigate();
   const navigate = onNavigate || routerNavigate;
   const unit = useWeightUnit();
+  const isOnline = useOnlineStatus();
 
   const parentRef = React.useRef<HTMLDivElement>(null);
   const [scrollMargin, setScrollMargin] = React.useState(0);
@@ -274,6 +277,8 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
     const civilDate = session.civil_date || session.workout_date || (session.date ? normalizeDateStr(session.date) : '');
     const isHighlighted = Boolean(highlightDate && civilDate === highlightDate);
 
+    const isSessionPending = Boolean((session as any).pending || session.sets?.some((s: any) => s.pending));
+
     const overflowItems: OverflowMenuItem[] = [
       {
         label: 'Edit in Workout',
@@ -281,8 +286,11 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
         testId: `edit-session-${session.id}`,
       },
       {
-        label: 'Delete session',
-        onSelect: () => setSessionToDelete(session),
+        label: !isOnline ? 'Delete session (Available when online)' : 'Delete session',
+        onSelect: () => {
+          if (!isOnline) return;
+          setSessionToDelete(session);
+        },
         tone: 'danger',
         testId: `delete-session-${session.id}`,
       },
@@ -299,7 +307,10 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
         <div className="flex items-center justify-between border-b border-zinc-800 pb-3 gap-2">
           {/* H21: min-w-0 flex-1 truncate session title at 320px */}
           <div className="min-w-0 flex-1">
-            <h3 className="text-sm font-bold text-white truncate">{session.name || 'Workout Session'}</h3>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <h3 className="text-sm font-bold text-white truncate">{session.name || 'Workout Session'}</h3>
+              {isSessionPending && <PendingMark size="sm" className="shrink-0" />}
+            </div>
             <div className="text-xs text-cyan-400 tabular-nums mt-0.5">
               {formatShortDate(civilDate)}
             </div>
@@ -400,8 +411,9 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
                             key={set.id || sIdx}
                             className="bg-zinc-900/90 border border-zinc-800/60 rounded-xl px-2.5 py-1.5 flex items-center justify-between text-xs"
                           >
-                            <div className="text-xs text-zinc-400 font-bold tabular-nums">
-                              SET {setNumber}
+                            <div className="flex items-center gap-1.5 text-xs text-zinc-400 font-bold tabular-nums">
+                              <span>SET {setNumber}</span>
+                              {(set as any).pending && <PendingMark size="sm" className="shrink-0" />}
                             </div>
                             <div className="flex items-center gap-2">
                               <div className="font-bold text-cyan-300 tabular-nums">
@@ -544,6 +556,10 @@ export const WorkoutSessionHistory: React.FC<WorkoutSessionHistoryProps> = ({
         isDestructive={true}
         isLoading={isDeletingSession}
         onConfirm={async () => {
+          if (!isOnline) {
+            setSessionToDelete(null);
+            return;
+          }
           if (sessionToDelete && onDeleteSession) {
             try {
               await onDeleteSession(sessionToDelete.id);
