@@ -10,6 +10,8 @@ import { ResetPasswordView } from './components/auth/ResetPasswordView';
 import { GlobalRestTimerPill } from './components/common/GlobalRestTimerPill';
 import { ToastProvider } from './context/ToastContext';
 import { ToastHost } from './components/common/ToastHost';
+import { UpdateBanner } from './pwa/UpdateBanner';
+import { recordLastRoute, getLastRoute } from './pwa/lastRoute';
 import './App.css';
 
 const WorkoutEngine = React.lazy(() =>
@@ -104,10 +106,27 @@ const PublicOnlyRoute: React.FC<{ children: React.ReactNode }> = ({ children }) 
   return <>{children}</>;
 };
 
+// Redirect '/' and '*' to user's last tab route (default /workout) per A12
+const LastRouteRedirect: React.FC = () => {
+  const { user, isCoachMode } = useAuth();
+  let destination = getLastRoute(user?.id);
+  if (destination === '/coach' && user && !isCoachMode) {
+    destination = '/workout';
+  }
+  return <Navigate to={destination} replace />;
+};
+
 function AppLayout() {
   const { user } = useAuth();
   const location = useLocation();
   const onHistory = location.pathname === '/history';
+
+  // Track last visited tab route per user (A12)
+  useEffect(() => {
+    if (user?.id) {
+      recordLastRoute(location.pathname, user.id);
+    }
+  }, [location.pathname, user?.id]);
 
   // Track whether an authenticated user has visited /history
   const [visitedUserId, setVisitedUserId] = useState<string | null>(null);
@@ -169,10 +188,11 @@ function AppLayout() {
   return (
     <div className="min-h-[100dvh] flex flex-col bg-zinc-950 text-zinc-100 selection:bg-cyan-500/20 selection:text-cyan-300">
       <Header />
+      <UpdateBanner />
       <main className={`flex-1 max-w-xl w-full mx-auto p-4 ${user ? 'pb-[calc(9.5rem+env(safe-area-inset-bottom,0px))]' : 'pb-8'}`}>
         <React.Suspense fallback={<LazyFallback />}>
           <Routes>
-            <Route path="/" element={<Navigate to="/workout" replace />} />
+            <Route path="/" element={<LastRouteRedirect />} />
             <Route
               path="/workout"
               element={
@@ -233,7 +253,7 @@ function AppLayout() {
               path="/reset-password" 
               element={<ResetPasswordView />} 
             />
-            <Route path="*" element={<Navigate to="/workout" replace />} />
+            <Route path="*" element={<LastRouteRedirect />} />
           </Routes>
         </React.Suspense>
         {shouldMountHistory && (
