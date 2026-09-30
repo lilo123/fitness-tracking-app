@@ -70,6 +70,17 @@ test.describe('Workout Catalog Tail Resolution E2E (Package G)', () => {
     await page.waitForURL('**/workout');
     await page.waitForLoadState('networkidle');
 
+    // Pin the routine: the default routine is weekday-based (Wed/Sat/Sun resolve to
+    // Rest Day, which renders no Add Exercise button), so never rely on today's schedule.
+    const routineBtn = page.locator('[data-testid="routine-select-btn"]');
+    await expect(routineBtn).toBeVisible({ timeout: 15000 });
+    await routineBtn.click();
+    const routineModal = page.locator('[data-testid="routine-picker-modal"]');
+    await expect(routineModal).toBeVisible({ timeout: 5000 });
+    await routineModal.locator('button:has-text("Free Workout")').click();
+    await expect(routineModal).not.toBeVisible();
+    await expect(routineBtn).toContainText('Free Workout');
+
     // 2. Open exercise picker to add the tail exercises: "Weighted Sit-Up" and "Zottman Curl"
     const addExerciseBtn = page.locator('[data-testid="add-exercise-btn"]');
     const addFirstExerciseBtn = page.locator('[data-testid="add-first-exercise-btn"]');
