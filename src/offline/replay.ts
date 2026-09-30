@@ -47,6 +47,7 @@ export async function executeReplayOp(
         {
           id: clientWorkoutId,
           user_id: op.userId,
+          date: workout_date,
           workout_date,
           name: name ?? null,
         },

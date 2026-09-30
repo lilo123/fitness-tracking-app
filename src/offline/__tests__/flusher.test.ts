@@ -213,4 +213,27 @@ describe('Flusher & EnqueueAndAwait (§A4, §D)', () => {
     expect(emittedCount).toBe(1);
     unsub();
   });
+
+  it('7. outbox owner check: flush does NOT execute if supabase.auth.getSession() user does not match outbox user even if flusherSessionUserId matches', async () => {
+    await enqueue({
+      userId: userA,
+      kind: 'workout.ensure',
+      payload: { clientWorkoutId: 'w-a', workout_date: '2026-09-30' },
+    });
+
+    setFlusherSessionUser(userA);
+    // But Supabase session has switched to userB!
+    (supabase.auth.getSession as any).mockResolvedValue({
+      data: {
+        session: { user: { id: userB } },
+      },
+    });
+
+    const syncedCount = await flushNow(userA);
+    expect(syncedCount).toBe(0);
+
+    const opsA = await getOutboxOps(userA);
+    expect(opsA).toHaveLength(1);
+    expect(opsA[0].state).toBe('pending');
+  });
 });

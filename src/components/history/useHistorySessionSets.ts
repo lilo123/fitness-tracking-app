@@ -111,7 +111,9 @@ export function useHistorySessionSets({
         }
       }
 
-      let combined = [...rawSets, ...sessionPendingSets].filter((s) => !s.id || !deletedSetIds.has(s.id));
+      const rawSetIds = new Set(rawSets.map((s) => s.id));
+      const nonDuplicatePending = sessionPendingSets.filter((s) => !rawSetIds.has(s.id));
+      let combined = [...rawSets, ...nonDuplicatePending].filter((s) => !s.id || !deletedSetIds.has(s.id));
       combined = combined.map((s) => {
         const patch = s.id ? updatedSets.get(s.id) : undefined;
         if (!patch) return s;

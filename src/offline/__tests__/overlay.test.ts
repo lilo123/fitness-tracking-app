@@ -85,6 +85,47 @@ describe('overlay', () => {
       expect(result[1].weight).toBe(105);
     });
 
+    it('does not duplicate sets when serverSets already contains the created set id', () => {
+      const serverSets: WorkoutSet[] = [
+        {
+          id: 'set-synced-1',
+          workout_id: 'w-1',
+          exercise_id: 'ex-1',
+          weight: 100,
+          reps: 5,
+          set_index: 0,
+          set_type: 'working',
+          created_at: '2026-03-30T10:00:00Z',
+        },
+      ];
+
+      const ops: OutboxOp[] = [
+        {
+          opId: 'op-1',
+          userId: 'u1',
+          seq: 1,
+          createdAt: '2026-03-30T10:00:00Z',
+          kind: 'set.create',
+          payload: {
+            id: 'set-synced-1',
+            workoutRef: 'w-1',
+            exercise_id: 'ex-1',
+            weight: 100,
+            reps: 5,
+            set_index: 0,
+            created_at: '2026-03-30T10:00:00Z',
+          },
+          state: 'pending',
+          attempts: 0,
+        },
+      ];
+
+      const result = applyPendingToDaySets(serverSets, ops, '2026-03-30');
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('set-synced-1');
+      expect(result[0].pending).toBe(true);
+    });
+
     it('applies pending updates and deletes to existing sets', () => {
       const serverSets: WorkoutSet[] = [
         {

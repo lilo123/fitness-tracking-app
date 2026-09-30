@@ -1,4 +1,4 @@
-import { getOutboxOps, getSyncingStatus } from './outbox';
+import { getOutboxOps, getSyncingStatus, getCachedOutboxSummary } from './outbox';
 import { getActiveUserId } from './flusher';
 
 /**
@@ -13,7 +13,13 @@ export function registerOutboxUpdateBlocker(
     if (isSyncing) {
       return 'Syncing changes in progress';
     }
-    // We can check if active user has pending ops synchronously or via status
+    const userId = getActiveUserId();
+    if (userId) {
+      const summary = getCachedOutboxSummary(userId);
+      if (summary.pending > 0) {
+        return 'Finish your workout and sync first';
+      }
+    }
     return null;
   });
 }

@@ -324,6 +324,12 @@ export function useWorkoutHistory(
   const deleteMutation = useMutation({
     mutationFn: async (workoutId: string) => {
       if (!targetUserId) throw new Error('Cannot delete session without user id');
+      const session = sessions.find((s) => s.id === workoutId);
+      const sessionDate =
+        session?.workout_date ||
+        session?.civil_date ||
+        (session?.date ? String(session.date).split('T')[0] : '');
+
       const { error: delError } = await supabase
         .from('workouts')
         .delete()
@@ -331,6 +337,13 @@ export function useWorkoutHistory(
         .eq('user_id', targetUserId);
 
       if (delError) throw delError;
+
+      if (sessionDate && typeof localStorage !== 'undefined') {
+        try {
+          localStorage.removeItem(`cybergym_client_workout_${targetUserId}_${sessionDate}`);
+        } catch {}
+      }
+
       await invalidateWorkoutDerived(queryClient, targetUserId);
     },
   });

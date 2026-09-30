@@ -253,33 +253,34 @@ export async function blockDependentOps(userId: string, failedOp: OutboxOp): Pro
     .sort((a, b) => a.seq - b.seq);
 
   // Check if failedOp was workout.ensure or a set op
-  const failedEnsureId =
-    failedOp.kind === 'workout.ensure' ? failedOp.payload.clientWorkoutId : null;
-  const failedSetId =
-    failedOp.kind === 'set.create' || failedOp.kind === 'set.update'
-      ? (failedOp.payload as { id: string }).id
-      : null;
+  const blockedWorkoutIds = new Set<string>();
+  if (failedOp.kind === 'workout.ensure') {
+    blockedWorkoutIds.add(failedOp.payload.clientWorkoutId);
+  }
+
+  const blockedSetIds = new Set<string>();
+  if (failedOp.kind === 'set.create' || failedOp.kind === 'set.update') {
+    blockedSetIds.add((failedOp.payload as { id: string }).id);
+  }
 
   for (const op of allOps) {
     if (op.seq <= failedOp.seq) continue;
     if (op.state === 'attention') continue;
 
     let isDependent = false;
-    if (failedEnsureId) {
-      if (
-        (op.kind === 'workout.rename' && op.payload.workoutRef === failedEnsureId) ||
-        (op.kind === 'set.create' && op.payload.workoutRef === failedEnsureId)
-      ) {
-        isDependent = true;
+    if (
+      (op.kind === 'workout.rename' && blockedWorkoutIds.has(op.payload.workoutRef)) ||
+      (op.kind === 'set.create' && blockedWorkoutIds.has(op.payload.workoutRef))
+    ) {
+      isDependent = true;
+      if (op.kind === 'set.create') {
+        blockedSetIds.add(op.payload.id);
       }
-    }
-    if (failedSetId) {
-      if (
-        (op.kind === 'set.update' || op.kind === 'set.delete') &&
-        (op.payload as { id: string }).id === failedSetId
-      ) {
-        isDependent = true;
-      }
+    } else if (
+      (op.kind === 'set.update' || op.kind === 'set.delete') &&
+      blockedSetIds.has((op.payload as { id: string }).id)
+    ) {
+      isDependent = true;
     }
 
     if (isDependent) {

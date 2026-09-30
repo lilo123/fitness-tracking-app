@@ -219,6 +219,16 @@ describe('Outbox Storage, Ordering & Dependent Blocking (§A4, §D)', () => {
       },
     });
 
+    // 5. Update to set1 (transitive dependency on workout 1)
+    const set1Update = await enqueue({
+      userId: userA,
+      kind: 'set.update',
+      payload: {
+        id: 's-1',
+        patch: { weight: 110 },
+      },
+    });
+
     // Mark ensure1 as failed with PERMANENT error
     ensure1.state = 'attention';
     ensure1.error = 'Permission denied (RLS policy violation)';
@@ -238,6 +248,12 @@ describe('Outbox Storage, Ordering & Dependent Blocking (§A4, §D)', () => {
     expect(updatedSet1?.state).toBe('attention');
     expect(updatedSet1?.blockedBy).toBe(ensure1.opId);
     expect(updatedSet1?.error).toContain(`blocked by ${ensure1.opId}`);
+
+    // set1Update transitively depended on s-1 -> also blocked by ensure1!
+    const updatedSet1Update = opMap.get(set1Update.opId);
+    expect(updatedSet1Update?.state).toBe('attention');
+    expect(updatedSet1Update?.blockedBy).toBe(ensure1.opId);
+    expect(updatedSet1Update?.error).toContain(`blocked by ${ensure1.opId}`);
 
     // set2 for w-2 is independent -> remains pending!
     const updatedSet2 = opMap.get(set2.opId);

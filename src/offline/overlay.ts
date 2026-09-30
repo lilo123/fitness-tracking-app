@@ -56,7 +56,15 @@ export function applyPendingToDaySets(
           workout_name: workoutName,
           pending: true,
         };
-        result.push(newSet);
+        const existingIdx = result.findIndex((s) => s.id === id);
+        if (existingIdx !== -1) {
+          result[existingIdx] = {
+            ...result[existingIdx],
+            ...newSet,
+          };
+        } else {
+          result.push(newSet);
+        }
       }
     } else if (op.kind === 'set.update') {
       const { id, patch } = op.payload;

@@ -602,5 +602,27 @@ describe('sets data layer writers (src/lib/sets.ts)', () => {
       const refNextDay = await resolveWorkoutRefForDate(userId, '2026-09-28', 'Morning Workout');
       expect(refNextDay).not.toBe(refPreMidnight);
     });
+
+    it('enqueues workout.ensure even when reusing stored client workout id from localStorage', async () => {
+      const ref1 = await resolveWorkoutRefForDate(userId, '2026-09-27', 'Push Day');
+      expect(enqueueAndAwait).toHaveBeenCalledTimes(1);
+
+      const ref2 = await resolveWorkoutRefForDate(userId, '2026-09-27', 'Push Day');
+      expect(ref2).toBe(ref1);
+      // enqueueAndAwait must be called again so that workout.ensure is enqueued
+      // ensuring server row existence even if prior session was deleted on server
+      expect(enqueueAndAwait).toHaveBeenCalledTimes(2);
+      expect(enqueueAndAwait).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          userId,
+          kind: 'workout.ensure',
+          payload: {
+            clientWorkoutId: ref1,
+            workout_date: '2026-09-27',
+            name: 'Push Day',
+          },
+        })
+      );
+    });
   });
 });

@@ -136,6 +136,15 @@ describe('Replay Executor & Idempotency (§A4, §D)', () => {
 
     const res = await executeReplayOp(op, mockClient);
     expect(res.canonicalId).toBe(canonicalServerId);
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: clientWorkoutId,
+        user_id: userId,
+        date: '2026-09-30',
+        workout_date: '2026-09-30',
+      }),
+      { onConflict: 'user_id,workout_date', ignoreDuplicates: true }
+    );
 
     // Save mapping to idmap and verify
     await setIdMapping(userId, clientWorkoutId, res.canonicalId!);

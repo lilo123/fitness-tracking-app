@@ -397,6 +397,46 @@ describe('useWorkoutHistory Data Layer (P5a W2)', () => {
       });
     });
 
+    it('cleans up localStorage client workout id pointer when deleting a session', async () => {
+      const page1 = [
+        {
+          id: 'w-to-delete-ls',
+          workout_date: '2026-09-30',
+          civil_date: '2026-09-30',
+          name: 'Push Day',
+          date: '2026-09-30T10:00:00Z',
+          set_count: 5,
+          total_volume: 1000,
+          total_count: 1,
+        },
+      ];
+      vi.mocked(supabase.rpc).mockResolvedValue({ data: page1, error: null } as any);
+
+      const eqMock = vi.fn().mockReturnThis();
+      const deleteMock = vi.fn().mockReturnValue({ eq: eqMock });
+      eqMock.mockImplementation(() => ({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      }));
+      vi.mocked((supabase as any)['from']).mockReturnValue({
+        delete: deleteMock,
+      } as any);
+
+      const lsKey = 'cybergym_client_workout_user-delete_2026-09-30';
+      localStorage.setItem(lsKey, 'client-w-stale');
+      expect(localStorage.getItem(lsKey)).toBe('client-w-stale');
+
+      const wrapper = createWrapper(queryClient);
+      const { result } = renderHook(() => useWorkoutHistory('user-delete', 'all'), { wrapper });
+
+      await waitFor(() => expect(result.current.isSessionsPending).toBe(false));
+
+      await act(async () => {
+        await result.current.deleteSession('w-to-delete-ls');
+      });
+
+      expect(localStorage.getItem(lsKey)).toBeNull();
+    });
+
     it('disables deletion when offline and does not call supabase (g)', async () => {
       const onlineSpy = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
 

@@ -407,4 +407,29 @@ describe('useWorkoutMutations (P2 / W4 / W20 / W35 / H2)', () => {
     });
     expect(result.current.exerciseErrors['Bench Press']).toBeUndefined();
   });
+
+  it('passes targetUserId to deleteSet in deleteSetMutation', async () => {
+    const deleteSpy = vi.spyOn(setsLib, 'deleteSet').mockResolvedValue(undefined as any);
+
+    const { result } = renderHook(
+      () =>
+        useWorkoutMutations({
+          targetUserId,
+          workoutDate,
+          activeRoutineName: 'Chest Day',
+          exercises: exercises as any,
+          autoRestTimer: false,
+        }),
+      { wrapper }
+    );
+
+    await act(async () => {
+      await result.current.deleteSetMutation.mutateAsync('set-to-delete-123');
+    });
+
+    expect(deleteSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      'set-to-delete-123'
+    );
+  });
 });

@@ -38,7 +38,7 @@ async function runWithMutex(userId: string, fn: () => Promise<void>): Promise<vo
   const current = new Promise<void>((resolve) => {
     release = resolve;
   });
-  userMutexes.set(userId, prev.then(() => current));
+  userMutexes.set(userId, prev.catch(() => {}).then(() => current));
 
   try {
     await prev;
@@ -124,17 +124,17 @@ export async function flushNow(targetUserId?: string, callerOpId?: string): Prom
 
   await runWithMutex(userId, async () => {
     // 1. Owner check: verify current authenticated user matches userId
-    let sessionUser: string | null = flusherSessionUserId;
+    let sessionUser: string | null = null;
+    try {
+      const {
+        data: { session },
+      } = await activeSupabaseClient.auth.getSession();
+      sessionUser = session?.user?.id || null;
+    } catch {
+      // Cannot verify session from supabase client
+    }
     if (!sessionUser) {
-      try {
-        const {
-          data: { session },
-        } = await activeSupabaseClient.auth.getSession();
-        sessionUser = session?.user?.id || null;
-      } catch {
-        // Cannot verify session
-        return;
-      }
+      sessionUser = flusherSessionUserId;
     }
 
     if (!sessionUser || sessionUser !== userId) {
@@ -151,6 +151,7 @@ export async function flushNow(targetUserId?: string, callerOpId?: string): Prom
 
     setSyncingStatus(true);
     let syncedThisRun = 0;
+    const syncedOpIds = new Set<string>();
 
     try {
       for (const op of pendingOps) {
@@ -170,6 +171,7 @@ export async function flushNow(targetUserId?: string, callerOpId?: string): Prom
           // Delete completed op from IDB
           await deleteOp(userId, op.opId);
           syncedThisRun++;
+          syncedOpIds.add(op.opId);
           retryAttempts = 0;
         } catch (rawError: any) {
           const classified = classifyError(rawError);
@@ -263,9 +265,10 @@ export async function flushNow(targetUserId?: string, callerOpId?: string): Prom
       if (syncedThisRun > 0) {
         setLastSyncedCount(syncedThisRun);
         // If this flush was triggered by enqueueAndAwait for a specific callerOpId,
-        // only emit onSynced for previously queued ops (syncedThisRun - 1).
+        // only emit onSynced for previously queued ops if callerOpId was actually synced in this run.
         // Otherwise, emit for all synced ops.
-        const queuedCountToEmit = callerOpId ? syncedThisRun - 1 : syncedThisRun;
+        const queuedCountToEmit =
+          callerOpId && syncedOpIds.has(callerOpId) ? syncedThisRun - 1 : syncedThisRun;
         if (queuedCountToEmit > 0) {
           emitSynced(queuedCountToEmit);
         }

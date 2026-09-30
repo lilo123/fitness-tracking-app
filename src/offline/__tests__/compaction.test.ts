@@ -345,4 +345,85 @@ describe('Outbox Compaction Matrix (§A4)', () => {
     expect(result.ops[0].state).toBe('attention');
     expect(result.ops[1].state).toBe('pending');
   });
+
+  it('9. does not merge incoming update into an inflight create op, appends instead', () => {
+    const inflightCreate: OutboxOp = {
+      opId: 'op-1',
+      userId,
+      seq: 1,
+      kind: 'set.create',
+      payload: {
+        id: 'set-1',
+        workoutRef: 'w-1',
+        exercise_id: 'ex-1',
+        weight: 100,
+        reps: 10,
+        set_index: 1,
+        set_type: 'working',
+        created_at: '2026-09-30T10:00:00Z',
+      },
+      createdAt: '2026-09-30T10:00:00Z',
+      attempts: 1,
+      state: 'inflight',
+    };
+
+    const newUpdate: OutboxOp = {
+      opId: 'op-2',
+      userId,
+      seq: 2,
+      kind: 'set.update',
+      payload: {
+        id: 'set-1',
+        patch: { weight: 105 },
+      },
+      createdAt: '2026-09-30T10:02:00Z',
+      attempts: 0,
+      state: 'pending',
+    };
+
+    const result = compactIncomingOp([inflightCreate], newUpdate);
+    expect(result.action).toBe('appended');
+    expect(result.ops).toHaveLength(2);
+    expect(result.ops[0].state).toBe('inflight');
+    expect(result.ops[1].state).toBe('pending');
+  });
+
+  it('10. does not cancel an inflight create op when delete arrives, appends delete op instead', () => {
+    const inflightCreate: OutboxOp = {
+      opId: 'op-1',
+      userId,
+      seq: 1,
+      kind: 'set.create',
+      payload: {
+        id: 'set-1',
+        workoutRef: 'w-1',
+        exercise_id: 'ex-1',
+        weight: 100,
+        reps: 10,
+        set_index: 1,
+        set_type: 'working',
+        created_at: '2026-09-30T10:00:00Z',
+      },
+      createdAt: '2026-09-30T10:00:00Z',
+      attempts: 1,
+      state: 'inflight',
+    };
+
+    const deleteOp: OutboxOp = {
+      opId: 'op-2',
+      userId,
+      seq: 2,
+      kind: 'set.delete',
+      payload: { id: 'set-1' },
+      createdAt: '2026-09-30T10:02:00Z',
+      attempts: 0,
+      state: 'pending',
+    };
+
+    const result = compactIncomingOp([inflightCreate], deleteOp);
+    expect(result.action).toBe('appended');
+    expect(result.ops).toHaveLength(2);
+    expect(result.ops[0].state).toBe('inflight');
+    expect(result.ops[1].kind).toBe('set.delete');
+  });
 });

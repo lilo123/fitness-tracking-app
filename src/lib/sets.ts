@@ -101,21 +101,24 @@ export async function resolveWorkoutRefForDate(
 
   // 2. Check localStorage for previously generated client workout id on this device
   const storageKey = `cybergym_client_workout_${userId}_${workoutDate}`;
+  let clientWorkoutId: string | null = null;
   if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
     try {
       const stored = localStorage.getItem(storageKey);
       if (stored && isUUID(stored)) {
-        return stored;
+        clientWorkoutId = stored;
       }
     } catch {}
   }
 
-  // 3. Generate a new client workout id and enqueue workout.ensure op
-  const clientWorkoutId = newId();
-  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-    try {
-      localStorage.setItem(storageKey, clientWorkoutId);
-    } catch {}
+  // 3. Generate a new client workout id if not already created
+  if (!clientWorkoutId) {
+    clientWorkoutId = newId();
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(storageKey, clientWorkoutId);
+      } catch {}
+    }
   }
 
   await enqueueAndAwait({
