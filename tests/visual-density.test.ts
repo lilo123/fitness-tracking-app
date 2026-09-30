@@ -3632,6 +3632,9 @@ async function checkTypeScale(
       const fvn = cs.fontVariantNumeric;
       const text = (el.innerText || el.textContent || '').trim().slice(0, 30);
       const isInput = Boolean(el.closest('input, select, textarea'));
+      // Named exception (user decision, P8.1 hotfix): logged set values sit in the
+      // input column and mirror the 16px inputs; only exactly 16px is allowed.
+      const isInputMirror = Boolean(el.closest('[data-input-mirror="true"]'));
 
       const sel = el.getAttribute('data-testid')
         ? `[data-testid="${el.getAttribute('data-testid')}"]`
@@ -3639,7 +3642,7 @@ async function checkTypeScale(
 
       // Check 1: Size
       if (!ALLOWED_SIZES.has(size)) {
-        if (size === 16 && isInput) {
+        if (size === 16 && (isInput || isInputMirror)) {
           // Allowed: inputs are 16px to prevent iOS auto-zoom (D18/D26)
         } else if (opts?.allowSizes16Plus && size >= 16) {
           // Allowed: page headings/titles on full routes when allowSizes16Plus is enabled
@@ -4210,6 +4213,17 @@ test.describe('P3a Workout', () => {
       const pendingRow = card.locator('input[data-testid^="ghost-weight-"]').first();
       await expect(loggedRow).toBeVisible();
       await expect(pendingRow).toBeVisible();
+
+      // Logged values (input-mirror exception) must match the pending inputs exactly.
+      const loggedValue = card.locator('[data-testid^="logged-weight-value-"]').first();
+      await expect(loggedValue).toBeVisible();
+      const fontOf = (l: Locator) =>
+        l.evaluate((el) => {
+          const cs = window.getComputedStyle(el);
+          return { size: cs.fontSize, weight: cs.fontWeight };
+        });
+      const [loggedFont, inputFont] = await Promise.all([fontOf(loggedValue), fontOf(pendingRow)]);
+      expect(loggedFont, 'logged set value font must equal pending input font').toEqual(inputFont);
 
       // Check typography on the whole exercise card (header, chips, controls, logged + pending rows)
       const setsBody = card;
@@ -7086,7 +7100,7 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
         const toast = page.locator('[data-testid="quick-log-toast"]');
         await expect(toast).toBeVisible({ timeout: 5000 });
 
-        const checkGeometry = async (scrollLabel: string) => {
+        const checkGeometry = async (_scrollLabel: string) => {
           return await page.evaluate(() => {
             const t = document.querySelector('[data-testid="quick-log-toast"]')?.getBoundingClientRect();
             const p = document.querySelector('[data-testid="rest-timer-pill"]')?.getBoundingClientRect();

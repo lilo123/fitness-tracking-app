@@ -69,12 +69,13 @@ export const SetRow: React.FC<SetRowProps> = memo((props) => {
           {ghost.hintText}
         </div>
         <div className="flex justify-center">
-          <div className="w-full max-w-[58px] h-11 rounded-lg bg-zinc-950/80 border border-zinc-700/60 flex items-center justify-center font-semibold text-white text-base tabular-nums">
+          {/* data-input-mirror: shows a logged value in the input column, sized like the 16px inputs (D43 exception). */}
+          <div data-testid={`logged-weight-value-${exIndex}-${rowIdx}`} data-input-mirror="true" className="w-full max-w-[58px] h-11 rounded-lg bg-zinc-950/80 border border-zinc-700/60 flex items-center justify-center font-semibold text-white text-base tabular-nums">
             {formatWeight(loggedSet.weight, unit)}
           </div>
         </div>
         <div className="flex justify-center">
-          <div className="w-full max-w-[52px] h-11 rounded-lg bg-zinc-950/80 border border-zinc-700/60 flex items-center justify-center font-semibold text-cyan-300 text-base tabular-nums">
+          <div data-testid={`logged-reps-value-${exIndex}-${rowIdx}`} data-input-mirror="true" className="w-full max-w-[52px] h-11 rounded-lg bg-zinc-950/80 border border-zinc-700/60 flex items-center justify-center font-semibold text-cyan-300 text-base tabular-nums">
             {loggedSet.reps}
           </div>
         </div>
