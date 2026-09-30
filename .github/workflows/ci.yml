@@ -186,6 +186,9 @@ jobs:
       - name: Run E2E tests (Desktop Chrome)
         run: npx playwright test tests/e2e --project='Desktop Chrome' --workers=1
 
+      - name: Run PWA production service-worker E2E tests
+        run: npx playwright test -c playwright.pwa.config.ts
+
       # Non-blocking pending human decision H-3: /workout payload measures ~182-194 KB vs the 153,600 B ceiling.
       # The ceiling must not be relaxed to make it pass. The breach remains visible in CI output.
       - name: Run performance trace (non-blocking, H-3 escalation)

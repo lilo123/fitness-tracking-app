@@ -58,4 +58,7 @@ done
 DENSITY_LINE=$(npx playwright test -c playwright.density.config.ts --list 2>&1 | grep "Total:" || echo "Failed to count")
 echo "  - Density (chromium):              $DENSITY_LINE"
 
+PWA_LINE=$(npx playwright test -c playwright.pwa.config.ts --list 2>&1 | grep "Total:" || echo "Failed to count")
+echo "  - PWA production (Desktop Chrome): $PWA_LINE"
+
 echo "================================================================================"
