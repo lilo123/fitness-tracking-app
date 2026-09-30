@@ -132,6 +132,36 @@ describe('SetRow', () => {
       expect(screen.getByText('12')).toBeInTheDocument();
     });
 
+    it('renders logged value boxes with h-11 and text-base font-semibold matching pending inputs (HF-A)', () => {
+      renderWithAuth(
+        <SetRow
+          exName="Bench Press"
+          exIndex={0}
+          rowIdx={0}
+          setIndex={1}
+          loggedSet={loggedSet}
+          ghost={defaultGhost}
+          draftWeight=""
+          draftReps=""
+          isMutating={false}
+          onUpdateDraft={vi.fn()}
+          onCommitSet={vi.fn()}
+          onEditSet={vi.fn()}
+        />
+      );
+
+      const loggedRow = screen.getByTestId("logged-set-row-0-0");
+      expect(loggedRow.className).toContain("py-0.5");
+      // Find weight and reps boxes
+      const boxes = loggedRow.querySelectorAll("div.rounded-lg.tabular-nums");
+      expect(boxes.length).toBeGreaterThanOrEqual(2);
+      boxes.forEach((box) => {
+        expect(box.className).toContain("h-11");
+        expect(box.className).toContain("text-base");
+        expect(box.className).toContain("font-semibold");
+      });
+    });
+
     it('satisfies a11y standards on logged row', async () => {
       const { container } = renderWithAuth(
         <SetRow

@@ -94,7 +94,8 @@ describe('ExerciseCard', () => {
     const lastChip = screen.getByTestId('last-chip-0');
     expect(lastChip).toBeInTheDocument();
     expect(lastChip.textContent).toContain('Last: 185×8, 185×8, 185×7');
-    expect(lastChip.className).toContain('max-w-none');
+    expect(lastChip.className).toContain('truncate');
+    expect(lastChip.className).not.toContain('max-w-none');
 
     // W7: PR chip formatted
     const prChip = screen.getByTestId('pr-chip-0');
@@ -120,12 +121,17 @@ describe('ExerciseCard', () => {
     expect(screen.getByText('No prior session')).toBeInTheDocument();
   });
 
-  it('handles target sets stepper decrease and increase', () => {
+  it('handles target sets stepper decrease and increase with unified 12px/700 type scale (HF-A)', () => {
     const onAdjustTargetSets = vi.fn();
     renderWithAuth(<ExerciseCard {...defaultProps} onAdjustTargetSets={onAdjustTargetSets} />);
 
     const decreaseBtn = screen.getByTitle('Decrease target sets');
     const increaseBtn = screen.getByTitle('Increase target sets');
+    // HF-A: Stepper -/+ buttons and value have same size (12px / 700 text-xs font-bold)
+    expect(decreaseBtn.className).toContain('text-xs');
+    expect(decreaseBtn.className).toContain('font-bold');
+    expect(increaseBtn.className).toContain('text-xs');
+    expect(increaseBtn.className).toContain('font-bold');
 
     fireEvent.click(increaseBtn);
     expect(onAdjustTargetSets).toHaveBeenCalledWith('Bench Press', 1);

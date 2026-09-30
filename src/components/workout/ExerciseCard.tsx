@@ -2,6 +2,7 @@ import React, { memo } from 'react';
 import type { WorkoutSet } from '../../types/database';
 import { ChevronDown, Trophy, Check, ArrowUp, ArrowDown, Trash2, AlertCircle, RotateCcw } from 'lucide-react';
 import { SetRow } from './SetRow';
+import { SET_GRID_TEMPLATE } from './setGrid';
 import { Card } from '../common/Card';
 import { Chip } from '../common/Chip';
 import { formatSet, weightUnitLabel, toDisplayWeight } from '../../utils/weight';
@@ -210,11 +211,11 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
             size="sm"
             variant="metric"
             label={`Last: ${benchmarks.lastSession.summaryText}`}
-            className="max-w-none text-zinc-300 font-semibold tabular-nums"
+            className="max-w-[110px] truncate text-zinc-300 font-semibold tabular-nums"
             testId={`last-chip-${exIndex}`}
           />
         ) : (
-          <span className="text-xs text-zinc-400 font-normal">No prior session</span>
+          <span className="text-xs text-zinc-400 font-normal shrink-0">No prior session</span>
         )}
 
         {benchmarks.pr && (() => {
@@ -233,7 +234,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
               variant="default"
               icon={<Trophy className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
               label={`PR: ${formatSet(benchmarks.pr.weight, benchmarks.pr.reps, unit)}${e1rmSuffix}`}
-              className="bg-amber-500/10 border-amber-500/30 text-amber-400 font-semibold tabular-nums"
+              className="bg-amber-500/10 border-amber-500/30 text-amber-400 font-semibold tabular-nums shrink-0"
               testId={`pr-chip-${exIndex}`}
             />
           );
@@ -245,7 +246,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
             variant="default"
             icon={<Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 stroke-[2.5]" />}
             label={`${setsToday.length}/${targetCount} Sets`}
-            className="bg-emerald-500/15 border-emerald-500/30 text-emerald-400 font-semibold tabular-nums shadow-[0_0_10px_rgba(16,185,129,0.15)]"
+            className="bg-emerald-500/15 border-emerald-500/30 text-emerald-400 font-semibold tabular-nums shadow-[0_0_10px_rgba(16,185,129,0.15)] shrink-0"
             testId={`sets-completed-chip-${exIndex}`}
           />
         ) : setsToday.length > 0 ? (
@@ -253,7 +254,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
             size="sm"
             variant="default"
             label={`${setsToday.length}/${targetCount} Sets`}
-            className="bg-cyan-500/15 text-cyan-300 border-cyan-500/30 font-semibold tabular-nums"
+            className="bg-cyan-500/15 text-cyan-300 border-cyan-500/30 font-semibold tabular-nums shrink-0"
             testId={`sets-progress-chip-${exIndex}`}
           />
         ) : (
@@ -261,7 +262,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
             size="sm"
             variant="default"
             label={`0/${targetCount} Sets`}
-            className="bg-zinc-800 border-zinc-700/80 text-zinc-400 font-semibold tabular-nums"
+            className="bg-zinc-800 border-zinc-700/80 text-zinc-400 font-semibold tabular-nums shrink-0"
             testId={`sets-zero-chip-${exIndex}`}
           />
         )}
@@ -275,19 +276,19 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
             type="button"
             onClick={() => onAdjustTargetSets(exName, -1)}
             disabled={targetCount <= Math.max(1, setsToday.length)}
-            className="relative h-11 w-11 flex items-center justify-center text-zinc-300 hover:text-white disabled:opacity-30 disabled:hover:text-zinc-300 font-bold touch-manipulation cursor-pointer select-none text-sm"
+            className="relative h-11 w-11 flex items-center justify-center text-zinc-300 hover:text-white disabled:opacity-30 disabled:hover:text-zinc-300 font-bold touch-manipulation cursor-pointer select-none text-xs"
             title="Decrease target sets"
             aria-label={`Decrease target sets for ${exName}`}
           >
             −
           </button>
-          <span className="font-semibold text-white px-1 text-xs tabular-nums select-none">
+          <span className="font-bold text-white px-1 text-xs tabular-nums select-none">
             {targetCount}
           </span>
           <button
             type="button"
             onClick={() => onAdjustTargetSets(exName, 1)}
-            className="relative h-11 w-11 flex items-center justify-center text-zinc-300 hover:text-white font-bold touch-manipulation cursor-pointer select-none text-sm"
+            className="relative h-11 w-11 flex items-center justify-center text-zinc-300 hover:text-white font-bold touch-manipulation cursor-pointer select-none text-xs"
             title="Increase target sets"
             aria-label={`Increase target sets for ${exName}`}
           >
@@ -337,15 +338,15 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = memo((props) => {
       {isExpanded && (
         <div id={`exercise-card-body-${exIndex}`} className="pt-1 space-y-1">
           {/* 5-Column Table Header */}
-          <div className="grid grid-cols-12 gap-1 text-xs font-bold uppercase tracking-wider text-zinc-400 px-1.5 pb-1 text-center">
-            <div className="col-span-2">Set</div>
-            <div className="col-span-2">Previous</div>
-            <div className="col-span-3">
+          <div className={`grid ${SET_GRID_TEMPLATE} gap-1 text-xs font-bold uppercase tracking-wider text-zinc-400 px-1.5 pb-1 text-center items-center`}>
+            <div>Set</div>
+            <div>Previous</div>
+            <div>
               <span className="sr-only">Weight</span>
-              <span aria-hidden="true" className="capitalize">{weightUnitLabel(unit)}</span>
+              <span aria-hidden="true">{weightUnitLabel(unit).toUpperCase()}</span>
             </div>
-            <div className="col-span-3">Reps</div>
-            <div className="col-span-2 text-right pr-1">
+            <div>Reps</div>
+            <div className="flex items-center justify-center">
               <span className="sr-only">Action</span>
               <span aria-hidden="true">Log</span>
             </div>

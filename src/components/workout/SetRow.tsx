@@ -3,6 +3,7 @@ import type { WorkoutSet } from '../../types/database';
 import { Check } from 'lucide-react';
 import { formatWeight, weightUnitLabel, toDisplayWeight, type WeightUnit } from '../../utils/weight';
 import { useWeightUnit } from '../../hooks/useWeightUnit';
+import { SET_GRID_TEMPLATE } from './setGrid';
 
 export interface SetRowProps {
   exName: string;
@@ -57,7 +58,7 @@ export const SetRow: React.FC<SetRowProps> = memo((props) => {
         onClick={() => onEditSet?.(exIndex, rowIdx)}
         aria-label={`Edit set ${displayedIndex} of ${exName}`}
         data-testid={`logged-set-row-${exIndex}-${rowIdx}`}
-        className="w-full text-left grid grid-cols-[20px_1fr_50px_46px_32px] gap-1 py-2 px-1.5 rounded-xl items-center bg-cyan-500/10 border border-cyan-500/20 text-xs my-1 transition cursor-pointer min-h-[44px] hover:bg-cyan-500/15 focus:outline-none focus:ring-1 focus:ring-cyan-500/80 active:scale-[0.99] touch-manipulation select-none"
+        className={`w-full text-left grid ${SET_GRID_TEMPLATE} gap-1 py-0.5 px-1.5 rounded-xl items-center bg-cyan-500/10 border border-cyan-500/20 text-xs my-1 transition cursor-pointer min-h-[44px] hover:bg-cyan-500/15 focus:outline-none focus:ring-1 focus:ring-cyan-500/80 active:scale-[0.99] touch-manipulation select-none`}
       >
         <div className="font-bold text-cyan-400 text-center flex items-center justify-center">
           <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-xs flex items-center justify-center font-bold tabular-nums">
@@ -68,18 +69,18 @@ export const SetRow: React.FC<SetRowProps> = memo((props) => {
           {ghost.hintText}
         </div>
         <div className="flex justify-center">
-          <div className="w-full max-w-[58px] h-8 rounded-lg bg-zinc-950/80 border border-zinc-700/60 flex items-center justify-center font-bold text-white text-sm tabular-nums">
+          <div className="w-full max-w-[58px] h-11 rounded-lg bg-zinc-950/80 border border-zinc-700/60 flex items-center justify-center font-semibold text-white text-base tabular-nums">
             {formatWeight(loggedSet.weight, unit)}
           </div>
         </div>
         <div className="flex justify-center">
-          <div className="w-full max-w-[52px] h-8 rounded-lg bg-zinc-950/80 border border-zinc-700/60 flex items-center justify-center font-bold text-cyan-300 text-sm tabular-nums">
+          <div className="w-full max-w-[52px] h-11 rounded-lg bg-zinc-950/80 border border-zinc-700/60 flex items-center justify-center font-semibold text-cyan-300 text-base tabular-nums">
             {loggedSet.reps}
           </div>
         </div>
-        <div className="flex justify-end pr-1">
+        <div className="flex items-center justify-center">
           <div
-            className="w-7.5 h-7.5 rounded-full bg-cyan-500 text-zinc-950 flex items-center justify-center shadow-[0_0_10px_rgba(6,182,212,0.4)]"
+            className="w-8 h-8 rounded-full bg-cyan-500 text-zinc-950 flex items-center justify-center shadow-[0_0_10px_rgba(6,182,212,0.4)]"
             aria-hidden="true"
           >
             <Check className="w-4 h-4 stroke-[3]" />
@@ -92,7 +93,7 @@ export const SetRow: React.FC<SetRowProps> = memo((props) => {
   return (
     <div
       key={rowIdx}
-      className="grid grid-cols-[20px_1fr_50px_46px_32px] gap-1 py-0.5 px-1.5 rounded-xl items-center border border-transparent hover:bg-zinc-800/30 text-xs my-1 transition min-h-[44px]"
+      className={`grid ${SET_GRID_TEMPLATE} gap-1 py-0.5 px-1.5 rounded-xl items-center border border-transparent hover:bg-zinc-800/30 text-xs my-1 transition min-h-[44px]`}
     >
       <div className="font-bold text-zinc-400 text-center flex items-center justify-center">
         <span className="w-5 h-5 rounded-full bg-zinc-800 text-xs flex items-center justify-center font-bold text-zinc-400 tabular-nums">
@@ -152,7 +153,7 @@ export const SetRow: React.FC<SetRowProps> = memo((props) => {
           data-testid={`ghost-reps-${exIndex}-${rowIdx}`}
         />
       </div>
-      <div className="flex justify-end pr-1">
+      <div className="flex items-center justify-center">
         <button
           type="button"
           onClick={() => {
