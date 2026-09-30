@@ -8,6 +8,15 @@ import type { PrMode } from '../lib/prComparator';
 import { AuthContext, type AuthContextType } from './AuthContextTypes';
 import { restTimerStore } from '../utils/restTimerStore';
 import { dedupeInFlight } from '../utils/promiseDedupe';
+import {
+  setAuthRequiredStatus,
+  initPersistForUser,
+  stopPersisting,
+  clearUserReadCache,
+  flushNow,
+  getCachedOutboxSummary,
+  setFlusherSessionUser,
+} from '../offline';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [profile, setProfile] = useState<UserProfile | null>(() => {
@@ -199,7 +208,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
             return;
           } else {
-            // Explicitly unauthenticated or expired/invalid session
+            // A8: Do NOT clear user when offline
+            if (typeof navigator !== 'undefined' && !navigator.onLine) {
+              setLoading(false);
+              return;
+            }
+            // Explicitly unauthenticated or expired/invalid session while online
+            setAuthRequiredStatus(true);
             setUser(null);
             setProfile(null);
             localStorage.removeItem('cybergym_user');
@@ -259,6 +274,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleLifecycleResume = () => {
       if (document.visibilityState === 'visible') {
         if (isRevalidatingRef.current) return;
+        // A8: Never clear user when offline
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          return;
+        }
         isRevalidatingRef.current = true;
 
         supabase.auth
@@ -273,6 +292,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 console.warn('[AuthContext] Background resume fetchProfile error:', err);
               });
             } else if (!session) {
+              if (typeof navigator !== 'undefined' && !navigator.onLine) {
+                return;
+              }
+              setAuthRequiredStatus(true);
               setUser(null);
               setProfile(null);
               localStorage.removeItem('cybergym_user');
@@ -365,14 +388,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [fetchProfile, syncUserTimezone]
   );
 
+  useEffect(() => {
+    if (user?.id) {
+      setFlusherSessionUser(user.id);
+      initPersistForUser(user.id, queryClient).catch((err) => {
+        console.warn('[AuthContext] initPersistForUser error:', err);
+      });
+    } else {
+      setFlusherSessionUser(null);
+    }
+    return () => {
+      stopPersisting();
+    };
+  }, [user?.id, queryClient]);
+
   const signOut = useCallback(async () => {
     signedOutRef.current = true;
+    const currentUserId = user?.id;
+
+    // A9: signOut: if online and outbox non-empty -> try flush (<=8s).
+    if (currentUserId && (typeof navigator === 'undefined' || navigator.onLine)) {
+      const summary = getCachedOutboxSummary(currentUserId);
+      if (summary.pending > 0) {
+        try {
+          await Promise.race([
+            flushNow(currentUserId),
+            new Promise((resolve) => setTimeout(resolve, 8000)),
+          ]);
+        } catch {
+          // ignore flush errors during sign out
+        }
+      }
+    }
+
     try {
       await supabase.auth.signOut();
     } catch {
       // ignore
     }
     restTimerStore.stop();
+
     localStorage.removeItem('cybergym_user');
     Object.keys(localStorage).forEach((key) => {
       if (key.startsWith('cybergym_')) {
@@ -382,7 +437,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setProfile(null);
     queryClient.clear();
-  }, [queryClient]);
+
+    // A9: on sign-out delete that user's rq store + queryClient.clear(), keep outbox/idmap
+    if (currentUserId) {
+      clearUserReadCache(currentUserId).catch((e) => {
+        console.warn('[AuthContext] Failed to clear user rq store:', e);
+      });
+    }
+    stopPersisting();
+  }, [user?.id, queryClient]);
 
   const updateProfile = useCallback(async (updates: Partial<UserProfile>) => {
     if (!profile) return { success: false, error: 'Not authenticated' };

@@ -1,0 +1,114 @@
+import type { QueryClient } from '@tanstack/react-query';
+import {
+  persistQueryClientRestore,
+  persistQueryClientSubscribe,
+} from '@tanstack/react-query-persist-client';
+import {
+  createIdbPersister,
+  shouldDehydrateQuery,
+  PERSIST_BUSTER,
+  PERSIST_MAX_AGE_MS,
+  WHITELIST_ROOTS,
+} from './persister';
+import { clearUserRqStore } from './db';
+import { setActiveUserForFlusher } from './flusher';
+import { loadIdMappings } from './idmap';
+
+let currentPersistingUserId: string | null = null;
+let currentPersistingQueryClient: QueryClient | null = null;
+let unsubscribePersist: (() => void) | null = null;
+
+/**
+ * Configure 8-day gcTime for all whitelisted offline query families.
+ */
+export function setupQueryDefaults(queryClient: QueryClient): void {
+  for (const root of WHITELIST_ROOTS) {
+    queryClient.setQueryDefaults([root], {
+      gcTime: PERSIST_MAX_AGE_MS,
+    });
+  }
+}
+
+/**
+ * Initialize persistence for an authenticated user.
+ * - Stops persisting previous user
+ * - Clears memory queryClient on user switch to ensure cross-user isolation
+ * - Restores persisted state from IndexedDB cybergym-offline-<userId>
+ * - Subscribes queryClient to auto-save whitelisted queries
+ */
+export async function initPersistForUser(
+  userId: string,
+  queryClient: QueryClient
+): Promise<void> {
+  if (!userId) return;
+  if (currentPersistingUserId === userId && currentPersistingQueryClient === queryClient && unsubscribePersist) {
+    return;
+  }
+
+  // If switching from another user on the same query client, stop persisting and clear in-memory cache
+  if (currentPersistingUserId && currentPersistingUserId !== userId) {
+    if (currentPersistingQueryClient === queryClient) {
+      queryClient.clear();
+    }
+    stopPersisting();
+  }
+
+  currentPersistingUserId = userId;
+  currentPersistingQueryClient = queryClient;
+  setActiveUserForFlusher(userId);
+
+  // Pre-load ID mappings for fast sync lookups
+  try {
+    await loadIdMappings(userId);
+  } catch (e) {
+    console.warn('[persistController] Failed to load ID mappings:', e);
+  }
+
+  const persister = createIdbPersister(userId);
+
+  // Restore client from IDB
+  try {
+    await persistQueryClientRestore({
+      queryClient,
+      persister,
+      maxAge: PERSIST_MAX_AGE_MS,
+      buster: PERSIST_BUSTER,
+    });
+  } catch (restoreErr) {
+    console.warn('[persistController] Failed to restore persisted client:', restoreErr);
+  }
+
+  // Subscribe to cache updates
+  unsubscribePersist = persistQueryClientSubscribe({
+    queryClient,
+    persister,
+    buster: PERSIST_BUSTER,
+    dehydrateOptions: {
+      shouldDehydrateQuery,
+    },
+  });
+}
+
+/**
+ * Stop persisting cache to IndexedDB and unsubscribe event listeners.
+ */
+export function stopPersisting(): void {
+  if (unsubscribePersist) {
+    unsubscribePersist();
+    unsubscribePersist = null;
+  }
+  currentPersistingUserId = null;
+  currentPersistingQueryClient = null;
+  setActiveUserForFlusher(null);
+}
+
+/**
+ * Delete a user's persisted read cache (`rq` store in IndexedDB) while keeping outbox and idmap.
+ */
+export async function clearUserReadCache(userId: string): Promise<void> {
+  await clearUserRqStore(userId);
+}
+
+export function getCurrentPersistingUserId(): string | null {
+  return currentPersistingUserId;
+}
