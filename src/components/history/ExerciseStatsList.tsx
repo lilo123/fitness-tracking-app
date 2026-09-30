@@ -219,53 +219,68 @@ export const ExerciseStatsList: React.FC<ExerciseStatsListProps> = ({
         className="w-full text-left bg-zinc-900/90 border border-zinc-800/80 hover:border-zinc-700/80 rounded-3xl p-5 shadow-2xl space-y-3 cursor-pointer transition focus:outline-none focus:ring-2 focus:ring-cyan-500/50 touch-manipulation block"
         data-testid={`exercise-card-${stat.exercise.id || stat.exercise.name || idx}`}
       >
-        <div className="flex items-center justify-between border-b border-zinc-800 pb-3 gap-2">
-          {/* H21-ex: min-w-0 truncate + title, H51: body part via Tag */}
-          <div className="min-w-0 flex-1 space-y-1.5">
+        <div className="border-b border-zinc-800 pb-3 space-y-2">
+          {/* Row 1: Title keeps its row (min width >= 60% of card, wraps before truncating) + Sparkline */}
+          <div className="flex items-start justify-between gap-2">
             <h3
-              className="text-sm font-bold text-white truncate"
+              className="text-sm font-bold text-white break-words min-w-0 flex-1"
               title={stat.exercise.name}
             >
               {stat.exercise.name}
             </h3>
+            {sparklinePoints.length >= 2 && (
+              <ExerciseSparkline
+                points={sparklinePoints}
+                width={60}
+                height={22}
+                className="text-cyan-400 shrink-0 mt-0.5"
+                unit={unit}
+              />
+            )}
+          </div>
+
+          {/* Row 2: Tag & PR Badge (wraps within card if needed) */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <Tag
                 label={stat.exercise.body_parts?.[0] || 'Full Body'}
                 tone="info"
               />
             </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            {/* H42: sparkline on card when >=2 points */}
-            {sparklinePoints.length >= 2 && (
-              <ExerciseSparkline
-                points={sparklinePoints}
-                width={60}
-                height={22}
-                className="text-cyan-400 shrink-0"
-                unit={unit}
-              />
-            )}
 
             {/* H47: PR line shows formatted pr_date */}
             {totalSets > 0 ? (() => {
               const prE1rm =
-                stat.prE1rm ??
-                (stat.maxWeight > 0 && stat.prReps <= 12
-                  ? e1rm(stat.maxWeight, stat.prReps)
-                  : null);
-              const e1rmSuffix =
-                prMode === 'e1rm' && prE1rm != null && prE1rm > 0
-                  ? ` · e1RM ${formatWeight(prE1rm, unit, { showUnit: true })}`
-                  : '';
+                prMode === 'e1rm'
+                  ? (stat.prE1rm ??
+                    (stat.maxWeight > 0 && stat.prReps <= 12
+                      ? e1rm(stat.maxWeight, stat.prReps)
+                      : null))
+                  : null;
+              const hasE1rm = prMode === 'e1rm' && prE1rm != null && prE1rm > 0;
+              const weightStr =
+                stat.maxWeight > 0
+                  ? formatWeight(stat.maxWeight, unit, { showUnit: true })
+                  : 'Bodyweight';
+              const dateStr = stat.prDate ? formatExerciseSetDate(stat.prDate) : '';
+
               return (
-                <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-2xl text-amber-400 text-xs font-bold shrink-0">
+                <div
+                  data-testid={`pr-badge-${stat.exercise.id || stat.exercise.name || idx}`}
+                  className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-2xl text-amber-400 text-xs font-bold max-w-full"
+                >
                   <Trophy className="w-3.5 h-3.5 shrink-0" />
-                  <span>
-                    PR: {stat.maxWeight > 0 ? formatWeight(stat.maxWeight, unit, { showUnit: true }) : 'Bodyweight'} × {stat.prReps}
-                    {e1rmSuffix}
-                    {stat.prDate ? ` · ${formatExerciseSetDate(stat.prDate)}` : ''}
+                  <span className={hasE1rm ? "flex flex-col sm:inline sm:space-x-1 min-w-0" : "min-w-0"}>
+                    {hasE1rm ? (
+                      <>
+                        <span className="break-words">PR: {weightStr} × {stat.prReps}</span>
+                        <span className="text-xs font-semibold text-amber-300/90 break-words">
+                          {`e1RM ${formatWeight(prE1rm, unit, { showUnit: true })}${dateStr ? ` · ${dateStr}` : ''}`}
+                        </span>
+                      </>
+                    ) : (
+                      `PR: ${weightStr} × ${stat.prReps}${dateStr ? ` · ${dateStr}` : ''}`
+                    )}
                   </span>
                 </div>
               );

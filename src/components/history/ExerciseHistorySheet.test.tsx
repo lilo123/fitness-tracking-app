@@ -13,11 +13,12 @@ vi.mock('../../lib/supabase', () => ({
 }));
 
 let mockWeightUnit: 'lb' | 'kg' = 'lb';
+let mockPrMode: 'weight' | 'e1rm' = 'weight';
 
 vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({
     user: { id: 'test-user-123' },
-    profile: { id: 'test-user-123', weight_unit: mockWeightUnit },
+    profile: { id: 'test-user-123', weight_unit: mockWeightUnit, pr_mode: mockPrMode },
   }),
 }));
 
@@ -26,6 +27,7 @@ describe('ExerciseHistorySheet', () => {
 
   beforeEach(() => {
     mockWeightUnit = 'lb';
+    mockPrMode = 'weight';
     vi.clearAllMocks();
     queryClient = new QueryClient({
       defaultOptions: {
@@ -488,5 +490,22 @@ describe('ExerciseHistorySheet', () => {
 
     // Set row displays in kg
     expect(await screen.findByText('102.1 kg × 8')).toBeDefined();
+  });
+
+  it('renders no "e1RM" text anywhere on sheet when pr_mode is weight', async () => {
+    mockPrMode = 'weight';
+    renderComponent({ prWeight: 225, prReps: 8 });
+
+    const summary = screen.getByTestId('exercise-sheet-pr-summary');
+    expect(summary.textContent).not.toContain('e1RM');
+  });
+
+  it('renders e1RM summary on sheet with 2-line badge when pr_mode is e1rm', async () => {
+    mockPrMode = 'e1rm';
+    renderComponent({ prWeight: 225, prReps: 8 });
+
+    const summary = screen.getByTestId('exercise-sheet-pr-summary');
+    expect(summary.textContent).toContain('e1RM');
+    expect(summary.className).toContain('max-w-full');
   });
 });

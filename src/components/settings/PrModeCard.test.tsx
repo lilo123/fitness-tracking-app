@@ -120,4 +120,21 @@ describe('PrModeCard', () => {
     const { container } = render(<PrModeCard />);
     await expectNoA11yViolations(container);
   });
+
+  it('applies sentence case styling matching WeightUnitCard and preserves 44px min-height', () => {
+    const { container } = render(<PrModeCard />);
+
+    const weightBtn = screen.getByTestId('pr-mode-weight');
+    const e1rmBtn = screen.getByTestId('pr-mode-e1rm');
+
+    expect(weightBtn.textContent).toBe('Max weight');
+    expect(e1rmBtn.textContent).toBe('Estimated 1RM');
+
+    const tablist = container.querySelector('[role="tablist"]');
+    expect(tablist?.className).toContain('[&_button]:normal-case');
+    expect(tablist?.className).toContain('[&_button]:tracking-normal');
+
+    expect(weightBtn.className).toContain('min-h-[44px]');
+    expect(e1rmBtn.className).toContain('min-h-[44px]');
+  });
 });

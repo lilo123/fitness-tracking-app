@@ -6445,4 +6445,470 @@ test.describe("P8 Route-Wide Density & Tap Grid", () => {
       throw testErr;
     }
   });
+
+  // 5. Exercise card header alignment with logged and pending SetRows across viewports
+  test("Exercise card column header aligns with logged and pending SetRow cells across viewports", async ({ browser }) => {
+    const testPriorWorkoutId = 'e8000000-0000-0000-0000-000000000101';
+    const testPriorSetId = 'e8000000-0000-0000-0000-000000000102';
+    const testTodayWorkoutId = 'e8000000-0000-0000-0000-000000000103';
+    const testTodaySetId = 'e8000000-0000-0000-0000-000000000104';
+    const psqlCmd = getPsqlCommand();
+
+    const cleanSql = `
+      DELETE FROM public.sets WHERE id IN ('${testPriorSetId}', '${testTodaySetId}');
+      DELETE FROM public.workouts WHERE id IN ('${testPriorWorkoutId}', '${testTodayWorkoutId}');
+      DELETE FROM public.sets WHERE workout_id IN (
+        SELECT id FROM public.workouts
+        WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io')
+          AND (workout_date = CURRENT_DATE OR date::date = CURRENT_DATE)
+      );
+      DELETE FROM public.workouts
+      WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io')
+        AND (workout_date = CURRENT_DATE OR date::date = CURRENT_DATE);
+    `;
+    execSync(psqlCmd, { input: cleanSql, encoding: 'utf8' });
+
+    const seedSql = `
+      DO $$
+      DECLARE
+        v_athlete_id uuid;
+        v_ex_id uuid;
+        v_prior_workout_id uuid;
+        v_today_workout_id uuid;
+      BEGIN
+        SELECT id INTO v_athlete_id FROM public.users WHERE email = 'athlete@cybergym.io' LIMIT 1;
+        SELECT id INTO v_ex_id FROM public.exercises WHERE name = 'Incline Bench Press' LIMIT 1;
+
+        INSERT INTO public.workouts (id, user_id, name, date, workout_date, created_at)
+        VALUES ('${testPriorWorkoutId}', v_athlete_id, 'Prior Workout', (CURRENT_DATE - INTERVAL '1 day')::date, (CURRENT_DATE - INTERVAL '1 day')::date, now() - INTERVAL '1 day')
+        ON CONFLICT (user_id, workout_date) DO UPDATE SET name = 'Prior Workout'
+        RETURNING id INTO v_prior_workout_id;
+
+        INSERT INTO public.sets (id, workout_id, exercise_id, weight, reps, set_index, set_type, created_at)
+        VALUES ('${testPriorSetId}', v_prior_workout_id, v_ex_id, 135, 10, 1, 'working', now() - INTERVAL '1 day')
+        ON CONFLICT (id) DO UPDATE SET workout_id = v_prior_workout_id, exercise_id = v_ex_id, weight = 135, reps = 10;
+
+        INSERT INTO public.workouts (id, user_id, name, date, workout_date, created_at)
+        VALUES ('${testTodayWorkoutId}', v_athlete_id, 'Workout A (Push, Quads & Core)', CURRENT_DATE, CURRENT_DATE, now())
+        ON CONFLICT (user_id, workout_date) DO UPDATE SET name = 'Workout A (Push, Quads & Core)'
+        RETURNING id INTO v_today_workout_id;
+
+        INSERT INTO public.sets (id, workout_id, exercise_id, weight, reps, set_index, set_type, created_at)
+        VALUES ('${testTodaySetId}', v_today_workout_id, v_ex_id, 135, 10, 1, 'working', now())
+        ON CONFLICT (id) DO UPDATE SET workout_id = v_today_workout_id, exercise_id = v_ex_id, weight = 135, reps = 10;
+      END $$;
+    `;
+    execSync(psqlCmd, { input: seedSql, encoding: 'utf8' });
+
+    let testErr: any = null;
+    let cleanupErr: any = null;
+    try {
+      for (const width of [320, 390, 430]) {
+        const page = await browser.newPage({
+          viewport: { width, height: 844 },
+          deviceScaleFactor: 1,
+        });
+
+        try {
+          await page.goto("/login");
+          await page.fill('input[type="email"]', "athlete@cybergym.io");
+          await page.fill('input[type="password"]', "password123");
+          await page.click('button[type="submit"]');
+          await page.waitForURL("**/workout");
+
+          await page.goto('/workout?routine=' + encodeURIComponent('Workout A (Push, Quads & Core)'));
+          await page.waitForLoadState('domcontentloaded');
+          await expect(page.locator('[data-testid="exercise-card-0"]')).toBeVisible();
+          await expect(page.locator('#exercise-card-body-0')).toBeVisible();
+
+          const measurements = await page.locator('#exercise-card-body-0').evaluate((bodyEl: HTMLElement) => {
+            const header = bodyEl.children[0] as HTMLElement;
+            const loggedRow = bodyEl.querySelector('[data-testid="logged-set-row-0-0"]') as HTMLElement;
+            const ghostHint1 = bodyEl.querySelector('[data-testid="ghost-hint-0-1"]');
+            const pendingRow = ghostHint1 ? (ghostHint1.parentElement as HTMLElement) : null;
+
+            if (!header || !loggedRow || !pendingRow) {
+              return { error: 'Elements not found', hasHeader: !!header, hasLogged: !!loggedRow, hasPending: !!pendingRow };
+            }
+
+            const hCells = Array.from(header.children).map((el) => {
+              const r = el.getBoundingClientRect();
+              return { left: r.left, right: r.right, width: r.width, center: (r.left + r.right) / 2 };
+            });
+
+            const lCells = Array.from(loggedRow.children).map((el) => {
+              const r = el.getBoundingClientRect();
+              return { left: r.left, right: r.right, width: r.width, center: (r.left + r.right) / 2 };
+            });
+
+            const pCells = Array.from(pendingRow.children).map((el) => {
+              const r = el.getBoundingClientRect();
+              return { left: r.left, right: r.right, width: r.width, center: (r.left + r.right) / 2 };
+            });
+
+            return { hCells, lCells, pCells };
+          });
+
+          expect('error' in measurements, JSON.stringify(measurements)).toBe(false);
+          if ('error' in measurements) throw new Error('Elements not found');
+
+          const { hCells, lCells, pCells } = measurements;
+          expect(hCells.length, '5 header columns').toBe(5);
+          expect(lCells.length, '5 logged row columns').toBe(5);
+          expect(pCells.length, '5 pending row columns').toBe(5);
+
+          // Assert no header label overlaps its neighbour
+          for (let i = 0; i < hCells.length - 1; i++) {
+            expect(
+              hCells[i].right,
+              `at ${width}px header col ${i} right <= col ${i+1} left (no overlap)`
+            ).toBeLessThanOrEqual(hCells[i + 1].left + 0.1);
+          }
+
+          // For each of the 5 header cells assert horizontal center lies within row cell [left, right]
+          // AND |headerCenter - cellCenter| <= 4 raw px for both logged and pending rows
+          for (let i = 0; i < 5; i++) {
+            const h = hCells[i];
+            const l = lCells[i];
+            const p = pCells[i];
+
+            // Logged row checks
+            expect(
+              h.center,
+              `at ${width}px col ${i} header center (${h.center.toFixed(1)}) >= logged cell left (${l.left.toFixed(1)})`
+            ).toBeGreaterThanOrEqual(l.left - 0.1);
+            expect(
+              h.center,
+              `at ${width}px col ${i} header center (${h.center.toFixed(1)}) <= logged cell right (${l.right.toFixed(1)})`
+            ).toBeLessThanOrEqual(l.right + 0.1);
+            const lDiff = Math.abs(h.center - l.center);
+            expect(
+              lDiff,
+              `at ${width}px col ${i} |headerCenter - loggedCenter| (${lDiff.toFixed(1)}px) <= 4px`
+            ).toBeLessThanOrEqual(4);
+
+            // Pending row checks
+            expect(
+              h.center,
+              `at ${width}px col ${i} header center (${h.center.toFixed(1)}) >= pending cell left (${p.left.toFixed(1)})`
+            ).toBeGreaterThanOrEqual(p.left - 0.1);
+            expect(
+              h.center,
+              `at ${width}px col ${i} header center (${h.center.toFixed(1)}) <= pending cell right (${p.right.toFixed(1)})`
+            ).toBeLessThanOrEqual(p.right + 0.1);
+            const pDiff = Math.abs(h.center - p.center);
+            expect(
+              pDiff,
+              `at ${width}px col ${i} |headerCenter - pendingCenter| (${pDiff.toFixed(1)}px) <= 4px`
+            ).toBeLessThanOrEqual(4);
+          }
+
+          // Relational check 1: Stepper -/+ buttons and value have same size (12px / 700 text-xs font-bold)
+          const stepperData = await page.locator('[data-testid="exercise-card-0"]').evaluate((card: HTMLElement) => {
+            const decBtn = card.querySelector('button[title="Decrease target sets"]') as HTMLElement;
+            const incBtn = card.querySelector('button[title="Increase target sets"]') as HTMLElement;
+            const countSpan = decBtn?.nextElementSibling as HTMLElement;
+            if (!decBtn || !incBtn || !countSpan) return null;
+            const decStyle = window.getComputedStyle(decBtn);
+            const incStyle = window.getComputedStyle(incBtn);
+            const countStyle = window.getComputedStyle(countSpan);
+            return {
+              decFontSize: parseFloat(decStyle.fontSize),
+              decFontWeight: parseInt(decStyle.fontWeight, 10),
+              incFontSize: parseFloat(incStyle.fontSize),
+              incFontWeight: parseInt(incStyle.fontWeight, 10),
+              countFontSize: parseFloat(countStyle.fontSize),
+              countFontWeight: parseInt(countStyle.fontWeight, 10),
+            };
+          });
+          expect(stepperData, "stepper buttons and count found").toBeTruthy();
+          expect(stepperData!.decFontSize, "stepper dec button font size is 12px").toBe(12);
+          expect(stepperData!.countFontSize, "stepper count font size is 12px").toBe(12);
+          expect(stepperData!.decFontSize, "stepper button and value have same font size").toBe(stepperData!.countFontSize);
+          expect(stepperData!.decFontWeight, "stepper dec button font weight is 700").toBe(700);
+          expect(stepperData!.countFontWeight, "stepper count font weight is 700").toBe(700);
+
+          // Relational check 2: Header weight unit is uppercase "LBS" or "KG" (no capitalize)
+          const headerUnit = await page.locator("#exercise-card-body-0 > div").first().evaluate((headerEl: HTMLElement) => {
+            const col3 = headerEl.children[2] as HTMLElement;
+            const span = col3.querySelector('span[aria-hidden="true"]');
+            return span ? span.textContent : col3.textContent;
+          });
+          expect(headerUnit?.trim(), "header weight unit is uppercase").toMatch(/^(LBS|KG)$/);
+
+          // Relational check 3: Logged value box height (44px) and font size/weight (16px / 600) equal pending input
+          const boxStyles = await page.locator("#exercise-card-body-0").evaluate((bodyEl: HTMLElement) => {
+            const loggedWeightBox = bodyEl.querySelector('[data-testid="logged-set-row-0-0"] div.rounded-lg.tabular-nums') as HTMLElement;
+            const pendingWeightInput = bodyEl.querySelector('[data-testid="ghost-weight-0-1"]') as HTMLElement;
+            if (!loggedWeightBox || !pendingWeightInput) return null;
+            const lStyle = window.getComputedStyle(loggedWeightBox);
+            const pStyle = window.getComputedStyle(pendingWeightInput);
+            return {
+              loggedHeight: loggedWeightBox.getBoundingClientRect().height,
+              pendingHeight: pendingWeightInput.getBoundingClientRect().height,
+              loggedFontSize: parseFloat(lStyle.fontSize),
+              pendingFontSize: parseFloat(pStyle.fontSize),
+              loggedFontWeight: parseInt(lStyle.fontWeight, 10),
+              pendingFontWeight: parseInt(pStyle.fontWeight, 10),
+            };
+          });
+          expect(boxStyles, "logged weight box and pending input found").toBeTruthy();
+          expect(boxStyles!.loggedHeight, "logged box height >= 44px").toBeGreaterThanOrEqual(44);
+          expect(boxStyles!.pendingHeight, "pending input height >= 44px").toBeGreaterThanOrEqual(44);
+          expect(Math.abs(boxStyles!.loggedHeight - boxStyles!.pendingHeight), "logged and pending heights equal so no jump").toBeLessThanOrEqual(1);
+          expect(boxStyles!.loggedFontSize, "logged value font size is 16px").toBe(16);
+          expect(boxStyles!.pendingFontSize, "pending input font size is 16px").toBe(16);
+          expect(boxStyles!.loggedFontSize, "logged value computed font-size == pending input font-size").toBe(boxStyles!.pendingFontSize);
+          expect(boxStyles!.loggedFontWeight, "logged value computed font-weight == pending input font-weight (600)").toBe(boxStyles!.pendingFontWeight);
+
+          // Relational check 4: Meta chips (Last / PR / Sets) - no multi-line wrap at 390 (single row height <= 32px)
+          if (width === 390) {
+            const chipRowHeight = await page.locator('[data-testid="exercise-card-0"]').evaluate((card: HTMLElement) => {
+              const chip = card.querySelector('[data-testid^="last-chip-"], [data-testid^="pr-chip-"], [data-testid^="sets-"]');
+              if (!chip || !chip.parentElement) return null;
+              return chip.parentElement.getBoundingClientRect().height;
+            });
+            expect(chipRowHeight, "chip row container found").toBeTruthy();
+            expect(chipRowHeight!, "at 390px chip row height <= 32px (single row, no multi-line wrap)").toBeLessThanOrEqual(32);
+          }
+
+          // Relational check 5: PR chip shows e1RM suffix only in e1rm mode (athlete profile defaults to weight mode)
+          const prChipText = await page.locator('[data-testid="pr-chip-0"]').textContent();
+          expect(prChipText, "PR chip in weight mode does not have e1RM suffix").not.toContain("e1RM");
+
+          // Relational check 6: Layout acceptance - no element right edge > card right edge, scrollWidth <= innerWidth
+          const { scrollWidth, innerWidth, cardOverflow } = await page.evaluate(() => {
+            const card = document.querySelector('[data-testid="exercise-card-0"]') as HTMLElement;
+            const cardRect = card ? card.getBoundingClientRect() : { right: 0 };
+            const overflowing = card ? Array.from(card.querySelectorAll("*")).filter((el) => {
+              const r = el.getBoundingClientRect();
+              return r.width > 0 && r.height > 0 && r.right > cardRect.right + 1;
+            }).length : 0;
+            return {
+              scrollWidth: document.documentElement.scrollWidth,
+              innerWidth: window.innerWidth,
+              cardOverflow: overflowing,
+            };
+          });
+          expect(scrollWidth, `at ${width}px page scrollWidth <= innerWidth`).toBeLessThanOrEqual(innerWidth);
+          expect(cardOverflow, `at ${width}px no element overflows exercise card right edge`).toBe(0);
+        } finally {
+          await page.close();
+        }
+      }
+    } catch (err) {
+      testErr = err;
+    } finally {
+      try {
+        execSync(psqlCmd, { input: cleanSql, encoding: 'utf8' });
+      } catch (cleanupErrCaught) {
+        console.error('[visual-density SetRow header alignment cleanup error]:', cleanupErrCaught);
+        if (!cleanupErr) cleanupErr = cleanupErrCaught;
+      }
+    }
+    if (cleanupErr) {
+      throw cleanupErr;
+    }
+    if (testErr) {
+      throw testErr;
+    }
+  });
+
+  test('HF-C: PR badge and exercise title layout at 320 and 390 in e1rm mode', async ({ page }) => {
+    const psqlCmd = getPsqlCommand();
+    const testExerciseId = 'c0000000-0000-0000-0000-000000000099';
+    const testWorkoutId1 = 'c0000000-0000-0000-0000-000000000098';
+    const testWorkoutId2 = 'c0000000-0000-0000-0000-000000000097';
+    const testSetId1 = 'c0000000-0000-0000-0000-000000000096';
+    const testSetId2 = 'c0000000-0000-0000-0000-000000000095';
+    const testExerciseName = 'HF-C Incline Dumbbell Press';
+
+    const cleanSql = `
+      DELETE FROM public.sets WHERE id IN ('${testSetId1}', '${testSetId2}') OR exercise_id = '${testExerciseId}';
+      DELETE FROM public.workouts WHERE id IN ('${testWorkoutId1}', '${testWorkoutId2}');
+      DELETE FROM public.exercises WHERE id = '${testExerciseId}';
+      UPDATE public.users SET pr_mode = 'weight' WHERE email = 'athlete@cybergym.io';
+    `;
+
+    const seedSql = `
+      DO $$
+      DECLARE
+        v_athlete_id uuid;
+      BEGIN
+        SELECT id INTO v_athlete_id FROM public.users WHERE email = 'athlete@cybergym.io' LIMIT 1;
+
+        -- Create dedicated exercise
+        INSERT INTO public.exercises (id, name, body_parts, is_master)
+        VALUES ('${testExerciseId}', '${testExerciseName}', '{"Chest"}', true)
+        ON CONFLICT (id) DO UPDATE SET name = '${testExerciseName}';
+
+        -- Session 1: 100x3 (e1RM = 110) 4 days ago
+        INSERT INTO public.workouts (id, user_id, name, workout_date, created_at)
+        VALUES ('${testWorkoutId1}', v_athlete_id, 'HF-C Past Session 1', (CURRENT_DATE - INTERVAL '4 days')::date, now() - INTERVAL '4 days')
+        ON CONFLICT (user_id, workout_date) DO UPDATE SET name = 'HF-C Past Session 1';
+
+        INSERT INTO public.sets (id, workout_id, exercise_id, weight, reps, set_index, set_type, created_at)
+        VALUES ('${testSetId1}', '${testWorkoutId1}', '${testExerciseId}', 100, 3, 1, 'working', now() - INTERVAL '4 days')
+        ON CONFLICT (id) DO UPDATE SET weight = 100, reps = 3;
+
+        -- Session 2: 90x10 (e1RM = 120) 2 days ago
+        INSERT INTO public.workouts (id, user_id, name, workout_date, created_at)
+        VALUES ('${testWorkoutId2}', v_athlete_id, 'HF-C Past Session 2', (CURRENT_DATE - INTERVAL '2 days')::date, now() - INTERVAL '2 days')
+        ON CONFLICT (user_id, workout_date) DO UPDATE SET name = 'HF-C Past Session 2';
+
+        INSERT INTO public.sets (id, workout_id, exercise_id, weight, reps, set_index, set_type, created_at)
+        VALUES ('${testSetId2}', '${testWorkoutId2}', '${testExerciseId}', 90, 10, 1, 'working', now() - INTERVAL '2 days')
+        ON CONFLICT (id) DO UPDATE SET weight = 90, reps = 10;
+
+        -- Set athlete pr_mode = 'e1rm'
+        UPDATE public.users SET pr_mode = 'e1rm' WHERE id = v_athlete_id;
+      END $$;
+    `;
+
+    execSync(psqlCmd, { input: cleanSql, encoding: 'utf8' });
+    execSync(psqlCmd, { input: seedSql, encoding: 'utf8' });
+
+    let testErr: any = null;
+    let cleanupErr: any = null;
+
+    try {
+      await page.goto('/login');
+      await page.fill('input[type="email"]', 'athlete@cybergym.io');
+      await page.fill('input[type="password"]', 'password123');
+      await page.click('button[type="submit"]');
+      await page.waitForURL('**/workout');
+
+      for (const width of [320, 390]) {
+        const height = width === 320 ? 568 : 844;
+        await page.setViewportSize({ width, height });
+
+        // Navigate to /history By Exercise
+        await page.goto('/history');
+        await page.waitForURL('**/history');
+        const byExerciseTab = page.locator('[data-testid="history-subview-exercise"]');
+        await expect(byExerciseTab).toBeVisible();
+        await byExerciseTab.click();
+
+        const card = page.locator(`[data-testid="exercise-card-${testExerciseId}"]`);
+        await expect(card).toBeVisible({ timeout: 10000 });
+
+        // Relational layout checks on exercise card
+        const cardMeasurements = await card.evaluate((cardEl: HTMLElement) => {
+          const cardRect = cardEl.getBoundingClientRect();
+          const cardStyle = window.getComputedStyle(cardEl);
+          const pL = parseFloat(cardStyle.paddingLeft) || 0;
+          const pR = parseFloat(cardStyle.paddingRight) || 0;
+          const cardInnerWidth = cardRect.width - pL - pR;
+
+          const titleEl = cardEl.querySelector('h3') as HTMLElement | null;
+          const titleRect = titleEl ? titleEl.getBoundingClientRect() : null;
+          const titleScrollWidth = titleEl ? titleEl.scrollWidth : 0;
+          const titleClientWidth = titleEl ? titleEl.clientWidth : 0;
+
+          const badgeEl = (cardEl.querySelector('[data-testid^="pr-badge-"]') ||
+            cardEl.querySelector('.bg-amber-500\\/10')) as HTMLElement | null;
+          const badgeRect = badgeEl ? badgeEl.getBoundingClientRect() : null;
+
+          const docScrollWidth = document.documentElement.scrollWidth;
+          const winInnerWidth = window.innerWidth;
+
+          return {
+            cardInnerWidth,
+            titleWidth: titleRect ? titleRect.width : 0,
+            titleScrollWidth,
+            titleClientWidth,
+            cardRight: cardRect.right,
+            badgeRight: badgeRect ? badgeRect.right : 0,
+            docScrollWidth,
+            winInnerWidth,
+          };
+        });
+
+        // 1. exercise title width >= 60% of card inner width and > 0
+        expect(cardMeasurements.titleWidth, `[${width}px] title width > 0`).toBeGreaterThan(0);
+        const titleRatio = cardMeasurements.titleWidth / cardMeasurements.cardInnerWidth;
+        expect(
+          titleRatio,
+          `[${width}px] exercise title width (${cardMeasurements.titleWidth}px) >= 60% of card inner width (${cardMeasurements.cardInnerWidth}px)`
+        ).toBeGreaterThanOrEqual(0.6);
+
+        // 2. title not clipped (scrollWidth <= clientWidth or wraps)
+        expect(
+          cardMeasurements.titleScrollWidth,
+          `[${width}px] title scrollWidth (${cardMeasurements.titleScrollWidth}px) <= clientWidth (${cardMeasurements.titleClientWidth}px)`
+        ).toBeLessThanOrEqual(cardMeasurements.titleClientWidth + 1);
+
+        // 3. badge right <= card right
+        expect(
+          cardMeasurements.badgeRight,
+          `[${width}px] badge right (${cardMeasurements.badgeRight}px) <= card right (${cardMeasurements.cardRight}px)`
+        ).toBeLessThanOrEqual(cardMeasurements.cardRight + 1);
+
+        // 4. document scrollWidth <= innerWidth
+        expect(
+          cardMeasurements.docScrollWidth,
+          `[${width}px] document scrollWidth (${cardMeasurements.docScrollWidth}px) <= innerWidth (${cardMeasurements.winInnerWidth}px)`
+        ).toBeLessThanOrEqual(cardMeasurements.winInnerWidth);
+
+        // Open ExerciseHistorySheet
+        await card.click();
+        const sheetPrSummary = page.locator('[data-testid="exercise-sheet-pr-summary"]');
+        await expect(sheetPrSummary).toBeVisible({ timeout: 10000 });
+
+        const sheetMeasurements = await page.evaluate(() => {
+          const prEl = document.querySelector('[data-testid="exercise-sheet-pr-summary"]') as HTMLElement | null;
+          const sheetEl = prEl ? (prEl.closest('.p-4') as HTMLElement | null) : null;
+          const sheetRect = sheetEl ? sheetEl.getBoundingClientRect() : null;
+          const prRect = prEl ? prEl.getBoundingClientRect() : null;
+
+          const docScrollWidth = document.documentElement.scrollWidth;
+          const winInnerWidth = window.innerWidth;
+
+          return {
+            sheetRight: sheetRect ? sheetRect.right : 0,
+            prRight: prRect ? prRect.right : 0,
+            docScrollWidth,
+            winInnerWidth,
+          };
+        });
+
+        // 5. sheet badge right <= sheet right
+        expect(
+          sheetMeasurements.prRight,
+          `[${width}px Sheet] badge right (${sheetMeasurements.prRight}px) <= sheet right (${sheetMeasurements.sheetRight}px)`
+        ).toBeLessThanOrEqual(sheetMeasurements.sheetRight + 1);
+
+        // 6. document scrollWidth <= innerWidth on sheet
+        expect(
+          sheetMeasurements.docScrollWidth,
+          `[${width}px Sheet] document scrollWidth (${sheetMeasurements.docScrollWidth}px) <= innerWidth (${sheetMeasurements.winInnerWidth}px)`
+        ).toBeLessThanOrEqual(sheetMeasurements.winInnerWidth);
+
+        // Close sheet
+        await page.keyboard.press('Escape');
+        await expect(sheetPrSummary).not.toBeVisible();
+      }
+    } catch (err) {
+      testErr = err;
+    } finally {
+      try {
+        await page.close();
+      } catch (e) {
+        if (!cleanupErr) cleanupErr = e;
+      }
+      try {
+        execSync(psqlCmd, { input: cleanSql, encoding: 'utf8' });
+      } catch (cleanupErrCaught) {
+        console.error('[visual-density HF-C cleanup error]:', cleanupErrCaught);
+        if (!cleanupErr) cleanupErr = cleanupErrCaught;
+      }
+    }
+
+    if (cleanupErr) {
+      throw cleanupErr;
+    }
+    if (testErr) {
+      throw testErr;
+    }
+  });
 });

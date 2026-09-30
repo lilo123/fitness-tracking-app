@@ -140,21 +140,33 @@ export const WorkoutExerciseHistory: React.FC<WorkoutExerciseHistoryProps> = ({
           {/* H47: PR line shows formatted pr_date */}
           {totalSets > 0 ? (() => {
             const calculatedE1rm =
-              stat.prE1rm ??
-              (stat.maxWeight > 0 && stat.prReps <= 12
-                ? e1rm(stat.maxWeight, stat.prReps)
-                : null);
-            const e1rmSuffix =
-              prMode === 'e1rm' && calculatedE1rm != null && calculatedE1rm > 0
-                ? ` · e1RM ${formatWeight(calculatedE1rm, unit, { showUnit: true })}`
-                : '';
+              prMode === 'e1rm'
+                ? (stat.prE1rm ??
+                  (stat.maxWeight > 0 && stat.prReps <= 12
+                    ? e1rm(stat.maxWeight, stat.prReps)
+                    : null))
+                : null;
+            const hasE1rm = prMode === 'e1rm' && calculatedE1rm != null && calculatedE1rm > 0;
+            const weightStr =
+              stat.maxWeight > 0
+                ? formatWeight(stat.maxWeight, unit, { showUnit: true })
+                : 'Bodyweight';
+            const dateStr = stat.prDate ? formatExerciseSetDate(stat.prDate) : '';
+
             return (
-              <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-2xl text-amber-400 text-xs font-bold shrink-0">
+              <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-2xl text-amber-400 text-xs font-bold max-w-full">
                 <Trophy className="w-3.5 h-3.5 shrink-0" />
-                <span>
-                  PR: {stat.maxWeight > 0 ? formatWeight(stat.maxWeight, unit, { showUnit: true }) : 'Bodyweight'} × {stat.prReps}
-                  {e1rmSuffix}
-                  {stat.prDate ? ` · ${formatExerciseSetDate(stat.prDate)}` : ''}
+                <span className={hasE1rm ? "flex flex-col sm:inline sm:space-x-1 min-w-0" : "min-w-0"}>
+                  {hasE1rm ? (
+                    <>
+                      <span className="break-words">PR: {weightStr} × {stat.prReps}</span>
+                      <span className="text-xs font-semibold text-amber-300/90 break-words">
+                        {`e1RM ${formatWeight(calculatedE1rm, unit, { showUnit: true })}${dateStr ? ` · ${dateStr}` : ''}`}
+                      </span>
+                    </>
+                  ) : (
+                    `PR: ${weightStr} × ${stat.prReps}${dateStr ? ` · ${dateStr}` : ''}`
+                  )}
                 </span>
               </div>
             );

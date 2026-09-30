@@ -192,6 +192,15 @@ test.describe('P8.1 PR Mode Setting E2E', () => {
     await expect(exerciseCard).toContainText('200 lbs × 2');
     await expect(exerciseCard).not.toContainText('e1RM');
 
+    // Open sheet in weight mode: verify sheet also renders no 'e1RM' text
+    await exerciseCard.click();
+    const sheetPrSummaryInitial = page.locator('[data-testid="exercise-sheet-pr-summary"]');
+    await expect(sheetPrSummaryInitial).toBeVisible({ timeout: 10000 });
+    await expect(sheetPrSummaryInitial).toContainText('200 lbs × 2');
+    await expect(sheetPrSummaryInitial).not.toContainText('e1RM');
+    await page.keyboard.press('Escape');
+    await expect(sheetPrSummaryInitial).not.toBeVisible();
+
     // In /workout with the test routine: ExerciseCard trophy chip displays PR: 200×2
     await page.goto('/workout?routine=P81%20PR%20Test%20Routine');
     await page.waitForURL('**/workout**');
@@ -211,6 +220,8 @@ test.describe('P8.1 PR Mode Setting E2E', () => {
     await expect(weightBtn).toBeVisible();
     await expect(e1rmBtn).toBeVisible();
     await expect(weightBtn).toHaveAttribute('aria-selected', 'true');
+    await expect(weightBtn).toHaveText('Max weight');
+    await expect(e1rmBtn).toHaveText('Estimated 1RM');
 
     // Click Estimated 1RM
     await e1rmBtn.click();
@@ -277,6 +288,15 @@ test.describe('P8.1 PR Mode Setting E2E', () => {
     await expect(exerciseCard).toBeVisible({ timeout: 10000 });
     await expect(exerciseCard).toContainText('200 lbs × 2');
     await expect(exerciseCard).not.toContainText('e1RM');
+
+    // Open sheet when restored to weight mode: verify sheet also has no 'e1RM' text
+    await exerciseCard.click();
+    const sheetPrSummaryRestored = page.locator('[data-testid="exercise-sheet-pr-summary"]');
+    await expect(sheetPrSummaryRestored).toBeVisible({ timeout: 10000 });
+    await expect(sheetPrSummaryRestored).toContainText('200 lbs × 2');
+    await expect(sheetPrSummaryRestored).not.toContainText('e1RM');
+    await page.keyboard.press('Escape');
+    await expect(sheetPrSummaryRestored).not.toBeVisible();
 
     // Verify /workout restores to Max weight PR
     await page.goto('/workout?routine=P81%20PR%20Test%20Routine');

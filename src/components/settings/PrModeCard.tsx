@@ -63,6 +63,7 @@ export const PrModeCard: React.FC = () => {
         tabs={tabs}
         activeTab={mode}
         onChange={(tabId) => void handleTabChange(tabId)}
+        className="[&_button]:normal-case [&_button]:tracking-normal"
       />
     </div>
   );
