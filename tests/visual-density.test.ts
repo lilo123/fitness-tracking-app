@@ -4215,15 +4215,23 @@ test.describe('P3a Workout', () => {
       await expect(pendingRow).toBeVisible();
 
       // Logged values (input-mirror exception) must match the pending inputs exactly.
-      const loggedValue = card.locator('[data-testid^="logged-weight-value-"]').first();
-      await expect(loggedValue).toBeVisible();
-      const fontOf = (l: Locator) =>
-        l.evaluate((el) => {
-          const cs = window.getComputedStyle(el);
-          return { size: cs.fontSize, weight: cs.fontWeight };
-        });
-      const [loggedFont, inputFont] = await Promise.all([fontOf(loggedValue), fontOf(pendingRow)]);
-      expect(loggedFont, 'logged set value font must equal pending input font').toEqual(inputFont);
+      // Read both in one evaluate (atomic w.r.t. re-renders) and poll until mounted.
+      await expect
+        .poll(
+          () =>
+            card.evaluate((root) => {
+              const logged = root.querySelector('[data-testid^="logged-weight-value-"]');
+              const input = root.querySelector('input[data-testid^="ghost-weight-"]');
+              if (!logged || !input) return { same: false, logged: null, input: null };
+              const a = window.getComputedStyle(logged);
+              const b = window.getComputedStyle(input);
+              const lf = { size: a.fontSize, weight: a.fontWeight };
+              const inf = { size: b.fontSize, weight: b.fontWeight };
+              return { same: lf.size !== '' && lf.size === inf.size && lf.weight === inf.weight, logged: lf, input: inf };
+            }),
+          { message: 'logged set value font must equal pending input font' }
+        )
+        .toMatchObject({ same: true });
 
       // Check typography on the whole exercise card (header, chips, controls, logged + pending rows)
       const setsBody = card;
@@ -7013,8 +7021,13 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
         const pill = page.locator('[data-testid="rest-timer-pill"]');
         await expect(pill).toBeVisible({ timeout: 5000 });
 
-        // Remove first exercise to trigger UndoToast
-        const removeBtn = page.locator('[data-testid="exercise-card-0"] button[aria-label^="Remove"], [data-testid="exercise-card-0"] button[title*="Remove"]').first();
+        // Remove an exercise with no logged sets to trigger the undo toast
+        // (independent of sets logged today by earlier tests).
+        const emptyCard = page
+          .locator('[data-testid^="exercise-card-"]')
+          .filter({ hasText: /(^|\D)0\/\d+ Sets/ })
+          .first();
+        const removeBtn = emptyCard.locator('button[aria-label^="Remove"]').first();
         await expect(removeBtn).toBeVisible({ timeout: 5000 });
         await removeBtn.click();
 
@@ -7066,6 +7079,26 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
         deviceScaleFactor: 1,
       });
 
+      // Own data (CI runs density on a fresh DB): two custom dishes pinned to the top.
+      const psqlCmd = getPsqlCommand();
+      const dishA = `e8100000-0000-0000-0000-000000000${width}`;
+      const dishB = `e8200000-0000-0000-0000-000000000${width}`;
+      const cleanupSql = `
+        DELETE FROM public.nutrition_logs WHERE food_name LIKE 'HFB Toast Dish %'
+          AND user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io');
+        DELETE FROM public.custom_dishes WHERE id IN ('${dishA}', '${dishB}');
+      `;
+      execSync(psqlCmd, {
+        input: `${cleanupSql}
+          INSERT INTO public.custom_dishes (id, user_id, name, calories, protein, carbs, fat, fiber, kind, use_count, notes, created_at)
+          VALUES
+            ('${dishA}', (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io'), 'HFB Toast Dish A', 132, 22, 0, 4.8, 0, 'food', 999999, NULL, now()),
+            ('${dishB}', (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io'), 'HFB Toast Dish B', 579, 47, 60, 12, 3, 'food', 999998, NULL, now());
+        `,
+        encoding: 'utf8',
+      });
+
+      let cleanupErr: unknown;
       try {
         await page.goto("/login");
         await page.fill('input[type="email"]', "athlete@cybergym.io");
@@ -7083,19 +7116,16 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
         await page.waitForSelector("text=Today's Nutrition", { timeout: 15000 });
         await expect(page.locator('[data-testid="rest-timer-pill"]')).toBeVisible({ timeout: 5000 });
 
-        // Stage a meal (tap favorite custom dish card)
-        const customDishes = page.locator('[data-testid^="custom-dish-card-"]');
-        await expect(customDishes.first()).toBeVisible({ timeout: 5000 });
-        await customDishes.first().click();
+        // Stage a meal by tapping our own dish A
+        const dishCardA = page.locator(`[data-testid="custom-dish-card-${dishA}"]`);
+        await expect(dishCardA).toBeVisible({ timeout: 5000 });
+        await dishCardA.click();
         await expect(page.locator('[data-testid="staged-meal-card"]')).toBeVisible({ timeout: 5000 });
 
-        // Trigger floating UndoToast while staged via favorite quick-log button
-        const addFavBtn = page.locator('[data-testid^="quick-log-btn-"]').first();
-        if (await addFavBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await addFavBtn.click();
-        } else {
-          await customDishes.nth(1).click();
-        }
+        // Trigger the floating toast while staged: quick-add dish B
+        const addBtnB = page.locator(`[data-testid="quick-log-btn-${dishB}"]`);
+        await expect(addBtnB).toBeVisible({ timeout: 5000 });
+        await addBtnB.click();
 
         const toast = page.locator('[data-testid="quick-log-toast"]');
         await expect(toast).toBeVisible({ timeout: 5000 });
@@ -7174,7 +7204,14 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
         expect(geo3!.toastBottom).toBeLessThanOrEqual(geo3!.pillTop);
       } finally {
         await page.close();
+        try {
+          execSync(psqlCmd, { input: cleanupSql, encoding: 'utf8' });
+        } catch (err) {
+          console.error('[visual-density HF-B nutrition cleanup error]:', err);
+          cleanupErr = err;
+        }
       }
+      if (cleanupErr) throw cleanupErr;
     });
   }
 
@@ -7259,6 +7296,19 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
         });
 
         expect(alphaResult.isOpaque, `rest-timer pill background must be 100% opaque (alpha == 1, got ${alphaResult.alpha}) at ${width}px`).toBe(true);
+
+        // Element-level opacity: a pulsing/fading container lets page content show
+        // through even with an opaque background colour.
+        const effective = await pill.evaluate((el) => ({
+          opacity: window.getComputedStyle(el).opacity,
+          animationName: window.getComputedStyle(el).animationName,
+          runningAnimations: el.getAnimations().length,
+        }));
+        expect(effective, `rest-timer pill must not fade (opacity 1, no container animation) at ${width}px`).toEqual({
+          opacity: '1',
+          animationName: 'none',
+          runningAnimations: 0,
+        });
       } finally {
         await page.close();
       }
