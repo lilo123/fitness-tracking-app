@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
+import { useOverlaidNutritionLogs } from '../../offline';
 import type { Exercise, NutritionLog } from '../../types/database';
 import { DEFAULT_EXERCISES_LIST } from '../../utils/ghostSets';
 import { roundTo1Decimal } from '../../utils/nutrition';
@@ -106,9 +107,13 @@ export function useHistoryData(targetUserId: string, onMutationError?: (msg: str
     getNextPageParam: (lastPage) => lastPage?.nextCursor,
   });
 
-  const nutritionLogs = useMemo(() => {
+  const rawNutritionLogs = useMemo(() => {
     return nutritionData?.pages.flatMap((page) => page.logs) ?? [];
   }, [nutritionData]);
+
+  const nutritionLogs = useOverlaidNutritionLogs(rawNutritionLogs, {
+    userId: targetUserId,
+  });
 
   // Delete nutrition log mutation
   const deleteMealMutation = useMutation({

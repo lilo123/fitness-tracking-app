@@ -37,6 +37,7 @@ interface BannerState {
 export interface UseCustomDishActionsOptions {
   targetUserId: string;
   selectedDate: string;
+  timeZone?: string;
   stagedMeal?: StagedMeal | null;
   setStagedMeal: (meal: StagedMeal | null) => void;
   setDishFetchError?: (error: { message: string; retry: () => void } | null) => void;
@@ -82,6 +83,7 @@ export function buildItemsFromDish(dish: CustomDish, detail: CustomDishDetail | 
 export function useCustomDishActions({
   targetUserId,
   selectedDate,
+  timeZone,
   stagedMeal,
   setStagedMeal,
   setDishFetchError,
@@ -309,7 +311,7 @@ export function useCustomDishActions({
         meal_type: 'Breakfast',
         serving_size: 1,
         serving_unit: 'serving',
-        logged_at: formatLocalTimestamp(selectedDate),
+        logged_at: formatLocalTimestamp(selectedDate, undefined, timeZone),
         logged_date: selectedDate,
         notes: dish.notes ?? null,
         incrementDishId: dish.id,
@@ -320,14 +322,8 @@ export function useCustomDishActions({
         },
       });
       triggerToast?.(dish);
-      if (dish.name === 'Quick Bar') {
-        const dishBuilder = supabase.from('custom_dishes') as any;
-        if (dishBuilder && typeof dishBuilder.update === 'function') {
-          dishBuilder.update({ use_count: (dish.use_count || 0) + 1 });
-        }
-      }
     },
-    [mutation, queryClient, selectedDate, targetUserId, triggerToast]
+    [mutation, queryClient, selectedDate, targetUserId, timeZone, triggerToast]
   );
 
   const isBannerActive =

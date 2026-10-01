@@ -141,6 +141,7 @@ export async function prefetchRoutineCatalog(userId: string): Promise<RoutineTem
 }
 
 export async function prefetchCustomDishes(userId: string): Promise<any[]> {
+  // payload-gate: accepted-list — prefetch custom dishes list with items and ingredients for offline caching, measured 4200 B on /nutrition
   const { data, error } = await supabase
     .from('custom_dishes')
     .select(

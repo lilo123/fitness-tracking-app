@@ -102,12 +102,6 @@ export function useNutritionData({
     queryFn: async () => {
       if (!targetUserId) return [];
       // payload-gate: accepted-list — custom dishes list with items and ingredients for offline caching, measured 4200 B on /nutrition
-      if (typeof supabase.from === 'function') {
-        const dishBuilder = supabase.from('custom_dishes') as any;
-        if (dishBuilder && (dishBuilder.constructor?.name === 'SupabaseQueryBuilderMock' || 'tableName' in dishBuilder)) {
-          dishBuilder.select('id, user_id, name, calories, protein, carbs, fat, fiber, created_at, kind, use_count, notes');
-        }
-      }
       const { data, error } = await supabase
         .from('custom_dishes')
         .select(
@@ -240,31 +234,6 @@ export function useNutritionData({
 
       if (clientLogId && newLog.items) {
         logItemsMemoryCache.set(clientLogId, newLog.items);
-      }
-
-      // In unit test harnesses where supabase.from('nutrition_logs').insert is explicitly mocked or uses the
-      // SupabaseQueryBuilderMock test double, invoke insert so test spies and mock state resolvers receive it:
-      const logsBuilder = supabase.from('nutrition_logs') as any;
-      if (logsBuilder && typeof logsBuilder.insert === 'function') {
-        const isMock =
-          'mock' in logsBuilder.insert ||
-          typeof logsBuilder.insert.mockReturnValue === 'function' ||
-          logsBuilder.constructor?.name === 'SupabaseQueryBuilderMock' ||
-          'tableName' in logsBuilder;
-        if (isMock) {
-          const mockRes = logsBuilder.insert([payload]);
-          let resultData: any = [payload];
-          if (mockRes && typeof mockRes.select === 'function') {
-            const selectRes = await mockRes.select();
-            if (selectRes?.error) throw selectRes.error;
-            if (selectRes?.data) resultData = selectRes.data;
-          } else if (mockRes && typeof mockRes.then === 'function') {
-            const awaited = await mockRes;
-            if (awaited?.error) throw awaited.error;
-            if (awaited?.data) resultData = awaited.data;
-          }
-          return resultData;
-        }
       }
 
       if (targetUserId) {

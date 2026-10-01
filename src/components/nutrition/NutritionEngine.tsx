@@ -291,7 +291,15 @@ export const NutritionEngine: React.FC = () => {
 
   const { handleStageCustomDish, handleQuickLogCustomDishDirect, handleAddCustomDishToStaged } =
     useCustomDishActions({
-      targetUserId, selectedDate, stagedMeal, setStagedMeal, setDishFetchError, fetchDishDetail, mutation, triggerToast,
+      targetUserId,
+      selectedDate,
+      timeZone: profile?.timezone ?? undefined,
+      stagedMeal,
+      setStagedMeal,
+      setDishFetchError,
+      fetchDishDetail,
+      mutation,
+      triggerToast,
     });
 
   const { handleAddParsedItems } = useStagedMealAddAi({

@@ -63,9 +63,26 @@ export function clearRecordedTables(): void {
   recordedTables.length = 0;
 }
 
+export interface RecordedUpsert {
+  table: string;
+  data: any;
+  options?: any;
+}
+
+export const recordedUpserts: RecordedUpsert[] = [];
+
+export function getRecordedUpserts(): RecordedUpsert[] {
+  return [...recordedUpserts];
+}
+
+export function clearRecordedUpserts(): void {
+  recordedUpserts.length = 0;
+}
+
 export function clearMockHistory(): void {
   recordedSelects.length = 0;
   recordedTables.length = 0;
+  recordedUpserts.length = 0;
 }
 
 export function assertSelectRecorded(table: string, projection: string): void {
@@ -257,8 +274,23 @@ export class SupabaseQueryBuilderMock implements PromiseLike<{ data: any; error:
     return this;
   }
 
-  upsert(values: any, _options?: any): this {
+  upsert(values: any, options?: any): this {
     this.upsertedData = values;
+    recordedUpserts.push({
+      table: this.tableName,
+      data: values,
+      options,
+    });
+    if (
+      this.insert !== SupabaseQueryBuilderMock.prototype.insert &&
+      this.upsert === SupabaseQueryBuilderMock.prototype.upsert
+    ) {
+      try {
+        this.insert(Array.isArray(values) ? values : [values], options);
+      } catch {
+        // ignore if mock throws or returns non-builder
+      }
+    }
     return this;
   }
 
@@ -300,8 +332,8 @@ export class SupabaseQueryBuilderMock implements PromiseLike<{ data: any; error:
       return this.formatResult(res, null);
     }
 
-    if (this._hasExplicitResolution) {
-      return this.formatResult(this._resolvedData, this._resolvedError);
+    if (this._resolvedError) {
+      return this.formatResult(null, this._resolvedError);
     }
 
     // Mutation handling fallback
@@ -324,6 +356,23 @@ export class SupabaseQueryBuilderMock implements PromiseLike<{ data: any; error:
 
     if (this.updatedData !== undefined) {
       return this.formatResult(this.updatedData, null);
+    }
+
+    if (this.upsertedData !== undefined) {
+      if (Array.isArray(this.upsertedData)) {
+        const rows = this.upsertedData.map((row: any, idx: number) => ({
+          id: row.id || `mock-id-${idx + 1}`,
+          created_at: new Date().toISOString(),
+          ...row,
+        }));
+        return this.formatResult(rows, null);
+      }
+      const row = {
+        id: this.upsertedData?.id || 'mock-id-1',
+        created_at: new Date().toISOString(),
+        ...this.upsertedData,
+      };
+      return this.formatResult([row], null);
     }
 
     if (this.isDeleted) {
@@ -507,5 +556,7 @@ export function createSupabaseMock(options?: MockSupabaseOptions) {
     clearRecordedSelects,
     getRecordedTables,
     clearRecordedTables,
+    getRecordedUpserts,
+    clearRecordedUpserts,
   };
 }

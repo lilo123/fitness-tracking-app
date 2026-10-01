@@ -56,6 +56,39 @@ vi.mock('../lib/supabase', () => ({
   },
 }));
 
+vi.mock('../offline', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../offline')>();
+  return {
+    ...actual,
+    enqueueAndAwait: vi.fn().mockImplementation(async (input: any) => {
+      const { incrementDishId, ...row } = input.payload;
+      const builder = (supabase.from('nutrition_logs') as any);
+      let b;
+      if (builder.insert && builder.insert.name === 'spy' || (builder.insert && builder.insert._isMockFunction)) {
+        b = builder.insert([row]);
+      } else {
+        b = builder.upsert(row, { onConflict: 'id', ignoreDuplicates: true });
+      }
+      const selectBuilder = b && typeof b.select === 'function' ? b.select('id') : b;
+      const res = await selectBuilder;
+      if (res?.error) {
+        throw res.error;
+      }
+      if (incrementDishId) {
+        const { data: dishData } = await (supabase.from('custom_dishes') as any)
+          .select('use_count')
+          .eq('id', incrementDishId)
+          .maybeSingle();
+        const currentCount = typeof dishData?.use_count === 'number' ? dishData.use_count : 0;
+        await (supabase.from('custom_dishes') as any)
+          .update({ use_count: currentCount + 1 })
+          .eq('id', incrementDishId);
+      }
+      return { status: 'synced', opId: 'mock-op-1' };
+    }),
+  };
+});
+
 describe('NutritionEngine', () => {
   let queryClient: QueryClient;
 
@@ -259,11 +292,14 @@ describe('NutritionEngine', () => {
   });
 
   it('logs a staged meal to supabase nutrition_logs', async () => {
-    const mockInsert = vi.fn().mockReturnValue({ select: vi.fn().mockResolvedValue({ data: [], error: null }) });
+    const mockUpsert = vi.fn((values: any, options?: any) => {
+      const b = createSupabaseBuilder('nutrition_logs');
+      return b.upsert(values, options);
+    });
     (supabase.from as any).mockImplementation((table: string) => {
       const b = createSupabaseBuilder(table, { data: [], error: null });
       if (table === 'nutrition_logs') {
-        b.insert = mockInsert;
+        b.upsert = mockUpsert;
       }
       return b;
     });
@@ -297,10 +333,10 @@ describe('NutritionEngine', () => {
     fireEvent.click(screen.getByText('Log Meal (+210 kcal)'));
 
     await waitFor(() => {
-      expect(mockInsert).toHaveBeenCalled();
+      expect(mockUpsert).toHaveBeenCalledTimes(1);
     });
 
-    const payload = mockInsert.mock.calls[0][0][0];
+    const payload = mockUpsert.mock.calls[0][0];
     expect(payload.food_name).toBe('3 Eggs');
     expect(payload.calories).toBe(210);
     expect(payload.protein).toBe(18);
@@ -554,7 +590,7 @@ describe('NutritionEngine', () => {
     expect(getRecordedTables()).toContain('custom_dishes');
     expect(getRecordedSelects()).toContainEqual({
       table: 'custom_dishes',
-      projection: 'id, user_id, name, calories, protein, carbs, fat, fiber, created_at, kind, use_count, notes',
+      projection: 'id, user_id, name, calories, protein, carbs, fat, fiber, created_at, kind, use_count, notes, items, ingredients',
     });
   });
 

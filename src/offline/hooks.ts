@@ -1,4 +1,5 @@
 import { useSyncExternalStore, useEffect, useCallback, useRef } from 'react';
+import { isDbClosedError } from './db';
 import {
   subscribeToOutbox,
   getOutboxOps,
@@ -30,11 +31,17 @@ export function usePendingOps(userId?: string): OutboxOp[] {
 
   // Trigger initial IDB fetch in background if not already in memory cache
   useEffect(() => {
+    let active = true;
     if (target && !hasCachedOpsForUser(target)) {
       getOutboxOps(target).catch((e) => {
+        // Closed-DB errors in this read-cache prewarm are expected at unmount/teardown.
+        if (!active || isDbClosedError(e)) return;
         console.warn('[outbox] usePendingOps background prewarm failed', e);
       });
     }
+    return () => {
+      active = false;
+    };
   }, [target]);
 
   const subscribe = useCallback(
@@ -63,11 +70,17 @@ export function useOutboxSummary(userId?: string): OutboxSummary {
   const target = userId || getActiveUserId() || '';
 
   useEffect(() => {
+    let active = true;
     if (target && !hasCachedOpsForUser(target)) {
       getOutboxOps(target).catch((e) => {
+        // Closed-DB errors in this read-cache prewarm are expected at unmount/teardown.
+        if (!active || isDbClosedError(e)) return;
         console.warn('[outbox] useOutboxSummary background prewarm failed', e);
       });
     }
+    return () => {
+      active = false;
+    };
   }, [target]);
 
   const subscribe = useCallback(
@@ -95,11 +108,17 @@ export function useAiQueue(userId?: string): AiQueueState {
   const target = userId || getActiveUserId() || '';
 
   useEffect(() => {
+    let active = true;
     if (target) {
       listAiItems(target).catch((e) => {
+        // Closed-DB errors in this read-cache prewarm are expected at unmount/teardown.
+        if (!active || isDbClosedError(e)) return;
         console.warn('[aiQueue] useAiQueue background fetch failed', e);
       });
     }
+    return () => {
+      active = false;
+    };
   }, [target]);
 
   const subscribe = useCallback(
