@@ -81,7 +81,7 @@ Provides robust offline logging for workouts (O1) and nutrition (O2) across web 
 | 9. Online behavior unchanged | `tests/e2e/p3b-session-flows.spec.ts`<br>`src/lib/sets.test.ts`<br>`tests/visual-density.test.ts` | - `(c) Finish with pending sets lists them in FinishReviewSheet, supports edit/remove, and inserts reviewed list or none` (verified single batch POST via `set.batchCreate`)<br>- `online -> enqueueAndAwait called, synced result returned`<br>- `batch inserts sets routing as a single set.batchCreate through enqueueAndAwait`<br>- `npm run test:tz` clean in LA and Tokyo<br>- `npm run perf:budget` verified under query bounds and bundle thresholds |
 
 ## 8. Change Log
-- **2026-09-30 (Phase O1 — branch `offline-o1` (code @ 657aea1; ff-shipped to v2-rewrite with this doc))**:
+- **2026-09-30 (Phase O1 — branch `offline-o1` (code @ b9ae119; ff-shipped to v2-rewrite with this doc))**:
   - Added PWA and persistence dependencies (`vite-plugin-pwa`, `workbox-build`, `workbox-window`, `idb`, `@tanstack/react-query-persist-client`, `fake-indexeddb`).
   - Implemented core offline engine in `src/offline/`: per-user IDB outbox, monotonic enqueue mutex, sequential replay under Web Locks, compaction, error classification, pure optimistic overlays, and query persister.
   - Implemented op kinds: `workout.ensure`, `workout.rename`, `set.create`, `set.batchCreate` (single upsert array), `set.update`, `set.delete`.
