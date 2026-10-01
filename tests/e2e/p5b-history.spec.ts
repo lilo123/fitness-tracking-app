@@ -113,9 +113,9 @@ async function seedP5bUserAndData(): Promise<P5bSeedData> {
       SELECT id, name INTO v_eid, v_ename FROM public.exercises WHERE is_master = true ORDER BY name LIMIT 1;
       SELECT id INTO v_eid_filler FROM public.exercises WHERE is_master = true AND id <> v_eid ORDER BY name LIMIT 1;
 
-      -- 1. Session 0 (Benchmark session, 1 day ago)
+      -- 1. Session 0 (Benchmark session, CURRENT_DATE)
       -- 4 working sets (PR: 245x6) + 2 warmup sets (45x10, 65x10)
-      v_date := CURRENT_DATE - 1;
+      v_date := CURRENT_DATE;
       v_wid := gen_random_uuid();
       INSERT INTO public.workouts (id, user_id, name, workout_date, created_at)
       VALUES (v_wid, v_uid, 'P5b Special Benchmark Session', v_date, v_date::timestamptz + interval '10 hours');
