@@ -46,6 +46,10 @@ Provides robust offline logging for workouts (O1) and nutrition (O2) across web 
 | D-O1-3 | Capacitor offline proven by architecture (bundled assets + shared IDB layer) + unit tests; no device E2E in CI | Accepted by user 2026-10-01 (G4); user will check Android offline manually |
 | D-O1-4 | History workout delete disabled offline to avoid tombstone sync conflicts | Approved |
 | D-O1-5 | Client-generated capture time stored as set `created_at` timestamp (client clock) | Approved |
+| D-O1-6 | Intermittent vitest teardown "Unhandled Errors" fixed in O1 (GATEFIX5b) rather than deferred: only exact closed-IndexedDB errors (`InvalidStateError` / exact idb close messages) are absorbed, in background read-cache paths only; outbox enqueue rejects on every error | Approved by user 2026-10-01 (G6, G9) |
+| D-O1-7 | GATEFIX5b scope includes `src/offline-prefetch/useOfflinePrefetch.ts` and `src/setupTests.ts` (offline infra + test teardown) | Conductor, within G9 intent |
+| D-O1-8 | Local gate CI-order contention failures on shared seeded users (mobile-viewport:152, workout-catalog-tail:62, p5a-history:150) are not O1 blockers; they must pass in GitHub CI (one project per job) | Accepted by user 2026-10-01 (G7, G10) |
+| D-O1-9 | Per-test seeded-user isolation for those specs deferred to O2 (test-only, covered by the O2 gate) so O1 ships exactly the gated code | Conductor (G11 optional) |
 | D-O2-1 | Paste-to-fill grammar definition and strict boundary rules | Placeholder (O2) |
 | D-O2-2 | Queued AI offline photo retention and lifecycle | Placeholder (O2) |
 
@@ -81,7 +85,7 @@ Provides robust offline logging for workouts (O1) and nutrition (O2) across web 
 | 9. Online behavior unchanged | `tests/e2e/p3b-session-flows.spec.ts`<br>`src/lib/sets.test.ts`<br>`tests/visual-density.test.ts` | - `(c) Finish with pending sets lists them in FinishReviewSheet, supports edit/remove, and inserts reviewed list or none` (verified single batch POST via `set.batchCreate`)<br>- `online -> enqueueAndAwait called, synced result returned`<br>- `batch inserts sets routing as a single set.batchCreate through enqueueAndAwait`<br>- `npm run test:tz` clean in LA and Tokyo<br>- `npm run perf:budget` verified under query bounds and bundle thresholds |
 
 ## 8. Change Log
-- **2026-09-30 (Phase O1 — branch `offline-o1` (code @ b9ae119; ff-shipped to v2-rewrite with this doc))**:
+- **2026-09-30 (Phase O1 — branch `offline-o1` (code @ e2e1c1b; ff-shipped to v2-rewrite with this doc))**:
   - Added PWA and persistence dependencies (`vite-plugin-pwa`, `workbox-build`, `workbox-window`, `idb`, `@tanstack/react-query-persist-client`, `fake-indexeddb`).
   - Implemented core offline engine in `src/offline/`: per-user IDB outbox, monotonic enqueue mutex, sequential replay under Web Locks, compaction, error classification, pure optimistic overlays, and query persister.
   - Implemented op kinds: `workout.ensure`, `workout.rename`, `set.create`, `set.batchCreate` (single upsert array), `set.update`, `set.delete`.
