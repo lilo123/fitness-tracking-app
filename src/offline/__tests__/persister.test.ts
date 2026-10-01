@@ -71,6 +71,7 @@ describe('Cache Persister & Whitelist (§A3, §A9, §D)', () => {
 
     it('allows custom_dishes list and nutrition_logs history_window', () => {
       expect(shouldDehydrateQuery(createMockQuery(['custom_dishes', userId]))).toBe(true);
+      expect(shouldDehydrateQuery(createMockQuery(['custom_dishes', userId, 'full']))).toBe(true);
       expect(shouldDehydrateQuery(createMockQuery(['nutrition_logs', userId, 'history_window', 'America/New_York']))).toBe(true);
       expect(shouldDehydrateQuery(createMockQuery(['nutrition_logs', userId, 'history_window']))).toBe(true);
     });

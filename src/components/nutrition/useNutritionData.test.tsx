@@ -737,4 +737,180 @@ describe('useNutritionData (src/components/nutrition/useNutritionData.ts)', () =
       expect(isWithinDayBounds(lateNightLog.logged_at, targetDate, tz)).toBe(true);
     });
   });
+
+  describe('fetchDishDetail resolution order and offline handling (§D-OFF-5b, O2)', () => {
+    const mockDishId = 'dish-test-101';
+    const mockUserId = 'user-dish-test';
+    const leanDish = {
+      id: mockDishId,
+      user_id: mockUserId,
+      name: 'Custom Oatmeal',
+      calories: 350,
+      protein: 20,
+      carbs: 50,
+      fat: 6,
+      fiber: 5,
+    };
+    const fullDishDetail = {
+      ...leanDish,
+      kind: 'food' as const,
+      use_count: 5,
+      notes: 'Steel cut',
+      items: [
+        {
+          name: 'Oats',
+          quantity: 1,
+          unit: 'cup',
+          calories: 300,
+          protein: 15,
+          carbs: 45,
+          fat: 5,
+          fiber: 4,
+        },
+      ],
+      ingredients: null,
+    };
+
+    it('resolves from list cache if items are present on the list entry', async () => {
+      queryClient.setQueryData(['custom_dishes', mockUserId], [fullDishDetail]);
+
+      const { result } = renderHook(
+        () =>
+          useNutritionData({
+            targetUserId: mockUserId,
+            selectedDate: '2026-10-01',
+            profile: null,
+            onMutationSuccessReset: vi.fn(),
+            setStatus: vi.fn(),
+            setIsError: vi.fn(),
+          }),
+        { wrapper }
+      );
+
+      vi.mocked(supabase.from).mockClear();
+      const detail = await result.current.fetchDishDetail(mockDishId);
+      expect(detail).toEqual(fullDishDetail);
+      expect(supabase.from).not.toHaveBeenCalledWith('custom_dishes');
+    });
+
+    it('resolves from "full" cache when list entry lacks items', async () => {
+      // List query has lean dish without items
+      queryClient.setQueryData(['custom_dishes', mockUserId], [leanDish]);
+      // Full cache has full dish detail with items
+      queryClient.setQueryData(['custom_dishes', mockUserId, 'full'], [fullDishDetail]);
+
+      const { result } = renderHook(
+        () =>
+          useNutritionData({
+            targetUserId: mockUserId,
+            selectedDate: '2026-10-01',
+            profile: null,
+            onMutationSuccessReset: vi.fn(),
+            setStatus: vi.fn(),
+            setIsError: vi.fn(),
+          }),
+        { wrapper }
+      );
+
+      vi.mocked(supabase.from).mockClear();
+      const detail = await result.current.fetchDishDetail(mockDishId);
+      expect(detail).toEqual(fullDishDetail);
+      expect(supabase.from).not.toHaveBeenCalledWith('custom_dishes');
+    });
+
+    it('stages a cached custom dish offline using full cache fallback', async () => {
+      const originalOnLine = navigator.onLine;
+      try {
+        Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+
+        // List query has lean dish
+        queryClient.setQueryData(['custom_dishes', mockUserId], [leanDish]);
+        // Deferred prefetch populated the 'full' cache
+        queryClient.setQueryData(['custom_dishes', mockUserId, 'full'], [fullDishDetail]);
+
+        const { result } = renderHook(
+          () =>
+            useNutritionData({
+              targetUserId: mockUserId,
+              selectedDate: '2026-10-01',
+              profile: null,
+              onMutationSuccessReset: vi.fn(),
+              setStatus: vi.fn(),
+              setIsError: vi.fn(),
+            }),
+          { wrapper }
+        );
+
+        const detail = await result.current.fetchDishDetail(mockDishId);
+        expect(detail).toBeDefined();
+        expect(detail?.items).toEqual(fullDishDetail.items);
+      } finally {
+        Object.defineProperty(navigator, 'onLine', { value: originalOnLine, configurable: true });
+      }
+    });
+
+    it('throws "Available when online" when offline and dish is not in cache', async () => {
+      const originalOnLine = navigator.onLine;
+      try {
+        Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+
+        // List has lean dish only, no 'full' cache
+        queryClient.setQueryData(['custom_dishes', mockUserId], [leanDish]);
+        queryClient.setQueryData(['custom_dishes', mockUserId, 'full'], []);
+
+        const { result } = renderHook(
+          () =>
+            useNutritionData({
+              targetUserId: mockUserId,
+              selectedDate: '2026-10-01',
+              profile: null,
+              onMutationSuccessReset: vi.fn(),
+              setStatus: vi.fn(),
+              setIsError: vi.fn(),
+            }),
+          { wrapper }
+        );
+
+        await expect(result.current.fetchDishDetail(mockDishId)).rejects.toThrow('Available when online');
+      } finally {
+        Object.defineProperty(navigator, 'onLine', { value: originalOnLine, configurable: true });
+      }
+    });
+
+    it('falls back to network when online and dish is not in full cache', async () => {
+      const originalOnLine = navigator.onLine;
+      try {
+        Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+
+        vi.mocked(supabase.from).mockImplementation((table: string) => {
+          if (table === 'custom_dishes') {
+            return createSupabaseBuilder(table, { data: fullDishDetail, error: null });
+          }
+          return createSupabaseBuilder(table, { data: [], error: null });
+        });
+
+        // List has lean dish only, no full cache
+        queryClient.setQueryData(['custom_dishes', mockUserId], [leanDish]);
+
+        const { result } = renderHook(
+          () =>
+            useNutritionData({
+              targetUserId: mockUserId,
+              selectedDate: '2026-10-01',
+              profile: null,
+              onMutationSuccessReset: vi.fn(),
+              setStatus: vi.fn(),
+              setIsError: vi.fn(),
+            }),
+          { wrapper }
+        );
+
+        const detail = await result.current.fetchDishDetail(mockDishId);
+        expect(detail).toEqual(fullDishDetail);
+        expect(getRecordedTables()).toContain('custom_dishes');
+      } finally {
+        Object.defineProperty(navigator, 'onLine', { value: originalOnLine, configurable: true });
+      }
+    });
+  });
 });

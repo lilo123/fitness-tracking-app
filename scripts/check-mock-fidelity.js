@@ -541,8 +541,8 @@ const SERVICED_QUERIES_REGISTRY = {
     {
       table: 'custom_dishes',
       type: 'EXACT',
-      projection: 'id, user_id, name, calories, protein, carbs, fat, fiber, created_at, kind, use_count, notes, items, ingredients',
-      description: 'Custom dishes list query with items and ingredients',
+      projection: 'id, user_id, name, calories, protein, carbs, fat, fiber, created_at, kind, use_count, notes',
+      description: 'Custom dishes list query with notes',
     },
     {
       table: 'nutrition_logs',

@@ -141,7 +141,7 @@ export async function prefetchRoutineCatalog(userId: string): Promise<RoutineTem
 }
 
 export async function prefetchCustomDishes(userId: string): Promise<any[]> {
-  // payload-gate: accepted-list — prefetch custom dishes list with items and ingredients for offline caching, measured 4200 B on /nutrition
+  // payload-gate: detail-fetch — prefetch full custom dishes with items and ingredients for offline caching
   const { data, error } = await supabase
     .from('custom_dishes')
     .select(
@@ -296,12 +296,12 @@ export async function runOfflinePrefetch(
       }
     }
 
-    // 5. Custom Dishes: Prefetch custom dishes list (with items, ingredients) for offline use
-    const existingDishes = queryClient.getQueryData(['custom_dishes', userId]);
+    // 5. Custom Dishes: Prefetch full custom dishes (with items, ingredients) for offline use into 'full' cache
+    const existingDishes = queryClient.getQueryData(['custom_dishes', userId, 'full']);
     if (!existingDishes || (Array.isArray(existingDishes) && existingDishes.length === 0)) {
       try {
         const dishes = await prefetchCustomDishes(userId);
-        queryClient.setQueryData(['custom_dishes', userId], dishes);
+        queryClient.setQueryData(['custom_dishes', userId, 'full'], dishes);
       } catch (dishErr) {
         console.warn('[offlinePrefetch] custom dishes prefetch failed, continuing:', dishErr);
       }

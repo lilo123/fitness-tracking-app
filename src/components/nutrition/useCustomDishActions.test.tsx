@@ -368,6 +368,62 @@ describe('useCustomDishActions', () => {
     expect(setStagedMeal).toHaveBeenCalledTimes(1);
   });
 
+  it('stages a custom dish offline when fetcher rejects with Available when online', async () => {
+    const originalOnLine = navigator.onLine;
+    try {
+      Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+      const setStagedMeal = vi.fn();
+      const setDishFetchError = vi.fn();
+      const dish: CustomDish = {
+        id: 'dish-offline-1',
+        user_id: 'user-123',
+        name: 'Offline Pudding',
+        calories: 200,
+        protein: 25,
+        carbs: 10,
+        fat: 4,
+        fiber: 0,
+        kind: 'food',
+        created_at: '2026-09-26T12:00:00Z',
+        use_count: 0,
+      };
+
+      const fetchDishDetail = vi.fn().mockRejectedValue(new Error('Available when online'));
+
+      const { result } = renderHook(
+        () =>
+          useCustomDishActions({
+            targetUserId: 'user-123',
+            selectedDate: '2026-09-26',
+            setStagedMeal,
+            setDishFetchError,
+            fetchDishDetail,
+            mutation: { mutate: vi.fn() },
+          }),
+        { wrapper }
+      );
+
+      await act(async () => {
+        await result.current.handleStageCustomDish(dish);
+      });
+
+      expect(setDishFetchError).toHaveBeenNthCalledWith(1, null);
+      expect(setStagedMeal).toHaveBeenCalledTimes(1);
+      expect(setStagedMeal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'Offline Pudding',
+          calories: 200,
+          protein: 25,
+          carbs: 10,
+          fat: 4,
+          fiber: 0,
+        })
+      );
+    } finally {
+      Object.defineProperty(navigator, 'onLine', { value: originalOnLine, configurable: true });
+    }
+  });
+
   describe('D33: handleAddCustomDishToStaged', () => {
     it('appends favorite items to staged meal without replacing it', async () => {
       const initialStagedMeal = {

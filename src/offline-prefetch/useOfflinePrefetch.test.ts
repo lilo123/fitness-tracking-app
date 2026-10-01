@@ -141,7 +141,7 @@ describe('useOfflinePrefetch', () => {
     expect(detail).toBeDefined();
 
     // Verify custom dishes cache
-    const dishes = queryClient.getQueryData(['custom_dishes', mockUserId]);
+    const dishes = queryClient.getQueryData(['custom_dishes', mockUserId, 'full']);
     expect(dishes).toBeDefined();
     expect((dishes as any[])[0].name).toBe('Oatmeal');
 

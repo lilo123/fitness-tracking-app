@@ -11,8 +11,11 @@ import {
   type NutritionLogPayload,
 } from '../../offline';
 
-// payload-gate: detail-fetch — user opens the dish editor or stages a dish
 export async function fetchDishDetail(dishId: string): Promise<CustomDishDetail | null> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error('Available when online');
+  }
+  // payload-gate: detail-fetch — user opens the dish editor or stages a dish
   const { data, error } = await supabase
     .from('custom_dishes')
     .select('id, items, ingredients, kind, notes')
@@ -101,11 +104,10 @@ export function useNutritionData({
     queryKey: ['custom_dishes', targetUserId],
     queryFn: async () => {
       if (!targetUserId) return [];
-      // payload-gate: accepted-list — custom dishes list with items and ingredients for offline caching, measured 4200 B on /nutrition
       const { data, error } = await supabase
         .from('custom_dishes')
         .select(
-          'id, user_id, name, calories, protein, carbs, fat, fiber, created_at, kind, use_count, notes, items, ingredients'
+          'id, user_id, name, calories, protein, carbs, fat, fiber, created_at, kind, use_count, notes'
         )
         .eq('user_id', targetUserId)
         .order('created_at', { ascending: false })
@@ -117,15 +119,43 @@ export function useNutritionData({
     },
   });
 
-  // Cached fetchDishDetail reading query cache first
+  // Cached fetchDishDetail reading query cache first:
+  // resolves: list entry with items -> 'full' cache entry -> network (online) -> clear offline error
   const cachedFetchDishDetail = useCallback(
     async (dishId: string): Promise<CustomDishDetail | null> => {
+      // 1. Check list entry with items
       const cachedList = queryClient.getQueryData<CustomDish[]>(['custom_dishes', targetUserId]);
-      const found = cachedList?.find((d) => d.id === dishId);
-      if (found && ((found as any).items !== undefined || (found as any).ingredients !== undefined)) {
-        return found as CustomDishDetail;
+      const foundInList = cachedList?.find((d) => d.id === dishId);
+      if (foundInList && ((foundInList as any).items !== undefined || (foundInList as any).ingredients !== undefined)) {
+        return foundInList as CustomDishDetail;
       }
-      return fetchDishDetail(dishId);
+
+      // 2. Check 'full' cache entry
+      const cachedFull = queryClient.getQueryData<CustomDishDetail[]>(['custom_dishes', targetUserId, 'full']);
+      const foundInFull = cachedFull?.find((d) => d.id === dishId);
+      if (foundInFull) {
+        return foundInFull;
+      }
+
+      // 3. Network (if online)
+      const isOnline = typeof navigator === 'undefined' || navigator.onLine;
+      if (isOnline) {
+        const detail = await fetchDishDetail(dishId);
+        if (detail && targetUserId) {
+          const currentFull = queryClient.getQueryData<CustomDishDetail[]>(['custom_dishes', targetUserId, 'full']) || [];
+          const idx = currentFull.findIndex((d) => d.id === dishId);
+          if (idx >= 0) {
+            currentFull[idx] = { ...currentFull[idx], ...detail };
+            queryClient.setQueryData(['custom_dishes', targetUserId, 'full'], [...currentFull]);
+          } else {
+            queryClient.setQueryData(['custom_dishes', targetUserId, 'full'], [...currentFull, detail]);
+          }
+        }
+        return detail;
+      }
+
+      // 4. Clear offline error
+      throw new Error('Available when online');
     },
     [queryClient, targetUserId]
   );

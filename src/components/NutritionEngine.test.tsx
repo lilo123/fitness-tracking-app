@@ -590,7 +590,7 @@ describe('NutritionEngine', () => {
     expect(getRecordedTables()).toContain('custom_dishes');
     expect(getRecordedSelects()).toContainEqual({
       table: 'custom_dishes',
-      projection: 'id, user_id, name, calories, protein, carbs, fat, fiber, created_at, kind, use_count, notes, items, ingredients',
+      projection: 'id, user_id, name, calories, protein, carbs, fat, fiber, created_at, kind, use_count, notes',
     });
   });
 

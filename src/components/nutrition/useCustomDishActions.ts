@@ -151,15 +151,21 @@ export function useCustomDishActions({
       try {
         detail = await fetcher(dish.id);
       } catch (err: any) {
-        if (mutationRef.current?.isPending) return;
-        const msg = err?.message || 'Failed to load dish details';
-        setDishFetchError?.({
-          message: msg,
-          retry: () => {
-            void stageDish(dish);
-          },
-        });
-        return;
+        // Offline with no cached full rows (deferred prefetch not done yet): stage from the dish summary
+        // (buildItemsFromDish falls back to one item with the dish macros). Online errors still surface.
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          detail = null;
+        } else {
+          if (mutationRef.current?.isPending) return;
+          const msg = err?.message || 'Failed to load dish details';
+          setDishFetchError?.({
+            message: msg,
+            retry: () => {
+              void stageDish(dish);
+            },
+          });
+          return;
+        }
       }
 
       if (mutationRef.current?.isPending) return;
@@ -201,15 +207,21 @@ export function useCustomDishActions({
       try {
         detail = await fetcher(dish.id);
       } catch (err: any) {
-        if (mutationRef.current?.isPending || !latestStagedMealRef.current) return;
-        const msg = err?.message || 'Failed to load dish details';
-        setDishFetchError?.({
-          message: msg,
-          retry: () => {
-            void addDishToStaged(dish);
-          },
-        });
-        return;
+        // Offline with no cached full rows (deferred prefetch not done yet): stage from the dish summary
+        // (buildItemsFromDish falls back to one item with the dish macros). Online errors still surface.
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          detail = null;
+        } else {
+          if (mutationRef.current?.isPending || !latestStagedMealRef.current) return;
+          const msg = err?.message || 'Failed to load dish details';
+          setDishFetchError?.({
+            message: msg,
+            retry: () => {
+              void addDishToStaged(dish);
+            },
+          });
+          return;
+        }
       }
 
       if (mutationRef.current?.isPending) return;
