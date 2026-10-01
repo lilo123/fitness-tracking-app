@@ -1,6 +1,6 @@
 import type { Persister, PersistedClient } from '@tanstack/react-query-persist-client';
 import type { Query } from '@tanstack/react-query';
-import { getOfflineDb } from './db';
+import { getOfflineDb, isDbClosedError } from './db';
 
 export const PERSIST_BUSTER = 'rq-v1';
 export const PERSIST_MAX_AGE_MS = 8 * 24 * 60 * 60 * 1000; // 8 days
@@ -134,18 +134,40 @@ export function applyPageCaps(persistedClient: PersistedClient): PersistedClient
 export function createIdbPersister(userId: string): Persister {
   return {
     persistClient: async (client: PersistedClient) => {
-      const capped = applyPageCaps(client);
-      const db = await getOfflineDb(userId);
-      await db.put('rq', capped, 'client');
+      try {
+        const capped = applyPageCaps(client);
+        const db = await getOfflineDb(userId);
+        await db.put('rq', capped, 'client');
+      } catch (err) {
+        // Read-cache write failed: absorb if DB connection is closing/closed during teardown, warn otherwise
+        if (!isDbClosedError(err)) {
+          console.warn('[persister] persistClient failed:', err);
+        }
+      }
     },
     restoreClient: async () => {
-      const db = await getOfflineDb(userId);
-      const stored = await db.get('rq', 'client');
-      return (stored as PersistedClient) || undefined;
+      try {
+        const db = await getOfflineDb(userId);
+        const stored = await db.get('rq', 'client');
+        return (stored as PersistedClient) || undefined;
+      } catch (err) {
+        // Read-cache restore failed: absorb if DB connection is closing/closed during teardown, warn otherwise
+        if (!isDbClosedError(err)) {
+          console.warn('[persister] restoreClient failed:', err);
+        }
+        return undefined;
+      }
     },
     removeClient: async () => {
-      const db = await getOfflineDb(userId);
-      await db.delete('rq', 'client');
+      try {
+        const db = await getOfflineDb(userId);
+        await db.delete('rq', 'client');
+      } catch (err) {
+        // Read-cache remove failed: absorb if DB connection is closing/closed during teardown, warn otherwise
+        if (!isDbClosedError(err)) {
+          console.warn('[persister] removeClient failed:', err);
+        }
+      }
     },
   };
 }

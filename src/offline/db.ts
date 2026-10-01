@@ -21,8 +21,12 @@ export async function getOfflineDb(userId: string): Promise<IDBPDatabase<Offline
       // If DB was closed externally, remove from cache and reopen
       db.transaction('meta', 'readonly');
       return db;
-    } catch {
+    } catch (err) {
+      // Cached connection was closed or in invalid state; evict from cache to reconnect
       dbCache.delete(dbName);
+      if (!isDbClosedError(err)) {
+        console.warn('[db] Cached DB connection error, evicting cache:', err);
+      }
     }
   }
 
@@ -68,8 +72,11 @@ export async function closeOfflineDb(userId: string): Promise<void> {
     try {
       const db = await promise;
       db.close();
-    } catch {
-      // ignore
+    } catch (err) {
+      // DB connection may already be closing or closed during teardown.
+      if (!isDbClosedError(err)) {
+        console.warn('[db] Failed to close offline DB:', err);
+      }
     }
   }
 }
@@ -78,12 +85,20 @@ export async function closeAllOfflineDbs(): Promise<void> {
   const entries = Array.from(dbCache.entries());
   dbCache.clear();
   for (const [, promise] of entries) {
-    try {
-      const db = await promise;
-      db.close();
-    } catch {
-      // ignore
-    }
+    promise
+      .then((db) => {
+        try {
+          db.close();
+        } catch {
+          // DB connection may already be closing or closed during teardown.
+        }
+      })
+      .catch((openErr) => {
+        // Pending openDB promise failed; ignore if DB was closed/invalidated during teardown, warn otherwise.
+        if (!isDbClosedError(openErr)) {
+          console.warn('[db] Failed to open DB during closeAllOfflineDbs:', openErr);
+        }
+      });
   }
 }
 
@@ -98,5 +113,24 @@ export async function deleteOfflineDb(userId: string): Promise<void> {
   await closeOfflineDb(userId);
   const dbName = getOfflineDbName(userId);
   await deleteDB(dbName);
+}
+
+const EXACT_DB_CLOSED_MESSAGES = new Set([
+  'The database connection is closing.',
+  'The database connection is closed.',
+  'Database is closing',
+  'Database is closed',
+  'The database is closing.',
+  'The database is closed.',
+  'An operation was called on an object on which it is not allowed or at a time when it is not allowed. Also occurs if a request is made on a source object that has been deleted or removed. Use TransactionInactiveError or ReadOnlyError when possible, as they are more specific variations of InvalidStateError.',
+  'The object is in an invalid state.',
+]);
+
+export function isDbClosedError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const name = (err as { name?: unknown }).name;
+  if (typeof name === 'string' && name === 'InvalidStateError') return true;
+  const message = (err as { message?: unknown }).message;
+  return typeof message === 'string' && EXACT_DB_CLOSED_MESSAGES.has(message);
 }
 

@@ -1,15 +1,15 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   shouldDehydrateQuery,
   applyPageCaps,
   createIdbPersister,
   PERSIST_BUSTER,
 } from '../persister';
-import { clearUserReadCache } from '../persistController';
+import { clearUserReadCache, initPersistForUser, stopPersisting } from '../persistController';
 import { enqueue, getOutboxOps } from '../outbox';
 import { setIdMapping, getIdMapping } from '../idmap';
 import { closeAllOfflineDbs, deleteOfflineDb } from '../db';
-import type { Query } from '@tanstack/react-query';
+import { QueryClient, type Query } from '@tanstack/react-query';
 import type { PersistedClient } from '@tanstack/react-query-persist-client';
 
 describe('Cache Persister & Whitelist (§A3, §A9, §D)', () => {
@@ -184,6 +184,37 @@ describe('Cache Persister & Whitelist (§A3, §A9, §D)', () => {
       // Verify idmap is KEPT!
       const mappedId = await getIdMapping(userId, 'client-w-keep');
       expect(mappedId).toBe('canonical-w-keep');
+    });
+
+    it('persistClient, restoreClient, removeClient absorb closed IndexedDB errors without throwing or rejecting', async () => {
+      const persister = createIdbPersister(userId);
+      const mockClientData: PersistedClient = {
+        timestamp: Date.now(),
+        buster: PERSIST_BUSTER,
+        clientState: { queries: [], mutations: [] },
+      };
+
+      // Mock getOfflineDb to simulate a database in closing/closed state
+      const dbModule = await import('../db');
+      const spy = vi.spyOn(dbModule, 'getOfflineDb').mockRejectedValue(
+        new DOMException('The database connection is closing.', 'InvalidStateError')
+      );
+
+      try {
+        // Must resolve without rejecting/throwing
+        await expect(persister.persistClient(mockClientData)).resolves.toBeUndefined();
+        await expect(persister.restoreClient()).resolves.toBeUndefined();
+        await expect(persister.removeClient()).resolves.toBeUndefined();
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('initPersistForUser aborts mid-flight when stopPersisting is invoked', async () => {
+      const queryClient = new QueryClient();
+      const p = initPersistForUser(userId, queryClient);
+      stopPersisting();
+      await expect(p).resolves.not.toThrow();
     });
   });
 });

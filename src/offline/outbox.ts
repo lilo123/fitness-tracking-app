@@ -1,4 +1,4 @@
-import { getOfflineDb } from './db';
+import { getOfflineDb, isDbClosedError } from './db';
 import type { OutboxOp, OpKind, OpPayloadMap, OutboxSummary } from './types';
 import { compactIncomingOp } from './compaction';
 
@@ -31,7 +31,10 @@ function scheduleOutboxRefresh(userId: string): void {
   const timer = setTimeout(() => {
     pendingRefreshTimers.delete(userId);
     getOutboxOps(userId).catch((e) => {
-      console.warn('[outbox] Failed to refresh outbox ops after channel broadcast', e);
+      // Background outbox refresh after broadcast: absorb closed-DB errors on teardown, warn otherwise
+      if (!isDbClosedError(e)) {
+        console.warn('[outbox] Failed to refresh outbox ops after channel broadcast', e);
+      }
     });
   }, 10);
   pendingRefreshTimers.set(userId, timer);
@@ -136,14 +139,20 @@ function runWithEnqueueMutex<T>(userId: string, fn: () => Promise<T>): Promise<T
     userId,
     prev
       .catch((e) => {
-        console.warn('[outbox] Previous enqueue task failed in mutex queue', e);
+        // If previous enqueue failed with closed-DB during teardown, absorb; otherwise warn
+        if (!isDbClosedError(e)) {
+          console.warn('[outbox] Previous enqueue task failed in mutex queue', e);
+        }
       })
       .then(() => current)
   );
 
   return prev
     .catch((e) => {
-      console.warn('[outbox] Previous enqueue task failed in mutex queue', e);
+      // If previous enqueue failed with closed-DB during teardown, absorb; otherwise warn
+      if (!isDbClosedError(e)) {
+        console.warn('[outbox] Previous enqueue task failed in mutex queue', e);
+      }
     })
     .then(async () => {
       try {
@@ -518,7 +527,10 @@ export async function updateOp(userId: string, op: OutboxOp): Promise<void> {
     }
   } else {
     getOutboxOps(userId).catch((e) => {
-      console.warn('[outbox] Failed to refresh outbox ops after updateOp', e);
+      // Background outbox refresh after update: absorb closed-DB errors on teardown, warn otherwise
+      if (!isDbClosedError(e)) {
+        console.warn('[outbox] Failed to refresh outbox ops after updateOp', e);
+      }
     });
   }
   notifyOutboxChanged(userId);
@@ -533,7 +545,10 @@ export async function deleteOp(userId: string, opId: string): Promise<void> {
     updateUserCache(userId, current.filter((op) => op.opId !== opId));
   } else {
     getOutboxOps(userId).catch((e) => {
-      console.warn('[outbox] Failed to refresh outbox ops after deleteOp', e);
+      // Background outbox refresh after delete: absorb closed-DB errors on teardown, warn otherwise
+      if (!isDbClosedError(e)) {
+        console.warn('[outbox] Failed to refresh outbox ops after deleteOp', e);
+      }
     });
   }
   notifyOutboxChanged(userId);

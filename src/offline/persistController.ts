@@ -10,7 +10,7 @@ import {
   PERSIST_MAX_AGE_MS,
   WHITELIST_ROOTS,
 } from './persister';
-import { clearUserRqStore } from './db';
+import { clearUserRqStore, isDbClosedError } from './db';
 import { setActiveUserForFlusher } from './flusher';
 import { loadIdMappings } from './idmap';
 import { getOutboxOps } from './outbox';
@@ -18,6 +18,7 @@ import { getOutboxOps } from './outbox';
 let currentPersistingUserId: string | null = null;
 let currentPersistingQueryClient: QueryClient | null = null;
 let unsubscribePersist: (() => void) | null = null;
+let persistSessionId = 0;
 
 /**
  * Configure 8-day gcTime for all whitelisted offline query families.
@@ -52,8 +53,11 @@ export async function initPersistForUser(
       queryClient.clear();
     }
     stopPersisting();
+  } else if (unsubscribePersist) {
+    stopPersisting();
   }
 
+  const thisSession = ++persistSessionId;
   currentPersistingUserId = userId;
   currentPersistingQueryClient = queryClient;
   setActiveUserForFlusher(userId);
@@ -61,10 +65,18 @@ export async function initPersistForUser(
   // Pre-load ID mappings and outbox cache for fast sync lookups and UI readiness
   try {
     await loadIdMappings(userId);
+    if (persistSessionId !== thisSession) return;
     await getOutboxOps(userId);
+    if (persistSessionId !== thisSession) return;
   } catch (e) {
-    console.warn('[persistController] Failed to load ID mappings / outbox:', e);
+    if (persistSessionId !== thisSession) return;
+    // Pre-loading ID mappings / outbox may fail if DB is closing during teardown; absorb closed-DB, warn otherwise
+    if (!isDbClosedError(e)) {
+      console.warn('[persistController] Failed to load ID mappings / outbox:', e);
+    }
   }
+
+  if (persistSessionId !== thisSession) return;
 
   const persister = createIdbPersister(userId);
 
@@ -77,8 +89,14 @@ export async function initPersistForUser(
       buster: PERSIST_BUSTER,
     });
   } catch (restoreErr) {
-    console.warn('[persistController] Failed to restore persisted client:', restoreErr);
+    if (persistSessionId !== thisSession) return;
+    // Restoring read cache may fail if DB is closing during teardown; absorb closed-DB, warn otherwise
+    if (!isDbClosedError(restoreErr)) {
+      console.warn('[persistController] Failed to restore persisted client:', restoreErr);
+    }
   }
+
+  if (persistSessionId !== thisSession) return;
 
   // Subscribe to cache updates
   unsubscribePersist = persistQueryClientSubscribe({
@@ -95,8 +113,16 @@ export async function initPersistForUser(
  * Stop persisting cache to IndexedDB and unsubscribe event listeners.
  */
 export function stopPersisting(): void {
+  persistSessionId++;
   if (unsubscribePersist) {
-    unsubscribePersist();
+    try {
+      unsubscribePersist();
+    } catch (err) {
+      // Unsubscribing persister may fail if subscriber callback encounters closed DB; absorb closed-DB, warn otherwise
+      if (!isDbClosedError(err)) {
+        console.warn('[persistController] Error during unsubscribePersist:', err);
+      }
+    }
     unsubscribePersist = null;
   }
   currentPersistingUserId = null;

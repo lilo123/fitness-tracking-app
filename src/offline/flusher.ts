@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { isDbClosedError } from './db';
 import {
   enqueue as outboxEnqueue,
   getOutboxOps,
@@ -85,6 +86,13 @@ export function getFlusherSupabaseClient(): any {
 export function setFlusherSessionUser(userId: string | null): void {
   flusherSessionUserId = userId;
   activeUserId = userId;
+  if (!userId) {
+    if (backoffTimer) {
+      clearTimeout(backoffTimer);
+      backoffTimer = null;
+    }
+    retryAttempts = 0;
+  }
 }
 
 export function getFlusherSessionUser(): string | null {
@@ -94,6 +102,26 @@ export function getFlusherSessionUser(): string | null {
 export function setActiveUserForFlusher(userId: string | null): void {
   activeUserId = userId;
   flusherSessionUserId = userId;
+  if (!userId) {
+    if (backoffTimer) {
+      clearTimeout(backoffTimer);
+      backoffTimer = null;
+    }
+    retryAttempts = 0;
+  }
+}
+
+export function resetFlusherForTesting(): void {
+  if (backoffTimer) {
+    clearTimeout(backoffTimer);
+    backoffTimer = null;
+  }
+  retryAttempts = 0;
+  syncedListeners.clear();
+  userMutexes.clear();
+  activeUserId = null;
+  flusherSessionUserId = null;
+  activeSupabaseClient = supabase;
 }
 
 export function getActiveUserId(): string | null {
@@ -190,7 +218,10 @@ export async function flushNow(targetUserId?: string, callerOpId?: string): Prom
             if (backoffTimer) clearTimeout(backoffTimer);
             backoffTimer = setTimeout(() => {
               flushNow(userId).catch((e) => {
-                console.warn('[flusher] Background flush retry failed', e);
+                // Background retry may encounter closed DB during teardown; absorb closed-DB, warn otherwise
+                if (!isDbClosedError(e)) {
+                  console.warn('[flusher] Background flush retry failed', e);
+                }
               });
             }, delay);
 
@@ -305,7 +336,10 @@ export async function enqueueAndAwait<K extends OpKind>(
 
   // Trigger flush immediately with callerOpId
   flushNow(input.userId, enqueuedOp.opId).catch((e) => {
-    console.warn('[flusher] Immediate flush failed', e);
+    // Immediate flush may encounter closed DB during teardown; absorb closed-DB, warn otherwise
+    if (!isDbClosedError(e)) {
+      console.warn('[flusher] Immediate flush failed', e);
+    }
   });
 
   // Wait for op to be deleted (synced), put in attention, or timeout
@@ -351,7 +385,10 @@ if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {
     retryAttempts = 0;
     flushNow().catch((e) => {
-      console.warn('[flusher] Online reconnect flush failed', e);
+      // Reconnect flush may encounter closed DB during teardown; absorb closed-DB, warn otherwise
+      if (!isDbClosedError(e)) {
+        console.warn('[flusher] Online reconnect flush failed', e);
+      }
     });
   });
 }

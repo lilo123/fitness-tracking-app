@@ -9,6 +9,7 @@ import {
 } from '../lib/exercises';
 import { fetchTemplateDetail } from '../components/workout/useWorkoutQueries';
 import type { RoutineTemplate } from '../types/database';
+import { isDbClosedError } from '../offline/db';
 
 export const PREFETCH_THROTTLE_MS = 12 * 60 * 60 * 1000; // 12 hours
 export const PREFETCH_STORAGE_KEY_PREFIX = 'offline_prefetch_';
@@ -289,7 +290,10 @@ export async function runOfflinePrefetch(
     }
     return true;
   } catch (err) {
-    console.warn('[useOfflinePrefetch] prefetch failed:', err);
+    // Offline prefetch write may fail if DB is closing during teardown; absorb closed-DB, warn otherwise
+    if (!isDbClosedError(err)) {
+      console.warn('[useOfflinePrefetch] prefetch failed:', err);
+    }
     return false;
   }
 }
@@ -354,7 +358,10 @@ export function useOfflinePrefetch(userId?: string | null): void {
       try {
         await offlinePrefetchOps.runOfflinePrefetch(queryClient, userId);
       } catch (err) {
-        console.warn('[offlinePrefetch] execute failed:', err);
+        // Prefetch execute error: absorb closed-DB during unmount/teardown, warn otherwise
+        if (!cancelled && !isDbClosedError(err)) {
+          console.warn('[offlinePrefetch] execute failed:', err);
+        }
       } finally {
         runningRef.current = false;
         cleanupTimersAndListeners();
