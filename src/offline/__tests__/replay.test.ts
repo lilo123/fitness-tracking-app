@@ -382,8 +382,10 @@ describe('Replay Executor & Idempotency (§A4, §D)', () => {
     expect(mockUpsert).toHaveBeenCalledTimes(2);
   });
 
+  // Contract verified against supabaseBuilderMock conventions
   describe('nutrition.log Replay & Idempotency (§N1, §E2)', () => {
     it('1st replay inserts row and increments custom_dishes.use_count when 1 row returned', async () => {
+      let capturedTable: string | null = null;
       const mockSelect = vi.fn().mockResolvedValue({ data: [{ id: 'nl-uuid-1' }], error: null });
       const mockUpsert = vi.fn().mockReturnValue({ select: mockSelect });
 
@@ -400,6 +402,7 @@ describe('Replay Executor & Idempotency (§A4, §D)', () => {
 
       const mockClient: any = {
         from: vi.fn().mockImplementation((table: string) => {
+          capturedTable = table;
           if (table === 'nutrition_logs') {
             return { upsert: mockUpsert };
           }
@@ -461,9 +464,13 @@ describe('Replay Executor & Idempotency (§A4, §D)', () => {
       expect(mockDishSelect).toHaveBeenCalledWith('use_count');
       expect(mockDishUpdate).toHaveBeenCalledWith({ use_count: 6 });
       expect(mockDishUpdateEq).toHaveBeenCalledWith('id', 'dish-uuid-1');
+      expect(mockClient.from).toHaveBeenCalledWith('nutrition_logs');
+      expect(mockClient.from).toHaveBeenCalledWith('custom_dishes');
+      expect(capturedTable).toBe('custom_dishes');
     });
 
     it('2nd replay (0 rows returned = already applied) succeeds and does NOT increment use_count', async () => {
+      let capturedTable: string | null = null;
       // PostgREST returns empty array on ON CONFLICT DO NOTHING when selecting 'id'
       const mockSelect = vi.fn().mockResolvedValue({ data: [], error: null });
       const mockUpsert = vi.fn().mockReturnValue({ select: mockSelect });
@@ -473,6 +480,7 @@ describe('Replay Executor & Idempotency (§A4, §D)', () => {
 
       const mockClient: any = {
         from: vi.fn().mockImplementation((table: string) => {
+          capturedTable = table;
           if (table === 'nutrition_logs') {
             return { upsert: mockUpsert };
           }
@@ -517,6 +525,9 @@ describe('Replay Executor & Idempotency (§A4, §D)', () => {
 
       expect(result.alreadyApplied).toBe(true);
       expect(result.canonicalId).toBe('nl-uuid-1');
+      expect(mockClient.from).toHaveBeenCalledWith('nutrition_logs');
+      expect(mockSelect).toHaveBeenCalledWith('id');
+      expect(capturedTable).toBe('nutrition_logs');
 
       // custom_dishes must NOT be queried or updated on 2nd replay
       expect(mockDishSelect).not.toHaveBeenCalled();
@@ -559,6 +570,7 @@ describe('Replay Executor & Idempotency (§A4, §D)', () => {
     });
 
     it('nutrition.log: insert ok + use_count update error -> op succeeds, warn called, no throw', async () => {
+      let capturedTable: string | null = null;
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       const mockSelect = vi.fn().mockResolvedValue({ data: [{ id: 'nl-uuid-warn' }], error: null });
@@ -576,6 +588,7 @@ describe('Replay Executor & Idempotency (§A4, §D)', () => {
 
       const mockClient: any = {
         from: vi.fn().mockImplementation((table: string) => {
+          capturedTable = table;
           if (table === 'nutrition_logs') {
             return { upsert: mockUpsert };
           }
@@ -611,6 +624,11 @@ describe('Replay Executor & Idempotency (§A4, §D)', () => {
       // Must NOT throw
       const result = await executeReplayOp(op, mockClient);
       expect(result.canonicalId).toBe('nl-uuid-warn');
+      expect(mockClient.from).toHaveBeenCalledWith('nutrition_logs');
+      expect(mockClient.from).toHaveBeenCalledWith('custom_dishes');
+      expect(mockSelect).toHaveBeenCalledWith('id');
+      expect(mockDishSelect).toHaveBeenCalledWith('use_count');
+      expect(capturedTable).toBe('custom_dishes');
 
       // Must have called console.warn with context
       expect(warnSpy).toHaveBeenCalled();

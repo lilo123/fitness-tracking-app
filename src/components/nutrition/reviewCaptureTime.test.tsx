@@ -7,7 +7,7 @@ import { ToastHost } from '../common/ToastHost';
 import { AuthProvider } from '../../context/AuthContext';
 import { CoachProvider } from '../../context/CoachContext';
 import { supabase } from '../../lib/supabase';
-import { createSupabaseBuilder, clearMockHistory } from '../../test/supabaseBuilderMock';
+import { createSupabaseBuilder, clearMockHistory, getRecordedSelects, getRecordedTables } from '../../test/supabaseBuilderMock';
 import { getLocalDateStr, formatLocalTimestamp, localCivilToUtcMs } from '../../utils/date';
 import {
   getOfflineDb,
@@ -228,6 +228,19 @@ describe('reviewCaptureTime - O2 capture date and original timestamp preservatio
 
     renderNutrition();
 
+    expect(getRecordedTables()).toContain('custom_dishes');
+    expect(getRecordedTables()).toContain('nutrition_logs');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'custom_dishes',
+      projection:
+        'id, user_id, name, calories, protein, carbs, fat, fiber, created_at, kind, use_count, notes, items, ingredients',
+    });
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'nutrition_logs',
+      projection:
+        'id, user_id, food_name, meal_type, calories, protein, carbs, fat, fiber, serving_size, serving_unit, logged_at, logged_date, created_at, has_components',
+    });
+
     // 2. Locate Pending review item and click Review
     const reviewBtn = await screen.findByTestId(`review-aiq-item-${seededItem.id}`);
     expect(reviewBtn).toBeInTheDocument();
@@ -305,6 +318,19 @@ describe('reviewCaptureTime - O2 capture date and original timestamp preservatio
 
     renderNutrition();
 
+    expect(getRecordedTables()).toContain('custom_dishes');
+    expect(getRecordedTables()).toContain('nutrition_logs');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'custom_dishes',
+      projection:
+        'id, user_id, name, calories, protein, carbs, fat, fiber, created_at, kind, use_count, notes, items, ingredients',
+    });
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'nutrition_logs',
+      projection:
+        'id, user_id, food_name, meal_type, calories, protein, carbs, fat, fiber, serving_size, serving_unit, logged_at, logged_date, created_at, has_components',
+    });
+
     const reviewBtn = await screen.findByTestId(`review-aiq-item-${seededItem.id}`);
     expect(reviewBtn).toBeInTheDocument();
 
@@ -358,6 +384,19 @@ describe('reviewCaptureTime - O2 capture date and original timestamp preservatio
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     renderNutrition();
+
+    expect(getRecordedTables()).toContain('custom_dishes');
+    expect(getRecordedTables()).toContain('nutrition_logs');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'custom_dishes',
+      projection:
+        'id, user_id, name, calories, protein, carbs, fat, fiber, created_at, kind, use_count, notes, items, ingredients',
+    });
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'nutrition_logs',
+      projection:
+        'id, user_id, food_name, meal_type, calories, protein, carbs, fat, fiber, serving_size, serving_unit, logged_at, logged_date, created_at, has_components',
+    });
 
     const reviewBtn = await screen.findByTestId(`review-aiq-item-${seededItem.id}`);
     fireEvent.click(reviewBtn);

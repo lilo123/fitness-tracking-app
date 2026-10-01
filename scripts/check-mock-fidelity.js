@@ -537,6 +537,42 @@ const SERVICED_QUERIES_REGISTRY = {
       description: 'Older nutrition log probe query',
     },
   ],
+  'src/components/nutrition/reviewCaptureTime.test.tsx': [
+    {
+      table: 'custom_dishes',
+      type: 'EXACT',
+      projection: 'id, user_id, name, calories, protein, carbs, fat, fiber, created_at, kind, use_count, notes, items, ingredients',
+      description: 'Custom dishes list query with items and ingredients',
+    },
+    {
+      table: 'nutrition_logs',
+      type: 'EXACT',
+      projection: 'id, user_id, food_name, meal_type, calories, protein, carbs, fat, fiber, serving_size, serving_unit, logged_at, logged_date, created_at, has_components',
+      description: 'Daily nutrition logs query',
+    },
+  ],
+  'src/offline-prefetch/useOfflinePrefetch.test.ts': [
+    {
+      table: 'custom_dishes',
+      type: 'EXACT',
+      projection: 'id, user_id, name, calories, protein, carbs, fat, fiber, created_at, kind, use_count, notes, items, ingredients',
+      description: 'Prefetch custom dishes query for offline caching',
+    },
+  ],
+  'src/offline/__tests__/replay.test.ts': [
+    {
+      table: 'nutrition_logs',
+      type: 'EXACT',
+      projection: 'id',
+      description: 'Nutrition log replay upsert row confirmation query',
+    },
+    {
+      table: 'custom_dishes',
+      type: 'EXACT',
+      projection: 'use_count',
+      description: 'Replay custom dish use_count query on first insert',
+    },
+  ],
 };
 
 function findTestFiles(dir) {

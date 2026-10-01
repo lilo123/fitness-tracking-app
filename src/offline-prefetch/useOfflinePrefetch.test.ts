@@ -15,6 +15,12 @@ import * as exercisesModule from '../lib/exercises';
 import * as workoutQueriesModule from '../components/workout/useWorkoutQueries';
 import * as onlineStatusModule from '../hooks/useOnlineStatus';
 import { supabase } from '../lib/supabase';
+import {
+  createSupabaseBuilder,
+  getRecordedSelects,
+  getRecordedTables,
+  clearMockHistory,
+} from '../test/supabaseBuilderMock';
 
 vi.mock('../lib/supabase', () => ({
   supabase: {
@@ -29,6 +35,7 @@ describe('useOfflinePrefetch', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    clearMockHistory();
     localStorage.clear();
     queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -53,34 +60,21 @@ describe('useOfflinePrefetch', () => {
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'custom_dishes') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockReturnValue({
-                limit: vi.fn().mockResolvedValue({
-                  data: [
-                    {
-                      id: 'dish-1',
-                      user_id: mockUserId,
-                      name: 'Oatmeal',
-                      calories: 300,
-                      items: [{ name: 'Oats', calories: 300 }],
-                      ingredients: null,
-                    },
-                  ],
-                  error: null,
-                }),
-              }),
-            }),
-          }),
-        };
+        return createSupabaseBuilder(table, {
+          data: [
+            {
+              id: 'dish-1',
+              user_id: mockUserId,
+              name: 'Oatmeal',
+              calories: 300,
+              items: [{ name: 'Oats', calories: 300 }],
+              ingredients: null,
+            },
+          ],
+          error: null,
+        });
       }
-      return {
-        select: vi.fn().mockReturnThis(),
-        or: vi.fn().mockReturnThis(),
-        order: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockResolvedValue({ data: [], error: null }),
-      };
+      return null;
     });
 
     (supabase.rpc as any).mockImplementation((fn: string) => {
@@ -150,6 +144,14 @@ describe('useOfflinePrefetch', () => {
     const dishes = queryClient.getQueryData(['custom_dishes', mockUserId]);
     expect(dishes).toBeDefined();
     expect((dishes as any[])[0].name).toBe('Oatmeal');
+
+    // Supabase query mock fidelity assertion
+    expect(getRecordedTables()).toContain('custom_dishes');
+    expect(getRecordedSelects()).toContainEqual({
+      table: 'custom_dishes',
+      projection:
+        'id, user_id, name, calories, protein, carbs, fat, fiber, created_at, kind, use_count, notes, items, ingredients',
+    });
 
     // Verify localStorage throttle set
     const key = `${PREFETCH_STORAGE_KEY_PREFIX}${mockUserId}`;
