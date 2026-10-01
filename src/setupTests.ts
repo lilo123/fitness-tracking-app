@@ -7,9 +7,9 @@ import { resetAudioContextForTesting } from './utils/sound';
 import { stopPersisting } from './offline/persistController';
 import { closeAllOfflineDbs } from './offline/db';
 import { resetOutboxForTesting } from './offline/outbox';
-import { resetFlusherForTesting, setFlusherSupabaseClient } from './offline/flusher';
+import { resetFlusherForTesting } from './offline/flusher';
 
-beforeEach(async () => {
+beforeEach(() => {
   if (typeof localStorage !== 'undefined') {
     localStorage.clear();
   }
@@ -24,10 +24,6 @@ beforeEach(async () => {
   }
   resetOutboxForTesting();
   resetFlusherForTesting();
-  // This setup file imports the flusher before a test file's vi.mock('../lib/supabase') is registered,
-  // so the flusher's module-level client is the real one. Re-bind it to whatever the test file sees.
-  const { supabase } = await import('./lib/supabase');
-  setFlusherSupabaseClient(supabase);
   workoutSessionStore.resetForTesting();
   restTimerStore.resetForTesting();
   resetAudioContextForTesting();

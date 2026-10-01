@@ -8,6 +8,7 @@ import { CoachProvider } from '../context/CoachContext';
 import { supabase } from '../lib/supabase';
 import { isWithinDayBounds } from '../utils/date';
 import { createSupabaseBuilder, clearMockHistory } from '../test/supabaseBuilderMock';
+import { setFlusherSupabaseClient } from '../offline/flusher';
 
 const { mockSession } = vi.hoisted(() => ({
   mockSession: {
@@ -49,6 +50,9 @@ describe('NutritionEngine — Staged meal survives date change (D29)', () => {
   const dateY = '2026-09-26';
 
   beforeEach(() => {
+    // setupTests imports the flusher before this file's vi.mock('../lib/supabase') is registered,
+    // so point the flusher at the mocked client explicitly.
+    setFlusherSupabaseClient(supabase);
     vi.clearAllMocks();
     clearMockHistory();
     (supabase.auth.getUser as any).mockResolvedValue({ data: { user: { id: 'test-user-id' } } });
