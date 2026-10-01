@@ -27,6 +27,17 @@ vi.mock('@capacitor/camera', () => ({
   },
 }));
 
+vi.mock('../../offline', async () => {
+  const actual = await vi.importActual<typeof import('../../offline')>('../../offline');
+  return {
+    ...actual,
+    enqueueAndAwait: vi.fn().mockImplementation(async (input: any) => {
+      await (supabase.from('nutrition_logs') as any).upsert(input.payload);
+      return { status: 'synced', opId: 'mock-op-1' };
+    }),
+  };
+});
+
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: vi.fn(),
@@ -108,6 +119,12 @@ describe('Snapshot Isolation: Custom Dish Notes', () => {
           insertedLogPayloads.push(...arr);
           return origInsert(payload);
         };
+        const origUpsert = builder.upsert.bind(builder);
+        builder.upsert = (payload: any, options: any) => {
+          const arr = Array.isArray(payload) ? payload : [payload];
+          insertedLogPayloads.push(...arr);
+          return origUpsert(payload, options);
+        };
         return builder;
       }
 
@@ -133,7 +150,7 @@ describe('Snapshot Isolation: Custom Dish Notes', () => {
     expect(getRecordedTables()).toContain('nutrition_logs');
     expect(getRecordedSelects()).toContainEqual({
       table: 'custom_dishes',
-      projection: 'id, user_id, name, calories, protein, carbs, fat, fiber, created_at, kind, use_count, notes',
+      projection: 'id, user_id, name, calories, protein, carbs, fat, fiber, created_at, kind, use_count, notes, items, ingredients',
     });
     expect(getRecordedSelects()).toContainEqual({
       table: 'nutrition_logs',
@@ -196,6 +213,12 @@ describe('Snapshot Isolation: Custom Dish Notes', () => {
           const arr = Array.isArray(payload) ? payload : [payload];
           insertedLogPayloads.push(...arr);
           return origInsert(payload);
+        };
+        const origUpsert = builder.upsert.bind(builder);
+        builder.upsert = (payload: any, options: any) => {
+          const arr = Array.isArray(payload) ? payload : [payload];
+          insertedLogPayloads.push(...arr);
+          return origUpsert(payload, options);
         };
         return builder;
       }

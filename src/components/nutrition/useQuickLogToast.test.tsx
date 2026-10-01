@@ -6,9 +6,26 @@ import { useNutritionData } from './useNutritionData';
 import { supabase } from '../../lib/supabase';
 import { createSupabaseBuilder, clearMockHistory } from '../../test/supabaseBuilderMock';
 
+vi.mock('../../offline', async () => {
+  const actual = await vi.importActual<typeof import('../../offline')>('../../offline');
+  return {
+    ...actual,
+    enqueueAndAwait: vi.fn().mockResolvedValue({ status: 'synced', opId: 'mock-op-1' }),
+    useOverlaidNutritionLogs: <T,>(logs: T[]) => logs,
+  };
+});
+
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: vi.fn(),
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-123' } } }),
+      getSession: vi.fn().mockResolvedValue({ data: { session: { user: { id: 'user-123' } } } }),
+      onAuthStateChange: vi.fn().mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } }),
+    },
+    functions: {
+      invoke: vi.fn(),
+    },
   },
 }));
 
@@ -43,6 +60,12 @@ describe('useQuickLogToast & D42 Undo Hook Tests', () => {
               error: null,
             }),
           }),
+          upsert: vi.fn().mockImplementation((payload) => ({
+            select: vi.fn().mockResolvedValue({
+              data: Array.isArray(payload) ? payload : [payload],
+              error: null,
+            }),
+          })),
           select: vi.fn().mockReturnValue(createSupabaseBuilder('nutrition_logs', { data: [], error: null })),
         } as any;
       }
@@ -114,6 +137,7 @@ describe('useQuickLogToast & D42 Undo Hook Tests', () => {
     // Perform direct log mutation
     await act(async () => {
       await result.current.mutation.mutateAsync({
+        id: 'new-log-789',
         food_name: 'Direct Logged Meal',
         calories: 350,
       });
@@ -163,6 +187,7 @@ describe('useQuickLogToast & D42 Undo Hook Tests', () => {
 
     await act(async () => {
       await result.current.mutation.mutateAsync({
+        id: 'new-log-789',
         food_name: 'Direct Logged Meal',
         calories: 350,
       });
@@ -197,6 +222,7 @@ describe('useQuickLogToast & D42 Undo Hook Tests', () => {
 
     await act(async () => {
       await result.current.mutation.mutateAsync({
+        id: 'new-log-789',
         food_name: 'Direct Logged Meal',
         calories: 350,
       });

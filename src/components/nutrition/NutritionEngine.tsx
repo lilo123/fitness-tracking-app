@@ -26,6 +26,9 @@ import { useStagedMealAddAi } from './useStagedMealAddAi';
 import { CustomDishesModal } from './CustomDishesModal';
 import { Utensils, AlertCircle, RotateCcw } from 'lucide-react';
 import { StatusBanner } from '../common/StatusBanner';
+import { PendingReviewList } from './PendingReviewList';
+import { useAiQueueReview } from './useAiQueueReview';
+import { deleteAfterLog, newId } from '../../offline';
 
 export const NutritionEngine: React.FC = () => {
   const { user, profile } = useAuth();
@@ -175,6 +178,8 @@ export const NutritionEngine: React.FC = () => {
 
   const ai = useNutritionAi({
     customDishes,
+    targetUserId,
+    timeZone: profile?.timezone ?? undefined,
     onParsedSuccess: (meal) => {
       setStagedMeal(meal);
       setShowManualForm(false);
@@ -189,6 +194,14 @@ export const NutritionEngine: React.FC = () => {
     },
     setStatus,
     setIsError,
+  });
+
+  const { aiQueueItems, aiQueueCounts, handleReviewAiItem } = useAiQueueReview({
+    targetUserId,
+    stagedMeal,
+    setStagedMeal,
+    showManualForm,
+    manualMealForm,
   });
 
   const dishModal = useCustomDishModal({
@@ -236,7 +249,12 @@ export const NutritionEngine: React.FC = () => {
     const totals = sumItems(items);
     const isSingle = items.length <= 1;
     const item0 = items[0];
+    const logDate = stagedMeal.captureDate || selectedDate;
+    const logTimestamp = stagedMeal.capturedAt || formatLocalTimestamp(selectedDate, undefined, profile?.timezone ?? undefined);
+    const aiqItemId = stagedMeal.aiqItemId;
+
     const payload = {
+      id: newId(),
       food_name: stagedMeal.name,
       calories: isSingle && item0 ? roundTo1Decimal(item0.calories) : roundTo1Decimal(totals.calories),
       protein: isSingle && item0 ? roundTo1Decimal(item0.protein) : roundTo1Decimal(totals.protein),
@@ -246,12 +264,22 @@ export const NutritionEngine: React.FC = () => {
       meal_type: stagedMeal.mealType,
       serving_size: Number(stagedMeal.servingSize) || 1,
       serving_unit: stagedMeal.servingUnit || 'serving',
-      logged_at: formatLocalTimestamp(selectedDate),
-      logged_date: selectedDate,
+      logged_at: logTimestamp,
+      logged_date: logDate,
       items: items.length > 1 ? itemsForPersist(items) : null,
       notes: stagedMeal.notes ?? null,
     };
-    mutation.mutate(payload);
+    mutation.mutate(payload, {
+      onSuccess: async () => {
+        if (aiqItemId && targetUserId) {
+          try {
+            await deleteAfterLog(targetUserId, aiqItemId);
+          } catch (deleteErr) {
+            console.warn('[NutritionEngine] Failed to delete aiq item after log:', deleteErr);
+          }
+        }
+      },
+    });
   };
 
   const { handleSaveStagedAsCustomDish, handleSaveItemAsCustomDish } = useCustomDishSaving({
@@ -368,6 +396,7 @@ export const NutritionEngine: React.FC = () => {
             isPending={mutation.isPending}
             customDishes={displayedCustomDishes}
             onAddParsedItems={handleAddParsedItems}
+            onAnalyzeWithAiInstead={() => ai.handleForceAiAnalyze(stagedMeal.rawText || stagedMeal.name)}
           />
         </div>
       ) : (
@@ -424,6 +453,18 @@ export const NutritionEngine: React.FC = () => {
         onManualServingUnitChange={manualMealForm.setManualServingUnit}
         onSubmit={manualMealForm.handleManualSubmit}
         isPending={mutation.isPending}
+      />
+
+      {/* AI Queue Pending Review */}
+      <PendingReviewList
+        userId={targetUserId}
+        items={aiQueueItems}
+        counts={aiQueueCounts}
+        onReviewItem={handleReviewAiItem}
+        onEnterManually={(item) => {
+          setShowManualForm(true);
+          manualMealForm.setManualDishName(item.text || 'Meal Photo');
+        }}
       />
 
       {/* Logged Meals Timeline */}

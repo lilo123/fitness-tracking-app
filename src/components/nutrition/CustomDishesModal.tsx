@@ -7,6 +7,7 @@ import { Star, X, Trash2, Edit2 } from 'lucide-react';
 import { CustomDishEditor } from './CustomDishEditor';
 import { NotesField } from './NotesField';
 import { useModalA11y } from '../../hooks/useModalA11y';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 
 export interface CustomDishesModalProps {
   isOpen: boolean;
@@ -76,6 +77,7 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
   const fiberId = `${baseId}-fiber`;
 
   const dishModalRef = useModalA11y(isOpen, onClose);
+  const isOnline = useOnlineStatus();
 
   const isFoodDisabled = dishModalKind === 'recipe' && dishModalItems.length > 1;
   const showDirectMacros = dishModalKind !== 'recipe' && dishModalItems.length <= 1;
@@ -325,10 +327,12 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
               <button
                 type="button"
                 onClick={() => {
+                  if (!isOnline) return;
                   onDeleteDish(editingDish.id);
                 }}
                 data-testid="modal-delete-dish-btn"
-                disabled={isDeleting}
+                disabled={isDeleting || !isOnline}
+                title={!isOnline ? 'Available when online' : undefined}
                 className="px-4 py-2 min-h-[44px] rounded-xl text-xs font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition flex items-center gap-1.5 touch-manipulation disabled:opacity-50"
               >
                 <Trash2 className="w-4 h-4" />
@@ -338,6 +342,11 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
               <div />
             )}
             <div className="flex items-center gap-2">
+              {!isOnline && (
+                <span data-testid="offline-helper-text" className="text-xs text-amber-400 font-medium">
+                  Available when online
+                </span>
+              )}
               <button
                 type="button"
                 onClick={onClose}
@@ -347,7 +356,8 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
               </button>
               <button
                 type="submit"
-                disabled={isSaving || recipeNeedsIngredient}
+                disabled={isSaving || recipeNeedsIngredient || !isOnline}
+                title={!isOnline ? 'Available when online' : undefined}
                 className="px-5 py-2 min-h-[44px] rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-black shadow-neon-cyan transition disabled:opacity-50 touch-manipulation"
               >
                 {isSaving ? 'Saving...' : 'Save Dish'}
@@ -398,19 +408,25 @@ export const CustomDishesModal: React.FC<CustomDishesModalProps> = memo(({
                   <div className="flex items-center gap-1 shrink-0">
                     <button
                       type="button"
-                      onClick={() => onOpenEditDishModal(dish)}
-                      className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-cyan-300 hover:bg-zinc-800 rounded-lg transition touch-manipulation"
-                      title="Edit"
+                      disabled={!isOnline}
+                      onClick={() => {
+                        if (!isOnline) return;
+                        onOpenEditDishModal(dish);
+                      }}
+                      className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-cyan-300 hover:bg-zinc-800 rounded-lg transition touch-manipulation disabled:opacity-50"
+                      title={!isOnline ? 'Available when online' : 'Edit'}
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
                       type="button"
+                      disabled={!isOnline}
                       onClick={() => {
+                        if (!isOnline) return;
                         onDeleteDish(dish.id);
                       }}
-                      className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition touch-manipulation"
-                      title="Delete"
+                      className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition touch-manipulation disabled:opacity-50"
+                      title={!isOnline ? 'Available when online' : 'Delete'}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

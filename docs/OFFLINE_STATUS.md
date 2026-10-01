@@ -50,8 +50,9 @@ Provides robust offline logging for workouts (O1) and nutrition (O2) across web 
 | D-O1-7 | GATEFIX5b scope includes `src/offline-prefetch/useOfflinePrefetch.ts` and `src/setupTests.ts` (offline infra + test teardown) | Conductor, within G9 intent |
 | D-O1-8 | Local gate CI-order contention failures on shared seeded users (mobile-viewport:152, workout-catalog-tail:62, p5a-history:150) are not O1 blockers; they must pass in GitHub CI (one project per job) | Accepted by user 2026-10-01 (G7, G10) |
 | D-O1-9 | Per-test seeded-user isolation for those specs deferred to O2 (test-only, covered by the O2 gate) so O1 ships exactly the gated code | Conductor (G11 optional) |
-| D-O2-1 | Paste-to-fill grammar definition and strict boundary rules | Placeholder (O2) |
-| D-O2-2 | Queued AI offline photo retention and lifecycle | Placeholder (O2) |
+| D-O2-1 | Paste-to-fill grammar definition and strict boundary rules: single nutrition block, all 4 macros required, 4*P + 4*C + 9*F calorie consistency check within max(60, 25%), strict rejection of multi-item, prose, non-g units, and digits in dish name | Approved |
+| D-O2-2 | Queued AI offline photo retention and lifecycle: base64/mime in IndexedDB up to 4 MB (exceeding rejects with AiPhotoTooLargeError), auto-cleaned on completion in same transaction, original capture timestamp and civil date preserved across midnight and time zones | Approved |
+| D-O2-3 | Nutrition offline logging via outbox: `nutrition.log` op with client UUID, idempotent replay, single upsert, `incrementDishId` increments `custom_dishes.use_count` once on replay, offline guards ("Available when online") on delete/edit/scale meal and custom dish CRUD | Approved |
 
 ## 5. Packages
 | Package | Version | License | Purpose | Bundle Impact |
@@ -97,3 +98,38 @@ Provides robust offline logging for workouts (O1) and nutrition (O2) across web 
   - Added sync indicators and management UI in `src/components/sync/` and `src/components/common/Header.tsx`.
   - Implemented out-of-scope guards disabling exercise creation, template editing, settings mutation, and coach actions offline.
   - Removed production test globals; added production-build PWA Playwright E2E harness (`tests/e2e-pwa/`) and 320px visual density tests in `tests/visual-density.test.ts`.
+
+## Paste grammar
+
+### Local Nutrition Block Grammar (D-OFF-6 / N4)
+
+Local parsing applies ONLY when the ENTIRE input is a single nutrition block.
+False positives are worse than misses: when in doubt, reject.
+
+1. **Lines & Structure**:
+   - Optional **NAME** line: first non-empty line only, <=60 chars, NO digits,
+     no conjunctions/list markers ('and', 'with', 'plus', '&', '+', ',', ';', '/').
+   - Optional **SERVING** line: `Serving( size)?: <num> <unit>` or `Per <num> <unit>` / `Per serving`.
+   - **HEADER NOISE**: `Nutrition Facts`, `Amount Per Serving`, `% Daily Value*`, etc. ignored.
+   - **IGNORABLE SUB-ROWS**: Saturated/trans fat, cholesterol, sodium, sugars, added sugars, salt, vitamins.
+   - **MACRO LINES**: Exactly one of each of the 4 macros (Calories, Protein, Carbs, Fat); optional Fiber.
+
+2. **Macro Forms**:
+   - Calories: `Calories[:]? <num>( kcal)?`, `Energy <num> kcal` (kJ alone rejected; if both, kcal wins).
+   - Protein: `Protein[:]? <num>( g)?`, `P<num>`, `30g protein`.
+   - Carbs: `(Total )?Carb(s|ohydrate(s)?)[:]? <num>( g)?`, `C<num>`, `40g carbs`.
+   - Fat: `(Total )?Fat[:]? <num>( g)?` (not sat/trans fat), `F<num>`, `8g fat`.
+   - Fiber (optional): `(Dietary )?Fib(er|re)[:]? <num>( g)?`.
+   - Compact: `350 kcal | 30g protein | 40g carbs | 8g fat` or `P30 C40 F8 350kcal`.
+   - Separators: `|`, `,`, `/`, `·`, `;`, or whitespace.
+
+3. **Units & Numbers**:
+   - Numbers: standard `.` or comma decimal `,` (e.g. `8,5 g`).
+   - Bounds: `0 <= calories <= 5000`, `0 <= macro <= 500 g`.
+   - Units: macros must be in `g` or unitless; `mg` or `oz` rejected.
+
+4. **Consistency & Rejection**:
+   - Consistency check: `|4*P + 4*C + 9*F - kcal| <= max(60, 25% * kcal)`.
+   - Reject: missing any macro, second calories line, duplicate macro with different value,
+     name with digits or multiple items/conjunctions, leftover words, prose, multiple foods.
+

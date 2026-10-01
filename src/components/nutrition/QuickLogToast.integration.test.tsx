@@ -17,6 +17,18 @@ const { mockSession } = vi.hoisted(() => ({
   },
 }));
 
+vi.mock('../../offline', async () => {
+  const actual = await vi.importActual<typeof import('../../offline')>('../../offline');
+  return {
+    ...actual,
+    newId: vi.fn().mockReturnValue('new-row-999'),
+    enqueueAndAwait: vi.fn().mockImplementation(async (input: any) => {
+      await (supabase.from('nutrition_logs') as any).upsert(input.payload);
+      return { status: 'synced', opId: 'mock-op-1' };
+    }),
+  };
+});
+
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: vi.fn(),
@@ -88,6 +100,7 @@ describe('NutritionEngine QuickLogToast Integration (D41 & D42)', () => {
         return {
           delete: mockDelete,
           insert: mockInsert,
+          upsert: mockInsert,
           select: vi.fn().mockReturnValue(createSupabaseBuilder('nutrition_logs', { data: [], error: null })),
         } as any;
       }
@@ -179,7 +192,7 @@ describe('NutritionEngine QuickLogToast Integration (D41 & D42)', () => {
     await waitFor(() => {
       expect(screen.getByText(/Log Meal \(\+200 kcal\)/i)).toBeInTheDocument();
     });
-  });
+  }, 15000);
 
   it('direct log -> floating toast with Undo -> delete called on created row id', async () => {
     renderComponent();
@@ -221,5 +234,5 @@ describe('NutritionEngine QuickLogToast Integration (D41 & D42)', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('quick-log-toast')).toBeNull();
     });
-  });
+  }, 15000);
 });

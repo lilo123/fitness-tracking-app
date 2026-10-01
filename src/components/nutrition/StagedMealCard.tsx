@@ -1,5 +1,6 @@
 import React, { memo, useRef, useEffect, useState } from 'react';
-import { Utensils, Check, Star, X, ChevronDown } from 'lucide-react';
+import { Utensils, Check, Star, X, ChevronDown, Sparkles } from 'lucide-react';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { formatCalories } from '../../utils/nutrition';
 import type { NutritionItem } from '../../utils/itemModel';
 import { ComponentRow } from './ComponentRow';
@@ -45,6 +46,7 @@ export interface StagedMealCardProps {
   isPending: boolean;
   customDishes?: CustomDish[];
   onAddParsedItems?: (items: StagedItem[], mealAtStart?: StagedMeal) => void;
+  onAnalyzeWithAiInstead?: () => void;
 }
 
 export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
@@ -66,8 +68,10 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
   isPending,
   customDishes = [],
   onAddParsedItems,
+  onAnalyzeWithAiInstead,
   navHeight: navHeightProp,
 }) => {
+  const isOnline = useOnlineStatus();
   const cardRef = useRef<HTMLDivElement>(null);
   const measuredNavHeight = useNavHeight();
   const isEditMode = mode === 'edit';
@@ -263,6 +267,29 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
           />
         </div>
       </div>
+
+      {/* Local Parse provenance banner */}
+      {stagedMeal.source === 'local' && (
+        <div className="flex items-center justify-between gap-2 border-b border-zinc-800 pb-1.5 pt-0.5">
+          <span
+            data-testid="parsed-locally-badge"
+            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30"
+          >
+            Parsed locally
+          </span>
+          {isOnline && onAnalyzeWithAiInstead && (
+            <button
+              type="button"
+              data-testid="analyze-with-ai-instead-btn"
+              onClick={onAnalyzeWithAiInstead}
+              className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-cyan-300 bg-cyan-950/60 border border-cyan-500/40 rounded-xl hover:bg-cyan-900/50 transition min-h-[44px] touch-manipulation"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Analyze with AI instead</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Date row in edit mode */}
       {isEditMode && (
@@ -465,7 +492,8 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
               logButtonHadFocusRef.current = false;
             }
           }}
-          disabled={isEditMode ? (isPending || !isDirty) : isPending}
+          disabled={isEditMode ? (isPending || !isDirty || !isOnline) : isPending}
+          title={isEditMode && !isOnline ? 'Available when online' : undefined}
           className={isEditMode
             ? 'flex-1 min-w-0 bg-gradient-to-r from-cyan-500 to-teal-600 hover:from-cyan-400 hover:to-teal-500 text-white font-bold py-2.5 px-2 min-h-[40px] rounded-xl text-xs shadow-[0_0_15px_rgba(6,182,212,0.3)] active:scale-95 transition motion-reduce:transition-none disabled:opacity-50 flex items-center justify-center gap-1 touch-manipulation whitespace-nowrap'
             : 'flex-1 min-w-0 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold py-2.5 px-2 min-h-[40px] rounded-xl text-xs shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-95 transition motion-reduce:transition-none disabled:opacity-50 flex items-center justify-center gap-1 touch-manipulation whitespace-nowrap'
@@ -482,12 +510,15 @@ export const StagedMealCard: React.FC<StagedMealCardProps> = memo(({
         <button
           type="button"
           aria-label="Save as Custom Dish"
+          disabled={!isOnline}
           onClick={onSaveStagedAsCustomDish}
-          className="bg-zinc-800 hover:bg-zinc-700 text-amber-300 font-bold py-2.5 px-3 min-h-[40px] rounded-xl text-xs border border-border-interactive transition motion-reduce:transition-none flex items-center gap-1.5 touch-manipulation shrink-0"
-          title="Save this meal as a quick-log custom dish"
+          className="bg-zinc-800 hover:bg-zinc-700 text-amber-300 font-bold py-2.5 px-3 min-h-[40px] rounded-xl text-xs border border-border-interactive transition motion-reduce:transition-none flex items-center gap-1.5 touch-manipulation shrink-0 disabled:opacity-50"
+          title={!isOnline ? 'Available when online' : 'Save this meal as a quick-log custom dish'}
         >
           <Star className="w-3.5 h-3.5 fill-amber-400 shrink-0" />
-          <span className="hidden sm:inline">Save as Custom Dish</span>
+          <span className="hidden sm:inline">
+            {!isOnline ? 'Save as Custom Dish (Available when online)' : 'Save as Custom Dish'}
+          </span>
         </button>
 
         {isEditMode ? (

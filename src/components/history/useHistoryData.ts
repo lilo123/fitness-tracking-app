@@ -113,6 +113,9 @@ export function useHistoryData(targetUserId: string, onMutationError?: (msg: str
   // Delete nutrition log mutation
   const deleteMealMutation = useMutation({
     mutationFn: async (logId: string) => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        throw new Error('Available when online');
+      }
       deleteCachedLogItems(logId);
       const { error } = await supabase.from('nutrition_logs').delete().eq('id', logId);
       if (error) throw error;
@@ -132,6 +135,9 @@ export function useHistoryData(targetUserId: string, onMutationError?: (msg: str
   // Whole-dish rescale mutation
   const scaleMealMutation = useMutation({
     mutationFn: async ({ log, items }: { log: NutritionLog; items?: NutritionItem[] }) => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        throw new Error('Available when online');
+      }
       let activeItems = items;
       if (!activeItems || activeItems.length === 0) {
         if (log.items && Array.isArray(log.items) && log.items.length > 0) {

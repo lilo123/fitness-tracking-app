@@ -21,6 +21,18 @@ vi.mock('../../lib/supabase', () => ({
   },
 }));
 
+vi.mock('../../offline', () => ({
+  useOverlaidNutritionLogs: vi.fn((logs: any) => logs),
+  usePendingOps: vi.fn(() => []),
+  enqueueAndAwait: vi.fn().mockImplementation(async (input: any) => {
+    await (supabase.from('nutrition_logs') as any).insert(input.payload);
+    return { status: 'synced', opId: 'mock-op-1' };
+  }),
+  setFlusherSessionUser: vi.fn(),
+  subscribeToOutbox: vi.fn(() => () => {}),
+  getOutboxOps: vi.fn().mockResolvedValue([]),
+}));
+
 describe('NEW-16: Rescale meal from /history consistency and silent revert prevention', () => {
   let queryClient: QueryClient;
   let mockDatabase: Record<string, any>;

@@ -5,6 +5,7 @@ import { scaleItemToQuantity, reanchorItemTo, type NutritionItem } from '../../u
 import { OverflowMenu, type OverflowMenuItem } from '../common/OverflowMenu';
 import { UnitChip } from './UnitChip';
 import { ItemNutritionModal } from './ItemNutritionModal';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import type { EditedItemNutrition } from './nutritionEngineHelpers';
 import { DEFAULT_MACRO_COLUMNS, getMacroGridTemplateColumns, type MacroColumnKey } from './macroColumns';
 import { MacroCell } from './MacroCell';
@@ -44,6 +45,7 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
   onEditNutrition,
   readOnly = false,
 }) => {
+  const isOnline = useOnlineStatus();
   const columns = macroColumns ?? DEFAULT_MACRO_COLUMNS;
   // The input is free text so an in-progress value like "" or "12." is not
   // clobbered by the controlled numeric round trip.
@@ -144,7 +146,14 @@ export const ComponentRow: React.FC<ComponentRowProps> = ({
     });
   }
   if (onSaveToQuickLog) {
-    menuItems.push({ label: 'Save to quick log', onSelect: onSaveToQuickLog, testId: 'component-save-quick-log' });
+    menuItems.push({
+      label: !isOnline ? 'Save to quick log (Available when online)' : 'Save to quick log',
+      onSelect: () => {
+        if (!isOnline) return;
+        onSaveToQuickLog();
+      },
+      testId: 'component-save-quick-log',
+    });
   }
   if (onRemove) {
     menuItems.push({ label: 'Remove', onSelect: onRemove, tone: 'danger', testId: 'component-remove' });

@@ -22,6 +22,11 @@ export function useCustomDishSaving({
   const { show: showToast, dismiss: dismissToast } = useToast();
 
   const handleSaveStagedAsCustomDish = async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setStatus('Available when online');
+      setIsError(true);
+      return;
+    }
     if (!stagedMeal) return;
     dismissToast();
     try {
@@ -54,6 +59,11 @@ export function useCustomDishSaving({
   };
 
   const handleSaveItemAsCustomDish = async (item: StagedItem) => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setStatus('Available when online');
+      setIsError(true);
+      return;
+    }
     try {
       const { error } = await supabase.from('custom_dishes').insert([
         {

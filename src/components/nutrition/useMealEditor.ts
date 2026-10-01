@@ -325,6 +325,10 @@ export function useMealEditor({
   }, []);
 
   const save = useCallback(async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setErrorMessage('Available when online');
+      return;
+    }
     if (!draft || !meal) return;
     if (!draft.name.trim()) {
       setErrorMessage("Meal name is required");

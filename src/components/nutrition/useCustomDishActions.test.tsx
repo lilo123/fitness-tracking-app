@@ -245,7 +245,10 @@ describe('useCustomDishActions', () => {
   });
 
   it('directly quick-logs custom dish when nothing is staged with exact mutation payload, date, use_count and toast', async () => {
-    const mutate = vi.fn();
+    const mutate = vi.fn().mockImplementation((_payload, options) => {
+      options?.onSuccess?.();
+    });
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
     const triggerToast = vi.fn();
     const dish: CustomDish = {
       id: 'dish-quick-1',
@@ -260,8 +263,6 @@ describe('useCustomDishActions', () => {
       notes: 'Vanilla flavor',
       use_count: 7,
     };
-
-    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
     const { result } = renderHook(
       () =>
@@ -286,6 +287,7 @@ describe('useCustomDishActions', () => {
     expect(mutate).toHaveBeenCalledTimes(1);
     const payload = mutate.mock.calls[0][0];
     expect(payload).toEqual({
+      id: expect.any(String),
       food_name: 'Greek Yogurt Cup',
       calories: 130.4,
       protein: 15.2,
@@ -298,12 +300,12 @@ describe('useCustomDishActions', () => {
       logged_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/),
       logged_date: '2026-09-26',
       notes: 'Vanilla flavor',
+      incrementDishId: 'dish-quick-1',
     });
     expect(isWithinDayBounds(payload.logged_at, '2026-09-26')).toBe(true);
 
-    expect(supabase.from).toHaveBeenCalledWith('custom_dishes');
-    expect(mockUpdate).toHaveBeenCalledWith({ use_count: 8 });
-    expect(mockUpdateEq).toHaveBeenCalledWith('id', 'dish-quick-1');
+    // Quick-log does not perform direct custom_dishes update; replay flushes it via incrementDishId
+    expect(mockUpdate).not.toHaveBeenCalled();
 
     await vi.waitFor(() => {
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['custom_dishes', 'user-123'] });

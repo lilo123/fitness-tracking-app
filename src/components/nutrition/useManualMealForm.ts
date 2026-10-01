@@ -86,3 +86,5 @@ export function useManualMealForm({ onStageMeal }: UseManualMealFormOptions) {
     handleManualSubmit,
   };
 }
+
+export type UseManualMealFormReturn = ReturnType<typeof useManualMealForm>;

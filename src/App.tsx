@@ -15,7 +15,8 @@ import { recordLastRoute, getLastRoute } from './pwa/lastRoute';
 import { SyncToastBridge } from './components/sync/SyncToastBridge';
 import { AttentionBanner } from './components/sync/AttentionBanner';
 import { useOfflinePrefetch } from './offline-prefetch';
-import { registerOutboxUpdateBlocker } from './offline';
+import { registerOutboxUpdateBlocker, startAiQueueProcessor } from './offline';
+import { parseNutrition } from './components/nutrition/parseNutrition';
 import { registerUpdateBlocker } from './pwa/updateSafety';
 import './App.css';
 
@@ -126,6 +127,29 @@ const LastRouteRedirect: React.FC = () => {
 function AppLayout() {
   const { user } = useAuth();
   useOfflinePrefetch(user?.id);
+
+  // Start/stop AI queue processor for signed-in user
+  useEffect(() => {
+    if (!user?.id) return;
+    return startAiQueueProcessor({
+      userId: user.id,
+      analyze: async (item) => {
+        return await parseNutrition({
+          text: item.text,
+          photo: item.photo
+            ? {
+                base64: item.photo.base64,
+                dataUrl: `data:${item.photo.mime};base64,${item.photo.base64}`,
+                mimeType: item.photo.mime,
+                sizeBytes: 0,
+                width: 0,
+                height: 0,
+              }
+            : null,
+        });
+      },
+    });
+  }, [user?.id]);
   const location = useLocation();
   const onHistory = location.pathname === '/history';
 

@@ -211,6 +211,16 @@ export interface StagedMeal {
    * themselves carry the scaled amounts.
    */
   scale?: number;
+  /** Provenance of the staged meal: 'ai', 'local', or 'manual' */
+  source?: 'ai' | 'local' | 'manual';
+  /** Original unparsed raw text input if staged locally */
+  rawText?: string;
+  /** Original ISO capture timestamp from AI queue */
+  capturedAt?: string;
+  /** Original civil capture date from AI queue */
+  captureDate?: string;
+  /** AI queue item ID if staged from AI queue */
+  aiqItemId?: string;
 }
 
 let itemSequence = 0;

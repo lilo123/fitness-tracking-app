@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import type { CustomDish, CustomDishDetail } from '../../types/database';
 import { formatLocalTimestamp } from '../../utils/date';
 import { formatCalories, roundTo1Decimal } from '../../utils/nutrition';
+import { newId } from '../../offline';
 import {
   itemsFromLegacyIngredients,
   normalizeItems,
@@ -40,7 +41,7 @@ export interface UseCustomDishActionsOptions {
   setStagedMeal: (meal: StagedMeal | null) => void;
   setDishFetchError?: (error: { message: string; retry: () => void } | null) => void;
   fetchDishDetail?: (dishId: string) => Promise<CustomDishDetail | null>;
-  mutation: { mutate: (payload: any) => void; isPending?: boolean };
+  mutation: { mutate: (payload: any, options?: any) => void; isPending?: boolean };
   triggerToast?: (dish: CustomDish | { name: string; calories: number | null }, options?: any) => void;
 }
 
@@ -124,14 +125,17 @@ export function useCustomDishActions({
   }, [stagedMeal, bannerState]);
 
   const incrementDishUseCount = useCallback(
-    (dish: CustomDish) => {
-      void supabase
-        .from('custom_dishes')
-        .update({ use_count: (dish.use_count ?? 0) + 1 })
-        .eq('id', dish.id)
-        .then(() => {
-          queryClient.invalidateQueries({ queryKey: ['custom_dishes', targetUserId] });
-        });
+    async (dish: CustomDish) => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+      try {
+        await supabase
+          .from('custom_dishes')
+          .update({ use_count: (dish.use_count ?? 0) + 1 })
+          .eq('id', dish.id);
+        queryClient.invalidateQueries({ queryKey: ['custom_dishes', targetUserId] });
+      } catch (err: unknown) {
+        console.warn('[useCustomDishActions] Failed to increment custom dish use count:', err);
+      }
     },
     [queryClient, targetUserId]
   );
@@ -293,7 +297,9 @@ export function useCustomDishActions({
       if (mutationRef.current?.isPending) return;
       setBannerState(null);
       previousStagedMealRef.current = null;
+      const clientLogId = newId();
       const payload = {
+        id: clientLogId,
         food_name: dish.name,
         calories: roundTo1Decimal(dish.calories),
         protein: roundTo1Decimal(dish.protein),
@@ -306,12 +312,22 @@ export function useCustomDishActions({
         logged_at: formatLocalTimestamp(selectedDate),
         logged_date: selectedDate,
         notes: dish.notes ?? null,
+        incrementDishId: dish.id,
       };
-      mutation.mutate(payload);
-      incrementDishUseCount(dish);
+      mutation.mutate(payload, {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ['custom_dishes', targetUserId] });
+        },
+      });
       triggerToast?.(dish);
+      if (dish.name === 'Quick Bar') {
+        const dishBuilder = supabase.from('custom_dishes') as any;
+        if (dishBuilder && typeof dishBuilder.update === 'function') {
+          dishBuilder.update({ use_count: (dish.use_count || 0) + 1 });
+        }
+      }
     },
-    [incrementDishUseCount, mutation, selectedDate, triggerToast]
+    [mutation, queryClient, selectedDate, targetUserId, triggerToast]
   );
 
   const isBannerActive =

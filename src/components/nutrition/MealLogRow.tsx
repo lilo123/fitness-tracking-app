@@ -13,6 +13,8 @@ import { supabase } from '../../lib/supabase';
 import { OverflowMenu, type OverflowMenuItem } from '../common/OverflowMenu';
 import { ComponentRow } from './ComponentRow';
 import { StatusBanner } from '../common/StatusBanner';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+import { PendingMark } from '../sync/PendingMark';
 
 export interface MealLogRowProps {
   log: NutritionLog & { items?: unknown };
@@ -47,6 +49,7 @@ export const MealLogRow: React.FC<MealLogRowProps> = ({
   onDelete,
   readOnly = false,
 }) => {
+  const isOnline = useOnlineStatus();
   const panelId = useId();
   const [expanded, setExpanded] = useState(false);
 
@@ -103,8 +106,23 @@ export const MealLogRow: React.FC<MealLogRowProps> = ({
   };
 
   const menuItems: OverflowMenuItem[] = [
-    { label: 'Edit meal', onSelect: () => onEdit(log), testId: `edit-meal-${log.id}` },
-    { label: 'Delete meal', onSelect: () => onDelete(log), tone: 'danger', testId: `delete-meal-${log.id}` },
+    {
+      label: !isOnline ? 'Edit meal (Available when online)' : 'Edit meal',
+      onSelect: () => {
+        if (!isOnline) return;
+        onEdit(log);
+      },
+      testId: `edit-meal-${log.id}`,
+    },
+    {
+      label: !isOnline ? 'Delete meal (Available when online)' : 'Delete meal',
+      onSelect: () => {
+        if (!isOnline) return;
+        onDelete(log);
+      },
+      tone: 'danger',
+      testId: `delete-meal-${log.id}`,
+    },
   ];
 
   const toggleExpanded = async () => {
@@ -127,6 +145,7 @@ export const MealLogRow: React.FC<MealLogRowProps> = ({
     setExpanded(false);
   };
 
+  const isPending = Boolean((log as any).pending);
   const identity = (
     <>
       <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900">
@@ -139,6 +158,7 @@ export const MealLogRow: React.FC<MealLogRowProps> = ({
       >
         {log.food_name}
       </span>
+      {isPending && <PendingMark size="sm" className="shrink-0" />}
     </>
   );
 
