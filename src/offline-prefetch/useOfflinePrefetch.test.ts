@@ -5,8 +5,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   runOfflinePrefetch,
   useOfflinePrefetch,
+  offlinePrefetchOps,
   PREFETCH_THROTTLE_MS,
   PREFETCH_STORAGE_KEY_PREFIX,
+  PREFETCH_INITIAL_DELAY_MS,
+  PREFETCH_SETTLE_DELAY_MS,
 } from './useOfflinePrefetch';
 import * as exercisesModule from '../lib/exercises';
 import * as workoutQueriesModule from '../components/workout/useWorkoutQueries';
@@ -148,5 +151,219 @@ describe('useOfflinePrefetch', () => {
 
     const catalog = queryClient.getQueryData(['exercise_catalog', 'offline_all', mockUserId]);
     expect(catalog).toBeUndefined();
+  });
+
+  it('does not start prefetch while initial queries are fetching and starts after they settle', async () => {
+    vi.useFakeTimers();
+    try {
+      let resolveQuery: (val: any) => void = () => {};
+      const pendingPromise = new Promise((resolve) => {
+        resolveQuery = resolve;
+      });
+
+      // Start an in-flight query
+      queryClient.prefetchQuery({
+        queryKey: ['active_route_query'],
+        queryFn: () => pendingPromise,
+      });
+
+      expect(queryClient.isFetching()).toBe(1);
+
+      renderHook(() => useOfflinePrefetch(mockUserId), {
+        wrapper: ({ children }: { children?: React.ReactNode }) =>
+          React.createElement(QueryClientProvider, { client: queryClient }, children),
+      });
+
+      // Advance past initial delay + settle delay while query is still in flight
+      await vi.advanceTimersByTimeAsync(PREFETCH_INITIAL_DELAY_MS + PREFETCH_SETTLE_DELAY_MS + 500);
+
+      // Prefetch must NOT have run
+      let catalog = queryClient.getQueryData(['exercise_catalog', 'offline_all', mockUserId]);
+      expect(catalog).toBeUndefined();
+
+      // Now resolve the in-flight query so fetching reaches 0
+      resolveQuery({ ok: true });
+      await vi.advanceTimersByTimeAsync(10);
+      expect(queryClient.isFetching()).toBe(0);
+
+      // Settle timer is now counting down; before settle delay it should not have run
+      await vi.advanceTimersByTimeAsync(PREFETCH_SETTLE_DELAY_MS - 200);
+      catalog = queryClient.getQueryData(['exercise_catalog', 'offline_all', mockUserId]);
+      expect(catalog).toBeUndefined();
+
+      // Advance past settle delay + idle callback (which uses up to 1000ms fallback)
+      await vi.advanceTimersByTimeAsync(1500);
+      await vi.runAllTicks();
+
+      catalog = queryClient.getQueryData(['exercise_catalog', 'offline_all', mockUserId]);
+      expect(catalog).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('hook does not repeat prefetch within 12 hours', async () => {
+    vi.useFakeTimers();
+    try {
+      const key = `${PREFETCH_STORAGE_KEY_PREFIX}${mockUserId}`;
+      localStorage.setItem(key, String(Date.now() - 3600000)); // 1 hour ago
+
+      renderHook(() => useOfflinePrefetch(mockUserId), {
+        wrapper: ({ children }: { children?: React.ReactNode }) =>
+          React.createElement(QueryClientProvider, { client: queryClient }, children),
+      });
+
+      await vi.advanceTimersByTimeAsync(PREFETCH_INITIAL_DELAY_MS + PREFETCH_SETTLE_DELAY_MS + 1000);
+
+      const catalog = queryClient.getQueryData(['exercise_catalog', 'offline_all', mockUserId]);
+      expect(catalog).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('cancels scheduled prefetch when user signs out or unmounts', async () => {
+    vi.useFakeTimers();
+    try {
+      const { unmount } = renderHook(
+        ({ uid }: { uid: string | null }) => useOfflinePrefetch(uid),
+        {
+          initialProps: { uid: mockUserId as string | null },
+          wrapper: ({ children }: { children?: React.ReactNode }) =>
+            React.createElement(QueryClientProvider, { client: queryClient }, children),
+        }
+      );
+
+      // Advance partially during settle timer
+      await vi.advanceTimersByTimeAsync(500);
+
+      // Sign out / unmount
+      unmount();
+
+      // Advance timers way past prefetch execution time
+      await vi.advanceTimersByTimeAsync(PREFETCH_INITIAL_DELAY_MS + PREFETCH_SETTLE_DELAY_MS + 5000);
+
+      const catalog = queryClient.getQueryData(['exercise_catalog', 'offline_all', mockUserId]);
+      expect(catalog).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not re-fetch routine catalog or stats when already cached in queryClient', async () => {
+    // Pre-cache routine templates and exercise stats
+    const preCachedTemplates = [
+      {
+        id: 'cached-tmpl-1',
+        user_id: mockUserId,
+        name: 'Cached Routine',
+        is_master: false,
+        assigned_to: null,
+        days_of_week: ['Tue'],
+        created_at: '2026-09-02T00:00:00Z',
+      },
+    ];
+    queryClient.setQueryData(['routine_templates', mockUserId, 'workout'], preCachedTemplates);
+
+    const preCachedStats = [{ exercise_id: 'ex-1', set_count: 10, max_weight: 315 }];
+    queryClient.setQueryData(['exercise_stats', mockUserId], preCachedStats);
+    queryClient.setQueryData(['exercise_stats', mockUserId, 'e1rm'], preCachedStats);
+
+    const rpcSpy = vi.spyOn(supabase, 'rpc');
+    rpcSpy.mockClear();
+
+    const success = await runOfflinePrefetch(queryClient, mockUserId, true);
+    expect(success).toBe(true);
+
+    // Verify get_routine_catalog RPC was NOT called because templates were cached
+    expect(rpcSpy).not.toHaveBeenCalledWith('get_routine_catalog', expect.anything());
+
+    // Verify weight stats query reuses preCachedStats
+    const weightStats = queryClient.getQueryData(['exercise_stats', mockUserId, 'weight']);
+    expect(weightStats).toEqual(preCachedStats);
+
+    // Verify get_exercise_stats was NOT called
+    expect(rpcSpy).not.toHaveBeenCalledWith('get_exercise_stats', expect.anything());
+  });
+
+  it('after failed prefetch, 10 cache events + timer advance -> runOfflinePrefetch called exactly once', async () => {
+    vi.useFakeTimers();
+    try {
+      const prefetchSpy = vi
+        .spyOn(offlinePrefetchOps, 'runOfflinePrefetch')
+        .mockRejectedValue(new Error('Network failure during prefetch'));
+
+      renderHook(() => useOfflinePrefetch(mockUserId), {
+        wrapper: ({ children }: { children?: React.ReactNode }) =>
+          React.createElement(QueryClientProvider, { client: queryClient }, children),
+      });
+
+      // Settle timer + idle callback to trigger prefetch
+      await vi.advanceTimersByTimeAsync(
+        PREFETCH_INITIAL_DELAY_MS + PREFETCH_SETTLE_DELAY_MS + 2000
+      );
+      await vi.runAllTicks();
+
+      expect(prefetchSpy).toHaveBeenCalledTimes(1);
+
+      // Trigger 10 cache events
+      for (let i = 0; i < 10; i++) {
+        queryClient.setQueryData(['subsequent_cache_event', i], { data: i });
+      }
+
+      // Advance timers significantly
+      await vi.advanceTimersByTimeAsync(15000);
+      await vi.runAllTicks();
+
+      // Must NOT retry in the same effect lifetime; called exactly once
+      expect(prefetchSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('after success, cache listener unsubscribed (no further scheduling)', async () => {
+    vi.useFakeTimers();
+    try {
+      const prefetchSpy = vi
+        .spyOn(offlinePrefetchOps, 'runOfflinePrefetch')
+        .mockResolvedValue(true);
+
+      const cache = queryClient.getQueryCache();
+      const originalSubscribe = cache.subscribe.bind(cache);
+      let unsubscribeCalled = false;
+      vi.spyOn(cache, 'subscribe').mockImplementation((listener) => {
+        const unsubscribe = originalSubscribe(listener);
+        return () => {
+          unsubscribeCalled = true;
+          unsubscribe();
+        };
+      });
+
+      renderHook(() => useOfflinePrefetch(mockUserId), {
+        wrapper: ({ children }: { children?: React.ReactNode }) =>
+          React.createElement(QueryClientProvider, { client: queryClient }, children),
+      });
+
+      // Settle timer + idle callback to trigger prefetch
+      await vi.advanceTimersByTimeAsync(
+        PREFETCH_INITIAL_DELAY_MS + PREFETCH_SETTLE_DELAY_MS + 2000
+      );
+      await vi.runAllTicks();
+
+      expect(prefetchSpy).toHaveBeenCalledTimes(1);
+      expect(unsubscribeCalled).toBe(true);
+
+      // Subsequent query cache events should not schedule or call prefetch
+      for (let i = 0; i < 5; i++) {
+        queryClient.setQueryData(['post_success_query', i], { data: i });
+      }
+      await vi.advanceTimersByTimeAsync(10000);
+      await vi.runAllTicks();
+
+      expect(prefetchSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

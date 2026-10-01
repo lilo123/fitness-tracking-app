@@ -4,6 +4,7 @@ import {
   cleanupPwaTestUser,
   signInUser,
   waitForSwControl,
+  waitForOfflineDataReady,
   goOffline,
   goOnline,
   seedPriorWorkoutSession,
@@ -51,7 +52,8 @@ test.describe('PWA Offline Workout Acceptance Specs', () => {
     await expect(lastChip).toBeVisible();
     await expect(lastChip).toContainText('100×10');
 
-    // 2. Go offline
+    // 2. Wait for offline prefetch data, then go offline
+    await waitForOfflineDataReady(page, user.id);
     await goOffline(context, page);
 
     // Header connection status reflects offline state
@@ -192,7 +194,8 @@ test.describe('PWA Offline Workout Acceptance Specs', () => {
     await waitForSwControl(page);
     await expect(page.locator('[data-testid="exercise-card-0"]')).toBeVisible();
 
-    // 2. Go offline
+    // 2. Wait for offline prefetch data, then go offline
+    await waitForOfflineDataReady(page, user.id);
     await goOffline(context, page);
 
     // 3. Switch to Free Workout via routine selector

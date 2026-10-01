@@ -124,8 +124,8 @@ const LastRouteRedirect: React.FC = () => {
 };
 
 function AppLayout() {
-  useOfflinePrefetch();
   const { user } = useAuth();
+  useOfflinePrefetch(user?.id);
   const location = useLocation();
   const onHistory = location.pathname === '/history';
 

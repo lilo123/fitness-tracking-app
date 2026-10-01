@@ -218,6 +218,71 @@ export async function waitForSwControl(page: Page, timeout = 15000): Promise<voi
 }
 
 /**
+ * Waits for offline prefetch data (exercise catalog) to be saved to IndexedDB `cybergym-offline-${userId}`.
+ * Polls the IDB `rq` store for the client query containing 'exercise_catalog' and 'offline_all'.
+ */
+export async function waitForOfflineDataReady(
+  page: Page,
+  userId: string,
+  timeout = 15000
+): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        return page.evaluate(async (uid) => {
+          return new Promise<boolean>((resolve) => {
+            const dbName = `cybergym-offline-${uid}`;
+            const req = indexedDB.open(dbName);
+            req.onerror = () => resolve(false);
+            req.onsuccess = () => {
+              const db = req.result;
+              if (!db.objectStoreNames.contains('rq')) {
+                db.close();
+                return resolve(false);
+              }
+              try {
+                const tx = db.transaction('rq', 'readonly');
+                const store = tx.objectStore('rq');
+                const getReq = store.get('client');
+                getReq.onsuccess = () => {
+                  const val = getReq.result as any;
+                  db.close();
+                  if (!val || !val.clientState || !Array.isArray(val.clientState.queries)) {
+                    return resolve(false);
+                  }
+                  const hasCatalog = val.clientState.queries.some((q: any) => {
+                    const k = q?.queryKey;
+                    return (
+                      Array.isArray(k) &&
+                      k[0] === 'exercise_catalog' &&
+                      k[1] === 'offline_all' &&
+                      q?.state?.status === 'success'
+                    );
+                  });
+                  resolve(hasCatalog);
+                };
+                getReq.onerror = () => {
+                  db.close();
+                  resolve(false);
+                };
+              } catch {
+                db.close();
+                resolve(false);
+              }
+            };
+          });
+        }, userId);
+      },
+      {
+        message: `Offline data not ready in IDB for user ${userId}`,
+        timeout,
+        intervals: [100, 250, 500],
+      }
+    )
+    .toBe(true);
+}
+
+/**
  * Emulates offline network state on browser context.
  */
 export async function goOffline(context: BrowserContext): Promise<void> {

@@ -4,6 +4,7 @@ import {
   cleanupPwaTestUser,
   signInUser,
   waitForSwControl,
+  waitForOfflineDataReady,
   goOffline,
   goOnline,
   createCustomExercise,
@@ -50,7 +51,8 @@ test.describe('Needs Attention - Conflict & Permanent Error Handling', () => {
     await page.goto('/workout');
     await page.waitForLoadState('networkidle');
 
-    // 3. Go offline
+    // 3. Wait for offline prefetch data, then go offline
+    await waitForOfflineDataReady(page, user.id);
     await goOffline(context, page);
 
     // 4. Switch to Free Workout via routine selector
