@@ -4262,6 +4262,13 @@ Total Fiber: 1 g`;
       await waitFor(() => {
         expect(screen.getByTestId('staged-meal-card')).toBeDefined();
       });
+      // Let StagedMealCard's mount-autofocus frame (requestAnimationFrame) run
+      // before arranging focus. Under CI load that frame could otherwise land
+      // after document.body.focus() below and move focus to the name input,
+      // which made this test flaky (CI run 36937022112).
+      await act(async () => {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      });
 
       const logBtn = screen.getByRole('button', { name: /Log Meal/i });
       logBtn.focus();
