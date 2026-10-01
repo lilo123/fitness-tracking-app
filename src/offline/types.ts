@@ -6,7 +6,8 @@ export type OpKind =
   | 'set.create'
   | 'set.batchCreate'
   | 'set.update'
-  | 'set.delete';
+  | 'set.delete'
+  | 'nutrition.log';
 
 export type OpState = 'pending' | 'inflight' | 'attention';
 
@@ -70,6 +71,26 @@ export interface SetDeletePayload {
   id: string;
 }
 
+export interface NutritionLogPayload {
+  id: string;
+  user_id: string;
+  food_name: string;
+  calories: number;
+  protein?: number | null;
+  carbs?: number | null;
+  fat?: number | null;
+  fiber?: number | null;
+  meal_type?: string | null;
+  serving_size?: number | null;
+  serving_unit?: string | null;
+  logged_at: string; // ISO string with offset
+  logged_date: string; // civil date YYYY-MM-DD
+  items?: unknown | null;
+  notes?: string | null;
+  incrementDishId?: string;
+  [key: string]: unknown;
+}
+
 export type OpPayloadMap = {
   'workout.ensure': WorkoutEnsurePayload;
   'workout.rename': WorkoutRenamePayload;
@@ -77,6 +98,7 @@ export type OpPayloadMap = {
   'set.batchCreate': SetBatchCreatePayload;
   'set.update': SetUpdatePayload;
   'set.delete': SetDeletePayload;
+  'nutrition.log': NutritionLogPayload;
 };
 
 interface BaseOp {
@@ -120,13 +142,19 @@ export interface OutboxOpDelete extends BaseOp {
   payload: SetDeletePayload;
 }
 
+export interface OutboxOpNutritionLog extends BaseOp {
+  kind: 'nutrition.log';
+  payload: NutritionLogPayload;
+}
+
 export type OutboxOp =
   | OutboxOpEnsure
   | OutboxOpRename
   | OutboxOpCreate
   | OutboxOpBatchCreate
   | OutboxOpUpdate
-  | OutboxOpDelete;
+  | OutboxOpDelete
+  | OutboxOpNutritionLog;
 
 export interface OutboxSummary {
   pending: number;
@@ -154,6 +182,55 @@ export type EnqueueAndAwaitResult =
   | { status: 'synced'; opId: string }
   | { status: 'queued'; opId: string };
 
+export type AiQueueItemStatus = 'queued' | 'analyzing' | 'ready' | 'failed';
+export type AiQueueItemKind = 'text' | 'photo';
+
+export interface AiQueuePhoto {
+  base64: string;
+  mime: string;
+}
+
+export interface AiQueueItem {
+  id: string;
+  userId: string;
+  kind: AiQueueItemKind;
+  text?: string;
+  photo?: AiQueuePhoto;
+  capturedAt: string; // ISO instant with offset
+  captureDate: string; // civil date in user timezone
+  mealType?: string;
+  status: AiQueueItemStatus;
+  result?: unknown;
+  attempts: number;
+  nextAttemptAt: number; // timestamp ms
+  lastError?: string;
+}
+
+export interface EnqueueAiItemInput {
+  id?: string;
+  userId: string;
+  kind: AiQueueItemKind;
+  text?: string;
+  photo?: AiQueuePhoto;
+  capturedAt: string;
+  captureDate: string;
+  mealType?: string;
+}
+
+export interface AiQueueCounts {
+  queued: number;
+  analyzing: number;
+  ready: number;
+  failed: number;
+  total: number;
+}
+
+export interface AiQueueState {
+  items: AiQueueItem[];
+  counts: AiQueueCounts;
+  isAnalyzing: boolean;
+}
+
 export interface OfflineDBSchema extends DBSchema {
   rq: {
     key: string;
@@ -175,5 +252,13 @@ export interface OfflineDBSchema extends DBSchema {
   meta: {
     key: string;
     value: unknown;
+  };
+  aiq: {
+    key: string; // item id
+    value: AiQueueItem;
+    indexes: {
+      status: string;
+      capturedAt: string;
+    };
   };
 }

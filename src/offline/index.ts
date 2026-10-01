@@ -78,6 +78,8 @@ export {
   shouldDehydrateQuery,
   applyPageCaps,
   createIdbPersister,
+  getCivilDateInTz,
+  getCivilDayDifference,
 } from './persister';
 
 export {
@@ -96,12 +98,37 @@ export {
   applyPendingToDaySets,
   pendingSetsBefore,
   applyPendingToHistory,
+  applyPendingToNutritionLogs,
+  type OverlayNutritionLogsOptions,
 } from './overlay';
+
+// AI Queue
+export {
+  enqueueAiItem,
+  listAiItems,
+  discardAiItem,
+  markReviewed,
+  deleteAfterLog,
+  resetStuckAnalyzingItems,
+  startAiQueueProcessor,
+  subscribeToAiQueue,
+  notifyAiQueueChanged,
+  getCachedAiQueue,
+  runWithAiMutex,
+  AiPhotoTooLargeError,
+  MAX_PHOTO_BASE64_BYTES,
+  AI_RATE_LIMIT_MS,
+  DEFAULT_429_RETRY_AFTER_SECONDS,
+  MIN_BACKOFF_MS,
+  MAX_BACKOFF_MS,
+} from './aiQueue';
 
 // Hooks
 export {
   usePendingOps,
   useOutboxSummary,
+  useAiQueue,
+  useOverlaidNutritionLogs,
 } from './hooks';
 
 // Update safety blocker & helpers

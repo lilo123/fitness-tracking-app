@@ -17,7 +17,7 @@ export function registerOutboxUpdateBlocker(
     if (userId) {
       const summary = getCachedOutboxSummary(userId);
       if (summary.pending > 0) {
-        return 'Finish your workout and sync first';
+        return 'Sync pending changes first';
       }
     }
 

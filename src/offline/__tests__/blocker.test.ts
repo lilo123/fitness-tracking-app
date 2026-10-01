@@ -39,7 +39,7 @@ describe('registerOutboxUpdateBlocker', () => {
     const result = canApplyUpdate();
 
     expect(result.ok).toBe(false);
-    expect(result.reason).toBe('Finish your workout and sync first');
+    expect(result.reason).toBe('Sync pending changes first');
   });
 
   it('blocks PWA update when outbox is actively syncing', () => {
@@ -81,7 +81,7 @@ describe('registerOutboxUpdateBlocker', () => {
     const result = canApplyUpdate();
 
     expect(result.ok).toBe(false);
-    expect(result.reason).toBe('Finish your workout and sync first');
+    expect(result.reason).toBe('Sync pending changes first');
 
     localStorage.removeItem(`cybergym_outbox_pending_${userId}`);
   });

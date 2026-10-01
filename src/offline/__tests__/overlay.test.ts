@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { applyPendingToDaySets, pendingSetsBefore, applyPendingToHistory } from '../overlay';
+import {
+  applyPendingToDaySets,
+  pendingSetsBefore,
+  applyPendingToHistory,
+  applyPendingToNutritionLogs,
+} from '../overlay';
 import type { OutboxOp } from '../types';
 import type { WorkoutSet } from '../../types/database';
 import type { HistorySession } from '../../components/history/useWorkoutHistory';
@@ -504,6 +509,214 @@ describe('overlay', () => {
       const beforeSets = pendingSetsBefore('2026-03-29', ops);
       expect(beforeSets).toHaveLength(2);
       expect(beforeSets.map((s) => s.id)).toEqual(['b-set-1', 'b-set-2']);
+    });
+  });
+
+  describe('applyPendingToNutritionLogs (§N2, §N3)', () => {
+    const userId = 'user-nl-overlay';
+
+    it('deduplicates by id: pending op replaces server log with pending: true', () => {
+      const serverLogs = [
+        {
+          id: 'meal-1',
+          food_name: 'Old Meal Name',
+          calories: 300,
+          logged_at: '2026-10-01T08:00:00Z',
+          logged_date: '2026-10-01',
+        },
+      ];
+
+      const ops: OutboxOp[] = [
+        {
+          opId: 'op-1',
+          userId,
+          seq: 1,
+          createdAt: '2026-10-01T08:05:00Z',
+          kind: 'nutrition.log',
+          payload: {
+            id: 'meal-1', // same id -> dedupe
+            user_id: userId,
+            food_name: 'Updated Meal Name',
+            calories: 350,
+            logged_at: '2026-10-01T08:00:00Z',
+            logged_date: '2026-10-01',
+          },
+          state: 'pending',
+          attempts: 0,
+        },
+      ];
+
+      const result = applyPendingToNutritionLogs(serverLogs, ops, { date: '2026-10-01', userId });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('meal-1');
+      expect(result[0].food_name).toBe('Updated Meal Name');
+      expect(result[0].calories).toBe(350);
+      expect(result[0].pending).toBe(true);
+    });
+
+    it('appends new pending op when id is not in server logs', () => {
+      const serverLogs = [
+        {
+          id: 'meal-server-1',
+          food_name: 'Breakfast',
+          calories: 400,
+          logged_at: '2026-10-01T08:00:00Z',
+          logged_date: '2026-10-01',
+        },
+      ];
+
+      const ops: OutboxOp[] = [
+        {
+          opId: 'op-2',
+          userId,
+          seq: 1,
+          createdAt: '2026-10-01T12:00:00Z',
+          kind: 'nutrition.log',
+          payload: {
+            id: 'meal-local-1',
+            user_id: userId,
+            food_name: 'Lunch Salad',
+            calories: 500,
+            logged_at: '2026-10-01T12:00:00Z',
+            logged_date: '2026-10-01',
+          },
+          state: 'pending',
+          attempts: 0,
+        },
+      ];
+
+      const result = applyPendingToNutritionLogs(serverLogs, ops, { date: '2026-10-01', userId });
+
+      expect(result).toHaveLength(2);
+      expect(result[0].id).toBe('meal-local-1');
+      expect(result[0].pending).toBe(true);
+      expect(result[1].id).toBe('meal-server-1');
+      expect(result[1].pending).toBe(false);
+    });
+
+    it('filters pending ops by target date when options.date is provided', () => {
+      const ops: OutboxOp[] = [
+        {
+          opId: 'op-today',
+          userId,
+          seq: 1,
+          createdAt: '2026-10-01T12:00:00Z',
+          kind: 'nutrition.log',
+          payload: {
+            id: 'meal-today',
+            user_id: userId,
+            food_name: 'Today Lunch',
+            calories: 500,
+            logged_at: '2026-10-01T12:00:00Z',
+            logged_date: '2026-10-01',
+          },
+          state: 'pending',
+          attempts: 0,
+        },
+        {
+          opId: 'op-yesterday',
+          userId,
+          seq: 2,
+          createdAt: '2026-09-30T12:00:00Z',
+          kind: 'nutrition.log',
+          payload: {
+            id: 'meal-yesterday',
+            user_id: userId,
+            food_name: 'Yesterday Lunch',
+            calories: 600,
+            logged_at: '2026-09-30T12:00:00Z',
+            logged_date: '2026-09-30',
+          },
+          state: 'pending',
+          attempts: 0,
+        },
+      ];
+
+      type TestLog = { id: string; food_name?: string; calories?: number; logged_at?: string; logged_date?: string | null };
+      const emptyLogs: TestLog[] = [];
+
+      const todayResult = applyPendingToNutritionLogs(emptyLogs, ops, { date: '2026-10-01', userId });
+      expect(todayResult).toHaveLength(1);
+      expect(todayResult[0].id).toBe('meal-today');
+
+      const yesterdayResult = applyPendingToNutritionLogs(emptyLogs, ops, { date: '2026-09-30', userId });
+      expect(yesterdayResult).toHaveLength(1);
+      expect(yesterdayResult[0].id).toBe('meal-yesterday');
+    });
+
+    it('includes pending ops across multiple dates when options.date is omitted (history window)', () => {
+      const ops: OutboxOp[] = [
+        {
+          opId: 'op-1',
+          userId,
+          seq: 1,
+          createdAt: '2026-10-01T12:00:00Z',
+          kind: 'nutrition.log',
+          payload: {
+            id: 'meal-1',
+            user_id: userId,
+            food_name: 'Meal Oct 1',
+            calories: 500,
+            logged_at: '2026-10-01T12:00:00Z',
+            logged_date: '2026-10-01',
+          },
+          state: 'pending',
+          attempts: 0,
+        },
+        {
+          opId: 'op-2',
+          userId,
+          seq: 2,
+          createdAt: '2026-09-30T12:00:00Z',
+          kind: 'nutrition.log',
+          payload: {
+            id: 'meal-2',
+            user_id: userId,
+            food_name: 'Meal Sep 30',
+            calories: 600,
+            logged_at: '2026-09-30T12:00:00Z',
+            logged_date: '2026-09-30',
+          },
+          state: 'pending',
+          attempts: 0,
+        },
+      ];
+
+      type TestLog = { id: string; food_name?: string; calories?: number; logged_at?: string; logged_date?: string | null };
+      const emptyLogs: TestLog[] = [];
+
+      const historyResult = applyPendingToNutritionLogs(emptyLogs, ops, { userId });
+      expect(historyResult).toHaveLength(2);
+      expect(historyResult[0].id).toBe('meal-1');
+      expect(historyResult[1].id).toBe('meal-2');
+    });
+
+    it('ignores pending ops belonging to a different user', () => {
+      const ops: OutboxOp[] = [
+        {
+          opId: 'op-other',
+          userId: 'other-user',
+          seq: 1,
+          createdAt: '2026-10-01T12:00:00Z',
+          kind: 'nutrition.log',
+          payload: {
+            id: 'meal-other',
+            user_id: 'other-user',
+            food_name: 'Other User Meal',
+            calories: 700,
+            logged_at: '2026-10-01T12:00:00Z',
+            logged_date: '2026-10-01',
+          },
+          state: 'pending',
+          attempts: 0,
+        },
+      ];
+
+      type TestLog = { id: string; food_name?: string; calories?: number; logged_at?: string; logged_date?: string | null };
+      const emptyLogs: TestLog[] = [];
+      const result = applyPendingToNutritionLogs(emptyLogs, ops, { userId });
+      expect(result).toHaveLength(0);
     });
   });
 });

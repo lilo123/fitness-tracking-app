@@ -3,6 +3,7 @@ import {
   shouldDehydrateQuery,
   applyPageCaps,
   createIdbPersister,
+  getCivilDateInTz,
   PERSIST_BUSTER,
 } from '../persister';
 import { clearUserReadCache, initPersistForUser, stopPersisting } from '../persistController';
@@ -15,6 +16,13 @@ import type { PersistedClient } from '@tanstack/react-query-persist-client';
 describe('Cache Persister & Whitelist (§A3, §A9, §D)', () => {
   const userId = 'user-persist-1';
 
+  function createMockQuery(queryKey: unknown[], status: 'success' | 'error' | 'pending' = 'success'): Query {
+    return {
+      queryKey,
+      state: { status },
+    } as unknown as Query;
+  }
+
   beforeEach(async () => {
     await closeAllOfflineDbs();
     await deleteOfflineDb(userId);
@@ -26,12 +34,6 @@ describe('Cache Persister & Whitelist (§A3, §A9, §D)', () => {
   });
 
   describe('Whitelist Filter (shouldDehydrateQuery)', () => {
-    function createMockQuery(queryKey: unknown[], status: 'success' | 'error' | 'pending' = 'success'): Query {
-      return {
-        queryKey,
-        state: { status },
-      } as unknown as Query;
-    }
 
     it('allows exercises family with status success', () => {
       expect(shouldDehydrateQuery(createMockQuery(['exercises', 'workout']))).toBe(true);
@@ -67,9 +69,30 @@ describe('Cache Persister & Whitelist (§A3, §A9, §D)', () => {
       expect(shouldDehydrateQuery(createMockQuery(['exercise_stats', userId]))).toBe(true);
     });
 
-    it('EXPLICITLY excludes nutrition families (O2 scope)', () => {
-      expect(shouldDehydrateQuery(createMockQuery(['nutrition_logs', userId, '2026-09-30']))).toBe(false);
-      expect(shouldDehydrateQuery(createMockQuery(['custom_dishes', userId]))).toBe(false);
+    it('allows custom_dishes list and nutrition_logs history_window', () => {
+      expect(shouldDehydrateQuery(createMockQuery(['custom_dishes', userId]))).toBe(true);
+      expect(shouldDehydrateQuery(createMockQuery(['nutrition_logs', userId, 'history_window', 'America/New_York']))).toBe(true);
+      expect(shouldDehydrateQuery(createMockQuery(['nutrition_logs', userId, 'history_window']))).toBe(true);
+    });
+
+    it('key filter: today-7 kept, today-8 dropped; today+1 kept, today+2 dropped', () => {
+      const tz = 'America/New_York';
+      const todayStr = getCivilDateInTz(new Date(), tz);
+      const [year, month, day] = todayStr.split('-').map(Number);
+      const addCivilDays = (days: number): string => {
+        const dt = new Date(Date.UTC(year, month - 1, day + days));
+        return dt.toISOString().slice(0, 10);
+      };
+
+      const minus7 = addCivilDays(-7);
+      const minus8 = addCivilDays(-8);
+      const plus1 = addCivilDays(1);
+      const plus2 = addCivilDays(2);
+
+      expect(shouldDehydrateQuery(createMockQuery(['nutrition_logs', userId, minus7, tz]))).toBe(true);
+      expect(shouldDehydrateQuery(createMockQuery(['nutrition_logs', userId, minus8, tz]))).toBe(false);
+      expect(shouldDehydrateQuery(createMockQuery(['nutrition_logs', userId, plus1, tz]))).toBe(true);
+      expect(shouldDehydrateQuery(createMockQuery(['nutrition_logs', userId, plus2, tz]))).toBe(false);
     });
   });
 
@@ -132,6 +155,117 @@ describe('Cache Persister & Whitelist (§A3, §A9, §D)', () => {
       const queryData = capped.clientState.queries[0].state.data as any;
       expect(queryData.pages).toHaveLength(1);
       expect(queryData.pageParams).toHaveLength(1);
+    });
+
+    it('12 day keys in the window -> the 10 nearest kept incl. today', () => {
+      const tz = 'America/New_York';
+      const todayStr = getCivilDateInTz(new Date(), tz);
+      const [year, month, day] = todayStr.split('-').map(Number);
+      const addCivilDays = (days: number): string => {
+        const dt = new Date(Date.UTC(year, month - 1, day + days));
+        return dt.toISOString().slice(0, 10);
+      };
+
+      // 12 day keys: from today+1 down to today-10
+      const offsets = [1, 0, -1, -2, -3, -4, -5, -6, -7, -8, -9, -10];
+      const queries = offsets.map((offset) => ({
+        queryKey: ['nutrition_logs', userId, addCivilDays(offset), tz],
+        state: { data: [{ id: `log-offset-${offset}` }], status: 'success' },
+        queryHash: `nutrition-offset-${offset}`,
+      }));
+
+      const client: PersistedClient = {
+        timestamp: Date.now(),
+        buster: PERSIST_BUSTER,
+        clientState: {
+          queries: queries as any,
+          mutations: [],
+        },
+      };
+
+      const capped = applyPageCaps(client);
+      expect(capped.clientState.queries).toHaveLength(10);
+
+      const keptDates = capped.clientState.queries.map((q: any) => q.queryKey[2]);
+      // Always keep today's key
+      expect(keptDates).toContain(todayStr);
+
+      // The 10 nearest to today:
+      // |diff| = 0: today (0)
+      // |diff| = 1: today+1 (1), today-1 (-1)
+      // |diff| = 2: today-2 (-2)
+      // |diff| = 3: today-3 (-3)
+      // |diff| = 4: today-4 (-4)
+      // |diff| = 5: today-5 (-5)
+      // |diff| = 6: today-6 (-6)
+      // |diff| = 7: today-7 (-7)
+      // |diff| = 8: today-8 (-8)
+      // Dropped: today-9, today-10 (furthest from today)
+      const expectedKeptOffsets = [0, 1, -1, -2, -3, -4, -5, -6, -7, -8];
+      for (const off of expectedKeptOffsets) {
+        expect(keptDates).toContain(addCivilDays(off));
+      }
+      expect(keptDates).not.toContain(addCivilDays(-9));
+      expect(keptDates).not.toContain(addCivilDays(-10));
+    });
+
+    it('a session that dehydrates 10 old keys, then today\'s key -> today\'s key is persisted', () => {
+      const tz = 'America/New_York';
+      const todayStr = getCivilDateInTz(new Date(), tz);
+      const [year, month, day] = todayStr.split('-').map(Number);
+      const addCivilDays = (days: number): string => {
+        const dt = new Date(Date.UTC(year, month - 1, day + days));
+        return dt.toISOString().slice(0, 10);
+      };
+
+      // In a session, 10 old day queries are dehydrated first (today-1 to today-10)
+      const oldOffsets = [-1, -2, -3, -4, -5, -6, -7, -8, -9, -10];
+      const oldQueries = oldOffsets.map((off) =>
+        createMockQuery(['nutrition_logs', userId, addCivilDays(off), tz])
+      );
+
+      // Keys in range [today-7, today+1] pass shouldDehydrateQuery
+      for (const off of [-1, -2, -3, -4, -5, -6, -7]) {
+        const q = createMockQuery(['nutrition_logs', userId, addCivilDays(off), tz]);
+        expect(shouldDehydrateQuery(q)).toBe(true);
+      }
+
+      // Then today's query arrives
+      const todayQuery = createMockQuery(['nutrition_logs', userId, todayStr, tz]);
+      // shouldDehydrateQuery must NOT reject today even after checking 10 previous queries
+      expect(shouldDehydrateQuery(todayQuery)).toBe(true);
+
+      // When all are persisted via applyPageCaps (10 old keys + today's key = 11 keys)
+      const allQueries = [
+        ...oldQueries.map((q) => ({
+          queryKey: q.queryKey,
+          state: q.state,
+          queryHash: String(q.queryKey[2]),
+        })),
+        {
+          queryKey: todayQuery.queryKey,
+          state: todayQuery.state,
+          queryHash: todayStr,
+        },
+      ];
+
+      const client: PersistedClient = {
+        timestamp: Date.now(),
+        buster: PERSIST_BUSTER,
+        clientState: {
+          queries: allQueries as any,
+          mutations: [],
+        },
+      };
+
+      const capped = applyPageCaps(client);
+      expect(capped.clientState.queries).toHaveLength(10);
+
+      const keptDates = capped.clientState.queries.map((q: any) => q.queryKey[2]);
+      // Today's key MUST be kept
+      expect(keptDates).toContain(todayStr);
+      // The furthest key (today-10) should be dropped
+      expect(keptDates).not.toContain(addCivilDays(-10));
     });
   });
 

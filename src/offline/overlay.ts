@@ -1,6 +1,6 @@
 import type { WorkoutSet } from '../types/database';
 import type { HistorySession } from '../components/history/useWorkoutHistory';
-import type { OutboxOp } from './types';
+import type { OutboxOp, OutboxOpNutritionLog } from './types';
 
 /**
  * Pure function: applies pending outbox operations to today's server sets.
@@ -371,5 +371,74 @@ export function applyPendingToHistory(
     const dateA = a.workout_date || a.civil_date || a.date;
     const dateB = b.workout_date || b.civil_date || b.date;
     return dateB.localeCompare(dateA);
+  });
+}
+
+export interface OverlayNutritionLogsOptions {
+  date?: string;
+  userId?: string;
+}
+
+/**
+ * Pure function: applies pending nutrition.log outbox operations to nutrition logs.
+ * Dedupes by id (pending replaces server log) and marks overlaid entities with `pending: true`.
+ * If options.date is provided, filters pending ops to that civil date.
+ * If options.userId is provided, filters pending ops to that user.
+ */
+export function applyPendingToNutritionLogs<
+  T extends { id: string; logged_at?: string; logged_date?: string | null }
+>(
+  serverLogs: T[],
+  pendingOps: OutboxOp[],
+  options?: OverlayNutritionLogsOptions
+): (T & { pending?: boolean })[] {
+  const targetUserId = options?.userId;
+  const targetDate = options?.date;
+
+  const nutritionOps = pendingOps.filter(
+    (op): op is OutboxOpNutritionLog =>
+      op.kind === 'nutrition.log' &&
+      (!targetUserId || op.userId === targetUserId) &&
+      (!targetDate || op.payload.logged_date === targetDate)
+  );
+
+  if (nutritionOps.length === 0) {
+    return serverLogs.map((log) => ({ ...log, pending: false }));
+  }
+
+  // Index existing server logs with pending: false
+  const logMap = new Map<string, T & { pending?: boolean }>();
+  for (const log of serverLogs) {
+    logMap.set(log.id, { ...log, pending: false });
+  }
+
+  // Sort pending ops by seq ascending so later ops overwrite earlier
+  const sortedOps = [...nutritionOps].sort((a, b) => a.seq - b.seq);
+
+  for (const op of sortedOps) {
+    const payload = op.payload;
+    const existing = logMap.get(payload.id);
+    const syntheticLog: any = {
+      ...(existing || {}),
+      ...payload,
+      has_components: Array.isArray(payload.items) && payload.items.length >= 2,
+      created_at: op.createdAt,
+      pending: true,
+    };
+    logMap.set(payload.id, syntheticLog);
+  }
+
+  const result = Array.from(logMap.values());
+
+  // Sort descending by civil date / logged_at
+  return result.sort((a, b) => {
+    const dateA = a.logged_date || (a.logged_at ? a.logged_at.slice(0, 10) : '');
+    const dateB = b.logged_date || (b.logged_at ? b.logged_at.slice(0, 10) : '');
+    if (dateA !== dateB) {
+      return dateB.localeCompare(dateA);
+    }
+    const timeA = a.logged_at || '';
+    const timeB = b.logged_at || '';
+    return timeB.localeCompare(timeA);
   });
 }

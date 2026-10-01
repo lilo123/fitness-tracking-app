@@ -174,6 +174,50 @@ export async function executeReplayOp(
       return {};
     }
 
+    case 'nutrition.log': {
+      const { incrementDishId, ...row } = op.payload;
+
+      // Upsert with ignoreDuplicates on id, selecting 'id' to check insertion status
+      const { data, error } = await (client.from('nutrition_logs') as any)
+        .upsert(row, { onConflict: 'id', ignoreDuplicates: true })
+        .select('id');
+
+      if (error) throw error;
+
+      const insertedCount = Array.isArray(data) ? data.length : 0;
+      if (insertedCount === 0) {
+        // 0 rows = already applied = success
+        return { alreadyApplied: true, canonicalId: row.id };
+      }
+
+      // Increment custom_dishes.use_count ONLY if exactly 1 row returned
+      // use_count is a non-critical counter; if reading/updating fails, warn but do not fail the replay
+      if (insertedCount === 1 && incrementDishId) {
+        try {
+          const { data: dishData, error: dishErr } = await (client.from('custom_dishes') as any)
+            .select('use_count')
+            .eq('id', incrementDishId)
+            .maybeSingle();
+
+          if (dishErr) {
+            console.warn(`[replay] Failed to read custom_dishes use_count for dish ${incrementDishId}:`, dishErr);
+          } else if (dishData) {
+            const currentCount = typeof dishData.use_count === 'number' ? dishData.use_count : 0;
+            const { error: incErr } = await (client.from('custom_dishes') as any)
+              .update({ use_count: currentCount + 1 })
+              .eq('id', incrementDishId);
+            if (incErr) {
+              console.warn(`[replay] Failed to update custom_dishes use_count for dish ${incrementDishId}:`, incErr);
+            }
+          }
+        } catch (counterErr) {
+          console.warn(`[replay] Unexpected error updating custom_dishes use_count for dish ${incrementDishId}:`, counterErr);
+        }
+      }
+
+      return { canonicalId: row.id };
+    }
+
     default:
       throw new Error(`Unknown op kind: ${(op as any).kind}`);
   }

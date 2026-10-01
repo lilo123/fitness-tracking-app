@@ -51,6 +51,38 @@ describe('useOfflinePrefetch', () => {
       totalCount: 1,
     });
 
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'custom_dishes') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockReturnValue({
+                limit: vi.fn().mockResolvedValue({
+                  data: [
+                    {
+                      id: 'dish-1',
+                      user_id: mockUserId,
+                      name: 'Oatmeal',
+                      calories: 300,
+                      items: [{ name: 'Oats', calories: 300 }],
+                      ingredients: null,
+                    },
+                  ],
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnThis(),
+        or: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+      };
+    });
+
     (supabase.rpc as any).mockImplementation((fn: string) => {
       if (fn === 'get_routine_catalog') {
         return Promise.resolve({
@@ -113,6 +145,11 @@ describe('useOfflinePrefetch', () => {
     // Verify template detail cache
     const detail = queryClient.getQueryData(['routine_template_detail', 'tmpl-1']);
     expect(detail).toBeDefined();
+
+    // Verify custom dishes cache
+    const dishes = queryClient.getQueryData(['custom_dishes', mockUserId]);
+    expect(dishes).toBeDefined();
+    expect((dishes as any[])[0].name).toBe('Oatmeal');
 
     // Verify localStorage throttle set
     const key = `${PREFETCH_STORAGE_KEY_PREFIX}${mockUserId}`;

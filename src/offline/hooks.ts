@@ -7,7 +7,9 @@ import {
   hasCachedOpsForUser,
 } from './outbox';
 import { getActiveUserId } from './flusher';
-import type { OutboxOp, OutboxSummary } from './types';
+import { subscribeToAiQueue, listAiItems, getCachedAiQueue } from './aiQueue';
+import { applyPendingToNutritionLogs, type OverlayNutritionLogsOptions } from './overlay';
+import type { OutboxOp, OutboxSummary, AiQueueState } from './types';
 
 const EMPTY_OPS: OutboxOp[] = [];
 const DEFAULT_SUMMARY: OutboxSummary = {
@@ -78,4 +80,50 @@ export function useOutboxSummary(userId?: string): OutboxSummary {
     () => (target ? getCachedOutboxSummary(target) : DEFAULT_SUMMARY),
     () => DEFAULT_SUMMARY
   );
+}
+
+const DEFAULT_AI_QUEUE_STATE: AiQueueState = {
+  items: [],
+  counts: { queued: 0, analyzing: 0, ready: 0, failed: 0, total: 0 },
+  isAnalyzing: false,
+};
+
+/**
+ * Hook to track AI queue items and summary counts for a user.
+ */
+export function useAiQueue(userId?: string): AiQueueState {
+  const target = userId || getActiveUserId() || '';
+
+  useEffect(() => {
+    if (target) {
+      listAiItems(target).catch((e) => {
+        console.warn('[aiQueue] useAiQueue background fetch failed', e);
+      });
+    }
+  }, [target]);
+
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => subscribeToAiQueue(onStoreChange, target),
+    [target]
+  );
+
+  return useSyncExternalStore(
+    subscribe,
+    () => (target ? getCachedAiQueue(target) : DEFAULT_AI_QUEUE_STATE),
+    () => DEFAULT_AI_QUEUE_STATE
+  );
+}
+
+/**
+ * Hook to apply pending outbox operations to nutrition logs.
+ */
+export function useOverlaidNutritionLogs<
+  T extends { id: string; logged_at?: string; logged_date?: string | null }
+>(
+  serverLogs: T[],
+  options?: OverlayNutritionLogsOptions
+): (T & { pending?: boolean })[] {
+  const targetUserId = options?.userId || getActiveUserId() || undefined;
+  const pendingOps = usePendingOps(targetUserId);
+  return applyPendingToNutritionLogs(serverLogs, pendingOps, { ...options, userId: targetUserId });
 }

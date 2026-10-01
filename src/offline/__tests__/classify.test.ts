@@ -106,6 +106,13 @@ describe('Error Classification Matrix (§A4)', () => {
       });
       expect(res.kind).toBe('PERMANENT');
       expect(res.code).toBe('23514');
+
+      const nutritionRes = classifyError({
+        code: '23514',
+        message: 'new row for relation "nutrition_logs" violates check constraint "chk_nl_parent_equals_items_sum"',
+      });
+      expect(nutritionRes.kind).toBe('PERMANENT');
+      expect(nutritionRes.code).toBe('23514');
     });
 
     it('classifies Postgres 22P02 (invalid UUID or text representation) as PERMANENT', () => {

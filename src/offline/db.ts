@@ -1,7 +1,7 @@
 import { openDB, type IDBPDatabase, deleteDB } from 'idb';
 import type { OfflineDBSchema } from './types';
 
-const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 export function getOfflineDbName(userId: string): string {
   if (!userId) {
@@ -46,6 +46,11 @@ export async function getOfflineDb(userId: string): Promise<IDBPDatabase<Offline
       }
       if (!db.objectStoreNames.contains('meta')) {
         db.createObjectStore('meta');
+      }
+      if (!db.objectStoreNames.contains('aiq')) {
+        const aiqStore = db.createObjectStore('aiq', { keyPath: 'id' });
+        aiqStore.createIndex('status', 'status', { unique: false });
+        aiqStore.createIndex('capturedAt', 'capturedAt', { unique: false });
       }
     },
     blocked() {

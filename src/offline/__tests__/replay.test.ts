@@ -381,4 +381,244 @@ describe('Replay Executor & Idempotency (§A4, §D)', () => {
     await expect(executeReplayOp(op, mockClient)).resolves.not.toThrow();
     expect(mockUpsert).toHaveBeenCalledTimes(2);
   });
+
+  describe('nutrition.log Replay & Idempotency (§N1, §E2)', () => {
+    it('1st replay inserts row and increments custom_dishes.use_count when 1 row returned', async () => {
+      const mockSelect = vi.fn().mockResolvedValue({ data: [{ id: 'nl-uuid-1' }], error: null });
+      const mockUpsert = vi.fn().mockReturnValue({ select: mockSelect });
+
+      const mockDishSelect = vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          maybeSingle: vi.fn().mockResolvedValue({ data: { use_count: 5 }, error: null }),
+        }),
+      });
+
+      const mockDishUpdateEq = vi.fn().mockResolvedValue({ error: null });
+      const mockDishUpdate = vi.fn().mockReturnValue({
+        eq: mockDishUpdateEq,
+      });
+
+      const mockClient: any = {
+        from: vi.fn().mockImplementation((table: string) => {
+          if (table === 'nutrition_logs') {
+            return { upsert: mockUpsert };
+          }
+          if (table === 'custom_dishes') {
+            return {
+              select: mockDishSelect,
+              update: mockDishUpdate,
+            };
+          }
+          return {};
+        }),
+      };
+
+      const op: OutboxOp = {
+        opId: 'op-nl-1',
+        userId,
+        seq: 1,
+        kind: 'nutrition.log',
+        payload: {
+          id: 'nl-uuid-1',
+          user_id: userId,
+          food_name: 'Chicken Rice',
+          calories: 550,
+          protein: 45,
+          carbs: 60,
+          fat: 10,
+          fiber: 4,
+          meal_type: 'Lunch',
+          serving_size: 1,
+          serving_unit: 'serving',
+          logged_at: '2026-10-01T12:00:00+00:00',
+          logged_date: '2026-10-01',
+          items: null,
+          incrementDishId: 'dish-uuid-1',
+        },
+        createdAt: '2026-10-01T12:00:00Z',
+        attempts: 0,
+        state: 'pending',
+      };
+
+      const result = await executeReplayOp(op, mockClient);
+
+      expect(result.canonicalId).toBe('nl-uuid-1');
+      expect(result.alreadyApplied).toBeUndefined();
+
+      // Verify nutrition_logs upsert
+      expect(mockUpsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'nl-uuid-1',
+          user_id: userId,
+          food_name: 'Chicken Rice',
+          calories: 550,
+        }),
+        { onConflict: 'id', ignoreDuplicates: true }
+      );
+      expect(mockSelect).toHaveBeenCalledWith('id');
+
+      // Verify custom_dishes use_count increment
+      expect(mockDishSelect).toHaveBeenCalledWith('use_count');
+      expect(mockDishUpdate).toHaveBeenCalledWith({ use_count: 6 });
+      expect(mockDishUpdateEq).toHaveBeenCalledWith('id', 'dish-uuid-1');
+    });
+
+    it('2nd replay (0 rows returned = already applied) succeeds and does NOT increment use_count', async () => {
+      // PostgREST returns empty array on ON CONFLICT DO NOTHING when selecting 'id'
+      const mockSelect = vi.fn().mockResolvedValue({ data: [], error: null });
+      const mockUpsert = vi.fn().mockReturnValue({ select: mockSelect });
+
+      const mockDishSelect = vi.fn();
+      const mockDishUpdate = vi.fn();
+
+      const mockClient: any = {
+        from: vi.fn().mockImplementation((table: string) => {
+          if (table === 'nutrition_logs') {
+            return { upsert: mockUpsert };
+          }
+          if (table === 'custom_dishes') {
+            return {
+              select: mockDishSelect,
+              update: mockDishUpdate,
+            };
+          }
+          return {};
+        }),
+      };
+
+      const op: OutboxOp = {
+        opId: 'op-nl-2',
+        userId,
+        seq: 2,
+        kind: 'nutrition.log',
+        payload: {
+          id: 'nl-uuid-1',
+          user_id: userId,
+          food_name: 'Chicken Rice',
+          calories: 550,
+          protein: 45,
+          carbs: 60,
+          fat: 10,
+          fiber: 4,
+          meal_type: 'Lunch',
+          serving_size: 1,
+          serving_unit: 'serving',
+          logged_at: '2026-10-01T12:00:00+00:00',
+          logged_date: '2026-10-01',
+          items: null,
+          incrementDishId: 'dish-uuid-1',
+        },
+        createdAt: '2026-10-01T12:00:00Z',
+        attempts: 1,
+        state: 'pending',
+      };
+
+      const result = await executeReplayOp(op, mockClient);
+
+      expect(result.alreadyApplied).toBe(true);
+      expect(result.canonicalId).toBe('nl-uuid-1');
+
+      // custom_dishes must NOT be queried or updated on 2nd replay
+      expect(mockDishSelect).not.toHaveBeenCalled();
+      expect(mockDishUpdate).not.toHaveBeenCalled();
+    });
+
+    it('throws errors from nutrition_logs upsert so classify can catch them', async () => {
+      const mockClient: any = {
+        from: vi.fn().mockReturnValue({
+          upsert: vi.fn().mockReturnValue({
+            select: vi.fn().mockResolvedValue({
+              data: null,
+              error: { code: '23514', message: 'chk_nl_parent_equals_items_sum' },
+            }),
+          }),
+        }),
+      };
+
+      const op: OutboxOp = {
+        opId: 'op-nl-err',
+        userId,
+        seq: 3,
+        kind: 'nutrition.log',
+        payload: {
+          id: 'nl-err-1',
+          user_id: userId,
+          food_name: 'Invalid Meal',
+          calories: 999,
+          logged_at: '2026-10-01T12:00:00Z',
+          logged_date: '2026-10-01',
+        },
+        createdAt: '2026-10-01T12:00:00Z',
+        attempts: 0,
+        state: 'pending',
+      };
+
+      await expect(executeReplayOp(op, mockClient)).rejects.toMatchObject({
+        code: '23514',
+      });
+    });
+
+    it('nutrition.log: insert ok + use_count update error -> op succeeds, warn called, no throw', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const mockSelect = vi.fn().mockResolvedValue({ data: [{ id: 'nl-uuid-warn' }], error: null });
+      const mockUpsert = vi.fn().mockReturnValue({ select: mockSelect });
+
+      const mockDishUpdateEq = vi.fn().mockResolvedValue({
+        data: null,
+        error: new Error('Simulated custom_dishes update failure'),
+      });
+      const mockDishUpdate = vi.fn().mockReturnValue({ eq: mockDishUpdateEq });
+      const mockDishSelectEq = vi.fn().mockReturnValue({
+        maybeSingle: vi.fn().mockResolvedValue({ data: { use_count: 3 }, error: null }),
+      });
+      const mockDishSelect = vi.fn().mockReturnValue({ eq: mockDishSelectEq });
+
+      const mockClient: any = {
+        from: vi.fn().mockImplementation((table: string) => {
+          if (table === 'nutrition_logs') {
+            return { upsert: mockUpsert };
+          }
+          if (table === 'custom_dishes') {
+            return {
+              select: mockDishSelect,
+              update: mockDishUpdate,
+            };
+          }
+          return {};
+        }),
+      };
+
+      const op: OutboxOp = {
+        opId: 'op-nl-warn',
+        userId,
+        seq: 4,
+        kind: 'nutrition.log',
+        payload: {
+          id: 'nl-uuid-warn',
+          user_id: userId,
+          food_name: 'Protein Shake',
+          calories: 250,
+          logged_at: '2026-10-01T12:00:00Z',
+          logged_date: '2026-10-01',
+          incrementDishId: 'dish-uuid-fail',
+        },
+        createdAt: '2026-10-01T12:00:00Z',
+        attempts: 0,
+        state: 'pending',
+      };
+
+      // Must NOT throw
+      const result = await executeReplayOp(op, mockClient);
+      expect(result.canonicalId).toBe('nl-uuid-warn');
+
+      // Must have called console.warn with context
+      expect(warnSpy).toHaveBeenCalled();
+      const warnCall = warnSpy.mock.calls[0];
+      expect(warnCall[0]).toContain('[replay]');
+      expect(warnCall[0]).toContain('dish-uuid-fail');
+
+      warnSpy.mockRestore();
+    });
+  });
 });

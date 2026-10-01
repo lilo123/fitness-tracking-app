@@ -15,7 +15,28 @@ export const WHITELIST_ROOTS = [
   'exercise_benchmarks',
   'exercise_stats',
   'users',
+  'custom_dishes',
+  'nutrition_logs',
 ] as const;
+
+export function getCivilDateInTz(date: Date = new Date(), timeZone?: string): string {
+  if (timeZone) {
+    try {
+      return new Intl.DateTimeFormat('en-CA', { timeZone }).format(date);
+    } catch {
+      // fallback if invalid timezone
+    }
+  }
+  return date.toISOString().slice(0, 10);
+}
+
+export function getCivilDayDifference(targetDateStr: string, baseDateStr: string): number {
+  const [tY, tM, tD] = targetDateStr.split('-').map(Number);
+  const [bY, bM, bD] = baseDateStr.split('-').map(Number);
+  const targetUtc = Date.UTC(tY, tM - 1, tD);
+  const baseUtc = Date.UTC(bY, bM - 1, bD);
+  return Math.round((targetUtc - baseUtc) / (24 * 60 * 60 * 1000));
+}
 
 /**
  * Filter function determining if a query should be persisted to IndexedDB.
@@ -43,8 +64,26 @@ export function shouldDehydrateQuery(query: Query): boolean {
 
   const root = String(key[0]);
 
-  // Explicitly reject nutrition
-  if (root === 'nutrition_logs' || root === 'custom_dishes') {
+  if (root === 'custom_dishes') {
+    return key.length >= 2;
+  }
+
+  if (root === 'nutrition_logs') {
+    // History window: ['nutrition_logs', uid, 'history_window', tz?]
+    if (key[2] === 'history_window') {
+      return true;
+    }
+
+    // Day key: ['nutrition_logs', uid, date, tz?]
+    const dateStr = key[2];
+    if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      const tz = typeof key[3] === 'string' ? key[3] : undefined;
+      const todayInTz = getCivilDateInTz(new Date(), tz);
+      const diff = getCivilDayDifference(dateStr, todayInTz);
+      // Whitelist date in [today-7, today+1]
+      return diff >= -7 && diff <= 1;
+    }
+
     return false;
   }
 
@@ -87,7 +126,7 @@ export function shouldDehydrateQuery(query: Query): boolean {
     return true;
   }
 
-  if (root === 'users' || root === 'athlete_profile') {
+  if (root === 'users') {
     return true;
   }
 
@@ -98,6 +137,7 @@ export function shouldDehydrateQuery(query: Query): boolean {
  * Applies page caps to dehydrated infinite queries before writing to IndexedDB:
  * - history_v2: at most 3 pages
  * - exercise_history: at most 1 page
+ * - nutrition_logs day keys: at most 10 queries closest to today
  */
 export function applyPageCaps(persistedClient: PersistedClient): PersistedClient {
   const cloned = structuredClone(persistedClient);
@@ -123,6 +163,55 @@ export function applyPageCaps(persistedClient: PersistedClient): PersistedClient
         }
       }
     }
+  }
+
+  // Cap nutrition_logs day keys to at most 10 queries closest to today
+  interface NutritionDayQueryInfo {
+    index: number;
+    diff: number;
+    absDiff: number;
+    isToday: boolean;
+  }
+
+  const nutritionDayList: NutritionDayQueryInfo[] = [];
+  queries.forEach((q, idx) => {
+    const key = q.queryKey;
+    if (key?.[0] === 'nutrition_logs' && key?.[2] !== 'history_window') {
+      const dateStr = key?.[2];
+      if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        const tz = typeof key?.[3] === 'string' ? key[3] : undefined;
+        const todayInTz = getCivilDateInTz(new Date(), tz);
+        const diff = getCivilDayDifference(dateStr, todayInTz);
+        nutritionDayList.push({
+          index: idx,
+          diff,
+          absDiff: Math.abs(diff),
+          isToday: diff === 0,
+        });
+      }
+    }
+  });
+
+  if (nutritionDayList.length > 10) {
+    // Sort criteria:
+    // 1. Always keep today's key (isToday first)
+    // 2. Closest to today (|diff| ascending)
+    // 3. Ties prefer newer date (diff descending: newer date has larger diff)
+    nutritionDayList.sort((a, b) => {
+      if (a.isToday !== b.isToday) {
+        return a.isToday ? -1 : 1;
+      }
+      if (a.absDiff !== b.absDiff) {
+        return a.absDiff - b.absDiff;
+      }
+      if (a.diff !== b.diff) {
+        return b.diff - a.diff;
+      }
+      return a.index - b.index;
+    });
+
+    const droppedIndices = new Set(nutritionDayList.slice(10).map((item) => item.index));
+    cloned.clientState.queries = queries.filter((_, idx) => !droppedIndices.has(idx));
   }
 
   return cloned;
