@@ -3,59 +3,116 @@ import type { OutboxOp, OpKind, OpPayloadMap, OutboxSummary } from './types';
 import { compactIncomingOp } from './compaction';
 
 // Subscription listeners for outbox state updates
-const subscribers = new Set<() => void>();
+const globalSubscribers = new Set<() => void>();
+const userSubscribers = new Map<string, Set<() => void>>();
 
 const BROADCAST_CHANNEL_NAME = 'cybergym_outbox_channel';
 let outboxBroadcastChannel: BroadcastChannel | null = null;
+let storageEventListener: ((event: StorageEvent) => void) | null = null;
 
-if (typeof BroadcastChannel !== 'undefined') {
-  try {
-    outboxBroadcastChannel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
-    outboxBroadcastChannel.onmessage = (event) => {
-      if (event.data?.type === 'outbox_changed' && event.data.userId) {
-        getOutboxOps(event.data.userId).catch((e) => {
-          console.warn('[outbox] Failed to refresh outbox ops after channel broadcast', e);
-        });
+interface InFlightRead {
+  promise: Promise<OutboxOp[]>;
+  gen: number;
+}
+
+const inFlightGetOps = new Map<string, InFlightRead>();
+const userMutationGen = new Map<string, number>();
+
+function bumpMutationGen(userId: string): number {
+  const next = (userMutationGen.get(userId) || 0) + 1;
+  userMutationGen.set(userId, next);
+  return next;
+}
+const pendingRefreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function scheduleOutboxRefresh(userId: string): void {
+  if (!userId) return;
+  if (pendingRefreshTimers.has(userId)) return;
+  const timer = setTimeout(() => {
+    pendingRefreshTimers.delete(userId);
+    getOutboxOps(userId).catch((e) => {
+      console.warn('[outbox] Failed to refresh outbox ops after channel broadcast', e);
+    });
+  }, 10);
+  pendingRefreshTimers.set(userId, timer);
+}
+
+function ensureListeners(): void {
+  if (!outboxBroadcastChannel && typeof BroadcastChannel !== 'undefined') {
+    try {
+      outboxBroadcastChannel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
+      outboxBroadcastChannel.onmessage = (event) => {
+        if (event.data?.type === 'outbox_changed' && event.data.userId) {
+          scheduleOutboxRefresh(event.data.userId);
+        }
+      };
+    } catch (e) {
+      console.warn('[outbox] BroadcastChannel setup failed:', e);
+    }
+  }
+
+  if (!storageEventListener && typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    storageEventListener = (event: StorageEvent) => {
+      if (event.key?.startsWith('cybergym_outbox_pending_')) {
+        const uId = event.key.slice('cybergym_outbox_pending_'.length);
+        if (uId) {
+          scheduleOutboxRefresh(uId);
+        }
       }
     };
-  } catch (e) {
-    console.warn('[outbox] BroadcastChannel setup failed:', e);
+    window.addEventListener('storage', storageEventListener);
   }
 }
 
-if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-  window.addEventListener('storage', (event) => {
-    if (event.key?.startsWith('cybergym_outbox_pending_')) {
-      const uId = event.key.slice('cybergym_outbox_pending_'.length);
-      if (uId) {
-        getOutboxOps(uId).catch((e) => {
-          console.warn('[outbox] Failed to refresh outbox ops on storage event', e);
-        });
-      }
+export function subscribeToOutbox(callback: () => void, userId?: string): () => void {
+  ensureListeners();
+  if (userId) {
+    let set = userSubscribers.get(userId);
+    if (!set) {
+      set = new Set();
+      userSubscribers.set(userId, set);
     }
-  });
-}
+    set.add(callback);
+    return () => {
+      set?.delete(callback);
+      if (set && set.size === 0) {
+        userSubscribers.delete(userId);
+      }
+    };
+  }
 
-export function subscribeToOutbox(callback: () => void): () => void {
-  subscribers.add(callback);
+  globalSubscribers.add(callback);
   return () => {
-    subscribers.delete(callback);
+    globalSubscribers.delete(callback);
   };
 }
 
 export function notifyOutboxChanged(userId?: string): void {
-  for (const sub of subscribers) {
+  ensureListeners();
+  for (const sub of globalSubscribers) {
     try {
       sub();
     } catch (e) {
       console.error('[outbox] subscriber error:', e);
     }
   }
-  if (userId && outboxBroadcastChannel) {
-    try {
-      outboxBroadcastChannel.postMessage({ type: 'outbox_changed', userId });
-    } catch (e) {
-      console.warn('[outbox] Failed to broadcast outbox update', e);
+  if (userId) {
+    const userSubs = userSubscribers.get(userId);
+    if (userSubs) {
+      for (const sub of userSubs) {
+        try {
+          sub();
+        } catch (e) {
+          console.error('[outbox] user subscriber error:', e);
+        }
+      }
+    }
+    if (outboxBroadcastChannel) {
+      try {
+        outboxBroadcastChannel.postMessage({ type: 'outbox_changed', userId });
+      } catch (e) {
+        console.warn('[outbox] Failed to broadcast outbox update', e);
+      }
     }
   }
 }
@@ -98,17 +155,47 @@ function runWithEnqueueMutex<T>(userId: string, fn: () => Promise<T>): Promise<T
 }
 
 export function resetOutboxForTesting(): void {
-  subscribers.clear();
+  globalSubscribers.clear();
+  userSubscribers.clear();
   userOpsCache.clear();
   userSummaryCache.clear();
   enqueueMutexes.clear();
+  inFlightGetOps.clear();
+  userMutationGen.clear();
+  for (const timer of pendingRefreshTimers.values()) {
+    clearTimeout(timer);
+  }
+  pendingRefreshTimers.clear();
+
+  if (outboxBroadcastChannel) {
+    try {
+      outboxBroadcastChannel.close();
+    } catch {
+      // ignore
+    }
+    outboxBroadcastChannel = null;
+  }
+
+  if (storageEventListener && typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+    try {
+      window.removeEventListener('storage', storageEventListener);
+    } catch {
+      // ignore
+    }
+    storageEventListener = null;
+  }
+
   if (typeof localStorage !== 'undefined') {
     try {
+      const keysToRemove: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
         if (k && k.startsWith('cybergym_outbox_pending_')) {
-          localStorage.removeItem(k);
+          keysToRemove.push(k);
         }
+      }
+      for (const k of keysToRemove) {
+        localStorage.removeItem(k);
       }
     } catch (e) {
       console.warn('[outbox] Failed to clear pending localStorage in resetOutboxForTesting', e);
@@ -119,21 +206,29 @@ export function resetOutboxForTesting(): void {
   globalLastSyncedCount = 0;
 }
 
-export function getCachedOpsForUser(userId: string): OutboxOp[] {
-  if (!userId) return [];
-  return userOpsCache.get(userId) || [];
+export function hasCachedOpsForUser(userId: string): boolean {
+  return Boolean(userId && userOpsCache.has(userId));
 }
+
+const EMPTY_OPS: OutboxOp[] = [];
+
+export function getCachedOpsForUser(userId: string): OutboxOp[] {
+  if (!userId) return EMPTY_OPS;
+  return userOpsCache.get(userId) || EMPTY_OPS;
+}
+
+const DEFAULT_EMPTY_SUMMARY: OutboxSummary = {
+  pending: 0,
+  attention: 0,
+  syncing: false,
+  authRequired: false,
+  lastSyncedCount: 0,
+  needsAttentionOps: [],
+};
 
 export function getCachedOutboxSummary(userId: string): OutboxSummary {
   if (!userId) {
-    return {
-      pending: 0,
-      attention: 0,
-      syncing: isSyncingGlobally,
-      authRequired: isAuthRequiredGlobally,
-      lastSyncedCount: globalLastSyncedCount,
-      needsAttentionOps: [],
-    };
+    return DEFAULT_EMPTY_SUMMARY;
   }
   const cached = userSummaryCache.get(userId);
   let pending = cached?.pending ?? 0;
@@ -152,15 +247,27 @@ export function getCachedOutboxSummary(userId: string): OutboxSummary {
   }
 
   if (cached) {
-    return {
+    if (
+      cached.pending === pending &&
+      cached.attention === attention &&
+      cached.syncing === isSyncingGlobally &&
+      cached.authRequired === isAuthRequiredGlobally &&
+      cached.lastSyncedCount === globalLastSyncedCount
+    ) {
+      return cached;
+    }
+    const updated: OutboxSummary = {
       ...cached,
       pending,
       syncing: isSyncingGlobally,
       authRequired: isAuthRequiredGlobally,
       lastSyncedCount: globalLastSyncedCount,
     };
+    userSummaryCache.set(userId, updated);
+    return updated;
   }
-  return {
+
+  const newSummary: OutboxSummary = {
     pending,
     attention,
     syncing: isSyncingGlobally,
@@ -168,6 +275,8 @@ export function getCachedOutboxSummary(userId: string): OutboxSummary {
     lastSyncedCount: globalLastSyncedCount,
     needsAttentionOps: [],
   };
+  userSummaryCache.set(userId, newSummary);
+  return newSummary;
 }
 
 export function updateUserCache(userId: string, ops: OutboxOp[]): OutboxSummary {
@@ -286,6 +395,7 @@ export async function enqueue<K extends OpKind>(input: {
         await outboxStore.put(compaction.compactedOp);
       }
       await tx.done;
+      bumpMutationGen(userId);
       updateUserCache(userId, compaction.ops);
       notifyOutboxChanged(userId);
       return compaction.compactedOp || incomingOp;
@@ -300,6 +410,7 @@ export async function enqueue<K extends OpKind>(input: {
         }
       }
       await tx.done;
+      bumpMutationGen(userId);
       updateUserCache(userId, compaction.ops);
       notifyOutboxChanged(userId);
       return incomingOp;
@@ -316,6 +427,7 @@ export async function enqueue<K extends OpKind>(input: {
       await outboxStore.put(incomingOp);
       await metaStore.put(nextSeq, 'last_seq');
       await tx.done;
+      bumpMutationGen(userId);
       updateUserCache(userId, compaction.ops);
       notifyOutboxChanged(userId);
       return incomingOp;
@@ -324,26 +436,65 @@ export async function enqueue<K extends OpKind>(input: {
   });
 }
 
-export async function getOutboxOps(userId: string): Promise<OutboxOp[]> {
+async function readOpsFromDb(userId: string): Promise<OutboxOp[]> {
   const db = await getOfflineDb(userId);
   const allOps = await db.getAll('outbox');
-  const sorted = allOps
+  return allOps
     .filter((op) => op.userId === userId)
     .sort((a, b) => a.seq - b.seq);
+}
 
-  const current = userOpsCache.get(userId);
-  const isDifferent =
-    !current ||
-    current.length !== sorted.length ||
-    current.some((op, i) => op.opId !== sorted[i]?.opId || op.state !== sorted[i]?.state);
-
-  updateUserCache(userId, sorted);
-
-  if (isDifferent) {
-    notifyOutboxChanged(userId);
+export async function getOutboxOps(userId: string): Promise<OutboxOp[]> {
+  if (!userId) return EMPTY_OPS;
+  const currentGen = userMutationGen.get(userId) || 0;
+  const existing = inFlightGetOps.get(userId);
+  if (existing && existing.gen === currentGen) {
+    return existing.promise;
   }
 
-  return sorted;
+  let promise!: Promise<OutboxOp[]>;
+  promise = (async () => {
+    try {
+      let attempts = 0;
+      let lastSorted: OutboxOp[] = EMPTY_OPS;
+      while (attempts < 3) {
+        attempts++;
+        const startGen = userMutationGen.get(userId) || 0;
+        const sorted = await readOpsFromDb(userId);
+        lastSorted = sorted;
+
+        const endGen = userMutationGen.get(userId) || 0;
+        if (endGen !== startGen) {
+          // Mutation occurred during read: do not overwrite cache with stale result
+          continue;
+        }
+
+        const current = userOpsCache.get(userId);
+        const isDifferent =
+          current === undefined
+            ? sorted.length > 0
+            : current.length !== sorted.length ||
+              current.some((op, i) => op.opId !== sorted[i]?.opId || op.state !== sorted[i]?.state);
+
+        updateUserCache(userId, sorted);
+
+        if (isDifferent) {
+          notifyOutboxChanged(userId);
+        }
+
+        return sorted;
+      }
+
+      return lastSorted;
+    } finally {
+      if (inFlightGetOps.get(userId)?.promise === promise) {
+        inFlightGetOps.delete(userId);
+      }
+    }
+  })();
+
+  inFlightGetOps.set(userId, { promise, gen: currentGen });
+  return promise;
 }
 
 export async function getOutboxSummary(userId: string): Promise<OutboxSummary> {
@@ -354,6 +505,7 @@ export async function getOutboxSummary(userId: string): Promise<OutboxSummary> {
 export async function updateOp(userId: string, op: OutboxOp): Promise<void> {
   const db = await getOfflineDb(userId);
   await db.put('outbox', op);
+  bumpMutationGen(userId);
   const current = userOpsCache.get(userId);
   if (current) {
     const idx = current.findIndex((o) => o.opId === op.opId);
@@ -375,6 +527,7 @@ export async function updateOp(userId: string, op: OutboxOp): Promise<void> {
 export async function deleteOp(userId: string, opId: string): Promise<void> {
   const db = await getOfflineDb(userId);
   await db.delete('outbox', opId);
+  bumpMutationGen(userId);
   const current = userOpsCache.get(userId);
   if (current) {
     updateUserCache(userId, current.filter((op) => op.opId !== opId));
@@ -451,6 +604,7 @@ export async function blockDependentOps(userId: string, failedOp: OutboxOp): Pro
   }
 
   await tx.done;
+  bumpMutationGen(userId);
   updateUserCache(userId, allOps);
   notifyOutboxChanged(userId);
 }
@@ -487,6 +641,7 @@ export async function retryOp(opId: string, userId: string): Promise<void> {
   }
 
   await tx.done;
+  bumpMutationGen(userId);
   updateUserCache(userId, allOps.filter((o) => o.userId === userId));
   notifyOutboxChanged(userId);
 }
@@ -519,6 +674,7 @@ export async function discardOp(opId: string, userId: string): Promise<void> {
   }
 
   await tx.done;
+  bumpMutationGen(userId);
   updateUserCache(userId, allOps.filter((o) => o.userId === userId));
   notifyOutboxChanged(userId);
 }

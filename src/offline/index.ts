@@ -56,6 +56,7 @@ export {
   getLastSyncedCount,
   getCachedOutboxSummary,
   getCachedOpsForUser,
+  hasCachedOpsForUser,
 } from './outbox';
 
 // Flusher & Concurrency

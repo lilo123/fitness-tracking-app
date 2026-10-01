@@ -9,10 +9,12 @@ import {
   updateOp,
   deleteOp,
   subscribeToOutbox,
+  notifyOutboxChanged,
   getCachedOpsForUser,
   getCachedOutboxSummary,
   resetOutboxForTesting,
 } from '../outbox';
+import * as dbModule from '../db';
 import { closeAllOfflineDbs, deleteOfflineDb } from '../db';
 
 describe('Outbox Storage, Ordering & Dependent Blocking (§A4, §D)', () => {
@@ -559,5 +561,163 @@ describe('Outbox Storage, Ordering & Dependent Blocking (§A4, §D)', () => {
     expect(updated).toBeDefined();
     expect(updated?.state).toBe('attention');
     expect(updated?.blockedBy).toBe(batchOp.opId);
+  });
+
+  it('13. N concurrent getOutboxOps calls result in <= 1 IndexedDB read (in-flight coalescing)', async () => {
+    resetOutboxForTesting();
+    const getOfflineDbSpy = vi.spyOn(dbModule, 'getOfflineDb');
+
+    // 5 concurrent calls for the same user
+    const results = await Promise.all([
+      getOutboxOps(userA),
+      getOutboxOps(userA),
+      getOutboxOps(userA),
+      getOutboxOps(userA),
+      getOutboxOps(userA),
+    ]);
+
+    expect(results).toHaveLength(5);
+    expect(results[0]).toEqual(results[1]);
+    // Exactly 1 IDB connection / fetch was initiated
+    expect(getOfflineDbSpy).toHaveBeenCalledTimes(1);
+
+    getOfflineDbSpy.mockRestore();
+  });
+
+  it('14. user-scoped subscriber does not re-run per unrelated notify', () => {
+    resetOutboxForTesting();
+    const subA = vi.fn();
+    const subB = vi.fn();
+    const unsubA = subscribeToOutbox(subA, userA);
+    const unsubB = subscribeToOutbox(subB, userB);
+
+    // Notify userA only
+    notifyOutboxChanged(userA);
+    expect(subA).toHaveBeenCalledTimes(1);
+    expect(subB).not.toHaveBeenCalled();
+
+    // Notify userB only
+    notifyOutboxChanged(userB);
+    expect(subA).toHaveBeenCalledTimes(1);
+    expect(subB).toHaveBeenCalledTimes(1);
+
+    unsubA();
+    unsubB();
+  });
+
+  it('15. resetOutboxForTesting cleanly tears down BroadcastChannel and storage listener', () => {
+    const subscriber = vi.fn();
+    subscribeToOutbox(subscriber, userA);
+
+    resetOutboxForTesting();
+
+    // After reset, notifying shouldn't trigger old subscribers
+    notifyOutboxChanged(userA);
+    expect(subscriber).not.toHaveBeenCalled();
+  });
+
+  it('16. in-flight getOutboxOps does not overwrite cache/returned list if enqueue occurs concurrently', async () => {
+    resetOutboxForTesting();
+    const realDb = await dbModule.getOfflineDb(userA);
+
+    let releaseRead: () => void = () => {};
+    const readGate = new Promise<void>((resolve) => {
+      releaseRead = resolve;
+    });
+
+    const originalGetAll = realDb.getAll;
+    let intercepted = false;
+    (realDb as any).getAll = async function (storeName: any, ...args: any[]) {
+      const result = await originalGetAll.call(realDb, storeName, ...args);
+      if (storeName === 'outbox' && !intercepted) {
+        intercepted = true;
+        // Wait for enqueue to complete before returning the read result
+        await readGate;
+      }
+      return result;
+    };
+
+    try {
+      // 1. Start getOutboxOps before enqueue
+      const p1 = getOutboxOps(userA);
+
+      // 2. Enqueue an operation before p1 resolves
+      const newOp = await enqueue({
+        userId: userA,
+        kind: 'workout.ensure',
+        payload: { clientWorkoutId: 'w-concurrent-1', name: 'Concurrent Test', workout_date: '2026-03-30' },
+      });
+
+      // 3. Release the readGate so p1 can finish
+      releaseRead();
+
+      // 4. Await p1, and start a new getOutboxOps call (p2)
+      const p2 = getOutboxOps(userA);
+      const [res1, res2] = await Promise.all([p1, p2]);
+
+      // Both p1 and p2 must include the new op
+      expect(res1.some((o) => o.opId === newOp.opId)).toBe(true);
+      expect(res2.some((o) => o.opId === newOp.opId)).toBe(true);
+
+      // Cache must include the new op
+      const cachedOps = getCachedOpsForUser(userA);
+      expect(cachedOps.some((o) => o.opId === newOp.opId)).toBe(true);
+
+      // Outbox summary pending must be correct (1)
+      const summary = getCachedOutboxSummary(userA);
+      expect(summary.pending).toBe(1);
+    } finally {
+      delete (realDb as any).getAll;
+    }
+  });
+
+  it('17. deleteOp during in-flight getOutboxOps does not resurrect the deleted op in cache', async () => {
+    resetOutboxForTesting();
+    const realDb = await dbModule.getOfflineDb(userA);
+
+    // Pre-populate an op
+    const op = await enqueue({
+      userId: userA,
+      kind: 'workout.ensure',
+      payload: { clientWorkoutId: 'w-delete-race', name: 'Delete Race Test', workout_date: '2026-03-30' },
+    });
+    expect(getCachedOpsForUser(userA)).toHaveLength(1);
+
+    let releaseRead: () => void = () => {};
+    const readGate = new Promise<void>((resolve) => {
+      releaseRead = resolve;
+    });
+
+    const originalGetAll = realDb.getAll;
+    let intercepted = false;
+    (realDb as any).getAll = async function (storeName: any, ...args: any[]) {
+      const result = await originalGetAll.call(realDb, storeName, ...args);
+      if (storeName === 'outbox' && !intercepted) {
+        intercepted = true;
+        // Wait for deleteOp to complete before returning the read result containing the deleted op
+        await readGate;
+      }
+      return result;
+    };
+
+    try {
+      // 1. Start getOutboxOps while op is in DB
+      const p1 = getOutboxOps(userA);
+
+      // 2. Delete the op before p1 resolves
+      await deleteOp(userA, op.opId);
+
+      // 3. Release the read gate
+      releaseRead();
+
+      const res1 = await p1;
+
+      // The deleted op must NOT be returned or resurrected in cache
+      expect(res1.some((o) => o.opId === op.opId)).toBe(false);
+      expect(getCachedOpsForUser(userA).some((o) => o.opId === op.opId)).toBe(false);
+      expect(getCachedOutboxSummary(userA).pending).toBe(0);
+    } finally {
+      delete (realDb as any).getAll;
+    }
   });
 });

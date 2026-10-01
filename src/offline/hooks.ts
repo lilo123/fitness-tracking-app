@@ -1,9 +1,10 @@
-import { useSyncExternalStore, useEffect } from 'react';
+import { useSyncExternalStore, useEffect, useCallback, useRef } from 'react';
 import {
   subscribeToOutbox,
   getOutboxOps,
   getCachedOpsForUser,
   getCachedOutboxSummary,
+  hasCachedOpsForUser,
 } from './outbox';
 import { getActiveUserId } from './flusher';
 import type { OutboxOp, OutboxSummary } from './types';
@@ -23,19 +24,32 @@ const DEFAULT_SUMMARY: OutboxSummary = {
  */
 export function usePendingOps(userId?: string): OutboxOp[] {
   const target = userId || getActiveUserId() || '';
+  const lastEmptyRef = useRef<OutboxOp[]>(EMPTY_OPS);
 
-  // Trigger initial IDB fetch in background to populate memory cache
+  // Trigger initial IDB fetch in background if not already in memory cache
   useEffect(() => {
-    if (target) {
+    if (target && !hasCachedOpsForUser(target)) {
       getOutboxOps(target).catch((e) => {
         console.warn('[outbox] usePendingOps background prewarm failed', e);
       });
     }
   }, [target]);
 
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => subscribeToOutbox(onStoreChange, target),
+    [target]
+  );
+
   return useSyncExternalStore(
-    subscribeToOutbox,
-    () => (target ? getCachedOpsForUser(target) : EMPTY_OPS),
+    subscribe,
+    () => {
+      if (!target) return EMPTY_OPS;
+      const ops = getCachedOpsForUser(target);
+      if (!ops || ops.length === 0) {
+        return lastEmptyRef.current;
+      }
+      return ops;
+    },
     () => EMPTY_OPS
   );
 }
@@ -47,15 +61,20 @@ export function useOutboxSummary(userId?: string): OutboxSummary {
   const target = userId || getActiveUserId() || '';
 
   useEffect(() => {
-    if (target) {
+    if (target && !hasCachedOpsForUser(target)) {
       getOutboxOps(target).catch((e) => {
         console.warn('[outbox] useOutboxSummary background prewarm failed', e);
       });
     }
   }, [target]);
 
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => subscribeToOutbox(onStoreChange, target),
+    [target]
+  );
+
   return useSyncExternalStore(
-    subscribeToOutbox,
+    subscribe,
     () => (target ? getCachedOutboxSummary(target) : DEFAULT_SUMMARY),
     () => DEFAULT_SUMMARY
   );

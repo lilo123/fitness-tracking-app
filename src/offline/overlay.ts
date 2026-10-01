@@ -214,6 +214,10 @@ export function applyPendingToHistory(
   sessions: HistorySession[],
   ops: OutboxOp[]
 ): (HistorySession & { pending?: boolean })[] {
+  if (!ops || ops.length === 0) {
+    return sessions;
+  }
+
   const result: (HistorySession & { pending?: boolean })[] = sessions.map((s) => ({
     ...s,
     pending: false,
