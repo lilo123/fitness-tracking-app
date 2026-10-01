@@ -1,4 +1,116 @@
+import { execSync } from 'child_process';
 import { test, expect } from '@playwright/test';
+
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'http://127.0.0.1:58821';
+const SUPABASE_ANON_KEY =
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+
+const DB_URL =
+  process.env.DATABASE_URL ||
+  'postgresql://postgres:postgres@127.0.0.1:58822/postgres';
+
+function getPsqlCommand(): string {
+  if (process.env.DATABASE_URL) {
+    let parsed: URL;
+    try {
+      parsed = new URL(process.env.DATABASE_URL);
+    } catch {
+      return `psql "${process.env.DATABASE_URL}" -v ON_ERROR_STOP=1`;
+    }
+    if (
+      (parsed.port && parsed.port !== '58822') ||
+      (parsed.hostname && parsed.hostname !== '127.0.0.1' && parsed.hostname !== 'localhost')
+    ) {
+      return `psql -h "${parsed.hostname}" -p "${parsed.port || '5432'}" -U "${parsed.username || 'postgres'}" -d "${parsed.pathname.slice(1) || 'postgres'}" -v ON_ERROR_STOP=1`;
+    }
+  }
+  return `psql "${DB_URL}" -v ON_ERROR_STOP=1`;
+}
+
+interface ViewportTestUser {
+  id: string;
+  email: string;
+  password: string;
+}
+
+async function createViewportTestUser(): Promise<ViewportTestUser> {
+  const email = `mobile-viewport-${Date.now()}-${Math.floor(Math.random() * 1000000)}@cybergym.io`;
+  const password = 'Password123!';
+
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to signup viewport test user: ${res.status} ${await res.text()}`);
+  }
+
+  const signupJson = await res.json();
+  const userId = signupJson.user?.id;
+  if (!userId) {
+    throw new Error('Signup did not return user id');
+  }
+
+  // Seed user profile with weight_unit = 'lb' and pinned 7-day routine so date/routine never depends on weekday
+  const seedSql = `
+    INSERT INTO public.users (id, email, username, role, weight_unit, pr_mode)
+    VALUES ('${userId}', '${email}', 'Viewport Tester', 'athlete', 'lb', 'weight')
+    ON CONFLICT (id) DO UPDATE SET username = 'Viewport Tester', role = 'athlete', weight_unit = 'lb', pr_mode = 'weight';
+
+    DO $$
+    DECLARE
+      v_eid uuid;
+      v_rid uuid := gen_random_uuid();
+      v_reid uuid := gen_random_uuid();
+    BEGIN
+      SELECT id INTO v_eid FROM public.exercises WHERE is_master = true ORDER BY name LIMIT 1;
+      INSERT INTO public.routine_templates (id, user_id, name, is_master, days_of_week)
+      VALUES (v_rid, '${userId}', 'Viewport Pinned Routine', false, '{"Mon","Tue","Wed","Thu","Fri","Sat","Sun"}');
+      INSERT INTO public.template_exercises (id, template_id, exercise_id, order_index, target_sets, target_reps)
+      VALUES (v_reid, v_rid, v_eid, 1, 3, 10);
+    END $$;
+  `;
+  const cmd = getPsqlCommand();
+  execSync(cmd, { input: seedSql, encoding: 'utf8' });
+
+  return { id: userId, email, password };
+}
+
+function cleanupViewportTestUser(user?: ViewportTestUser): void {
+  if (!user || (!user.id && !user.email)) return;
+  const whereClauses: string[] = [];
+  if (user.email) whereClauses.push(`email = '${user.email}'`);
+  if (user.id) whereClauses.push(`id = '${user.id}'`);
+
+  const idSubquery = `SELECT id FROM auth.users WHERE ${whereClauses.join(' OR ')}`;
+
+  const cleanupSql = `
+    DELETE FROM public.template_exercises WHERE template_id IN (
+      SELECT id FROM public.routine_templates WHERE user_id IN (${idSubquery})
+    );
+    DELETE FROM public.routine_templates WHERE user_id IN (${idSubquery});
+    DELETE FROM public.sets WHERE workout_id IN (
+      SELECT id FROM public.workouts WHERE user_id IN (${idSubquery})
+    );
+    DELETE FROM public.workouts WHERE user_id IN (${idSubquery});
+    DELETE FROM public.users WHERE id IN (${idSubquery});
+    DELETE FROM auth.users WHERE ${whereClauses.join(' OR ')};
+  `;
+
+  try {
+    const cmd = getPsqlCommand();
+    execSync(cmd, { input: cleanupSql, encoding: 'utf8' });
+  } catch (err) {
+    console.error('[mobile-viewport] Cleanup error (rethrown):', err);
+    throw err;
+  }
+}
 
 test.describe('Mobile Viewport & Ergonomics', () => {
   test('has correct viewport meta tag with viewport-fit=cover and no user-scalable=no', async ({ page }) => {
@@ -150,51 +262,59 @@ test.describe('Mobile Viewport & Ergonomics', () => {
   });
 
   test("prevents horizontal scroll overflow on Settings with WeightUnitCard and /workout in kg mode", async ({ page }) => {
-    await page.goto("/login");
-    await page.fill('input[type="email"]', "athlete@cybergym.io");
-    await page.fill('input[type="password"]', "password123");
-    await page.click('button[type="submit"]');
-    await page.waitForURL("**/workout");
-    await expect(page.locator('[data-testid="workout-date-input"]')).toBeVisible();
-
-    // 1. Navigate to /settings and verify WeightUnitCard has no horizontal overflow
-    await page.goto("/settings");
-    await page.waitForURL("**/settings");
-    const card = page.locator('fieldset[aria-label="Weight unit"]').locator('xpath=ancestor::div[contains(@class, "rounded-3xl")][1]');
-    await expect(card).toBeVisible();
-
-    const isCardOverflowing = await card.evaluate((el) => el.scrollWidth > el.clientWidth);
-    expect(isCardOverflowing, "WeightUnitCard has no horizontal overflow").toBe(false);
-
-    // Switch to kg
-    const lbBtn = page.locator('[data-testid="weight-unit-lb"]');
-    const kgBtn = page.locator('[data-testid="weight-unit-kg"]');
-    await expect(lbBtn).toBeVisible();
-    await expect(kgBtn).toBeVisible();
-    await expect(lbBtn).toHaveAttribute("aria-pressed", "true");
-    await expect(kgBtn).toHaveAttribute("aria-pressed", "false");
-
-    await kgBtn.click();
-    await expect(kgBtn).toHaveAttribute("aria-pressed", "true");
-
+    let user: ViewportTestUser | undefined;
     try {
-      // 2. Navigate to /workout in kg mode and verify no horizontal overflow
-      await page.goto("/workout");
+      user = await createViewportTestUser();
+      await page.goto("/login");
+      await page.fill('input[type="email"]', user.email);
+      await page.fill('input[type="password"]', user.password);
+      await page.click('button[type="submit"]');
       await page.waitForURL("**/workout");
       await expect(page.locator('[data-testid="workout-date-input"]')).toBeVisible();
 
-      const isOverflowingWorkoutKg = await page.evaluate(() => {
-        return document.documentElement.scrollWidth > window.innerWidth;
-      });
-      expect(isOverflowingWorkoutKg, "No horizontal overflow on /workout in kg mode").toBe(false);
-    } finally {
-      // Revert athlete back to lb
+      // 1. Navigate to /settings and verify WeightUnitCard has no horizontal overflow
       await page.goto("/settings");
       await page.waitForURL("**/settings");
+      const card = page.locator('fieldset[aria-label="Weight unit"]').locator('xpath=ancestor::div[contains(@class, "rounded-3xl")][1]');
+      await expect(card).toBeVisible();
+
+      const isCardOverflowing = await card.evaluate((el) => el.scrollWidth > el.clientWidth);
+      expect(isCardOverflowing, "WeightUnitCard has no horizontal overflow").toBe(false);
+
+      // Switch to kg
       const lbBtn = page.locator('[data-testid="weight-unit-lb"]');
+      const kgBtn = page.locator('[data-testid="weight-unit-kg"]');
       await expect(lbBtn).toBeVisible();
-      await lbBtn.click();
+      await expect(kgBtn).toBeVisible();
       await expect(lbBtn).toHaveAttribute("aria-pressed", "true");
+      await expect(kgBtn).toHaveAttribute("aria-pressed", "false");
+
+      await kgBtn.click();
+      await expect(kgBtn).toHaveAttribute("aria-pressed", "true");
+
+      try {
+        // 2. Navigate to /workout in kg mode and verify no horizontal overflow
+        await page.goto("/workout");
+        await page.waitForURL("**/workout");
+        await expect(page.locator('[data-testid="workout-date-input"]')).toBeVisible();
+
+        const isOverflowingWorkoutKg = await page.evaluate(() => {
+          return document.documentElement.scrollWidth > window.innerWidth;
+        });
+        expect(isOverflowingWorkoutKg, "No horizontal overflow on /workout in kg mode").toBe(false);
+      } finally {
+        // Revert athlete back to lb
+        await page.goto("/settings");
+        await page.waitForURL("**/settings");
+        const lbBtn = page.locator('[data-testid="weight-unit-lb"]');
+        await expect(lbBtn).toBeVisible();
+        await lbBtn.click();
+        await expect(lbBtn).toHaveAttribute("aria-pressed", "true");
+      }
+    } finally {
+      if (user) {
+        cleanupViewportTestUser(user);
+      }
     }
   });
 

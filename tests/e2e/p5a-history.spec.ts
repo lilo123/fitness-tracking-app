@@ -1,9 +1,6 @@
 import { execSync } from 'child_process';
 import { test, expect, type Page } from '@playwright/test';
 
-const P5A_USER_EMAIL = 'p5a-history-e2e@cybergym.io';
-const P5A_USER_PASSWORD = 'password123';
-
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'http://127.0.0.1:58821';
 const SUPABASE_ANON_KEY =
   process.env.VITE_SUPABASE_ANON_KEY ||
@@ -31,9 +28,29 @@ function getPsqlCommand(): string {
   return `psql "${DB_URL}" -v ON_ERROR_STOP=1`;
 }
 
-function cleanupP5aUser() {
+interface P5aTestUser {
+  id: string;
+  email: string;
+  password: string;
+}
+
+let p5aUser: P5aTestUser;
+
+function cleanupP5aUser(user?: P5aTestUser) {
+  if (!user || (!user.id && !user.email)) return;
+  const whereClauses: string[] = [];
+  if (user.email) whereClauses.push(`email = '${user.email}'`);
+  if (user.id) whereClauses.push(`id = '${user.id}'`);
+
+  const idSubquery = `SELECT id FROM auth.users WHERE ${whereClauses.join(' OR ')}`;
+
   const sql = `
-    DELETE FROM auth.users WHERE email = '${P5A_USER_EMAIL}';
+    DELETE FROM public.sets WHERE workout_id IN (
+      SELECT id FROM public.workouts WHERE user_id IN (${idSubquery})
+    );
+    DELETE FROM public.workouts WHERE user_id IN (${idSubquery});
+    DELETE FROM public.users WHERE id IN (${idSubquery});
+    DELETE FROM auth.users WHERE ${whereClauses.join(' OR ')};
   `;
   try {
     const cmd = getPsqlCommand();
@@ -44,8 +61,9 @@ function cleanupP5aUser() {
   }
 }
 
-async function seedP5aUserAndSessions() {
-  cleanupP5aUser();
+async function seedP5aUserAndSessions(): Promise<P5aTestUser> {
+  const email = `p5a-history-${Date.now()}-${Math.floor(Math.random() * 1000000)}@cybergym.io`;
+  const password = 'Password123!';
 
   const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
     method: 'POST',
@@ -53,10 +71,7 @@ async function seedP5aUserAndSessions() {
       'Content-Type': 'application/json',
       apikey: SUPABASE_ANON_KEY,
     },
-    body: JSON.stringify({
-      email: P5A_USER_EMAIL,
-      password: P5A_USER_PASSWORD,
-    }),
+    body: JSON.stringify({ email, password }),
   });
   if (!res.ok) {
     throw new Error(`Failed to signup test user: ${res.status} ${await res.text()}`);
@@ -67,8 +82,13 @@ async function seedP5aUserAndSessions() {
     throw new Error('Signup did not return a user id');
   }
 
-  // Seed 35 sessions dated 40..74 days ago (all older than 30d, all within 90d/all)
+  // Ensure user profile with weight_unit = 'lb' and pr_mode = 'weight'
+  // and seed 35 sessions dated 40..74 days ago (all older than 30d, all within 90d/all)
   const sql = `
+    INSERT INTO public.users (id, email, username, role, weight_unit, pr_mode)
+    VALUES ('${userId}', '${email}', 'P5a Athlete', 'athlete', 'lb', 'weight')
+    ON CONFLICT (id) DO UPDATE SET username = 'P5a Athlete', role = 'athlete', weight_unit = 'lb', pr_mode = 'weight';
+
     DO $$
     DECLARE
       v_uid uuid := '${userId}';
@@ -90,12 +110,14 @@ async function seedP5aUserAndSessions() {
   `;
   const cmd = getPsqlCommand();
   execSync(cmd, { input: sql, encoding: 'utf8' });
+
+  return { id: userId, email, password };
 }
 
 async function loginAsP5aAthlete(page: Page) {
   await page.goto('/login');
-  await page.fill('input[type="email"]', P5A_USER_EMAIL);
-  await page.fill('input[type="password"]', P5A_USER_PASSWORD);
+  await page.fill('input[type="email"]', p5aUser.email);
+  await page.fill('input[type="password"]', p5aUser.password);
   await page.click('button[type="submit"]');
   await page.waitForURL('**/workout', { timeout: 15000 });
   await expect(page.locator('[data-testid="workout-date-input"]')).toBeVisible({ timeout: 15000 });
@@ -108,11 +130,13 @@ test.describe('P5a History Suite (p5a-history)', () => {
   test.describe.configure({ mode: 'serial' });
 
   test.beforeAll(async () => {
-    await seedP5aUserAndSessions();
+    p5aUser = await seedP5aUserAndSessions();
   });
 
   test.afterAll(async () => {
-    cleanupP5aUser();
+    if (p5aUser) {
+      cleanupP5aUser(p5aUser);
+    }
   });
 
   // (a) Range chips:
