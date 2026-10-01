@@ -778,6 +778,34 @@ test('manual form stages meal, adds item with updated totals, and logs to timeli
       });
     });
 
+    const evalRes = await page.evaluate(async () => {
+      const openReq = indexedDB.open('cybergym-offline-a0000000-0000-0000-0000-000000000002');
+      return new Promise<string>((resolve) => {
+        openReq.onsuccess = () => {
+          const db = openReq.result;
+          if (db.objectStoreNames.contains('rq')) {
+            const tx = db.transaction(['rq'], 'readwrite');
+            tx.objectStore('rq').clear();
+            tx.oncomplete = () => {
+              db.close();
+              resolve('rq-cleared');
+            };
+            tx.onerror = () => {
+              db.close();
+              resolve('tx-error: ' + String(tx.error));
+            };
+          } else {
+            db.close();
+            resolve('no-rq-store');
+          }
+        };
+        openReq.onerror = () => resolve('open-error: ' + String(openReq.error));
+        openReq.onblocked = () => resolve('open-blocked');
+      });
+    });
+    // O2 persists ['custom_dishes', uid] in the per-user rq store; clear it so the route mock above is what loads.
+    expect(evalRes).toMatch(/^(rq-cleared|no-rq-store)$/);
+
     await safeGoto(page, '/nutrition');
     await page.waitForSelector("text=Today's Nutrition");
 
@@ -887,6 +915,34 @@ test('manual form stages meal, adds item with updated totals, and logs to timeli
         body: JSON.stringify({}),
       });
     });
+
+    const evalRes = await page.evaluate(async () => {
+      const openReq = indexedDB.open('cybergym-offline-a0000000-0000-0000-0000-000000000002');
+      return new Promise<string>((resolve) => {
+        openReq.onsuccess = () => {
+          const db = openReq.result;
+          if (db.objectStoreNames.contains('rq')) {
+            const tx = db.transaction(['rq'], 'readwrite');
+            tx.objectStore('rq').clear();
+            tx.oncomplete = () => {
+              db.close();
+              resolve('rq-cleared');
+            };
+            tx.onerror = () => {
+              db.close();
+              resolve('tx-error: ' + String(tx.error));
+            };
+          } else {
+            db.close();
+            resolve('no-rq-store');
+          }
+        };
+        openReq.onerror = () => resolve('open-error: ' + String(openReq.error));
+        openReq.onblocked = () => resolve('open-blocked');
+      });
+    });
+    // O2 persists ['custom_dishes', uid] in the per-user rq store; clear it so the route mock above is what loads.
+    expect(evalRes).toMatch(/^(rq-cleared|no-rq-store)$/);
 
     await safeGoto(page, '/nutrition');
     await page.waitForSelector("text=Today's Nutrition");

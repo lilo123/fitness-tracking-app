@@ -148,6 +148,8 @@ export function cleanupPwaTestUser(user: { id?: string; email?: string }): void 
       SELECT id FROM public.routine_templates WHERE user_id IN (${idSubquery})
     );
     DELETE FROM public.routine_templates WHERE user_id IN (${idSubquery});
+    DELETE FROM public.nutrition_logs WHERE user_id IN (${idSubquery});
+    DELETE FROM public.custom_dishes WHERE user_id IN (${idSubquery});
     DELETE FROM public.sets WHERE workout_id IN (
       SELECT id FROM public.workouts WHERE user_id IN (${idSubquery})
     );
@@ -285,8 +287,13 @@ export async function waitForOfflineDataReady(
 /**
  * Emulates offline network state on browser context.
  */
-export async function goOffline(context: BrowserContext): Promise<void> {
+export async function goOffline(context: BrowserContext, page?: Page): Promise<void> {
   await context.setOffline(true);
+  if (page) {
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event('offline'));
+    }).catch(() => {});
+  }
 }
 
 /**
@@ -429,5 +436,74 @@ export function getUserSets(
      JOIN public.workouts w ON s.workout_id = w.id
      ${where}
      ORDER BY s.set_index ASC`
+  );
+}
+
+/**
+ * Seeds a custom dish in public.custom_dishes for the user.
+ */
+export function seedCustomDish(
+  user: PwaTestUser,
+  name: string,
+  calories: number,
+  protein: number,
+  carbs: number,
+  fat: number,
+  fiber = 0
+): string {
+  const safeName = name.replace(/'/g, "''");
+  const sql = `
+    INSERT INTO public.custom_dishes (id, user_id, name, calories, protein, carbs, fat, fiber, use_count, kind)
+    VALUES (gen_random_uuid(), '${user.id}', '${safeName}', ${calories}, ${protein}, ${carbs}, ${fat}, ${fiber}, 0, 'food')
+    RETURNING id;
+  `;
+  const raw = execPsql(sql);
+  return raw.split('\n')[0].trim();
+}
+
+/**
+ * Returns a custom dish record by id.
+ */
+export function getCustomDish(
+  dishId: string
+): { id: string; name: string; calories: number; use_count: number } | null {
+  const rows = queryRows<{ id: string; name: string; calories: number; use_count: number }>(
+    `SELECT id, name, calories, use_count FROM public.custom_dishes WHERE id = '${dishId}' LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+/**
+ * Returns nutrition log records for a user.
+ */
+export function getUserNutritionLogs(
+  userId: string,
+  date?: string
+): {
+  id: string;
+  user_id: string;
+  food_name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber: number;
+  logged_at: string;
+  logged_date: string;
+  meal_type: string;
+  serving_size: number;
+  serving_unit: string;
+  items: unknown;
+}[] {
+  let where = `WHERE user_id = '${userId}'`;
+  if (date) {
+    where += ` AND logged_date = '${date}'`;
+  }
+  return queryRows(
+    `SELECT id, user_id, food_name, calories, protein, carbs, fat, fiber,
+            logged_at::text, logged_date::text, meal_type, serving_size, serving_unit, items
+     FROM public.nutrition_logs
+     ${where}
+     ORDER BY logged_at ASC`
   );
 }
