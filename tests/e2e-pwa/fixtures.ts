@@ -287,12 +287,20 @@ export async function waitForOfflineDataReady(
 /**
  * Emulates offline network state on browser context.
  */
-export async function goOffline(context: BrowserContext, page?: Page): Promise<void> {
+export async function goOffline(context: BrowserContext, _page?: Page): Promise<void> {
   await context.setOffline(true);
-  if (page) {
+}
+
+/**
+ * goOffline plus a synthetic window 'offline' event so the app reacts at once. Call it only after the page
+ * has settled: dispatching it mid-navigation aborts in-flight catalog fetches (account-switch flake, O2 gate #1).
+ */
+export async function goOfflineAndNotify(context: BrowserContext, page: Page): Promise<void> {
+  await context.setOffline(true);
+  if (!page.isClosed()) {
     await page.evaluate(() => {
       window.dispatchEvent(new Event('offline'));
-    }).catch(() => {});
+    });
   }
 }
 

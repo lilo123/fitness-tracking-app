@@ -5,6 +5,7 @@ import {
   signInUser,
   waitForSwControl,
   goOffline,
+  goOfflineAndNotify,
   goOnline,
   seedCustomDish,
   getCustomDish,
@@ -53,7 +54,7 @@ test.describe('PWA Nutrition Offline Acceptance Specs (O2)', () => {
     await expect(page.locator('text=No meals logged for this date yet.')).toBeVisible({ timeout: 15000 });
 
     // 2. Go offline
-    await goOffline(context, page);
+    await goOfflineAndNotify(context, page);
     const connectionStatus = page.locator('[data-testid="connection-status"]');
     await expect(connectionStatus).toHaveText(/^Offline/);
 
@@ -255,7 +256,7 @@ test.describe('PWA Nutrition Offline Acceptance Specs (O2)', () => {
     await expect(stagedCard).not.toBeVisible();
 
     // 2. Mixed input offline
-    await goOffline(context, page);
+    await goOfflineAndNotify(context, page);
 
     const mixedOfflineText = 'Whey shake with 30g protein and a banana';
     await page.locator('textarea').fill(mixedOfflineText);
@@ -296,7 +297,7 @@ test.describe('PWA Nutrition Offline Acceptance Specs (O2)', () => {
       await expect(page.locator('text=No meals logged for this date yet.')).toBeVisible({ timeout: 15000 });
 
       // 1. Go offline
-      await goOffline(context, page);
+      await goOfflineAndNotify(context, page);
 
       // Queue text item offline
       await page.locator('textarea').fill('Tokyo Ramen with chashu and soft egg');
@@ -581,7 +582,7 @@ test.describe('PWA Nutrition Offline Acceptance Specs (O2)', () => {
     await page.waitForLoadState('networkidle');
 
     // 2. Go offline
-    await goOffline(context, page);
+    await goOfflineAndNotify(context, page);
 
     // 3. Quick-log dish offline with 1 tap
     await quickLogBtn.click();
@@ -644,7 +645,7 @@ test.describe('PWA Nutrition Offline Acceptance Specs (O2)', () => {
     await page.waitForLoadState('networkidle');
 
     // Go offline
-    await goOffline(context, page);
+    await goOfflineAndNotify(context, page);
 
     // Track network requests
     let mutatingRequestCount = 0;
@@ -710,7 +711,7 @@ test.describe('PWA Nutrition Offline Acceptance Specs (O2)', () => {
       await expect(page.locator('text=No meals logged for this date yet.')).toBeVisible({ timeout: 15000 });
 
       // User A goes offline
-      await goOffline(context, page);
+      await goOfflineAndNotify(context, page);
 
       // User A logs a meal offline
       await page.locator('textarea').fill('User A Secret Offline Steak\nServing: 250 g\nCalories: 450\nProtein: 55 g\nCarbs: 0 g\nFat: 24 g');
