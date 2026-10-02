@@ -22,7 +22,7 @@ INSERT INTO auth.users (
   'a0000000-0000-0000-0000-000000000001',
   'authenticated',
   'authenticated',
-  'coach@cybergym.io',
+  'coach@yourbody.fyi',
   crypt('password123', gen_salt('bf')),
   now(),
   now(),
@@ -40,7 +40,7 @@ INSERT INTO auth.users (
   'a0000000-0000-0000-0000-000000000002',
   'authenticated',
   'authenticated',
-  'athlete@cybergym.io',
+  'athlete@yourbody.fyi',
   crypt('password123', gen_salt('bf')),
   now(),
   now(),
@@ -58,7 +58,7 @@ INSERT INTO auth.users (
 -- Seed Demo Coach metadata and link to Demo Athlete
 UPDATE public.users
 SET is_coach_mode = true,
-    coach_code = 'CYBER-DEMO01',
+    coach_code = 'YB-DEMO01',
     coach_tier = 'free',
     max_athletes = 3
 WHERE id = 'a0000000-0000-0000-0000-000000000001';
@@ -119,7 +119,7 @@ BEGIN
       VALUES (
         v_tpl_id,
         v_coach_id,
-        format('Cybergym Master Hypertrophy Routine #%s', lpad(i::text, 3, '0')),
+        format('Yourbody Master Hypertrophy Routine #%s', lpad(i::text, 3, '0')),
         true,
         v_athlete_id,
         now() - (i || ' minutes')::interval
@@ -157,7 +157,7 @@ INSERT INTO auth.users (
   'a0000000-0000-0000-0000-000000000009',
   'authenticated',
   'authenticated',
-  'paginate@cybergym.io',
+  'paginate@yourbody.fyi',
   crypt('password123', gen_salt('bf')),
   now(),
   now(),
@@ -184,7 +184,7 @@ INSERT INTO auth.identities (
 ) VALUES (
   'a0000000-0000-0000-0000-000000000009',
   'a0000000-0000-0000-0000-000000000009',
-  '{"sub":"a0000000-0000-0000-0000-000000000009","email":"paginate@cybergym.io"}'::jsonb,
+  '{"sub":"a0000000-0000-0000-0000-000000000009","email":"paginate@yourbody.fyi"}'::jsonb,
   'email',
   'a0000000-0000-0000-0000-000000000009',
   now(),
@@ -195,12 +195,12 @@ INSERT INTO auth.identities (
 INSERT INTO public.users (id, email, username, role)
 VALUES (
   'a0000000-0000-0000-0000-000000000009',
-  'paginate@cybergym.io',
+  'paginate@yourbody.fyi',
   'Paginate Athlete',
   'athlete'
 ) ON CONFLICT (id) DO NOTHING;
 
--- Seed exactly 151 workouts for paginate@cybergym.io with at least one set each
+-- Seed exactly 151 workouts for paginate@yourbody.fyi with at least one set each
 DO $$
 DECLARE
   v_paginate_id uuid := 'a0000000-0000-0000-0000-000000000009';
@@ -246,7 +246,7 @@ END $$;
 
 
 -- Payload Stress Benchmark Seed (wired from scripts/seed-payload-stress.sql for RFIX-08 / R-2)
--- User: bench-athlete@cybergym.io (05497a83-49a9-4802-aa84-0a81a2a53bf0)
+-- User: bench-athlete@yourbody.fyi (05497a83-49a9-4802-aa84-0a81a2a53bf0)
 
 INSERT INTO auth.users (
   instance_id,
@@ -271,7 +271,7 @@ INSERT INTO auth.users (
   '05497a83-49a9-4802-aa84-0a81a2a53bf0',
   'authenticated',
   'authenticated',
-  'bench-athlete@cybergym.io',
+  'bench-athlete@yourbody.fyi',
   crypt('password123', gen_salt('bf')),
   now(),
   now(),
@@ -298,7 +298,7 @@ INSERT INTO auth.identities (
 ) VALUES (
   '05497a83-49a9-4802-aa84-0a81a2a53bf0',
   '05497a83-49a9-4802-aa84-0a81a2a53bf0',
-  '{"sub":"05497a83-49a9-4802-aa84-0a81a2a53bf0","email":"bench-athlete@cybergym.io"}'::jsonb,
+  '{"sub":"05497a83-49a9-4802-aa84-0a81a2a53bf0","email":"bench-athlete@yourbody.fyi"}'::jsonb,
   'email',
   '05497a83-49a9-4802-aa84-0a81a2a53bf0',
   now(),
@@ -309,7 +309,7 @@ INSERT INTO auth.identities (
 INSERT INTO public.users (id, email, username, role)
 VALUES (
   '05497a83-49a9-4802-aa84-0a81a2a53bf0',
-  'bench-athlete@cybergym.io',
+  'bench-athlete@yourbody.fyi',
   'Bench Athlete',
   'athlete'
 ) ON CONFLICT (id) DO NOTHING;

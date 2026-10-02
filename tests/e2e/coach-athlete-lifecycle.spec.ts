@@ -9,7 +9,7 @@ test.describe('Coach-Athlete Code Linking & Lifecycle E2E', () => {
 
     // 1. Athlete logs in
     await page.goto('/login');
-    await page.fill('input[type="email"]', 'athlete@cybergym.io');
+    await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/workout');
@@ -32,9 +32,9 @@ test.describe('Coach-Athlete Code Linking & Lifecycle E2E', () => {
       await expect(codeInput).toBeVisible();
     }
 
-    // 4. Link to Demo Coach using code CYBER-DEMO01
+    // 4. Link to Demo Coach using code YB-DEMO01
     await expect(codeInput).toBeVisible();
-    await codeInput.fill('CYBER-DEMO01');
+    await codeInput.fill('YB-DEMO01');
 
     const linkBtn = page.locator('[data-testid="link-coach-btn"]');
     await expect(linkBtn).toBeEnabled();
@@ -43,7 +43,7 @@ test.describe('Coach-Athlete Code Linking & Lifecycle E2E', () => {
     // Verify link confirmation & assigned coach display
     await expect(page.locator('[data-testid="link-coach-status"]')).toContainText('Successfully linked to coach!');
     await expect(disconnectBtn).toBeVisible();
-    await expect(page.locator('text=CYBER-DEMO01')).toBeVisible();
+    await expect(page.locator('text=YB-DEMO01')).toBeVisible();
 
     // 5. Athlete signs out
     const signOutBtn = page.locator('button[title="Sign Out"]');
@@ -51,7 +51,7 @@ test.describe('Coach-Athlete Code Linking & Lifecycle E2E', () => {
     await page.waitForURL('**/login');
 
     // 6. Coach logs in
-    await page.fill('input[type="email"]', 'coach@cybergym.io');
+    await page.fill('input[type="email"]', 'coach@yourbody.fyi');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/coach');
@@ -98,7 +98,7 @@ test.describe('Coach-Athlete Code Linking & Lifecycle E2E', () => {
     await page.waitForURL('**/login');
 
     // 10. Athlete logs back in
-    await page.fill('input[type="email"]', 'athlete@cybergym.io');
+    await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/workout');
@@ -123,7 +123,7 @@ test.describe('Coach-Athlete Code Linking & Lifecycle E2E', () => {
     await expect(page.locator('[data-testid="link-coach-code-input"]')).toBeVisible();
 
     // 13. Re-link at the end to leave DB in seeded state for other test suites
-    await codeInput.fill('CYBER-DEMO01');
+    await codeInput.fill('YB-DEMO01');
     await expect(linkBtn).toBeEnabled();
     await linkBtn.click({ force: true });
     await expect(page.locator('[data-testid="link-coach-status"]')).toContainText('Successfully linked to coach!');

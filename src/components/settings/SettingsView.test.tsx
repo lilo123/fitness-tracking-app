@@ -13,7 +13,7 @@ import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 
 const { mockSession } = vi.hoisted(() => ({
   mockSession: {
-    user: { id: 'test-coach-id', email: 'coach@cybergym.io' },
+    user: { id: 'test-coach-id', email: 'coach@yourbody.fyi' },
   },
 }));
 
@@ -48,11 +48,11 @@ describe('SettingsView', () => {
         const b = createSupabaseBuilder('users', {
           data: {
             id: 'test-coach-id',
-            email: 'coach@cybergym.io',
+            email: 'coach@yourbody.fyi',
             username: 'Coach Duy',
             role: 'coach',
             is_coach_mode: true,
-            coach_code: 'CYBER-DEMO01',
+            coach_code: 'YB-DEMO01',
             coach_tier: 'pro',
             max_athletes: 10,
             target_calories: 2400,
@@ -134,7 +134,7 @@ describe('SettingsView', () => {
 
     fireEvent.click(athleteModeBtn);
     await waitFor(() => {
-      expect(localStorage.getItem('cybergym_view_mode')).toBe('athlete');
+      expect(localStorage.getItem('yourbody_view_mode')).toBe('athlete');
     });
   });
 
@@ -165,7 +165,7 @@ describe('SettingsView', () => {
 
     await waitFor(() => {
       expect(toggleBtn.getAttribute('aria-checked')).toBe('false');
-      expect(localStorage.getItem('cybergym_auto_rest_timer')).toBe('false');
+      expect(localStorage.getItem('yourbody_auto_rest_timer')).toBe('false');
       expect(mockUpsert).toHaveBeenCalledWith(
         expect.objectContaining({
           auto_rest_timer: false,
@@ -177,7 +177,7 @@ describe('SettingsView', () => {
     fireEvent.click(toggleBtn);
     await waitFor(() => {
       expect(toggleBtn.getAttribute('aria-checked')).toBe('true');
-      expect(localStorage.getItem('cybergym_auto_rest_timer')).toBe('true');
+      expect(localStorage.getItem('yourbody_auto_rest_timer')).toBe('true');
       expect(mockUpsert).toHaveBeenCalledWith(
         expect.objectContaining({
           auto_rest_timer: true,
@@ -212,7 +212,7 @@ describe('SettingsView', () => {
     await screen.findByDisplayValue('Coach Duy');
 
     expect(screen.getByText('Coach Mode & Roster')).toBeDefined();
-    expect(screen.getByTestId('active-coach-code').textContent).toContain('CYBER-DEMO01');
+    expect(screen.getByTestId('active-coach-code').textContent).toContain('YB-DEMO01');
     expect(screen.getByTestId('coach-capacity-badge').textContent).toContain('0 / 10 Athletes (pro)');
     expect(screen.getByTestId('copy-coach-code-btn')).toBeDefined();
     expect(screen.getByTestId('vanity-code-input')).toBeDefined();
@@ -285,11 +285,11 @@ describe('SettingsView', () => {
         const b = createSupabaseBuilder('users', {
           data: {
             id: 'test-coach-id',
-            email: 'coach@cybergym.io',
+            email: 'coach@yourbody.fyi',
             username: 'Coach Duy',
             role: 'coach',
             is_coach_mode: true,
-            coach_code: 'CYBER-DEMO01',
+            coach_code: 'YB-DEMO01',
             coach_tier: null,
             max_athletes: 3,
           },
@@ -314,13 +314,13 @@ describe('SettingsView', () => {
 
     expect(screen.getByText('My Coach')).toBeDefined();
     const linkInput = await screen.findByTestId('link-coach-code-input');
-    fireEvent.change(linkInput, { target: { value: 'CYBER-DEMO01' } });
+    fireEvent.change(linkInput, { target: { value: 'YB-DEMO01' } });
 
     const linkBtn = screen.getByTestId('link-coach-btn');
     fireEvent.click(linkBtn);
 
     await waitFor(() => {
-      expect(supabase.rpc).toHaveBeenCalledWith('link_to_coach', { input_code: 'CYBER-DEMO01' });
+      expect(supabase.rpc).toHaveBeenCalledWith('link_to_coach', { input_code: 'YB-DEMO01' });
     });
 
     expect(
@@ -336,7 +336,7 @@ describe('SettingsView', () => {
         id: 'link-1',
         coach_id: 'coach-lead',
         linked_at: '2026-09-01T00:00:00Z',
-        coach: { username: 'Coach Sarah', email: 'sarah@cybergym.io', coach_code: 'SARAH-FIT' },
+        coach: { username: 'Coach Sarah', email: 'sarah@yourbody.fyi', coach_code: 'SARAH-FIT' },
       },
     ];
 
@@ -345,11 +345,11 @@ describe('SettingsView', () => {
         const b = createSupabaseBuilder('users', {
           data: {
             id: 'test-coach-id',
-            email: 'coach@cybergym.io',
+            email: 'coach@yourbody.fyi',
             username: 'Coach Duy',
             role: 'coach',
             is_coach_mode: true,
-            coach_code: 'CYBER-DEMO01',
+            coach_code: 'YB-DEMO01',
             coach_tier: 'pro',
             max_athletes: 10,
             target_calories: 2400,
@@ -401,8 +401,8 @@ describe('SettingsView', () => {
     renderComponent();
     await screen.findByDisplayValue('Coach Duy');
     expect(screen.queryByRole('textbox', { name: /email address/i })).toBeNull();
-    expect(screen.queryByDisplayValue('coach@cybergym.io')).toBeNull();
-    const emailEl = screen.getByText('coach@cybergym.io');
+    expect(screen.queryByDisplayValue('coach@yourbody.fyi')).toBeNull();
+    const emailEl = screen.getByText('coach@yourbody.fyi');
     expect(emailEl.tagName).toBe('DD');
   });
 

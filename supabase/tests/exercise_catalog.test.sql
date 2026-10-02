@@ -245,12 +245,12 @@ BEGIN
     (v_ath, 'cat_ath@test.com', '{"role":"athlete"}'::jsonb),
     (v_stranger, 'cat_stranger@test.com', '{"role":"athlete"}'::jsonb);
 
-  UPDATE public.users SET coach_code = 'CYBER-CAT1', is_coach_mode = true WHERE id = v_coach;
+  UPDATE public.users SET coach_code = 'YB-CAT1', is_coach_mode = true WHERE id = v_coach;
 
   -- Link coach and athlete
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_ath || '"}', true);
-  PERFORM public.link_to_coach('CYBER-CAT1');
+  PERFORM public.link_to_coach('YB-CAT1');
 
   PERFORM set_config('role', 'postgres', true);
   -- Coach custom exercise
@@ -455,12 +455,12 @@ BEGIN
     (v_coach, 'rcat_coach@test.com', '{"role":"athlete"}'::jsonb),
     (v_ath, 'rcat_ath@test.com', '{"role":"athlete"}'::jsonb);
 
-  UPDATE public.users SET coach_code = 'CYBER-RCAT1', is_coach_mode = true WHERE id = v_coach;
+  UPDATE public.users SET coach_code = 'YB-RCAT1', is_coach_mode = true WHERE id = v_coach;
 
   -- Link coach and athlete
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_ath || '"}', true);
-  PERFORM public.link_to_coach('CYBER-RCAT1');
+  PERFORM public.link_to_coach('YB-RCAT1');
 
   PERFORM set_config('role', 'postgres', true);
   SELECT id INTO v_ex FROM public.exercises WHERE is_master = true LIMIT 1;

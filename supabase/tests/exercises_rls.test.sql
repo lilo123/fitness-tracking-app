@@ -11,11 +11,11 @@ DECLARE
 BEGIN
   INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (v_coach_id, 'exrls_coach1@test.com', '{"role":"athlete"}'::jsonb);
   INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (v_ath_id, 'exrls_ath1@test.com', '{"role":"athlete"}'::jsonb);
-  UPDATE public.users SET coach_code = 'CYBER-EXRLS1', is_coach_mode = true WHERE id = v_coach_id;
+  UPDATE public.users SET coach_code = 'YB-EXRLS1', is_coach_mode = true WHERE id = v_coach_id;
 
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_ath_id || '"}', true);
-  PERFORM public.link_to_coach('CYBER-EXRLS1');
+  PERFORM public.link_to_coach('YB-EXRLS1');
 
   PERFORM set_config('role', 'postgres', true);
   INSERT INTO public.exercises (name, body_parts, is_master, user_id)
@@ -51,11 +51,11 @@ DECLARE
 BEGIN
   INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (v_coach_id, 'exrls_coach2@test.com', '{"role":"athlete"}'::jsonb);
   INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (v_ath_id, 'exrls_ath2@test.com', '{"role":"athlete"}'::jsonb);
-  UPDATE public.users SET coach_code = 'CYBER-EXRLS2', is_coach_mode = true WHERE id = v_coach_id;
+  UPDATE public.users SET coach_code = 'YB-EXRLS2', is_coach_mode = true WHERE id = v_coach_id;
 
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_ath_id || '"}', true);
-  PERFORM public.link_to_coach('CYBER-EXRLS2');
+  PERFORM public.link_to_coach('YB-EXRLS2');
 
   PERFORM set_config('role', 'postgres', true);
   INSERT INTO public.exercises (name, body_parts, is_master, user_id)
@@ -90,11 +90,11 @@ BEGIN
   INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (v_coach_id, 'exrls_coach3@test.com', '{"role":"athlete"}'::jsonb);
   INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (v_ath_id, 'exrls_ath3@test.com', '{"role":"athlete"}'::jsonb);
   INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (v_stranger_id, 'exrls_stranger@test.com', '{"role":"athlete"}'::jsonb);
-  UPDATE public.users SET coach_code = 'CYBER-EXRLS3', is_coach_mode = true WHERE id = v_coach_id;
+  UPDATE public.users SET coach_code = 'YB-EXRLS3', is_coach_mode = true WHERE id = v_coach_id;
 
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_ath_id || '"}', true);
-  PERFORM public.link_to_coach('CYBER-EXRLS3');
+  PERFORM public.link_to_coach('YB-EXRLS3');
 
   PERFORM set_config('role', 'postgres', true);
   INSERT INTO public.exercises (name, body_parts, is_master, user_id)

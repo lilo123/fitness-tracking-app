@@ -191,12 +191,12 @@ BEGIN
   VALUES (v_coach_id, 'coach_rls_test@test.com', '{"role":"athlete"}'::jsonb),
          (v_ath_id, 'ath_rls_test@test.com', '{"role":"athlete"}'::jsonb);
 
-  UPDATE public.users SET coach_code = 'CYBER-WUNIT', is_coach_mode = true, max_athletes = 3 WHERE id = v_coach_id;
+  UPDATE public.users SET coach_code = 'YB-WUNIT', is_coach_mode = true, max_athletes = 3 WHERE id = v_coach_id;
 
   -- Athlete links to coach
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_ath_id || '"}', true);
-  PERFORM public.link_to_coach('CYBER-WUNIT');
+  PERFORM public.link_to_coach('YB-WUNIT');
 
   -- Verify active link exists
   IF NOT EXISTS (SELECT 1 FROM public.coach_athlete_links WHERE coach_id = v_coach_id AND athlete_id = v_ath_id AND status = 'active') THEN

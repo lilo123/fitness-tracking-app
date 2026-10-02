@@ -189,11 +189,11 @@ BEGIN
   VALUES (v_coach_id, 'coach_prm_test@test.com', '{"role":"athlete"}'::jsonb),
          (v_ath_id, 'ath_prm_test@test.com', '{"role":"athlete"}'::jsonb);
 
-  UPDATE public.users SET coach_code = 'CYBER-PRMOD', is_coach_mode = true, max_athletes = 3 WHERE id = v_coach_id;
+  UPDATE public.users SET coach_code = 'YB-PRMOD', is_coach_mode = true, max_athletes = 3 WHERE id = v_coach_id;
 
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_ath_id || '"}', true);
-  PERFORM public.link_to_coach('CYBER-PRMOD');
+  PERFORM public.link_to_coach('YB-PRMOD');
 
   -- Coach attempts to update Athlete's pr_mode
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_coach_id || '"}', true);

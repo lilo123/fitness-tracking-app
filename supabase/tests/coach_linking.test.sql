@@ -53,8 +53,8 @@ BEGIN
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_coach_id || '"}', true);
 
   -- Set custom vanity code
-  v_custom_code := public.set_coach_code('CYBER-TEST1');
-  IF v_custom_code <> 'CYBER-TEST1' THEN
+  v_custom_code := public.set_coach_code('YB-TEST1');
+  IF v_custom_code <> 'YB-TEST1' THEN
     RAISE EXCEPTION 'set_coach_code did not return requested custom code: %', v_custom_code;
   END IF;
 
@@ -93,39 +93,39 @@ BEGIN
 
   -- Setup coach with capacity 3
   UPDATE public.users 
-  SET coach_code = 'CYBER-CAP3', is_coach_mode = true, max_athletes = 3 
+  SET coach_code = 'YB-CAP3', is_coach_mode = true, max_athletes = 3 
   WHERE id = v_coach_id;
 
   -- Coach tries to link to self -> rejected
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_coach_id || '"}', true);
-  v_res := public.link_to_coach('CYBER-CAP3');
+  v_res := public.link_to_coach('YB-CAP3');
   IF (v_res->>'success')::boolean IS TRUE THEN
     RAISE EXCEPTION 'Self-coaching was accepted!';
   END IF;
 
   -- Athlete 1 links
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_ath1_id || '"}', true);
-  v_res := public.link_to_coach('cyber-cap3'); -- case insensitivity test
+  v_res := public.link_to_coach('yb-cap3'); -- case insensitivity test
   IF (v_res->>'success')::boolean IS NOT TRUE THEN
     RAISE EXCEPTION 'Athlete 1 link failed: %', v_res;
   END IF;
 
   -- Athlete 1 links again -> idempotent already_linked
-  v_res := public.link_to_coach('CYBER-CAP3');
+  v_res := public.link_to_coach('YB-CAP3');
   IF (v_res->>'already_linked')::boolean IS NOT TRUE THEN
     RAISE EXCEPTION 'Athlete 1 idempotent relink failed: %', v_res;
   END IF;
 
   -- Athlete 2 and 3 link
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_ath2_id || '"}', true);
-  PERFORM public.link_to_coach('CYBER-CAP3');
+  PERFORM public.link_to_coach('YB-CAP3');
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_ath3_id || '"}', true);
-  PERFORM public.link_to_coach('CYBER-CAP3');
+  PERFORM public.link_to_coach('YB-CAP3');
 
   -- Athlete 4 links -> capacity exceeded
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_ath4_id || '"}', true);
-  v_res := public.link_to_coach('CYBER-CAP3');
+  v_res := public.link_to_coach('YB-CAP3');
   IF (v_res->>'success')::boolean IS TRUE THEN
     RAISE EXCEPTION 'Athlete 4 linked beyond capacity limit!';
   END IF;
@@ -151,12 +151,12 @@ BEGIN
   INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (v_coach_id, 'coach_disc@test.com', '{"role":"athlete"}'::jsonb);
   INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (v_ath_id, 'ath_disc@test.com', '{"role":"athlete"}'::jsonb);
 
-  UPDATE public.users SET coach_code = 'CYBER-DISC', is_coach_mode = true, max_athletes = 3 WHERE id = v_coach_id;
+  UPDATE public.users SET coach_code = 'YB-DISC', is_coach_mode = true, max_athletes = 3 WHERE id = v_coach_id;
 
   -- Link athlete
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_ath_id || '"}', true);
-  PERFORM public.link_to_coach('CYBER-DISC');
+  PERFORM public.link_to_coach('YB-DISC');
 
   -- Athlete disconnects
   v_res := public.disconnect_coach();
@@ -188,12 +188,12 @@ BEGIN
   INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (v_ath_id, 'ath_mac@test.com', '{"role":"athlete"}'::jsonb);
   INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (v_unlinked_id, 'unlinked_mac@test.com', '{"role":"athlete"}'::jsonb);
 
-  UPDATE public.users SET coach_code = 'CYBER-MAC1', is_coach_mode = true WHERE id = v_coach_id;
+  UPDATE public.users SET coach_code = 'YB-MAC1', is_coach_mode = true WHERE id = v_coach_id;
 
   -- Link athlete to coach
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_ath_id || '"}', true);
-  PERFORM public.link_to_coach('CYBER-MAC1');
+  PERFORM public.link_to_coach('YB-MAC1');
 
   -- Coach updates athlete macros
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_coach_id || '"}', true);
@@ -271,12 +271,12 @@ BEGIN
   INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (v_ath_id, 'ath_rls@test.com', '{"role":"athlete"}'::jsonb);
   INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (v_stranger_id, 'stranger_rls@test.com', '{"role":"athlete"}'::jsonb);
 
-  UPDATE public.users SET coach_code = 'CYBER-RLS1', is_coach_mode = true WHERE id = v_coach_id;
+  UPDATE public.users SET coach_code = 'YB-RLS1', is_coach_mode = true WHERE id = v_coach_id;
 
   -- Link athlete to coach
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_ath_id || '"}', true);
-  PERFORM public.link_to_coach('CYBER-RLS1');
+  PERFORM public.link_to_coach('YB-RLS1');
 
   -- Athlete can view coach profile
   SELECT count(*) INTO v_seen_count FROM public.users WHERE id = v_coach_id;
@@ -323,12 +323,12 @@ BEGIN
   INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (v_ath_id, 'ath_tpl@test.com', '{"role":"athlete"}'::jsonb);
   INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (v_stranger_id, 'stranger_tpl@test.com', '{"role":"athlete"}'::jsonb);
 
-  UPDATE public.users SET coach_code = 'CYBER-TPL1', is_coach_mode = true WHERE id = v_coach_id;
+  UPDATE public.users SET coach_code = 'YB-TPL1', is_coach_mode = true WHERE id = v_coach_id;
 
   -- Link athlete to coach
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_ath_id || '"}', true);
-  PERFORM public.link_to_coach('CYBER-TPL1');
+  PERFORM public.link_to_coach('YB-TPL1');
 
   -- Coach saves routine assigned to athlete
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_coach_id || '"}', true);
@@ -381,13 +381,13 @@ BEGIN
   INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (v_ath_id, 'ath_iso@test.com', '{"role":"athlete"}'::jsonb);
   INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (v_stranger_coach_id, 'stranger_c@test.com', '{"role":"athlete"}'::jsonb);
 
-  UPDATE public.users SET coach_code = 'CYBER-ISO1', is_coach_mode = true WHERE id = v_coach_id;
-  UPDATE public.users SET coach_code = 'CYBER-ISO2', is_coach_mode = true WHERE id = v_stranger_coach_id;
+  UPDATE public.users SET coach_code = 'YB-ISO1', is_coach_mode = true WHERE id = v_coach_id;
+  UPDATE public.users SET coach_code = 'YB-ISO2', is_coach_mode = true WHERE id = v_stranger_coach_id;
 
   -- Link athlete to coach 1
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"' || v_ath_id || '"}', true);
-  PERFORM public.link_to_coach('CYBER-ISO1');
+  PERFORM public.link_to_coach('YB-ISO1');
 
   -- Athlete creates workout, set, and nutrition log
   SELECT id INTO v_eid FROM public.exercises WHERE is_master = true LIMIT 1;

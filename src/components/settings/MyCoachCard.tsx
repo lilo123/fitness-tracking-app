@@ -225,7 +225,7 @@ export const MyCoachCard: React.FC<MyCoachCardProps> = ({
               type="text"
               value={linkCodeInput}
               onChange={(e) => setLinkCodeInput(e.target.value.toUpperCase())}
-              placeholder="e.g. CYBER-DEMO01"
+              placeholder="e.g. YB-DEMO01"
               maxLength={20}
               disabled={!isOnline || isLinking}
               title={!isOnline ? 'Available when online' : undefined}
