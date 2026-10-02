@@ -122,7 +122,7 @@ describe('auth_guard (A8 + A9 Offline Auth Guarantees)', () => {
     expect(getAuthRequiredStatus()).toBe(false);
   });
 
-  it('online invalid session clears user and sets authRequired status', async () => {
+  it('online boot with invalid session clears user and does NOT set authRequired status (D-YB2-2)', async () => {
     Object.defineProperty(navigator, 'onLine', {
       configurable: true,
       value: true,
@@ -142,6 +142,55 @@ describe('auth_guard (A8 + A9 Offline Auth Guarantees)', () => {
         </AuthProvider>
       </QueryClientProvider>
     );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-user-id').textContent).toBe('none');
+    });
+
+    expect(localStorage.getItem('yourbody_user')).toBeNull();
+    expect(getAuthRequiredStatus()).toBe(false);
+  });
+
+  it('online resume with invalid session clears user and sets authRequired status when user was authenticated (D-YB2-2)', async () => {
+    Object.defineProperty(navigator, 'onLine', {
+      configurable: true,
+      value: true,
+    });
+
+    localStorage.setItem('yourbody_user', JSON.stringify(mockUser));
+
+    // Session is initially valid
+    (supabase.auth.getSession as any).mockResolvedValue({
+      data: {
+        session: { user: { id: mockUser.id, email: mockUser.email } },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <TestConsumer />
+        </AuthProvider>
+      </QueryClientProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-user-id').textContent).toBe(mockUser.id);
+    });
+
+    // Device resumes while online, but session is now revoked/null
+    (supabase.auth.getSession as any).mockResolvedValue({
+      data: { session: null },
+    });
+
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'visible',
+    });
+
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId('auth-user-id').textContent).toBe('none');

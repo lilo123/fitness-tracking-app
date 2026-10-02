@@ -10,6 +10,7 @@ import { restTimerStore } from '../utils/restTimerStore';
 import { dedupeInFlight } from '../utils/promiseDedupe';
 import {
   setAuthRequiredStatus,
+  getAuthRequiredStatus,
   initPersistForUser,
   stopPersisting,
   clearUserReadCache,
@@ -68,7 +69,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signedOutRef = useRef(false);
   const isRevalidatingRef = useRef(false);
+  const userRef = useRef<User | null>(user);
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
+  const markAuthValid = useCallback((validUserId?: string | null) => {
+    if (getAuthRequiredStatus()) {
+      setAuthRequiredStatus(false);
+      const targetId = validUserId || undefined;
+      flushNow(targetId).catch((err) => {
+        console.warn('[AuthContext] flushNow after auth recovery error:', err);
+      });
+    }
+  }, []);
 
   const syncUserTimezone = useCallback(async (userId: string, force = false) => {
     return dedupeInFlight(`timezone:${userId}`, async () => {
@@ -202,7 +218,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (result.kind === 'session') {
           if (result.session?.user) {
             signedOutRef.current = false;
+            userRef.current = result.session.user;
             setUser(result.session.user);
+            markAuthValid(result.session.user.id);
             setLoading(false);
             syncUserTimezone(result.session.user.id);
             fetchProfile(result.session.user.id, result.session.user.email).catch((err) => {
@@ -216,7 +234,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               return;
             }
             // Explicitly unauthenticated or expired/invalid session while online
-            setAuthRequiredStatus(true);
+            userRef.current = null;
             setUser(null);
             setProfile(null);
             localStorage.removeItem('yourbody_user');
@@ -259,13 +277,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!mounted) return;
       if (session?.user) {
         signedOutRef.current = false;
+        userRef.current = session.user;
         setUser(session.user);
+        markAuthValid(session.user.id);
         syncUserTimezone(session.user.id);
         fetchProfile(session.user.id, session.user.email).catch((err) => {
           console.warn('[AuthContext] Background fetchProfile error:', err);
         });
       } else if (_event === 'SIGNED_OUT') {
         signedOutRef.current = true;
+        userRef.current = null;
         setUser(null);
         setProfile(null);
         localStorage.removeItem('yourbody_user');
@@ -288,7 +309,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (!mounted) return;
             if (session?.user) {
               signedOutRef.current = false;
+              userRef.current = session.user;
               setUser(session.user);
+              markAuthValid(session.user.id);
               syncUserTimezone(session.user.id);
               fetchProfile(session.user.id, session.user.email).catch((err) => {
                 console.warn('[AuthContext] Background resume fetchProfile error:', err);
@@ -297,7 +320,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               if (typeof navigator !== 'undefined' && !navigator.onLine) {
                 return;
               }
-              setAuthRequiredStatus(true);
+              if (userRef.current) {
+                setAuthRequiredStatus(true);
+              }
+              userRef.current = null;
               setUser(null);
               setProfile(null);
               localStorage.removeItem('yourbody_user');
@@ -321,7 +347,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       document.removeEventListener('visibilitychange', handleLifecycleResume);
       window.removeEventListener('pageshow', handleLifecycleResume);
     };
-  }, [fetchProfile, syncUserTimezone]);
+  }, [fetchProfile, syncUserTimezone, markAuthValid]);
 
   const signIn = useCallback(
     async (email: string, password = 'password123') => {
@@ -336,7 +362,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         if (data?.user) {
           signedOutRef.current = false;
+          userRef.current = data.user;
           setUser(data.user);
+          markAuthValid(data.user.id);
           syncUserTimezone(data.user.id);
           await fetchProfile(data.user.id, data.user.email);
 
@@ -352,7 +380,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: err.message };
       }
     },
-    [fetchProfile, syncUserTimezone]
+    [fetchProfile, syncUserTimezone, markAuthValid]
   );
 
   const signUp = useCallback(
@@ -373,7 +401,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return { success: false, error: error.message };
         }
         if (data?.session && data?.user) {
+          userRef.current = data.user;
           setUser(data.user);
+          markAuthValid(data.user.id);
           syncUserTimezone(data.user.id);
           await fetchProfile(data.user.id, data.user.email);
           return { success: true };
@@ -387,7 +417,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: err.message };
       }
     },
-    [fetchProfile, syncUserTimezone]
+    [fetchProfile, syncUserTimezone, markAuthValid]
   );
 
   useEffect(() => {
@@ -406,6 +436,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = useCallback(async () => {
     signedOutRef.current = true;
+    userRef.current = null;
     const currentUserId = user?.id;
 
     // A9: signOut: if online and outbox non-empty -> try flush (<=8s).

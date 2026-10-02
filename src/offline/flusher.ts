@@ -205,6 +205,7 @@ export async function flushNow(targetUserId?: string, callerOpId?: string): Prom
           syncedThisRun++;
           syncedOpIds.add(op.opId);
           retryAttempts = 0;
+          setAuthRequiredStatus(false);
         } catch (rawError: any) {
           const classified = classifyError(rawError);
 
@@ -244,6 +245,7 @@ export async function flushNow(targetUserId?: string, callerOpId?: string): Prom
               const { error: refErr } = await activeSupabaseClient.auth.refreshSession();
               if (!refErr) {
                 refreshSuccess = true;
+                setAuthRequiredStatus(false);
               } else {
                 const refClassified = classifyError(refErr);
                 if (refClassified.isInvalidRefreshToken) {
@@ -267,6 +269,7 @@ export async function flushNow(targetUserId?: string, callerOpId?: string): Prom
                 await deleteOp(userId, op.opId);
                 syncedThisRun++;
                 retryAttempts = 0;
+                setAuthRequiredStatus(false);
                 continue;
               } catch (retryErr: any) {
                 const secondClassified = classifyError(retryErr);

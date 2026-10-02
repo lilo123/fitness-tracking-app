@@ -6,7 +6,7 @@ import {
   setFlusherSessionUser,
   setFlusherSupabaseClient,
 } from '../flusher';
-import { enqueue, getOutboxOps } from '../outbox';
+import { enqueue, getOutboxOps, getAuthRequiredStatus, setAuthRequiredStatus } from '../outbox';
 import { closeAllOfflineDbs, deleteOfflineDb } from '../db';
 import { supabase } from '../../lib/supabase';
 
@@ -235,5 +235,79 @@ describe('Flusher & EnqueueAndAwait (§A4, §D)', () => {
     const opsA = await getOutboxOps(userA);
     expect(opsA).toHaveLength(1);
     expect(opsA[0].state).toBe('pending');
+  });
+
+  it('8. flusher clears authRequiredStatus after successful standard replay op (D-YB2-2)', async () => {
+    setAuthRequiredStatus(true);
+    await enqueue({
+      userId: userA,
+      kind: 'workout.ensure',
+      payload: { clientWorkoutId: 'w-recovery', workout_date: '2026-09-30' },
+    });
+
+    const synced = await flushNow(userA);
+    expect(synced).toBe(1);
+    expect(getAuthRequiredStatus()).toBe(false);
+  });
+
+  it('9. flusher clears authRequiredStatus after successful refresh and retry replay (D-YB2-2)', async () => {
+    setAuthRequiredStatus(true);
+    await enqueue({
+      userId: userA,
+      kind: 'workout.ensure',
+      payload: { clientWorkoutId: 'w-refresh-recovery', workout_date: '2026-09-30' },
+    });
+
+    let attempt = 0;
+    ((supabase as any)['from']).mockReturnValue({
+      upsert: vi.fn().mockImplementation(() => {
+        attempt++;
+        if (attempt === 1) {
+          return Promise.reject({ status: 401, message: 'JWT expired' });
+        }
+        return Promise.resolve({ data: null, error: null });
+      }),
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({ data: { id: 'canonical-w-refresh' }, error: null }),
+          }),
+        }),
+      }),
+    });
+
+    (supabase.auth.refreshSession as any).mockResolvedValue({ error: null });
+
+    const synced = await flushNow(userA);
+    expect(synced).toBe(1);
+    expect(getAuthRequiredStatus()).toBe(false);
+  });
+
+  it('10. flusher sets authRequiredStatus on invalid refresh token during replay (D-YB2-2)', async () => {
+    setAuthRequiredStatus(false);
+    await enqueue({
+      userId: userA,
+      kind: 'workout.ensure',
+      payload: { clientWorkoutId: 'w-invalid-ref', workout_date: '2026-09-30' },
+    });
+
+    ((supabase as any)['from']).mockReturnValue({
+      upsert: vi.fn().mockRejectedValue({ status: 401, message: 'JWT expired' }),
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({ data: { id: 'canonical-w-ref' }, error: null }),
+          }),
+        }),
+      }),
+    });
+
+    (supabase.auth.refreshSession as any).mockResolvedValue({
+      error: { code: 'refresh_token_not_found', message: 'Invalid Refresh Token' },
+    });
+
+    const synced = await flushNow(userA);
+    expect(synced).toBe(0);
+    expect(getAuthRequiredStatus()).toBe(true);
   });
 });

@@ -7,6 +7,7 @@ import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory } from '../test/supabaseBuilderMock';
 import type { UserProfile } from '../types/database';
+import * as offlineModule from '../offline';
 
 vi.mock('../lib/supabase', () => ({
   supabase: {
@@ -509,6 +510,143 @@ describe('AuthContext - iOS PWA Resilience & Lifecycle', () => {
     });
 
     expect(updateAttempts).toBe(2);
+  });
+
+  describe('D-YB2-2 Auth Flag Recovery & MarkAuthValid Contracts', () => {
+    it('11. clears authRequired flag and kicks flushNow on true-to-false transition with valid session', async () => {
+      offlineModule.setAuthRequiredStatus(true);
+      const flushSpy = vi.spyOn(offlineModule, 'flushNow').mockResolvedValue(0);
+
+      render(
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <TestConsumer />
+          </AuthProvider>
+        </QueryClientProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('auth-user-id').textContent).toBe(mockProfile.id);
+      });
+
+      expect(offlineModule.getAuthRequiredStatus()).toBe(false);
+      expect(flushSpy).toHaveBeenCalledWith(mockProfile.id);
+    });
+
+    it('12. does not kick flushNow if authRequired was already false', async () => {
+      offlineModule.setAuthRequiredStatus(false);
+      const flushSpy = vi.spyOn(offlineModule, 'flushNow').mockResolvedValue(0);
+
+      render(
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <TestConsumer />
+          </AuthProvider>
+        </QueryClientProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('auth-user-id').textContent).toBe(mockProfile.id);
+      });
+
+      expect(offlineModule.getAuthRequiredStatus()).toBe(false);
+      expect(flushSpy).not.toHaveBeenCalled();
+    });
+
+    it('13. online boot with no session does NOT set authRequired status', async () => {
+      offlineModule.setAuthRequiredStatus(false);
+      (supabase.auth.getSession as any).mockResolvedValue({
+        data: { session: null },
+      });
+
+      render(
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <TestConsumer />
+          </AuthProvider>
+        </QueryClientProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('auth-loading').textContent).toBe('false');
+      });
+
+      expect(screen.getByTestId('auth-user-id').textContent).toBe('none');
+      expect(offlineModule.getAuthRequiredStatus()).toBe(false);
+    });
+
+    it('14. resume without session sets authRequired status ONLY if a user context existed before', async () => {
+      offlineModule.setAuthRequiredStatus(false);
+      (supabase.auth.getSession as any).mockResolvedValue({
+        data: {
+          session: {
+            user: { id: mockProfile.id, email: mockProfile.email },
+          },
+        },
+      });
+
+      render(
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <TestConsumer />
+          </AuthProvider>
+        </QueryClientProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('auth-user-id').textContent).toBe(mockProfile.id);
+      });
+
+      // Session revoked during resume
+      (supabase.auth.getSession as any).mockResolvedValue({
+        data: { session: null },
+      });
+
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        get: () => 'visible',
+      });
+
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('auth-user-id').textContent).toBe('none');
+      });
+
+      expect(offlineModule.getAuthRequiredStatus()).toBe(true);
+    });
+
+    it('15. resume without session does NOT set authRequired status if no user existed before', async () => {
+      offlineModule.setAuthRequiredStatus(false);
+      (supabase.auth.getSession as any).mockResolvedValue({
+        data: { session: null },
+      });
+
+      render(
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <TestConsumer />
+          </AuthProvider>
+        </QueryClientProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('auth-loading').textContent).toBe('false');
+      });
+
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        get: () => 'visible',
+      });
+
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      expect(offlineModule.getAuthRequiredStatus()).toBe(false);
+    });
   });
 });
 
