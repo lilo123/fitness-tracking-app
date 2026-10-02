@@ -4977,7 +4977,37 @@ test.describe("P4 Picker", () => {
 // P5a History: Density, Hit Targets, Typography & Accessibility
 // ---------------------------------------------------------------------------
 
+const P5_NUTRITION_LOG_ID = 'e8000000-0000-0000-0000-000000000095';
+
+function seedHistoryNutritionLog(): void {
+  const psqlCmd = getPsqlCommand();
+  const seedSql = `
+    INSERT INTO public.nutrition_logs (
+      id, user_id, food_name, meal_type, calories, protein, carbs, fat, fiber, serving_size, serving_unit, logged_at, logged_date
+    ) VALUES (
+      '${P5_NUTRITION_LOG_ID}',
+      'a0000000-0000-0000-0000-000000000002',
+      'Protein Oatmeal Bowl',
+      'Breakfast',
+      520, 38, 62, 12, 8,
+      1, 'bowl',
+      CURRENT_TIMESTAMP,
+      CURRENT_DATE
+    ) ON CONFLICT (id) DO NOTHING;
+  `;
+  execSync(psqlCmd, { input: seedSql, stdio: 'pipe' });
+}
+
+function cleanupHistoryNutritionLog(): void {
+  const psqlCmd = getPsqlCommand();
+  const cleanSql = `DELETE FROM public.nutrition_logs WHERE id = '${P5_NUTRITION_LOG_ID}';`;
+  execSync(psqlCmd, { input: cleanSql, stdio: 'pipe' });
+}
+
 async function setupHistoryDensityPage(page: Page) {
+  // Ensure athlete has a nutrition log so the Nutrition Timeline has at least one expandable day
+  seedHistoryNutritionLog();
+
   await page.goto("/login");
   await page.fill('input[type="email"]', "athlete@yourbody.fyi");
   await page.fill('input[type="password"]', "password123");
@@ -4990,6 +5020,9 @@ async function setupHistoryDensityPage(page: Page) {
 }
 
 test.describe("P5a History", () => {
+  test.afterAll(() => {
+    cleanupHistoryNutritionLog();
+  });
   // (a) Hit-area + layout acceptance at 320px and 390px on /history (both By Session and By Exercise)
   for (const width of [320, 390] as const) {
     test(`hit-area and layout acceptance at ${width}px on /history (sessions and by-exercise)`, async ({ browser }) => {
@@ -5198,6 +5231,10 @@ test.describe("P5a History", () => {
 // ---------------------------------------------------------------------------
 
 test.describe("P5b History", () => {
+  test.afterAll(() => {
+    cleanupHistoryNutritionLog();
+  });
+
   // (a) Hit-area and layout acceptance at 320px and 390px on /history (Exercise Sheet, Calendar Sheet, Nutrition Timeline)
   for (const width of [320, 390] as const) {
     test(`hit-area and layout acceptance at ${width}px on /history (exercise sheet, calendar, nutrition)`, async ({ browser }) => {
@@ -5312,6 +5349,11 @@ test.describe("P5b History", () => {
         await page.locator('[data-testid="history-tab-nutrition"]').click();
         await expect(page.locator('[data-testid="history-tab-nutrition"]')).toHaveAttribute("aria-selected", "true");
 
+        const dayToggle = page.locator('button[data-testid^="expand-day-btn-"]').first();
+        await expect(dayToggle).toBeVisible();
+        await dayToggle.click();
+        await expect(dayToggle).toHaveAttribute('aria-expanded', 'true');
+
         const hasNutritionOverflow = await page.evaluate(() => {
           return document.documentElement.scrollWidth > window.innerWidth;
         });
@@ -5324,6 +5366,7 @@ test.describe("P5b History", () => {
         const nutControls = [
           page.locator('[data-testid="history-tab-workouts"]'),
           page.locator('[data-testid="history-tab-nutrition"]'),
+          dayToggle,
         ];
         for (const loc of nutControls) {
           await assertHitArea44(loc, "Nutrition domain control");
@@ -5382,6 +5425,10 @@ test.describe("P5b History", () => {
       // 3. Audit Nutrition Timeline
       await page.locator('[data-testid="history-tab-nutrition"]').click();
       await expect(page.locator('[data-testid="history-tab-nutrition"]')).toHaveAttribute("aria-selected", "true");
+      const toggle = page.locator('button[data-testid^="expand-day-btn-"]').first();
+      await expect(toggle).toBeVisible();
+      await toggle.click();
+      await expect(toggle).toHaveAttribute('aria-expanded', 'true');
       await runAxeOnLocator(page.locator("main"), "History Nutrition Timeline");
     } finally {
       await page.close();

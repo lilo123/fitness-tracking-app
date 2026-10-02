@@ -784,7 +784,7 @@ test('manual form stages meal, adds item with updated totals, and logs to timeli
     });
 
     const evalRes = await page.evaluate(async () => {
-      const openReq = indexedDB.open('cybergym-offline-a0000000-0000-0000-0000-000000000002');
+      const openReq = indexedDB.open('yourbody-offline-a0000000-0000-0000-0000-000000000002');
       return new Promise<string>((resolve) => {
         openReq.onsuccess = () => {
           const db = openReq.result;
@@ -922,7 +922,7 @@ test('manual form stages meal, adds item with updated totals, and logs to timeli
     });
 
     const evalRes = await page.evaluate(async () => {
-      const openReq = indexedDB.open('cybergym-offline-a0000000-0000-0000-0000-000000000002');
+      const openReq = indexedDB.open('yourbody-offline-a0000000-0000-0000-0000-000000000002');
       return new Promise<string>((resolve) => {
         openReq.onsuccess = () => {
           const db = openReq.result;

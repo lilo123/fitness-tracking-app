@@ -100,7 +100,7 @@ export const LoginView: React.FC = () => {
         <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-[0_0_25px_rgba(6,182,212,0.4)] mx-auto mb-3">
           <Zap className="w-8 h-8 text-zinc-950 fill-zinc-950" />
         </div>
-        <h1 className="text-2xl font-bold tracking-wider uppercase bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
+        <h1 className="text-2xl font-bold tracking-wider bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
           Yourbody.fyi
         </h1>
         <p className="text-xs text-zinc-400 tracking-wider mt-1 uppercase">

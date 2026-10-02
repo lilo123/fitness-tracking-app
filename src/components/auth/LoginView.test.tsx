@@ -57,7 +57,10 @@ describe('LoginView', () => {
     expect(userBuilder.tableName).toBe('users');
     expect(getRecordedTables()).toContain('users');
     renderComponent();
-    expect(screen.getByText('Yourbody.fyi')).toBeDefined();
+    const titleEl = screen.getByRole('heading', { level: 1, name: 'Yourbody.fyi' });
+    expect(titleEl).toBeDefined();
+    expect(titleEl.textContent).toBe('Yourbody.fyi');
+    expect(titleEl.className).not.toContain('uppercase');
     expect(screen.getByPlaceholderText('you@example.com')).toBeDefined();
     expect(getRecordedSelects()).toHaveLength(0);
   });
