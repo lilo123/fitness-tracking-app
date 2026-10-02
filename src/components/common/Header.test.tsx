@@ -458,6 +458,7 @@ describe('Header connection status badge', () => {
       expect(h1).not.toBeNull();
       expect(h1?.className).toContain('text-sm');
       expect(h1?.className).toContain('font-bold');
+      expect(h1?.className).toContain('text-zinc-50');
       expect(h1?.className).not.toContain('text-xs');
 
       const tagline = container.querySelector('header h1 + div');

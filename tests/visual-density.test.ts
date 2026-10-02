@@ -8821,7 +8821,7 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
     test.setTimeout(180000);
 
     const verifyHeaderControlsGeometry = async (page: Page, width: number, desc: string) => {
-      const result = await page.evaluate(() => {
+      const result = await page.evaluate(({ width, desc }) => {
         const controls = Array.from(document.querySelectorAll<HTMLElement>(
           'header div.shrink-0 > button, header div.shrink-0 > a'
         )).filter((el) => {
@@ -8926,9 +8926,19 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
         }
 
         // (f) tagline either display:none or scrollWidth <= clientWidth
+        // Explicitly enforces: at 320px tagline is display:none; at 390px on /workout tagline is visible and not truncated
         const tagline = document.querySelector('header h1 + div') as HTMLElement;
         if (tagline) {
           const tagStyle = window.getComputedStyle(tagline);
+          if (width === 320) {
+            if (tagStyle.display !== 'none') {
+              issues.push(`Tagline at 320px must be display:none, found ${tagStyle.display}`);
+            }
+          } else if (width === 390 && desc.includes('/workout')) {
+            if (tagStyle.display === 'none') {
+              issues.push(`Tagline at 390px on /workout (${desc}) must be visible, found display:none`);
+            }
+          }
           if (tagStyle.display !== 'none') {
             if (tagline.scrollWidth > tagline.clientWidth + 1) {
               issues.push(`Tagline scrollWidth (${tagline.scrollWidth}) > clientWidth (${tagline.clientWidth})`);
@@ -8941,7 +8951,7 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
           controlCount: controls.length,
           boxes,
         };
-      });
+      }, { width, desc });
 
       expect(result.issues, `Header controls geometry issues for ${desc} at ${width}px`).toEqual([]);
       expect(result.controlCount, `Expected controls for ${desc} at ${width}px`).toBeGreaterThan(0);

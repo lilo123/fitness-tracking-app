@@ -100,12 +100,12 @@ export const Header: React.FC = () => {
               <Zap className="w-3.5 h-3.5 text-zinc-950 fill-zinc-950" />
             </div>
             <div className="min-w-0">
-              <h1 className="font-bold tracking-tight sm:tracking-normal text-sm sm:text-base bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent leading-none">
+              <h1 className="font-bold tracking-tight sm:tracking-normal text-sm sm:text-base text-zinc-50 leading-none">
                 Yourbody.fyi
               </h1>
               <div
                 className={`text-xs font-semibold tracking-normal text-cyan-400/70 mt-0.5 truncate max-[359px]:hidden ${
-                  role === 'coach' ? 'max-sm:hidden' : ''
+                  showCoachDashboard ? 'max-[379px]:hidden' : ''
                 }`}
               >
                 Fitness & Nutrition
@@ -155,7 +155,7 @@ export const Header: React.FC = () => {
               ) : (
                 <span
                   className={`h-9 rounded-full border text-xs font-bold flex items-center justify-center gap-1.5 px-2.5 ${
-                    showCoachDashboard ? 'max-sm:w-9 max-sm:px-0' : 'max-[359px]:w-9 max-[359px]:px-0'
+                    isCoachMode ? 'max-sm:w-9 max-sm:px-0' : 'max-[359px]:w-9 max-[359px]:px-0'
                   } transition-colors ${
                     badgeTone === 'syncing'
                       ? 'text-cyan-300 bg-cyan-500/15 border-cyan-500/30'
@@ -174,7 +174,7 @@ export const Header: React.FC = () => {
                     role="status"
                     aria-live="polite"
                     className={`${
-                      showCoachDashboard ? 'max-sm:sr-only' : 'max-[359px]:sr-only'
+                      isCoachMode ? 'max-sm:sr-only' : 'max-[359px]:sr-only'
                     } inline`}
                   >
                     {statusText}
