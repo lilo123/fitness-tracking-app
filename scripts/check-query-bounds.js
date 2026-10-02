@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * CyberGym V2 — Supabase Query Bounds Checker (RFIX-22)
+ * Yourbody V2 — Supabase Query Bounds Checker (RFIX-22)
  *
  * Scans non-test TypeScript files under src/ for Supabase .select() queries
  * and enforces that every user-data query carries an explicit, unconditional row bound:
@@ -248,7 +248,7 @@ function checkFile(filePath, violations) {
 
 function main() {
   console.log('====================================================');
-  console.log('🔍 CyberGym Supabase Query Bounds Checker (RFIX-22)');
+  console.log('🔍 Yourbody Supabase Query Bounds Checker (RFIX-22)');
   console.log('====================================================\n');
 
   const targetArg = process.argv[2];

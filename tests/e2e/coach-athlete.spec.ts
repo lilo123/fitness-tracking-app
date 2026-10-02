@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Coach-Athlete Multi-Tenant Flow E2E', () => {
   test('coach logs in and accesses coach cockpit', async ({ page }) => {
     await page.goto('/login');
-    await page.fill('input[type="email"]', 'coach@cybergym.io');
+    await page.fill('input[type="email"]', 'coach@yourbody.fyi');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/coach');
@@ -21,7 +21,7 @@ test.describe('Coach-Athlete Multi-Tenant Flow E2E', () => {
 
   test('coach builds and saves a workout routine template', async ({ page }) => {
     await page.goto('/login');
-    await page.fill('input[type="email"]', 'coach@cybergym.io');
+    await page.fill('input[type="email"]', 'coach@yourbody.fyi');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/coach');

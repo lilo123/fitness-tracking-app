@@ -5,7 +5,7 @@ test.describe('RFIX-09 History Keyset Pagination Verification', () => {
     test.setTimeout(60000);
     // 1. Authenticate as dedicated pagination user (151 seeded workouts)
     await page.goto('/login');
-    await page.fill('input[type="email"]', 'paginate@cybergym.io');
+    await page.fill('input[type="email"]', 'paginate@yourbody.fyi');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/workout');

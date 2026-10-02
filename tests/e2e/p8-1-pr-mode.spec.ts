@@ -1,7 +1,7 @@
 import { execSync } from 'child_process';
 import { test, expect, type Page } from '@playwright/test';
 
-const ATHLETE_EMAIL = 'p81-athlete-pr@cybergym.io';
+const ATHLETE_EMAIL = 'p81-athlete-pr@yourbody.fyi';
 const PASSWORD = 'password123';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'http://127.0.0.1:58821';

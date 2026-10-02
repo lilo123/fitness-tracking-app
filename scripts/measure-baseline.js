@@ -1,6 +1,6 @@
 
 /**
- * CyberGym V2 — Performance Baseline Measurement Harness (RFIX-12 / DIR-000)
+ * Yourbody V2 — Performance Baseline Measurement Harness (RFIX-12 / DIR-000)
  *
  * Captures authoritative baseline metrics for:
  * 1. Bundle composition & chunk byte sizes (raw and gzip) from production build
@@ -155,7 +155,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   const skipProfiler = process.argv.includes('--skip-profiler');
 
 console.log('====================================================');
-console.log('🚀 CyberGym V2 — Performance Baseline Harness (RFIX-12)');
+console.log('🚀 Yourbody V2 — Performance Baseline Harness (RFIX-12)');
 console.log(`   Throttling: ${isThrottling ? 'Slow 4G + 4x CPU (simulated)' : 'DISABLED (--no-throttling)'}`);
 console.log('====================================================\n');
 
@@ -360,12 +360,12 @@ function getFreePort() {
 console.log('\nStep 5/5: Executing authoritative Lighthouse Mobile runner on production build...');
 
 const routes = [
-  { path: '/workout', name: 'Workout', email: 'athlete@cybergym.io', password: 'password123' },
-  { path: '/nutrition', name: 'Nutrition', email: 'athlete@cybergym.io', password: 'password123' },
-  { path: '/history', name: 'History', email: 'athlete@cybergym.io', password: 'password123' },
-  { path: '/coach', name: 'Coach', email: 'coach@cybergym.io', password: 'password123' },
-  { path: '/exercises', name: 'Exercises', email: 'athlete@cybergym.io', password: 'password123' },
-  { path: '/settings', name: 'Settings', email: 'athlete@cybergym.io', password: 'password123' },
+  { path: '/workout', name: 'Workout', email: 'athlete@yourbody.fyi', password: 'password123' },
+  { path: '/nutrition', name: 'Nutrition', email: 'athlete@yourbody.fyi', password: 'password123' },
+  { path: '/history', name: 'History', email: 'athlete@yourbody.fyi', password: 'password123' },
+  { path: '/coach', name: 'Coach', email: 'coach@yourbody.fyi', password: 'password123' },
+  { path: '/exercises', name: 'Exercises', email: 'athlete@yourbody.fyi', password: 'password123' },
+  { path: '/settings', name: 'Settings', email: 'athlete@yourbody.fyi', password: 'password123' },
 ];
 
 const throttlingSettings = isThrottling
@@ -665,7 +665,7 @@ console.log(`\n✅ Machine-readable results emitted: ${resultsJsonPath}`);
 console.log('Writing comprehensive docs/perf-baseline.md...');
 
 const docLines = [
-  '# CyberGym V2 — Authoritative Performance Baseline (RFIX-12 / DIR-000)',
+  '# Yourbody V2 — Authoritative Performance Baseline (RFIX-12 / DIR-000)',
   '',
   '**Generated:** ' + new Date().toISOString(),
   // W-7: the generated doc previously carried no commit stamp at all, only a timestamp. That is how the
@@ -688,7 +688,7 @@ const docLines = [
   '',
   '## 1. Executive Summary & Ratified Criteria Evaluation',
   '',
-  'This baseline report establishes empirical measurements for CyberGym V2 on a production compilation artifact set (`dist/`) under standardized mobile network and CPU throttling. All numbers reflect genuine runtime executions with zero fabricated fallbacks.',
+  'This baseline report establishes empirical measurements for Yourbody V2 on a production compilation artifact set (`dist/`) under standardized mobile network and CPU throttling. All numbers reflect genuine runtime executions with zero fabricated fallbacks.',
   '',
   '| Ratified Exit Criterion | Target Threshold | Observed Baseline Value | Status |',
   '|---|---|---|---|',
@@ -740,7 +740,7 @@ docLines.push(
   '## 3. Route Load & Network Transfer Baseline (Seeded Account)',
   '',
   'Measured using the automated Playwright performance project (`perf-trace`) on a simulated mobile device (Pixel 7).',
-  'The seeded benchmark account (`bench-athlete@cybergym.io`) holds **550 sets across 50 workouts** and **350 daily nutrition logs**.',
+  'The seeded benchmark account (`bench-athlete@yourbody.fyi`) holds **550 sets across 50 workouts** and **350 daily nutrition logs**.',
   '',
   '| Route | Auth Context | Total Requests | Transferred Bytes | Supabase Query Payload | First Meaningful Content / Load |',
   '|---|---|---|---|---|---|',

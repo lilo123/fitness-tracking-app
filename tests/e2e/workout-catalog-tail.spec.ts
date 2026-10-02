@@ -35,7 +35,7 @@ interface TailTestUser {
 }
 
 async function createTailTestUser(): Promise<TailTestUser> {
-  const email = `workout-tail-${Date.now()}-${Math.floor(Math.random() * 1000000)}@cybergym.io`;
+  const email = `workout-tail-${Date.now()}-${Math.floor(Math.random() * 1000000)}@yourbody.fyi`;
   const password = 'Password123!';
 
   const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {

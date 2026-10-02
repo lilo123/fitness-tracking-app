@@ -19,7 +19,7 @@ async function getAthleteToken(): Promise<string> {
       apikey: SUPABASE_ANON_KEY,
     },
     body: JSON.stringify({
-      email: 'athlete@cybergym.io',
+      email: 'athlete@yourbody.fyi',
       password: 'password123',
     }),
   });
@@ -102,7 +102,7 @@ function cleanupLibraryTestData() {
 
 async function loginAsAthlete(page: Page) {
   await page.goto('/login');
-  await page.fill('input[type="email"]', 'athlete@cybergym.io');
+  await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
   await page.fill('input[type="password"]', 'password123');
   await page.click('button[type="submit"]');
   await page.waitForURL('**/workout');
@@ -111,7 +111,7 @@ async function loginAsAthlete(page: Page) {
 
 async function loginAsCoach(page: Page) {
   await page.goto('/login');
-  await page.fill('input[type="email"]', 'coach@cybergym.io');
+  await page.fill('input[type="email"]', 'coach@yourbody.fyi');
   await page.fill('input[type="password"]', 'password123');
   await page.click('button[type="submit"]');
   await page.waitForURL('**/coach');
@@ -879,7 +879,7 @@ test.describe('P7b Library Template Builder and Catalog Acceptance Proofs', () =
   test('Proof (g): as coach, creates template for athlete via single save_routine_template RPC (p_assigned_to) with zero direct table writes', async ({ page }) => {
     // 1. Resolve athlete id dynamically from database
     const athleteId = execSync(
-      `${getPsqlCommand()} -At -c "SELECT id FROM auth.users WHERE email = 'athlete@cybergym.io' LIMIT 1;"`
+      `${getPsqlCommand()} -At -c "SELECT id FROM auth.users WHERE email = 'athlete@yourbody.fyi' LIMIT 1;"`
     ).toString().trim();
     expect(athleteId).toBeTruthy();
 
@@ -908,7 +908,7 @@ test.describe('P7b Library Template Builder and Catalog Acceptance Proofs', () =
 
     // 2. Login as coach
     await page.goto('/login');
-    await page.fill('input[type="email"]', 'coach@cybergym.io');
+    await page.fill('input[type="email"]', 'coach@yourbody.fyi');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/coach');
@@ -969,7 +969,7 @@ test.describe('P7b Library Template Builder and Catalog Acceptance Proofs', () =
 
   test('Proof (g-fail): Coach save_routine_template 500 failure shows error banner, zero table writes, and leaves no orphan', async ({ page }) => {
     const athleteId = execSync(
-      `${getPsqlCommand()} -At -c "SELECT id FROM auth.users WHERE email = 'athlete@cybergym.io' LIMIT 1;"`
+      `${getPsqlCommand()} -At -c "SELECT id FROM auth.users WHERE email = 'athlete@yourbody.fyi' LIMIT 1;"`
     ).toString().trim();
     expect(athleteId).toBeTruthy();
 
@@ -987,7 +987,7 @@ test.describe('P7b Library Template Builder and Catalog Acceptance Proofs', () =
 
     // 1. Login as coach
     await page.goto('/login');
-    await page.fill('input[type="email"]', 'coach@cybergym.io');
+    await page.fill('input[type="email"]', 'coach@yourbody.fyi');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/coach');

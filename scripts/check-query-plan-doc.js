@@ -85,7 +85,7 @@ function getLiveIndexes() {
 
 function runAudit() {
   console.log('====================================================');
-  console.log('🔍 CyberGym Query Plans Index Audit (RFIX-16)');
+  console.log('🔍 Yourbody Query Plans Index Audit (RFIX-16)');
   console.log('====================================================');
 
   const docIndexes = getDocIndexes();

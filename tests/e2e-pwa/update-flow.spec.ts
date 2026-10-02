@@ -92,9 +92,9 @@ test.describe('PWA Service Worker Update Flow & Safety Blockers', () => {
       const month = String(now.getMonth() + 1).padStart(2, '0');
       const day = String(now.getDate()).padStart(2, '0');
       const today = `${year}-${month}-${day}`;
-      localStorage.setItem(`cybergym_current_session_pointer_${uid}`, today);
+      localStorage.setItem(`yourbody_current_session_pointer_${uid}`, today);
       localStorage.setItem(
-        `cybergym_active_session_${uid}_${today}`,
+        `yourbody_active_session_${uid}_${today}`,
         JSON.stringify({
           schemaVersion: 1,
           sessionId: 'active-session-blocker',
@@ -121,10 +121,10 @@ test.describe('PWA Service Worker Update Flow & Safety Blockers', () => {
 
     // Clear active workout session so workout blocker is cleared
     await page.evaluate((uid) => {
-      localStorage.removeItem(`cybergym_current_session_pointer_${uid}`);
+      localStorage.removeItem(`yourbody_current_session_pointer_${uid}`);
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const key = localStorage.key(i);
-        if (key && (key.startsWith('cybergym_current_session_pointer_') || key.startsWith('cybergym_active_session_'))) {
+        if (key && (key.startsWith('yourbody_current_session_pointer_') || key.startsWith('yourbody_active_session_'))) {
           localStorage.removeItem(key);
         }
       }

@@ -1,5 +1,5 @@
--- Payload Stress Benchmark Seed Script for CyberGym V2 (RFIX-08)
--- User: bench-athlete@cybergym.io (05497a83-49a9-4802-aa84-0a81a2a53bf0)
+-- Payload Stress Benchmark Seed Script for Yourbody V2 (RFIX-08)
+-- User: bench-athlete@yourbody.fyi (05497a83-49a9-4802-aa84-0a81a2a53bf0)
 
 -- 0. Ensure benchmark auth user, identity, and profile exist
 INSERT INTO auth.users (
@@ -25,7 +25,7 @@ INSERT INTO auth.users (
   '05497a83-49a9-4802-aa84-0a81a2a53bf0',
   'authenticated',
   'authenticated',
-  'bench-athlete@cybergym.io',
+  'bench-athlete@yourbody.fyi',
   crypt('password123', gen_salt('bf')),
   now(),
   now(),
@@ -52,7 +52,7 @@ INSERT INTO auth.identities (
 ) VALUES (
   '05497a83-49a9-4802-aa84-0a81a2a53bf0',
   '05497a83-49a9-4802-aa84-0a81a2a53bf0',
-  '{"sub":"05497a83-49a9-4802-aa84-0a81a2a53bf0","email":"bench-athlete@cybergym.io"}'::jsonb,
+  '{"sub":"05497a83-49a9-4802-aa84-0a81a2a53bf0","email":"bench-athlete@yourbody.fyi"}'::jsonb,
   'email',
   '05497a83-49a9-4802-aa84-0a81a2a53bf0',
   now(),
@@ -63,7 +63,7 @@ INSERT INTO auth.identities (
 INSERT INTO public.users (id, email, username, role)
 VALUES (
   '05497a83-49a9-4802-aa84-0a81a2a53bf0',
-  'bench-athlete@cybergym.io',
+  'bench-athlete@yourbody.fyi',
   'Bench Athlete',
   'athlete'
 ) ON CONFLICT (id) DO NOTHING;

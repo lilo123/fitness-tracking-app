@@ -22,7 +22,7 @@ test.describe('RFIX-06 Payload & Cache Key Disambiguation Verification', () => {
     );
 
     await page.goto('/login');
-    await page.fill('input[type="email"]', 'athlete@cybergym.io');
+    await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/workout');
@@ -72,7 +72,7 @@ test.describe('RFIX-06 Payload & Cache Key Disambiguation Verification', () => {
   test('Order B: Client navigation /exercises -> /workout refetches bounded query <= 51,200 B and asserts projection & order', async ({ page }) => {
     // 1. Authenticate session
     await page.goto('/login');
-    await page.fill('input[type="email"]', 'athlete@cybergym.io');
+    await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/workout');

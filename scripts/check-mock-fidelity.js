@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * CyberGym V2 — Supabase Mock Fidelity Checker (RFIX-14)
+ * Yourbody V2 — Supabase Mock Fidelity Checker (RFIX-14)
  *
  * Enforces per-query database contract fidelity across all test doubles mocking `supabase.from`:
  * 1. Measures mock fidelity at the QUERY level (distinct (table, projection) pairs serviced).
@@ -717,7 +717,7 @@ function analyzeTestFile(filePath) {
 
 function main() {
   console.log('========================================================================');
-  console.log('🔍 CyberGym Mock Fidelity Checker — Per-Query Database Contract Verification');
+  console.log('🔍 Yourbody Mock Fidelity Checker — Per-Query Database Contract Verification');
   console.log('========================================================================\n');
 
   const testFiles = findTestFiles(srcDir);

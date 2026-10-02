@@ -41,9 +41,9 @@ export default async function globalTeardown() {
     SELECT id, email
     FROM public.users
     WHERE email IN (
-      'athlete@cybergym.io',
-      'coach@cybergym.io',
-      'paginate@cybergym.io'
+      'athlete@yourbody.fyi',
+      'coach@yourbody.fyi',
+      'paginate@yourbody.fyi'
     );
 
     DO $$
@@ -56,9 +56,9 @@ export default async function globalTeardown() {
       END IF;
       IF EXISTS (
         SELECT 1 FROM e2e_test_users
-        WHERE id = (SELECT id FROM public.users WHERE email = 'bench-athlete@cybergym.io')
+        WHERE id = (SELECT id FROM public.users WHERE email = 'bench-athlete@yourbody.fyi')
       ) THEN
-        RAISE EXCEPTION 'CRITICAL: bench-athlete@cybergym.io must never be in e2e_test_users!';
+        RAISE EXCEPTION 'CRITICAL: bench-athlete@yourbody.fyi must never be in e2e_test_users!';
       END IF;
     END $$;
 

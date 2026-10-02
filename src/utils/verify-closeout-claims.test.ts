@@ -363,7 +363,7 @@ Some intro text.
   describe('Unaccounted-Figure Sweep (NC-5 / NC-6 Oracle)', () => {
     it('fails and names both invented figures and line numbers when unverified prose is appended (NC-5)', () => {
       const markdown = `
-# CyberGym Tier 3 Closeout Verification Report
+# Yourbody Tier 3 Closeout Verification Report
 
 | Metric ID | Description | Claimed Value | Evidence Source | Type | Context |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -392,7 +392,7 @@ The /workout route now transfers 999999 B and the react-vendor chunk is 172129 B
       // vanished from the sweep entirely. That is indistinguishable from having
       // no sweep at all for anyone who writes naturally, so pin it.
       const markdown = `
-# CyberGym Tier 3 Closeout Verification Report
+# Yourbody Tier 3 Closeout Verification Report
 
 | Metric ID | Description | Claimed Value | Evidence Source | Type | Context |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -418,7 +418,7 @@ A separate pre-888888 baseline was also recorded.
 
     it('allows figures explicitly waived inline with a human reason', () => {
       const markdown = `
-# CyberGym Tier 3 Closeout Verification Report
+# Yourbody Tier 3 Closeout Verification Report
 
 | Metric ID | Description | Claimed Value | Evidence Source | Type | Context |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -434,7 +434,7 @@ The /workout route now transfers 999999 B and the react-vendor chunk is 172129 B
 
     it('respects narrow ignore rules (ISO timestamps, git SHAs, UUIDs, section numbers, list numbers, URLs)', () => {
       const markdown = `
-# CyberGym Tier 3 Closeout Verification Report
+# Yourbody Tier 3 Closeout Verification Report
 
 - **Commit**: \`9d2a01cbc5de20591782afbc33afe7be10b90653\`
 - **Manifest Timestamp**: \`2026-09-17T16:29:02.369Z\`

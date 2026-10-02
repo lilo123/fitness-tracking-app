@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * CyberGym V2 — Perf Artifact Verifier (RFIX-08 / R-1)
+ * Yourbody V2 — Perf Artifact Verifier (RFIX-08 / R-1)
  *
  * Replaces RFIX-08's original inline verification command:
  *

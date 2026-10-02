@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# CyberGym Tier 3: Evidence Collector (RFIX-24 / P3-2)
+# Yourbody Tier 3: Evidence Collector (RFIX-24 / P3-2)
 #
 # Runs every verification gate, tees raw stdout and stderr to docs/evidence/<gate>.txt,
 # captures exact exit codes, and writes docs/evidence/manifest.json.
@@ -32,7 +32,7 @@ if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
 fi
 
 echo "=============================================================================="
-echo "CyberGym Evidence Collector"
+echo "Yourbody Evidence Collector"
 echo "Commit: $GIT_COMMIT (dirty: $GIT_DIRTY)"
 echo "Output Directory: $EVIDENCE_DIR"
 echo "=============================================================================="

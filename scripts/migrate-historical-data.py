@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Production Historical Data Migration Script
-CyberGym V1 (Google Apps Script & Google Drive) -> CyberGym V2 (Supabase PostgreSQL)
+Yourbody V1 (Google Apps Script & Google Drive) -> Yourbody V2 (Supabase PostgreSQL)
 
 Target User: Coach Duy (diehard643@gmail.com / id: 2d444ce2-c0cf-483f-a82e-43c8fb9807b1)
 Remote Supabase Project: erqhtucitatzhcqwtvce
@@ -19,6 +19,7 @@ import uuid
 from typing import Any, Dict, List
 
 # Fixed Namespace for Deterministic UUIDv5
+# D-YB-4 keep: ID namespace constant; changing it breaks re-runs of the historical import
 ROOT_NAMESPACE = uuid.uuid5(uuid.NAMESPACE_DNS, 'cybergym.app')
 COACH_UID = '2d444ce2-c0cf-483f-a82e-43c8fb9807b1'
 APPS_SCRIPT_BASE_URL = (
@@ -57,7 +58,7 @@ def fetch_apps_script_data(sheet_type: str, athlete: str = 'duy') -> List[Dict[s
     if athlete:
         url += f'&athlete={athlete}'
     print(f'Fetching {sheet_type} from {url}...')
-    req = urllib.request.Request(url, headers={'User-Agent': 'CyberGymMigration/2.0'})
+    req = urllib.request.Request(url, headers={'User-Agent': 'YourbodyMigration/2.0'})
     with urllib.request.urlopen(req, timeout=30) as resp:
         data = json.loads(resp.read().decode('utf-8'))
         if not data.get('success'):
@@ -150,7 +151,7 @@ def build_migration_sql(
 ) -> str:
     """Build atomic, deterministic, idempotent SQL migration."""
     statements: List[str] = []
-    statements.append('-- CyberGym V1 to V2 Production Historical Data Migration')
+    statements.append('-- Yourbody V1 to V2 Production Historical Data Migration')
     statements.append('-- Target User: Coach Duy (2d444ce2-c0cf-483f-a82e-43c8fb9807b1)')
     statements.append('BEGIN;\n')
 
@@ -361,13 +362,13 @@ def run_post_migration_verification():
 
 
 def main():
-    parser = argparse.ArgumentParser(description='CyberGym Historical Data Migration')
+    parser = argparse.ArgumentParser(description='Yourbody Historical Data Migration')
     parser.add_argument('--dry-run', action='store_true', help='Generate SQL without executing')
     parser.add_argument('--refresh-nutrition', action='store_true', help='Force re-export nutrition CSV from Google Drive')
     parser.add_argument('--sql-out', default='/tmp/production_migration.sql', help='Output SQL file path')
     args = parser.parse_args()
 
-    print('Starting CyberGym Historical Data Migration Pipeline...')
+    print('Starting Yourbody Historical Data Migration Pipeline...')
 
     # 1. Fetch Source Data
     legacy_exercises = fetch_apps_script_data('Exercises')

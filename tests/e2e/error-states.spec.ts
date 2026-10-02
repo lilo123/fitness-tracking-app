@@ -5,7 +5,7 @@ test.describe('RFIX-11 Error States & Retry Affordance E2E', () => {
   test('Route 1: /workout displays error state and retry affordance on PostgREST read error, recovering on retry', async ({ page }) => {
     // 1. Authenticate as athlete
     await page.goto('/login');
-    await page.fill('input[type="email"]', 'athlete@cybergym.io');
+    await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/workout');
@@ -34,7 +34,7 @@ test.describe('RFIX-11 Error States & Retry Affordance E2E', () => {
   test('Route 2: /history displays error state and retry affordance on PostgREST read error, recovering on retry', async ({ page }) => {
     // 1. Authenticate as athlete
     await page.goto('/login');
-    await page.fill('input[type="email"]', 'athlete@cybergym.io');
+    await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/workout');
@@ -63,7 +63,7 @@ test.describe('RFIX-11 Error States & Retry Affordance E2E', () => {
   test('Route 3: /nutrition displays error state and retry affordance on PostgREST read error, recovering on retry', async ({ page }) => {
     // 1. Authenticate as athlete
     await page.goto('/login');
-    await page.fill('input[type="email"]', 'athlete@cybergym.io');
+    await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/workout');
@@ -92,7 +92,7 @@ test.describe('RFIX-11 Error States & Retry Affordance E2E', () => {
   test('Route 4: /exercises displays error state and retry affordance on PostgREST read error, recovering on retry', async ({ page }) => {
     // 1. Authenticate as athlete
     await page.goto('/login');
-    await page.fill('input[type="email"]', 'athlete@cybergym.io');
+    await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/workout');
@@ -121,7 +121,7 @@ test.describe('RFIX-11 Error States & Retry Affordance E2E', () => {
   test('Route 5: /coach displays error state and retry affordance on PostgREST read error, recovering on retry', async ({ page }) => {
     // 1. Authenticate as coach
     await page.goto('/login');
-    await page.fill('input[type="email"]', 'coach@cybergym.io');
+    await page.fill('input[type="email"]', 'coach@yourbody.fyi');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/coach');

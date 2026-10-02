@@ -35,7 +35,7 @@ interface ViewportTestUser {
 }
 
 async function createViewportTestUser(): Promise<ViewportTestUser> {
-  const email = `mobile-viewport-${Date.now()}-${Math.floor(Math.random() * 1000000)}@cybergym.io`;
+  const email = `mobile-viewport-${Date.now()}-${Math.floor(Math.random() * 1000000)}@yourbody.fyi`;
   const password = 'Password123!';
 
   const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
@@ -125,7 +125,7 @@ test.describe('Mobile Viewport & Ergonomics', () => {
   test('prevents horizontal scroll overflow on mobile', async ({ page }) => {
     await page.goto('/login');
     // Quick login via demo athlete
-    await page.fill('input[type="email"]', 'athlete@cybergym.io');
+    await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/workout');
@@ -159,7 +159,7 @@ test.describe('Mobile Viewport & Ergonomics', () => {
     }
 
     // Login and check workout inputs
-    await page.fill('input[type="email"]', 'athlete@cybergym.io');
+    await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/workout');
@@ -179,7 +179,7 @@ test.describe('Mobile Viewport & Ergonomics', () => {
   test("prevents horizontal scroll overflow on /history (both By Session and By Exercise)", async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 844 });
     await page.goto("/login");
-    await page.fill('input[type="email"]', "athlete@cybergym.io");
+    await page.fill('input[type="email"]', "athlete@yourbody.fyi");
     await page.fill('input[type="password"]', "password123");
     await page.click('button[type="submit"]');
     await page.waitForURL("**/workout");
@@ -207,7 +207,7 @@ test.describe('Mobile Viewport & Ergonomics', () => {
 
   test("prevents horizontal scroll overflow on /history with open sheets and nutrition timeline", async ({ page }) => {
     await page.goto("/login");
-    await page.fill('input[type="email"]', "athlete@cybergym.io");
+    await page.fill('input[type="email"]', "athlete@yourbody.fyi");
     await page.fill('input[type="password"]', "password123");
     await page.click('button[type="submit"]');
     await page.waitForURL("**/workout");
@@ -321,7 +321,7 @@ test.describe('Mobile Viewport & Ergonomics', () => {
   test("prevents horizontal scroll overflow on /exercises (both Exercises and Templates) and verifies search input font size >= 16px at 320px", async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 844 });
     await page.goto("/login");
-    await page.fill('input[type="email"]', "athlete@cybergym.io");
+    await page.fill('input[type="email"]', "athlete@yourbody.fyi");
     await page.fill('input[type="password"]', "password123");
     await page.click('button[type="submit"]');
     await page.waitForURL("**/workout");
@@ -358,7 +358,7 @@ test.describe('Mobile Viewport & Ergonomics', () => {
   test("prevents horizontal scroll overflow on /exercises Template Sheet at 320px and verifies controls >= 44x44", async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 844 });
     await page.goto("/login");
-    await page.fill('input[type="email"]', "athlete@cybergym.io");
+    await page.fill('input[type="email"]', "athlete@yourbody.fyi");
     await page.fill('input[type="password"]', "password123");
     await page.click('button[type="submit"]');
     await page.waitForURL("**/workout");
@@ -402,7 +402,7 @@ test.describe('Mobile Viewport & Ergonomics', () => {
   test("BottomNav at 320px: all 5 labels visible, scrollWidth <= clientWidth, tabs >= 44px tall, aria-current on active tab", async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 844 });
     await page.goto("/login");
-    await page.fill('input[type="email"]', "athlete@cybergym.io");
+    await page.fill('input[type="email"]', "athlete@yourbody.fyi");
     await page.fill('input[type="password"]', "password123");
     await page.click('button[type="submit"]');
     await page.waitForURL("**/workout");

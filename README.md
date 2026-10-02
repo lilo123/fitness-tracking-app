@@ -1,12 +1,12 @@
-# CyberGym V2
+# Yourbody V2
 
-CyberGym V2 is a modern, mobile-first fitness and nutrition tracking application featuring a cyberpunk aesthetic, multi-tier coach/athlete roles, intelligent ghost-set tracking, AI-powered nutritional analysis, and Android Health Connect integration.
+Yourbody V2 is a modern, mobile-first fitness and nutrition tracking application featuring a cyberpunk aesthetic, multi-tier coach/athlete roles, intelligent ghost-set tracking, AI-powered nutritional analysis, and Android Health Connect integration.
 
 ---
 
 ## Architecture Overview
 
-CyberGym V2 is architected for high performance, modularity, and operational resilience:
+Yourbody V2 is architected for high performance, modularity, and operational resilience:
 
 - **Frontend & UI**:
   - **Framework**: React 19 + TypeScript + Vite 8
@@ -120,7 +120,7 @@ npm run build
 
 ## Test Suite Commands
 
-The CyberGym test suite verifies code quality, unit logic, component interactions, database constraints/RLS, edge functions, and end-to-end user flows.
+The Yourbody test suite verifies code quality, unit logic, component interactions, database constraints/RLS, edge functions, and end-to-end user flows.
 
 | Command | Tool | Scope |
 |---|---|---|

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * CyberGym V2 — Perf Trace Runner (R-1b)
+ * Yourbody V2 — Perf Trace Runner (R-1b)
  *
  * Runs trace-then-merge in a single command:
  * 1. Cleans stale shards from test-results/perf-shards/

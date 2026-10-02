@@ -68,7 +68,7 @@ function seedTestData() {
 
 async function loginAsAthlete(page: Page) {
   await page.goto('/login');
-  await page.fill('input[type="email"]', 'athlete@cybergym.io');
+  await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
   await page.fill('input[type="password"]', 'password123');
   await page.click('button[type="submit"]');
   await page.waitForURL('**/workout');

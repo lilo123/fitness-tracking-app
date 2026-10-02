@@ -321,7 +321,7 @@ test.describe('PWA Nutrition Offline Acceptance Specs (O2)', () => {
 
       // Verify photo item has photo data in IDB initially
       const hasPhotoInitially = await page.evaluate(async (uid) => {
-        const req = indexedDB.open(`cybergym-offline-${uid}`);
+        const req = indexedDB.open(`yourbody-offline-${uid}`);
         const db: IDBDatabase = await new Promise((resolve, reject) => {
           req.onsuccess = () => resolve(req.result);
           req.onerror = () => reject(req.error);
@@ -403,7 +403,7 @@ test.describe('PWA Nutrition Offline Acceptance Specs (O2)', () => {
       // Poll IDB until 429 backoff has elapsed, then dispatch online event to wake processor
       await expect.poll(async () => {
         return page.evaluate(async (uid) => {
-          const openReq = indexedDB.open(`cybergym-offline-${uid}`);
+          const openReq = indexedDB.open(`yourbody-offline-${uid}`);
           const db: IDBDatabase = await new Promise((resolve, reject) => {
             openReq.onsuccess = () => resolve(openReq.result);
             openReq.onerror = () => reject(openReq.error);
@@ -431,7 +431,7 @@ test.describe('PWA Nutrition Offline Acceptance Specs (O2)', () => {
 
       // 5. Verify IndexedDB aiq photo field is deleted after analysis
       const isPhotoDeleted = await page.evaluate(async (uid) => {
-        const req = indexedDB.open(`cybergym-offline-${uid}`);
+        const req = indexedDB.open(`yourbody-offline-${uid}`);
         const db: IDBDatabase = await new Promise((resolve, reject) => {
           req.onsuccess = () => resolve(req.result);
           req.onerror = () => reject(req.error);
@@ -458,7 +458,7 @@ test.describe('PWA Nutrition Offline Acceptance Specs (O2)', () => {
 
       // Read capturedAt stored in the specific aiq item from IDB before review
       const capturedAiItem = await page.evaluate(async ({ uid, itemId }) => {
-        const req = indexedDB.open(`cybergym-offline-${uid}`);
+        const req = indexedDB.open(`yourbody-offline-${uid}`);
         const db: IDBDatabase = await new Promise((resolve, reject) => {
           req.onsuccess = () => resolve(req.result);
           req.onerror = () => reject(req.error);
@@ -493,7 +493,7 @@ test.describe('PWA Nutrition Offline Acceptance Specs (O2)', () => {
       // 7. Test Discard on failed (422) item
       // Seed a failed item into IDB
       await page.evaluate(async (uid) => {
-        const req = indexedDB.open(`cybergym-offline-${uid}`);
+        const req = indexedDB.open(`yourbody-offline-${uid}`);
         const db: IDBDatabase = await new Promise((resolve, reject) => {
           req.onsuccess = () => resolve(req.result);
           req.onerror = () => reject(req.error);
@@ -538,7 +538,7 @@ test.describe('PWA Nutrition Offline Acceptance Specs (O2)', () => {
 
       // Verify item and photo gone from IDB
       const failedItemInDb = await page.evaluate(async (uid) => {
-        const req = indexedDB.open(`cybergym-offline-${uid}`);
+        const req = indexedDB.open(`yourbody-offline-${uid}`);
         const db: IDBDatabase = await new Promise((resolve, reject) => {
           req.onsuccess = () => resolve(req.result);
           req.onerror = () => reject(req.error);

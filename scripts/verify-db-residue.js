@@ -111,7 +111,7 @@ function main() {
   const baseline = loadBaseline(options.baselineFile);
 
   console.log('====================================================');
-  console.log('🔍 CyberGym DB Residue Verification (RFIX-20)');
+  console.log('🔍 Yourbody DB Residue Verification (RFIX-20)');
   console.log('====================================================');
   console.log(
     `${'Table'.padEnd(24)} ${'Baseline'.padEnd(10)} ${'Current'.padEnd(10)} Status`

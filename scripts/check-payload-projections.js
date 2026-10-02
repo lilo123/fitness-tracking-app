@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * CyberGym V2 — Supabase Payload Projection Gate (Gate A / P1-0)
+ * Yourbody V2 — Supabase Payload Projection Gate (Gate A / P1-0)
  *
  * Scans non-test TypeScript files under src/ for Supabase .select() queries
  * and enforces the heavy-column denylist:

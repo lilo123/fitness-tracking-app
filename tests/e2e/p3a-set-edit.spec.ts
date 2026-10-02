@@ -28,11 +28,11 @@ function cleanupPollutedWorkouts() {
     DELETE FROM public.sets
     WHERE workout_id IN (
       SELECT id FROM public.workouts
-      WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io')
+      WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@yourbody.fyi')
         AND name <> 'Push Day Benchmark'
     );
     DELETE FROM public.workouts
-    WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io')
+    WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@yourbody.fyi')
       AND name <> 'Push Day Benchmark';
   `;
   try {
@@ -84,7 +84,7 @@ test.describe('P3a Set Edit and Delete Workflows (p3a-set-edit)', () => {
     });
 
     await page.goto('/login');
-    await page.fill('input[type="email"]', 'athlete@cybergym.io');
+    await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/workout');
@@ -226,7 +226,7 @@ test.describe('P3a Set Edit and Delete Workflows (p3a-set-edit)', () => {
     });
 
     await page.goto('/login');
-    await page.fill('input[type="email"]', 'athlete@cybergym.io');
+    await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/workout');
@@ -297,7 +297,7 @@ test.describe('P3a Set Edit and Delete Workflows (p3a-set-edit)', () => {
     page,
   }) => {
     // Provide a deterministic quick-log favorite so the test is self-sufficient on fresh seed DBs
-    // (supabase/seed.sql lines 492-508 seed custom dishes only for bench-athlete, 0 for athlete@cybergym.io).
+    // (supabase/seed.sql lines 492-508 seed custom dishes only for bench-athlete, 0 for athlete@yourbody.fyi).
     const favoriteDish = {
       id: 'dish-poached-chicken-fav',
       user_id: 'a0000000-0000-0000-0000-000000000002',
@@ -346,7 +346,7 @@ test.describe('P3a Set Edit and Delete Workflows (p3a-set-edit)', () => {
     });
 
     await page.goto('/login');
-    await page.fill('input[type="email"]', 'athlete@cybergym.io');
+    await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/workout');

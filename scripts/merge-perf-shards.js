@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * CyberGym V2 — Merge Perf Trace Shards (R-1b)
+ * Yourbody V2 — Merge Perf Trace Shards (R-1b)
  *
  * Merges individual per-route perf trace shards from test-results/perf-shards/
  * into docs/perf-trace-results.json, stamping a complete _meta provenance block.

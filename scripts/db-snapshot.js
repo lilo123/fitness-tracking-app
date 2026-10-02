@@ -82,7 +82,7 @@ function main() {
     const beforeCounts = JSON.parse(fs.readFileSync(SNAPSHOT_BEFORE_PATH, 'utf8'));
 
     console.log('====================================================');
-    console.log('🔍 CyberGym Database Residue Audit (RFIX-20)');
+    console.log('🔍 Yourbody Database Residue Audit (RFIX-20)');
     console.log('====================================================');
     console.log(
       `${'Table'.padEnd(24)} ${'Before'.padEnd(10)} ${'After'.padEnd(10)} Diff`

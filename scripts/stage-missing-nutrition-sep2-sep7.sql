@@ -1,4 +1,4 @@
--- CyberGym V2: Missing Nutrition Logs Staging (Sep 2, 2026 - Sep 7, 2026)
+-- Yourbody V2: Missing Nutrition Logs Staging (Sep 2, 2026 - Sep 7, 2026)
 -- Target User: Coach Duy (diehard643@gmail.com / id: 2d444ce2-c0cf-483f-a82e-43c8fb9807b1)
 -- Timestamp Anchor: Noon UTC (12:00:00Z) consistent with historical seed data and date normalization
 

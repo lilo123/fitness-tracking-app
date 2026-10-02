@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "CyberGym V2 \u2014 Design Ratchet Baseline (STD-TYP-1..4, STD-INT-3, STD-CMP-7)",
+  "description": "Yourbody V2 \u2014 Design Ratchet Baseline (STD-TYP-1..4, STD-INT-3, STD-CMP-7)",
   "rules": [
     "confirm",
     "font-mono",

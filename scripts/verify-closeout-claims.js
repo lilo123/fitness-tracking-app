@@ -615,7 +615,7 @@ export function sweepUnaccountedFigures(markdownText, verifiedResults = [], mani
       continue;
     }
 
-    // Rule 4: Section / Heading numbering & CyberGym Tier N
+    // Rule 4: Section / Heading numbering & Yourbody Tier N
     if (/^#+\s+\d+(?:\.\d+)*\.?\s+/.test(line.trim())) {
       line = line.replace(/^#+\s+\d+(?:\.\d+)*\.?\s+/, '');
     }
@@ -845,7 +845,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   }
 
   console.log('==============================================================================');
-  console.log('🔍 CyberGym Closeout Claims Verifier (RFIX-24)');
+  console.log('🔍 Yourbody Closeout Claims Verifier (RFIX-24)');
   console.log(`Document:    ${closeoutPath}`);
   console.log(`Evidence:    ${evidenceDir}`);
   console.log('==============================================================================\n');

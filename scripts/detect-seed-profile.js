@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * CyberGym Tier 3 — Seed Profile Detector (Gate C: Seed Provenance)
+ * Yourbody Tier 3 — Seed Profile Detector (Gate C: Seed Provenance)
  *
  * Why this exists:
  * Previously, docs/perf-trace-results.json recorded `_meta.seedProfile`, which was

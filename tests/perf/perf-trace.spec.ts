@@ -77,7 +77,7 @@ test.describe('Performance Trace & Route Baselines', () => {
     const supabaseAnonKey =
       process.env.VITE_SUPABASE_ANON_KEY ||
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
-    const benchEmail = 'bench-athlete@cybergym.io';
+    const benchEmail = 'bench-athlete@yourbody.fyi';
     const benchPassword = 'password123';
 
     // 1. Authenticate as benchmark user
@@ -168,7 +168,7 @@ test.describe('Performance Trace & Route Baselines', () => {
   test('benchmark /workout first authenticated paint with seeded account', async ({ page }) => {
     // 1. Log in as benchmark athlete
     await page.goto('/login');
-    await page.fill('input[type="email"]', 'bench-athlete@cybergym.io');
+    await page.fill('input[type="email"]', 'bench-athlete@yourbody.fyi');
     await page.fill('input[type="password"]', 'password123');
 
     // Attach vitals observer before route transition to /workout
@@ -278,7 +278,7 @@ test.describe('Performance Trace & Route Baselines', () => {
 
     recordRoute('workout_seeded', {
       route: '/workout',
-      user: 'bench-athlete@cybergym.io (550 sets, 350 nutrition logs)',
+      user: 'bench-athlete@yourbody.fyi (550 sets, 350 nutrition logs)',
       totalRequests: requests.length,
       totalTransferredBytes: totalBytes,
       supabaseQueryCount: supabaseRequests.length,
@@ -305,7 +305,7 @@ test.describe('Performance Trace & Route Baselines', () => {
   test('benchmark /nutrition route load', async ({ page }) => {
     // Log in as athlete
     await page.goto('/login');
-    await page.fill('input[type="email"]', 'bench-athlete@cybergym.io');
+    await page.fill('input[type="email"]', 'bench-athlete@yourbody.fyi');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/workout');
@@ -399,7 +399,7 @@ test.describe('Performance Trace & Route Baselines', () => {
 
   test('benchmark /history route load', async ({ page }) => {
     await page.goto('/login');
-    await page.fill('input[type="email"]', 'bench-athlete@cybergym.io');
+    await page.fill('input[type="email"]', 'bench-athlete@yourbody.fyi');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/workout');
@@ -492,7 +492,7 @@ test.describe('Performance Trace & Route Baselines', () => {
 
   test('benchmark /coach route load', async ({ page }) => {
     await page.goto('/login');
-    await page.fill('input[type="email"]', 'coach@cybergym.io');
+    await page.fill('input[type="email"]', 'coach@yourbody.fyi');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/coach');

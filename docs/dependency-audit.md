@@ -1,4 +1,4 @@
-# Cyber-Gym V2: Dependency Health & Supply-Chain Baseline (DIR-D5)
+# Yourbody V2: Dependency Health & Supply-Chain Baseline (DIR-D5)
 
 **Directive:** DIR-D5  
 **Workstream:** Security & Supply-Chain Integrity  
@@ -10,7 +10,7 @@
 
 ## 1. Executive Summary
 
-As part of architectural directive **DIR-D5**, a complete security, supply-chain, and dependency-health audit was conducted for the Cyber-Gym V2 codebase.
+As part of architectural directive **DIR-D5**, a complete security, supply-chain, and dependency-health audit was conducted for the Yourbody V2 codebase.
 
 ### Key Audit Findings & Remediation Actions:
 1. **Unused Production Dependency Remediation (`ws`):**

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * CyberGym V2 — Design Standards Ratchet & Gate (P3a)
+ * Yourbody V2 — Design Standards Ratchet & Gate (P3a)
  *
  * Enforces typography and interaction design standards across src:
  * 1. STD-CMP-7 / STD-INT-3: No `window.confirm(`, bare `confirm(`, `window.alert(`, or bare `alert(` calls.
@@ -410,7 +410,7 @@ export function updateBaseline(currentCounts, oldBaseline, options = {}) {
 
   const newBaseline = {
     version: 1,
-    description: 'CyberGym V2 — Design Ratchet Baseline (STD-TYP-1..4, STD-INT-3, STD-CMP-7)',
+    description: 'Yourbody V2 — Design Ratchet Baseline (STD-TYP-1..4, STD-INT-3, STD-CMP-7)',
     rules: [...RULES],
     hardRuleDirectories: [...HARD_RULE_DIRECTORIES],
     flaggedConfirm: {},
@@ -505,7 +505,7 @@ export function main() {
 
   if (isHelp) {
     console.log(`
-CyberGym Design Ratchet Gate (STD-TYP-1..4, STD-INT-3, STD-CMP-7)
+Yourbody Design Ratchet Gate (STD-TYP-1..4, STD-INT-3, STD-CMP-7)
 
 Usage:
   node scripts/check-design-ratchet.js [options]
@@ -571,7 +571,7 @@ Rules Enforced:
   }
 
   console.log('========================================================================');
-  console.log('🔍 CyberGym Design Standards Ratchet (STD-TYP-1..4, STD-INT-3, STD-CMP-7)');
+  console.log('🔍 Yourbody Design Standards Ratchet (STD-TYP-1..4, STD-INT-3, STD-CMP-7)');
   console.log('========================================================================\n');
 
   console.log(`Scanned ${Object.keys(currentCounts).length} TypeScript source file(s) under src/.\n`);

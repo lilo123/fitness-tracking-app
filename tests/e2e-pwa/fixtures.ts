@@ -68,7 +68,7 @@ export interface PwaTestUser {
  * Never depends on weekday: routine explicitly covers Mon..Sun.
  */
 export async function createPwaTestUser(prefix = 'pwa-user'): Promise<PwaTestUser> {
-  const email = `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000000)}@cybergym.io`;
+  const email = `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000000)}@yourbody.fyi`;
   const password = 'Password123!';
 
   const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
@@ -220,7 +220,7 @@ export async function waitForSwControl(page: Page, timeout = 15000): Promise<voi
 }
 
 /**
- * Waits for offline prefetch data (exercise catalog) to be saved to IndexedDB `cybergym-offline-${userId}`.
+ * Waits for offline prefetch data (exercise catalog) to be saved to IndexedDB `yourbody-offline-${userId}`.
  * Polls the IDB `rq` store for the client query containing 'exercise_catalog' and 'offline_all'.
  */
 export async function waitForOfflineDataReady(
@@ -233,7 +233,7 @@ export async function waitForOfflineDataReady(
       async () => {
         return page.evaluate(async (uid) => {
           return new Promise<boolean>((resolve) => {
-            const dbName = `cybergym-offline-${uid}`;
+            const dbName = `yourbody-offline-${uid}`;
             const req = indexedDB.open(dbName);
             req.onerror = () => resolve(false);
             req.onsuccess = () => {

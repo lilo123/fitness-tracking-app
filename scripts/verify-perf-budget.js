@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * CyberGym V2 — Performance Budget Verification Harness (DIR-D6)
+ * Yourbody V2 — Performance Budget Verification Harness (DIR-D6)
  *
  * Enforces architectural budgets defined in perf-budget.json:
  * 1. index-*.js raw bytes <= indexRawMaxBytes
@@ -28,7 +28,7 @@ const indexHtmlPath = path.resolve(distDir, 'index.html');
 const componentsDir = path.resolve(rootDir, 'src', 'components');
 
 console.log('====================================================');
-console.log('⚡ CyberGym Performance Budget Verification (DIR-D6)');
+console.log('⚡ Yourbody Performance Budget Verification (DIR-D6)');
 console.log('====================================================\n');
 
 // 1. Load budget thresholds

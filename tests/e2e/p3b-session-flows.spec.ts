@@ -28,11 +28,11 @@ function cleanupPollutedWorkouts() {
     DELETE FROM public.sets
     WHERE workout_id IN (
       SELECT id FROM public.workouts
-      WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io')
+      WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@yourbody.fyi')
         AND name <> 'Push Day Benchmark'
     );
     DELETE FROM public.workouts
-    WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io')
+    WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@yourbody.fyi')
       AND name <> 'Push Day Benchmark';
   `;
   try {
@@ -46,7 +46,7 @@ function cleanupPollutedWorkouts() {
 
 async function loginAsAthlete(page: Page) {
   await page.goto('/login');
-  await page.fill('input[type="email"]', 'athlete@cybergym.io');
+  await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
   await page.fill('input[type="password"]', 'password123');
   await page.click('button[type="submit"]');
   await page.waitForURL('**/workout');

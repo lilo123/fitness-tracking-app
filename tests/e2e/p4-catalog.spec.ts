@@ -33,11 +33,11 @@ function cleanupPollutedWorkouts() {
     DELETE FROM public.sets
     WHERE workout_id IN (
       SELECT id FROM public.workouts
-      WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io')
+      WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@yourbody.fyi')
         AND name <> 'Push Day Benchmark'
     );
     DELETE FROM public.workouts
-    WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io')
+    WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@yourbody.fyi')
       AND name <> 'Push Day Benchmark';
   `;
   try {
@@ -54,27 +54,27 @@ function cleanupP4Data() {
     DELETE FROM public.template_exercises
     WHERE template_id IN (
       SELECT id FROM public.routine_templates
-      WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io')
+      WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@yourbody.fyi')
         AND name LIKE 'P4 Test Routine %'
     );
     DELETE FROM public.routine_templates
-    WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io')
+    WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@yourbody.fyi')
       AND name LIKE 'P4 Test Routine %';
     DELETE FROM public.sets
     WHERE exercise_id IN (
       SELECT id FROM public.exercises
       WHERE (name LIKE 'Zercher%' OR name LIKE '%Zercher Hold%')
-        AND user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io')
+        AND user_id = (SELECT id FROM public.users WHERE email = 'athlete@yourbody.fyi')
     );
     DELETE FROM public.template_exercises
     WHERE exercise_id IN (
       SELECT id FROM public.exercises
       WHERE (name LIKE 'Zercher%' OR name LIKE '%Zercher Hold%')
-        AND user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io')
+        AND user_id = (SELECT id FROM public.users WHERE email = 'athlete@yourbody.fyi')
     );
     DELETE FROM public.exercises
     WHERE (name LIKE 'Zercher%' OR name LIKE '%Zercher Hold%')
-      AND user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io');
+      AND user_id = (SELECT id FROM public.users WHERE email = 'athlete@yourbody.fyi');
   `;
   try {
     const cmd = getPsqlCommand();
@@ -88,7 +88,7 @@ function cleanupP4Data() {
 
 async function loginAsAthlete(page: Page) {
   await page.goto('/login');
-  await page.fill('input[type="email"]', 'athlete@cybergym.io');
+  await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
   await page.fill('input[type="password"]', 'password123');
   await page.click('button[type="submit"]');
   await page.waitForURL('**/workout');
@@ -103,7 +103,7 @@ async function getAthleteSession(): Promise<{ token: string; userId: string }> {
       apikey: SUPABASE_ANON_KEY,
     },
     body: JSON.stringify({
-      email: 'athlete@cybergym.io',
+      email: 'athlete@yourbody.fyi',
       password: 'password123',
     }),
   });
@@ -174,7 +174,7 @@ function getVisibleExercisesFromDB(): Array<{ name: string; body_part: string }>
     SELECT name, COALESCE(array_to_string(body_parts, ' · '), '')
     FROM public.exercises
     WHERE is_archived = false
-      AND (is_master = true OR user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io'))
+      AND (is_master = true OR user_id = (SELECT id FROM public.users WHERE email = 'athlete@yourbody.fyi'))
     ORDER BY lower(name) ASC, id ASC
     LIMIT 50;
   `;
@@ -197,7 +197,7 @@ function getPushDayBenchmarkExercises(): string[] {
     JOIN public.sets s ON s.workout_id = w.id
     JOIN public.exercises e ON e.id = s.exercise_id
     WHERE w.name = 'Push Day Benchmark'
-      AND w.user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io')
+      AND w.user_id = (SELECT id FROM public.users WHERE email = 'athlete@yourbody.fyi')
     ORDER BY e.name;
   `;
   const cmd = `${getPsqlCommand()} -t -A -F "|"`;
