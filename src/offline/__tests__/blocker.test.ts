@@ -75,34 +75,38 @@ describe('registerOutboxUpdateBlocker', () => {
     expect(safety.status).toBe('clear');
   });
 
-  it('allows PWA update when another user has pending ops but active user has 0', () => {
+  it('blocks PWA update when active user has pending ops in localStorage from another tab', () => {
     vi.spyOn(flusherModule, 'getActiveUserId').mockReturnValue(userId);
     vi.spyOn(outboxModule, 'getSyncingStatus').mockReturnValue(false);
-    vi.spyOn(outboxModule, 'getCachedOutboxSummary').mockImplementation((targetUserId: string) => {
-      if (targetUserId === userId) {
-        return {
-          pending: 0,
-          attention: 0,
-          syncing: false,
-          authRequired: false,
-          lastSyncedCount: 0,
-          needsAttentionOps: [],
-        };
+    localStorage.setItem(`yourbody_outbox_pending_${userId}`, '2');
+
+    try {
+      registerOutboxUpdateBlocker(registerUpdateBlocker);
+      const safety = evaluateUpdateSafety({ userId });
+
+      expect(safety.status).toBe('soft');
+      if (safety.status === 'soft') {
+        expect(safety.items).toEqual([{ kind: 'outbox', count: 2 }]);
       }
-      return {
-        pending: 5,
-        attention: 0,
-        syncing: false,
-        authRequired: false,
-        lastSyncedCount: 0,
-        needsAttentionOps: [],
-      };
-    });
+    } finally {
+      localStorage.removeItem(`yourbody_outbox_pending_${userId}`);
+    }
+  });
 
-    registerOutboxUpdateBlocker(registerUpdateBlocker);
-    const safety = evaluateUpdateSafety({ userId });
+  it('allows PWA update when another user has pending ops in localStorage but active user has 0', () => {
+    vi.spyOn(flusherModule, 'getActiveUserId').mockReturnValue(userId);
+    vi.spyOn(outboxModule, 'getSyncingStatus').mockReturnValue(false);
+    // Another user's retained outbox
+    localStorage.setItem('yourbody_outbox_pending_other-user', '5');
 
-    expect(safety.status).toBe('clear');
+    try {
+      registerOutboxUpdateBlocker(registerUpdateBlocker);
+      const safety = evaluateUpdateSafety({ userId });
+
+      expect(safety.status).toBe('clear');
+    } finally {
+      localStorage.removeItem('yourbody_outbox_pending_other-user');
+    }
   });
 });
 
