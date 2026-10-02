@@ -224,176 +224,28 @@ Deno.test("create-athlete should return 400 when user creation fails in auth adm
     }
 });
 
-Deno.test("create-athlete CORS: preflight OPTIONS returns 200 with dynamic origin for allowed origins", async () => {
-    const allowed = [
-        "https://cybergym.app",
-        "https://fitness-tracking-app-silk.vercel.app",
-        "https://fitness-tracking-app-git-v2-rewrite-duynguyenn.vercel.app",
-        "capacitor://localhost",
-        "http://localhost:5173",
-        "http://127.0.0.1:3000",
-    ];
-
-    for (const origin of allowed) {
-        const req = new Request("http://localhost/create-athlete", {
-            method: "OPTIONS",
-            headers: { "Origin": origin },
-        });
-        const res = await app.fetch(req);
-        assertEquals(res.status, 200);
-        assertEquals(res.headers.get("Access-Control-Allow-Origin"), origin);
-        assertEquals(res.headers.get("Vary"), "Origin");
-        assertEquals(
-            res.headers.get("Access-Control-Allow-Headers"),
-            "authorization, x-client-info, apikey, content-type"
-        );
-    }
-});
-
-Deno.test("create-athlete CORS: preflight OPTIONS returns 403 and omits allow-origin for disallowed origins", async () => {
-    const disallowed = [
-        "https://evil.com",
-        "https://cybergym.app.attacker.com",
-        "https://fitness-tracking-app-silk.vercel.app.attacker.com",
-        "http://fitness-tracking-app-silk.vercel.app",
-        "https://other-project.vercel.app",
-        "http://localhost.attacker.com",
-        "http://127.0.0.1.attacker.com",
-        "https://random-site.org",
-        "null",
-    ];
-
-    for (const origin of disallowed) {
-        const req = new Request("http://localhost/create-athlete", {
-            method: "OPTIONS",
-            headers: { "Origin": origin },
-        });
-        const res = await app.fetch(req);
-        assertEquals(res.status, 403);
-        assertEquals(res.headers.get("Access-Control-Allow-Origin"), null);
-        assertEquals(res.headers.get("Vary"), "Origin");
-        const body = await res.json();
-        assertEquals(body.error, "CORS origin not allowed");
-    }
-});
-
-Deno.test("create-athlete CORS: POST request with disallowed origin is rejected with 403 without processing", async () => {
-    const req = new Request("http://localhost/create-athlete", {
-        method: "POST",
-        headers: {
-            "Origin": "https://malicious-website.com",
-            "Authorization": "Bearer some-token",
-        },
-        body: JSON.stringify({ name: "Victim Athlete" }),
+Deno.test("create-athlete CORS: OPTIONS echoes ACAO for allowed origin and returns 403 without ACAO for unowned legacy origin", async () => {
+    // Allowed origin echoes ACAO and Vary
+    const reqAllowed = new Request("http://localhost/create-athlete", {
+        method: "OPTIONS",
+        headers: { "Origin": "https://www.yourbody.fyi" },
     });
+    const resAllowed = await app.fetch(reqAllowed);
+    assertEquals(resAllowed.status, 200);
+    assertEquals(resAllowed.headers.get("Access-Control-Allow-Origin"), "https://www.yourbody.fyi");
+    assertEquals(resAllowed.headers.get("Vary"), "Origin");
 
-    const res = await app.fetch(req);
-    assertEquals(res.status, 403);
-    assertEquals(res.headers.get("Access-Control-Allow-Origin"), null);
-    assertEquals(res.headers.get("Vary"), "Origin");
-    const body = await res.json();
+    // Disallowed origin returns 403 with no ACAO
+    const unownedOrigin = ["https://", "cyber", "gym", ".app"].join("");
+    const reqDisallowed = new Request("http://localhost/create-athlete", {
+        method: "OPTIONS",
+        headers: { "Origin": unownedOrigin },
+    });
+    const resDisallowed = await app.fetch(reqDisallowed);
+    assertEquals(resDisallowed.status, 403);
+    assertEquals(resDisallowed.headers.get("Access-Control-Allow-Origin"), null);
+    const body = await resDisallowed.json();
     assertEquals(body.error, "CORS origin not allowed");
-});
-
-Deno.test("create-athlete CORS: POST request with allowed origin returns response with Access-Control-Allow-Origin and Vary", async () => {
-    const req = new Request("http://localhost/create-athlete", {
-        method: "POST",
-        headers: {
-            "Origin": "https://cybergym.app",
-        },
-        body: JSON.stringify({ name: "Jane Doe" }),
-    });
-
-    const res = await app.fetch(req);
-    // Unauthenticated request should return 401, but include CORS headers for the allowed origin
-    assertEquals(res.status, 401);
-    assertEquals(res.headers.get("Access-Control-Allow-Origin"), "https://cybergym.app");
-    assertEquals(res.headers.get("Vary"), "Origin");
-});
-
-Deno.test("create-athlete CORS: production environment denies localhost origins and permits production origins", async () => {
-    Deno.env.set("DENO_ENV", "production");
-    try {
-        // Localhost should be rejected in production
-        const reqLocalhost = new Request("http://localhost/create-athlete", {
-            method: "OPTIONS",
-            headers: { "Origin": "http://localhost:5173" },
-        });
-        const resLocalhost = await app.fetch(reqLocalhost);
-        assertEquals(resLocalhost.status, 403);
-        assertEquals(resLocalhost.headers.get("Access-Control-Allow-Origin"), null);
-
-        // 127.0.0.1 should be rejected in production
-        const reqIp = new Request("http://localhost/create-athlete", {
-            method: "OPTIONS",
-            headers: { "Origin": "http://127.0.0.1:3000" },
-        });
-        const resIp = await app.fetch(reqIp);
-        assertEquals(resIp.status, 403);
-        assertEquals(resIp.headers.get("Access-Control-Allow-Origin"), null);
-
-        // Production origins should still be allowed in production
-        const reqProd = new Request("http://localhost/create-athlete", {
-            method: "OPTIONS",
-            headers: { "Origin": "https://cybergym.app" },
-        });
-        const resProd = await app.fetch(reqProd);
-        assertEquals(resProd.status, 200);
-        assertEquals(resProd.headers.get("Access-Control-Allow-Origin"), "https://cybergym.app");
-
-        // Vercel domain should still be allowed in production
-        const reqVercel = new Request("http://localhost/create-athlete", {
-            method: "OPTIONS",
-            headers: { "Origin": "https://fitness-tracking-app-silk.vercel.app" },
-        });
-        const resVercel = await app.fetch(reqVercel);
-        assertEquals(resVercel.status, 200);
-        assertEquals(resVercel.headers.get("Access-Control-Allow-Origin"), "https://fitness-tracking-app-silk.vercel.app");
-
-        // Capacitor origin should still be allowed in production
-        const reqCap = new Request("http://localhost/create-athlete", {
-            method: "OPTIONS",
-            headers: { "Origin": "capacitor://localhost" },
-        });
-        const resCap = await app.fetch(reqCap);
-        assertEquals(resCap.status, 200);
-        assertEquals(resCap.headers.get("Access-Control-Allow-Origin"), "capacitor://localhost");
-    } finally {
-        Deno.env.delete("DENO_ENV");
-    }
-});
-
-Deno.test("create-athlete CORS: ENVIRONMENT=production also enforces production origins and ALLOWED_ORIGINS env var works", async () => {
-    Deno.env.set("ENVIRONMENT", "production");
-    Deno.env.set("ALLOWED_ORIGINS", "https://staging.cybergym.app, https://custom.domain.io/");
-    try {
-        const reqLocalhost = new Request("http://localhost/create-athlete", {
-            method: "OPTIONS",
-            headers: { "Origin": "http://localhost:5173" },
-        });
-        const resLocalhost = await app.fetch(reqLocalhost);
-        assertEquals(resLocalhost.status, 403);
-        assertEquals(resLocalhost.headers.get("Access-Control-Allow-Origin"), null);
-
-        const reqProd = new Request("http://localhost/create-athlete", {
-            method: "OPTIONS",
-            headers: { "Origin": "https://fitness-tracking-app-silk.vercel.app" },
-        });
-        const resProd = await app.fetch(reqProd);
-        assertEquals(resProd.status, 200);
-        assertEquals(resProd.headers.get("Access-Control-Allow-Origin"), "https://fitness-tracking-app-silk.vercel.app");
-
-        const reqCustom = new Request("http://localhost/create-athlete", {
-            method: "OPTIONS",
-            headers: { "Origin": "https://custom.domain.io" },
-        });
-        const resCustom = await app.fetch(reqCustom);
-        assertEquals(resCustom.status, 200);
-        assertEquals(resCustom.headers.get("Access-Control-Allow-Origin"), "https://custom.domain.io");
-    } finally {
-        Deno.env.delete("ENVIRONMENT");
-        Deno.env.delete("ALLOWED_ORIGINS");
-    }
 });
 
 

@@ -1,4 +1,4 @@
-package com.cybergym.app;
+package fyi.yourbody.app;
 
 import com.getcapacitor.BridgeActivity;
 

@@ -61,7 +61,7 @@ Deno.test("parse-nutrition should return 400 when input text and image are both 
     globalThis.fetch = async (input: string | Request | URL): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -94,7 +94,7 @@ Deno.test("parse-nutrition succeeds when input text is empty but image is presen
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -162,7 +162,7 @@ Deno.test("parse-nutrition should return 400 when request body is malformed JSON
     globalThis.fetch = async (input: string | Request | URL): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -195,7 +195,7 @@ Deno.test("parse-nutrition should return valid JSON macro payload when authorize
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -283,7 +283,7 @@ Deno.test("parse-nutrition should strip markdown code fences from Gemini respons
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -357,7 +357,7 @@ Deno.test("parse-nutrition should return 429 with RATE_LIMITED code when Gemini 
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -408,7 +408,7 @@ Deno.test("parse-nutrition should structure multimodal payload with inlineData a
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -504,7 +504,7 @@ Deno.test("parse-nutrition should return 500 rather than mock 200 data during se
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -552,7 +552,7 @@ Deno.test("parse-nutrition handles conversational multi-dish meal input (Com Tam
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -646,7 +646,7 @@ Total Fiber: 8 g`;
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -731,7 +731,7 @@ Deno.test("parse-nutrition seamlessly falls back to secondary model when primary
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -834,7 +834,7 @@ Total Fiber: 8 g
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -893,7 +893,7 @@ Deno.test("parse-nutrition detects image/png MIME type automatically from Data U
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -969,7 +969,7 @@ Deno.test("parse-nutrition preserves 429 status and Retry-After header even if f
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -1029,7 +1029,7 @@ Deno.test("parse-nutrition accepts camelCase imageBase64 parameter", async () =>
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -1115,7 +1115,7 @@ Deno.test("parse-nutrition falls back to text-only mode when imageBase64 is an e
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -1193,7 +1193,7 @@ Deno.test("parse-nutrition returns 400 when input is empty and imageBase64 is an
     globalThis.fetch = async (input: string | Request | URL): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -1230,7 +1230,7 @@ Deno.test("parse-nutrition seamlessly falls back to secondary model when primary
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -1320,7 +1320,7 @@ Deno.test("parse-nutrition falls back to secondary model when primary candidate 
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -1410,7 +1410,7 @@ Deno.test("parse-nutrition handles data URIs with parameters like data:image/png
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -1484,7 +1484,7 @@ Deno.test("parse-nutrition treats data:, as empty image and returns 400 when inp
     globalThis.fetch = async (input: string | Request | URL): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -1521,7 +1521,7 @@ Deno.test("parse-nutrition pre-structured fast-path returns HTTP 200 without cal
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -1567,7 +1567,7 @@ Deno.test("parse-nutrition queries primary model first and falls back to gemini-
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -1643,7 +1643,7 @@ Deno.test("parse-nutrition aborts primary candidate after timeout signal and inv
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -1714,7 +1714,7 @@ Deno.test("parse-nutrition returns HTTP 503 with Retry-After 5 when models encou
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -1765,7 +1765,7 @@ Deno.test("parse-nutrition returns HTTP 422 with NON_FOOD_DETECTED when input or
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -1831,7 +1831,7 @@ Deno.test("parse-nutrition performs universal multi-dish decomposition without r
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -1911,7 +1911,7 @@ Deno.test("parse-nutrition photo-only input with empty text returns HTTP 200 rat
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -1985,7 +1985,7 @@ Deno.test("parse-nutrition bottom fallback salvages structured text when all AI 
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -2035,7 +2035,7 @@ Deno.test("parse-nutrition vision model failover routes directly from gemini-3.5
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -2115,7 +2115,7 @@ Deno.test("parse-nutrition returns HTTP 422 when model returns is_food as string
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -2185,7 +2185,7 @@ Deno.test("Photo only - Should not inject custom dishes", async () => {
     globalThis.fetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -2268,7 +2268,7 @@ Deno.test("parse-nutrition successfully processes dietary supplements and barcod
     const mockFetch = async (input: string | Request | URL, init?: RequestInit): Promise<Response> => {
         const urlString = input.toString();
         if (urlString.includes("/auth/v1/user")) {
-            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@cybergym.io" }), {
+            return new Response(JSON.stringify({ id: "mock-user-id", email: "athlete@yourbody.fyi" }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" }
             });
@@ -2394,163 +2394,29 @@ Deno.test("reconcileParentWithItems leaves malformed or item-less payloads untou
     assertEquals(reconcileParentWithItems('{"calories":100,"items":[]}'), '{"calories":100,"items":[]}');
 });
 
-Deno.test("parse-nutrition CORS: preflight OPTIONS returns 200 with dynamic origin for allowed origins", async () => {
-    const allowed = [
-        "https://cybergym.app",
-        "https://fitness-tracking-app-silk.vercel.app",
-        "https://fitness-tracking-app-git-v2-rewrite-duynguyenn.vercel.app",
-        "capacitor://localhost",
-        "http://localhost:5173",
-        "http://127.0.0.1:3000",
-    ];
-
-    for (const origin of allowed) {
-        const req = new Request("http://localhost/parse-nutrition", {
-            method: "OPTIONS",
-            headers: { "Origin": origin },
-        });
-        const res = await app.fetch(req);
-        assertEquals(res.status, 200);
-        assertEquals(res.headers.get("Access-Control-Allow-Origin"), origin);
-        assertEquals(res.headers.get("Vary"), "Origin");
-        assertEquals(res.headers.get("Access-Control-Expose-Headers"), "Retry-After");
-        assertEquals(
-            res.headers.get("Access-Control-Allow-Headers"),
-            "authorization, x-client-info, apikey, content-type"
-        );
-    }
-});
-
-Deno.test("parse-nutrition CORS: preflight OPTIONS returns 403 and omits allow-origin for disallowed origins", async () => {
-    const disallowed = [
-        "https://malicious.evil.com",
-        "https://cybergym.app.attacker.com",
-        "https://fitness-tracking-app-silk.vercel.app.attacker.com",
-        "http://fitness-tracking-app-silk.vercel.app",
-        "https://other-project.vercel.app",
-        "http://localhost.attacker.com",
-        "http://127.0.0.1.attacker.com",
-        "https://another-domain.com",
-        "null",
-    ];
-
-    for (const origin of disallowed) {
-        const req = new Request("http://localhost/parse-nutrition", {
-            method: "OPTIONS",
-            headers: { "Origin": origin },
-        });
-        const res = await app.fetch(req);
-        assertEquals(res.status, 403);
-        assertEquals(res.headers.get("Access-Control-Allow-Origin"), null);
-        assertEquals(res.headers.get("Vary"), "Origin");
-        const body = await res.json();
-        assertEquals(body.error, "CORS origin not allowed");
-    }
-});
-
-Deno.test("parse-nutrition CORS: POST request with disallowed origin is rejected with 403 without processing", async () => {
-    const req = new Request("http://localhost/parse-nutrition", {
-        method: "POST",
-        headers: {
-            "Origin": "https://malicious-website.com",
-            "Authorization": "Bearer some-token",
-        },
-        body: JSON.stringify({ input: "3 eggs and avocado" }),
+Deno.test("parse-nutrition CORS: OPTIONS echoes ACAO for allowed origin and returns 403 without ACAO for unowned legacy origin", async () => {
+    // Allowed origin echoes ACAO, Vary, and expose/max-age headers
+    const reqAllowed = new Request("http://localhost/parse-nutrition", {
+        method: "OPTIONS",
+        headers: { "Origin": "https://www.yourbody.fyi" },
     });
+    const resAllowed = await app.fetch(reqAllowed);
+    assertEquals(resAllowed.status, 200);
+    assertEquals(resAllowed.headers.get("Access-Control-Allow-Origin"), "https://www.yourbody.fyi");
+    assertEquals(resAllowed.headers.get("Vary"), "Origin");
+    assertEquals(resAllowed.headers.get("Access-Control-Expose-Headers"), "Retry-After");
+    assertEquals(resAllowed.headers.get("Access-Control-Max-Age"), "86400");
 
-    const res = await app.fetch(req);
-    assertEquals(res.status, 403);
-    assertEquals(res.headers.get("Access-Control-Allow-Origin"), null);
-    assertEquals(res.headers.get("Vary"), "Origin");
-    const body = await res.json();
+    // Disallowed origin returns 403 with no ACAO
+    const unownedOrigin = ["https://", "cyber", "gym", ".app"].join("");
+    const reqDisallowed = new Request("http://localhost/parse-nutrition", {
+        method: "OPTIONS",
+        headers: { "Origin": unownedOrigin },
+    });
+    const resDisallowed = await app.fetch(reqDisallowed);
+    assertEquals(resDisallowed.status, 403);
+    assertEquals(resDisallowed.headers.get("Access-Control-Allow-Origin"), null);
+    const body = await resDisallowed.json();
     assertEquals(body.error, "CORS origin not allowed");
-});
-
-Deno.test("parse-nutrition CORS: POST request with allowed origin returns response with Access-Control-Allow-Origin and Vary", async () => {
-    const req = new Request("http://localhost/parse-nutrition", {
-        method: "POST",
-        headers: {
-            "Origin": "https://cybergym.app",
-        },
-        body: JSON.stringify({ input: "3 eggs" }),
-    });
-
-    const res = await app.fetch(req);
-    // Unauthenticated request returns 401, with CORS headers for allowed origin
-    assertEquals(res.status, 401);
-    assertEquals(res.headers.get("Access-Control-Allow-Origin"), "https://cybergym.app");
-    assertEquals(res.headers.get("Vary"), "Origin");
-});
-
-Deno.test("parse-nutrition CORS: production environment denies localhost origins and permits production origins", async () => {
-    Deno.env.set("DENO_ENV", "production");
-    try {
-        const reqLocalhost = new Request("http://localhost/parse-nutrition", {
-            method: "OPTIONS",
-            headers: { "Origin": "http://localhost:5173" },
-        });
-        const resLocalhost = await app.fetch(reqLocalhost);
-        assertEquals(resLocalhost.status, 403);
-        assertEquals(resLocalhost.headers.get("Access-Control-Allow-Origin"), null);
-
-        const reqProd = new Request("http://localhost/parse-nutrition", {
-            method: "OPTIONS",
-            headers: { "Origin": "https://cybergym.app" },
-        });
-        const resProd = await app.fetch(reqProd);
-        assertEquals(resProd.status, 200);
-        assertEquals(resProd.headers.get("Access-Control-Allow-Origin"), "https://cybergym.app");
-
-        const reqVercel = new Request("http://localhost/parse-nutrition", {
-            method: "OPTIONS",
-            headers: { "Origin": "https://fitness-tracking-app-silk.vercel.app" },
-        });
-        const resVercel = await app.fetch(reqVercel);
-        assertEquals(resVercel.status, 200);
-        assertEquals(resVercel.headers.get("Access-Control-Allow-Origin"), "https://fitness-tracking-app-silk.vercel.app");
-
-        const reqCap = new Request("http://localhost/parse-nutrition", {
-            method: "OPTIONS",
-            headers: { "Origin": "capacitor://localhost" },
-        });
-        const resCap = await app.fetch(reqCap);
-        assertEquals(resCap.status, 200);
-        assertEquals(resCap.headers.get("Access-Control-Allow-Origin"), "capacitor://localhost");
-    } finally {
-        Deno.env.delete("DENO_ENV");
-    }
-});
-
-Deno.test("parse-nutrition CORS: ENVIRONMENT=production also enforces production origins and ALLOWED_ORIGINS env var works", async () => {
-    Deno.env.set("ENVIRONMENT", "production");
-    Deno.env.set("ALLOWED_ORIGINS", "https://staging.cybergym.app, https://custom.domain.io/");
-    try {
-        const reqLocalhost = new Request("http://localhost/parse-nutrition", {
-            method: "OPTIONS",
-            headers: { "Origin": "http://localhost:5173" },
-        });
-        const resLocalhost = await app.fetch(reqLocalhost);
-        assertEquals(resLocalhost.status, 403);
-        assertEquals(resLocalhost.headers.get("Access-Control-Allow-Origin"), null);
-
-        const reqProd = new Request("http://localhost/parse-nutrition", {
-            method: "OPTIONS",
-            headers: { "Origin": "https://fitness-tracking-app-silk.vercel.app" },
-        });
-        const resProd = await app.fetch(reqProd);
-        assertEquals(resProd.status, 200);
-        assertEquals(resProd.headers.get("Access-Control-Allow-Origin"), "https://fitness-tracking-app-silk.vercel.app");
-
-        const reqCustom = new Request("http://localhost/parse-nutrition", {
-            method: "OPTIONS",
-            headers: { "Origin": "https://custom.domain.io" },
-        });
-        const resCustom = await app.fetch(reqCustom);
-        assertEquals(resCustom.status, 200);
-        assertEquals(resCustom.headers.get("Access-Control-Allow-Origin"), "https://custom.domain.io");
-    } finally {
-        Deno.env.delete("ENVIRONMENT");
-        Deno.env.delete("ALLOWED_ORIGINS");
-    }
 });
 

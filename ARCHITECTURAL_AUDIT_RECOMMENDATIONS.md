@@ -1,4 +1,4 @@
-# Cyber-Gym V2: Architectural Audit & Agent Recommendations
+# Yourbody V2: Architectural Audit & Agent Recommendations
 
 **Author:** Jetski Orchestrator / DeepInvestigator Review  
 **Date:** August 31, 2026  
@@ -49,7 +49,7 @@ An independent architectural and empirical audit of the PRD, technical stack, an
    source ~/.nvm/nvm.sh
    npm install @capacitor/core@^7.0.0 @kiwi-health/capacitor-health-connect@0.0.42
    npm install -D @capacitor/cli@^7.0.0 @capacitor/android@^7.0.0
-   npx cap init "CyberGym" "com.cybergym.app" --web-dir dist
+   npx cap init "Yourbody" "fyi.yourbody.app" --web-dir dist
    npx cap add android
    ```
 

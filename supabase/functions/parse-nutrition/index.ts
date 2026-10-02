@@ -17,61 +17,15 @@ const HTTP_RETRY_OPTIONS = {
   jitter: 1,
 };
 
-export function isAllowedOrigin(origin: string | null | undefined): boolean {
-  if (!origin) return false;
-  const trimmed = origin.trim().replace(/\/+$/, '');
-  if (!trimmed || trimmed === 'null') return false;
+import { isAllowedOrigin, getCorsHeaders as getBaseCorsHeaders } from "../_shared/cors.ts";
 
-  const lower = trimmed.toLowerCase();
-  if (
-    lower === 'https://cybergym.app' ||
-    lower === 'capacitor://localhost' ||
-    lower === 'https://fitness-tracking-app-silk.vercel.app' ||
-    /^https:\/\/fitness-tracking-app[a-z0-9-]*\.vercel\.app$/i.test(trimmed)
-  ) {
-    return true;
-  }
-
-  const allowedOriginsEnv = Deno.env.get('ALLOWED_ORIGINS');
-  if (allowedOriginsEnv) {
-    const extraOrigins = allowedOriginsEnv
-      .split(',')
-      .map((o) => o.trim().replace(/\/+$/, '').toLowerCase())
-      .filter(Boolean);
-    if (extraOrigins.includes(lower)) {
-      return true;
-    }
-  }
-
-  const denoEnv = Deno.env.get('DENO_ENV');
-  const environment = Deno.env.get('ENVIRONMENT');
-  const isProduction = denoEnv === 'production' || environment === 'production';
-
-  if (!isProduction) {
-    if (
-      /^https?:\/\/localhost(?::\d+)?$/i.test(trimmed) ||
-      /^https?:\/\/127\.0\.0\.1(?::\d+)?$/i.test(trimmed)
-    ) {
-      return true;
-    }
-  }
-
-  return false;
-}
+export { isAllowedOrigin };
 
 export function getCorsHeaders(origin: string | null | undefined): Record<string, string> {
-  const headers: Record<string, string> = {
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  return getBaseCorsHeaders(origin, {
     'Access-Control-Expose-Headers': 'Retry-After',
     'Access-Control-Max-Age': '86400',
-    'Vary': 'Origin',
-  };
-
-  if (origin && isAllowedOrigin(origin)) {
-    headers['Access-Control-Allow-Origin'] = origin;
-  }
-
-  return headers;
+  });
 }
 
 export interface StructuredNutritionResult {

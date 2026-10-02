@@ -65,6 +65,9 @@ jobs:
       - name: Verify design ratchet
         run: npm run check:design
 
+      - name: Verify brand guard
+        run: npm run check:brand
+
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v3
         with:
