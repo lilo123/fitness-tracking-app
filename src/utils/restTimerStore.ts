@@ -16,10 +16,10 @@ export const SERVER_SNAPSHOT: RestTimerSnapshot = Object.freeze({
   targetEndTime: null,
 });
 
-const KEY_END = 'cybergym_rest_timer_end';
-const KEY_REMAINING = 'cybergym_rest_timer_remaining';
-const KEY_TOTAL = 'cybergym_rest_timer_total';
-const KEY_PAUSED = 'cybergym_rest_timer_paused';
+const KEY_END = 'yourbody_rest_timer_end';
+const KEY_REMAINING = 'yourbody_rest_timer_remaining';
+const KEY_TOTAL = 'yourbody_rest_timer_total';
+const KEY_PAUSED = 'yourbody_rest_timer_paused';
 
 export class RestTimerStore {
   private listeners = new Set<() => void>();

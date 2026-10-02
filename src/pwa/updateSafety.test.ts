@@ -74,7 +74,7 @@ describe('PWA updateSafety blockers', () => {
       };
 
       workoutSessionStore.saveSession(completedSession, false);
-      localStorage.setItem(`cybergym_current_session_pointer_${userId}`, testDate);
+      localStorage.setItem(`yourbody_current_session_pointer_${userId}`, testDate);
 
       const result = canApplyUpdate();
       expect(result.ok).toBe(true);

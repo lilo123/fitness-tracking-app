@@ -9,7 +9,7 @@ import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMock
 
 const { mockSession } = vi.hoisted(() => ({
   mockSession: {
-    user: { id: 'test-user-id', email: 'coach@cybergym.io' },
+    user: { id: 'test-user-id', email: 'coach@yourbody.fyi' },
   },
 }));
 
@@ -39,7 +39,7 @@ describe('App Shell & Navigation', () => {
 
     const mockUser = {
       id: 'test-user-id',
-      email: 'coach@cybergym.io',
+      email: 'coach@yourbody.fyi',
       username: 'Coach Duy',
       role: 'coach',
       target_calories: 2400,
@@ -70,7 +70,7 @@ describe('App Shell & Navigation', () => {
 
     // Wait for auth initialization and header render
     await waitFor(() => {
-      expect(screen.getByText('CyberGym')).toBeDefined();
+      expect(screen.getByText('Yourbody.fyi')).toBeDefined();
       expect(screen.getByText('Fitness & Nutrition')).toBeDefined();
       expect(screen.getByTestId('nav-workout')).toBeDefined();
       expect(screen.getByTestId('nav-nutrition')).toBeDefined();
@@ -117,7 +117,7 @@ describe('App Shell & Navigation', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('CyberGym')).toBeDefined();
+      expect(screen.getByText('Yourbody.fyi')).toBeDefined();
     });
 
     // Trigger SIGNED_OUT
@@ -129,7 +129,7 @@ describe('App Shell & Navigation', () => {
 
     await waitFor(() => {
       expect(screen.getAllByText('Sign In').length).toBeGreaterThanOrEqual(1);
-      expect(screen.getByPlaceholderText('athlete@cybergym.io')).toBeDefined();
+      expect(screen.getByPlaceholderText('you@example.com')).toBeDefined();
     });
   });
 
@@ -141,7 +141,7 @@ describe('App Shell & Navigation', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('CyberGym')).toBeDefined();
+      expect(screen.getByText('Yourbody.fyi')).toBeDefined();
     });
 
     // Start timer globally
@@ -187,7 +187,7 @@ describe('App Shell & Navigation', () => {
       </QueryClientProvider>
     );
 
-    expect(screen.getByText('Connecting to CyberGym...')).toBeDefined();
+    expect(screen.getByText('Connecting to Yourbody...')).toBeDefined();
     expect(screen.queryByTestId('auth-retry-button')).toBeNull();
 
     act(() => {
@@ -195,7 +195,7 @@ describe('App Shell & Navigation', () => {
     });
 
     expect(screen.getByTestId('auth-retry-button')).toBeDefined();
-    expect(screen.getByText('Connecting to CyberGym... Tap to Retry')).toBeDefined();
+    expect(screen.getByText('Connecting to Yourbody... Tap to Retry')).toBeDefined();
     vi.useRealTimers();
   });
 
@@ -204,7 +204,7 @@ describe('App Shell & Navigation', () => {
 
     const cachedProfile = {
       id: 'cached-athlete-1',
-      email: 'athlete@cybergym.io',
+      email: 'athlete@yourbody.fyi',
       username: 'FastRunner',
       role: 'athlete',
       target_calories: 2200,
@@ -214,7 +214,7 @@ describe('App Shell & Navigation', () => {
       target_fiber: 30,
       auto_rest_timer: true,
     };
-    localStorage.setItem('cybergym_user', JSON.stringify(cachedProfile));
+    localStorage.setItem('yourbody_user', JSON.stringify(cachedProfile));
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -223,14 +223,14 @@ describe('App Shell & Navigation', () => {
     );
 
     // Spinner should NOT be displayed
-    expect(screen.queryByText('Connecting to CyberGym...')).toBeNull();
+    expect(screen.queryByText('Connecting to Yourbody...')).toBeNull();
     // App header shell is rendered immediately
-    expect(screen.getByText('CyberGym')).toBeDefined();
+    expect(screen.getByText('Yourbody.fyi')).toBeDefined();
     expect(screen.getByTestId('nav-workout')).toBeDefined();
   });
 
   it('renders exactly 5 tabs in BottomNav with Coach absent, and reaches Coach view via Header mode switch', async () => {
-    localStorage.setItem('cybergym_view_mode', 'athlete');
+    localStorage.setItem('yourbody_view_mode', 'athlete');
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -240,7 +240,7 @@ describe('App Shell & Navigation', () => {
 
     // Wait for auth initialization
     await waitFor(() => {
-      expect(screen.getByText('CyberGym')).toBeDefined();
+      expect(screen.getByText('Yourbody.fyi')).toBeDefined();
       expect(screen.getByTestId('role-switch-button')).toBeDefined();
     });
 

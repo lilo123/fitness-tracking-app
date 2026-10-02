@@ -25,8 +25,12 @@ export class AiPhotoTooLargeError extends Error {
 // In-tab mutex fallback for AI queue
 const aiUserMutexes = new Map<string, Promise<void>>();
 
+export function getAiQueueLockName(userId: string): string {
+  return `yourbody-aiq-${userId}`;
+}
+
 export async function runWithAiMutex(userId: string, fn: () => Promise<void>): Promise<void> {
-  const lockName = `cybergym-aiq-${userId}`;
+  const lockName = getAiQueueLockName(userId);
   if (typeof navigator !== 'undefined' && navigator.locks && typeof navigator.locks.request === 'function') {
     try {
       return await navigator.locks.request(lockName, fn);

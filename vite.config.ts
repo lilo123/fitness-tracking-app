@@ -83,9 +83,9 @@ export default defineConfig({
       registerType: 'prompt',
       injectRegister: false,
       manifest: {
-        name: 'CyberGym',
-        short_name: 'CyberGym',
-        description: 'CyberGym | Fitness & Nutrition',
+        name: 'Yourbody.fyi',
+        short_name: 'Yourbody',
+        description: 'Yourbody.fyi | Fitness & Nutrition',
         theme_color: '#09090b',
         background_color: '#09090b',
         display: 'standalone',

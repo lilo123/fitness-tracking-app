@@ -253,7 +253,7 @@ async function setupPageAndLogin(page: Page) {
   });
 
   await page.goto('/login');
-  await page.fill('input[type="email"]', 'athlete@cybergym.io');
+  await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
   await page.fill('input[type="password"]', 'password123');
   await page.click('button[type="submit"]');
   await page.waitForURL('**/workout');
@@ -2934,7 +2934,7 @@ test.describe("D37 ring clearance", () => {
         headers: { "access-control-allow-origin": "*" },
         body: JSON.stringify({
           id: "a0000000-0000-0000-0000-000000000002",
-          email: "athlete@cybergym.io",
+          email: "athlete@yourbody.fyi",
           username: "athlete",
           role: "athlete",
           target_calories: targets.calories,
@@ -4166,7 +4166,7 @@ ${JSON.stringify(typeViolations, null, 2)}`).toHaveLength(0);
 
 async function setupWorkoutDensityPage(page: Page) {
   await page.goto('/login');
-  await page.fill('input[type="email"]', 'athlete@cybergym.io');
+  await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
   await page.fill('input[type="password"]', 'password123');
   await page.click('button[type="submit"]');
   await page.waitForURL('**/workout');
@@ -4979,7 +4979,7 @@ test.describe("P4 Picker", () => {
 
 async function setupHistoryDensityPage(page: Page) {
   await page.goto("/login");
-  await page.fill('input[type="email"]', "athlete@cybergym.io");
+  await page.fill('input[type="email"]', "athlete@yourbody.fyi");
   await page.fill('input[type="password"]', "password123");
   await page.click('button[type="submit"]');
   await page.waitForURL("**/workout");
@@ -5397,7 +5397,7 @@ test.describe("P5b History", () => {
 
 async function setupSettingsDensityPage(page: Page) {
   await page.goto("/login");
-  await page.fill('input[type="email"]', "athlete@cybergym.io");
+  await page.fill('input[type="email"]', "athlete@yourbody.fyi");
   await page.fill('input[type="password"]', "password123");
   await page.click('button[type="submit"]');
   await page.waitForURL("**/workout");
@@ -5687,7 +5687,7 @@ test.describe("P6 Weight Units", () => {
 
 async function setupLibraryDensityPage(page: Page) {
   await page.goto("/login");
-  await page.fill('input[type="email"]', "athlete@cybergym.io");
+  await page.fill('input[type="email"]', "athlete@yourbody.fyi");
   await page.fill('input[type="password"]', "password123");
   await page.click('button[type="submit"]');
   await page.waitForURL("**/workout");
@@ -6041,7 +6041,7 @@ test.describe("P8 Route-Wide Density & Tap Grid", () => {
         });
         try {
           await page.goto("/login");
-          await page.fill('input[type="email"]', "athlete@cybergym.io");
+          await page.fill('input[type="email"]', "athlete@yourbody.fyi");
           await page.fill('input[type="password"]', "password123");
           await page.click('button[type="submit"]');
           await page.waitForURL("**/workout");
@@ -6072,7 +6072,7 @@ test.describe("P8 Route-Wide Density & Tap Grid", () => {
       });
       try {
         await page.goto("/login");
-        await page.fill('input[type="email"]', "coach@cybergym.io");
+        await page.fill('input[type="email"]', "coach@yourbody.fyi");
         await page.fill('input[type="password"]', "password123");
         await page.click('button[type="submit"]');
         await page.waitForURL("**/coach");
@@ -6103,7 +6103,7 @@ test.describe("P8 Route-Wide Density & Tap Grid", () => {
       });
       try {
         await page.goto("/login");
-        await page.fill('input[type="email"]', "athlete@cybergym.io");
+        await page.fill('input[type="email"]', "athlete@yourbody.fyi");
         await page.fill('input[type="password"]', "password123");
         await page.click('button[type="submit"]');
         await page.waitForURL("**/workout");
@@ -6143,7 +6143,7 @@ test.describe("P8 Route-Wide Density & Tap Grid", () => {
                 v_ex_id uuid;
                 v_workout_id uuid;
               BEGIN
-                SELECT id INTO v_athlete_id FROM public.users WHERE email = 'athlete@cybergym.io' LIMIT 1;
+                SELECT id INTO v_athlete_id FROM public.users WHERE email = 'athlete@yourbody.fyi' LIMIT 1;
                 SELECT id INTO v_ex_id FROM public.exercises WHERE name = 'Incline Bench Press' LIMIT 1;
 
                 INSERT INTO public.workouts (id, user_id, name, date, workout_date, created_at)
@@ -6203,7 +6203,7 @@ test.describe("P8 Route-Wide Density & Tap Grid", () => {
     });
     try {
       await page.goto("/login");
-      await page.fill('input[type="email"]', "coach@cybergym.io");
+      await page.fill('input[type="email"]', "coach@yourbody.fyi");
       await page.fill('input[type="password"]', "password123");
       await page.click('button[type="submit"]');
       await page.waitForURL("**/coach");
@@ -6246,7 +6246,7 @@ test.describe("P8 Route-Wide Density & Tap Grid", () => {
         id, user_id, food_name, meal_type, calories, protein, carbs, fat, fiber, serving_size, serving_unit, logged_at, logged_date
       ) VALUES (
         '${testLogId}',
-        (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io'),
+        (SELECT id FROM public.users WHERE email = 'athlete@yourbody.fyi'),
         'Grilled Salmon with Rice',
         'Dinner',
         550, 45, 50, 18, 4, 1, 'serving',
@@ -6258,7 +6258,7 @@ test.describe("P8 Route-Wide Density & Tap Grid", () => {
         id, user_id, name, calories, protein, carbs, fat, fiber, kind, use_count, notes, created_at
       ) VALUES (
         '${testDishId}',
-        (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io'),
+        (SELECT id FROM public.users WHERE email = 'athlete@yourbody.fyi'),
         'Poached Chicken Slices',
         132, 22, 0, 4.8, 0,
         'food',
@@ -6271,7 +6271,7 @@ test.describe("P8 Route-Wide Density & Tap Grid", () => {
 
     try {
       await page.goto("/login");
-      await page.fill('input[type="email"]', "athlete@cybergym.io");
+      await page.fill('input[type="email"]', "athlete@yourbody.fyi");
       await page.fill('input[type="password"]', "password123");
       await page.click('button[type="submit"]');
       await page.waitForURL("**/workout");
@@ -6360,11 +6360,11 @@ test.describe("P8 Route-Wide Density & Tap Grid", () => {
       DELETE FROM public.workouts WHERE id = '${testWorkoutId}';
       DELETE FROM public.sets WHERE workout_id IN (
         SELECT id FROM public.workouts
-        WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io')
+        WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@yourbody.fyi')
           AND (workout_date = CURRENT_DATE OR date::date = CURRENT_DATE)
       );
       DELETE FROM public.workouts
-      WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io')
+      WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@yourbody.fyi')
         AND (workout_date = CURRENT_DATE OR date::date = CURRENT_DATE);
     `;
     execSync(psqlCmd, { input: cleanSql, encoding: 'utf8' });
@@ -6376,7 +6376,7 @@ test.describe("P8 Route-Wide Density & Tap Grid", () => {
         v_ex_id uuid;
         v_workout_id uuid;
       BEGIN
-        SELECT id INTO v_athlete_id FROM public.users WHERE email = 'athlete@cybergym.io' LIMIT 1;
+        SELECT id INTO v_athlete_id FROM public.users WHERE email = 'athlete@yourbody.fyi' LIMIT 1;
         SELECT id INTO v_ex_id FROM public.exercises WHERE name = 'Incline Bench Press' LIMIT 1;
 
         INSERT INTO public.workouts (id, user_id, name, date, workout_date, created_at)
@@ -6395,7 +6395,7 @@ test.describe("P8 Route-Wide Density & Tap Grid", () => {
     let cleanupErr: any = null;
     try {
       await page.goto("/login");
-      await page.fill('input[type="email"]', "athlete@cybergym.io");
+      await page.fill('input[type="email"]', "athlete@yourbody.fyi");
       await page.fill('input[type="password"]', "password123");
       await page.click('button[type="submit"]');
       await page.waitForURL("**/workout");
@@ -6481,11 +6481,11 @@ test.describe("P8 Route-Wide Density & Tap Grid", () => {
       DELETE FROM public.workouts WHERE id IN ('${testPriorWorkoutId}', '${testTodayWorkoutId}');
       DELETE FROM public.sets WHERE workout_id IN (
         SELECT id FROM public.workouts
-        WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io')
+        WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@yourbody.fyi')
           AND (workout_date = CURRENT_DATE OR date::date = CURRENT_DATE)
       );
       DELETE FROM public.workouts
-      WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io')
+      WHERE user_id = (SELECT id FROM public.users WHERE email = 'athlete@yourbody.fyi')
         AND (workout_date = CURRENT_DATE OR date::date = CURRENT_DATE);
     `;
     execSync(psqlCmd, { input: cleanSql, encoding: 'utf8' });
@@ -6498,7 +6498,7 @@ test.describe("P8 Route-Wide Density & Tap Grid", () => {
         v_prior_workout_id uuid;
         v_today_workout_id uuid;
       BEGIN
-        SELECT id INTO v_athlete_id FROM public.users WHERE email = 'athlete@cybergym.io' LIMIT 1;
+        SELECT id INTO v_athlete_id FROM public.users WHERE email = 'athlete@yourbody.fyi' LIMIT 1;
         SELECT id INTO v_ex_id FROM public.exercises WHERE name = 'Incline Bench Press' LIMIT 1;
 
         INSERT INTO public.workouts (id, user_id, name, date, workout_date, created_at)
@@ -6533,7 +6533,7 @@ test.describe("P8 Route-Wide Density & Tap Grid", () => {
 
         try {
           await page.goto("/login");
-          await page.fill('input[type="email"]', "athlete@cybergym.io");
+          await page.fill('input[type="email"]', "athlete@yourbody.fyi");
           await page.fill('input[type="password"]', "password123");
           await page.click('button[type="submit"]');
           await page.waitForURL("**/workout");
@@ -6749,7 +6749,7 @@ test.describe("P8 Route-Wide Density & Tap Grid", () => {
       DELETE FROM public.sets WHERE id IN ('${testSetId1}', '${testSetId2}') OR exercise_id = '${testExerciseId}';
       DELETE FROM public.workouts WHERE id IN ('${testWorkoutId1}', '${testWorkoutId2}');
       DELETE FROM public.exercises WHERE id = '${testExerciseId}';
-      UPDATE public.users SET pr_mode = 'weight' WHERE email = 'athlete@cybergym.io';
+      UPDATE public.users SET pr_mode = 'weight' WHERE email = 'athlete@yourbody.fyi';
     `;
 
     const seedSql = `
@@ -6757,7 +6757,7 @@ test.describe("P8 Route-Wide Density & Tap Grid", () => {
       DECLARE
         v_athlete_id uuid;
       BEGIN
-        SELECT id INTO v_athlete_id FROM public.users WHERE email = 'athlete@cybergym.io' LIMIT 1;
+        SELECT id INTO v_athlete_id FROM public.users WHERE email = 'athlete@yourbody.fyi' LIMIT 1;
 
         -- Create dedicated exercise
         INSERT INTO public.exercises (id, name, body_parts, is_master)
@@ -6795,7 +6795,7 @@ test.describe("P8 Route-Wide Density & Tap Grid", () => {
 
     try {
       await page.goto('/login');
-      await page.fill('input[type="email"]', 'athlete@cybergym.io');
+      await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
       await page.fill('input[type="password"]', 'password123');
       await page.click('button[type="submit"]');
       await page.waitForURL('**/workout');
@@ -6950,7 +6950,7 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
 
       try {
         await page.goto("/login");
-        await page.fill('input[type="email"]', "athlete@cybergym.io");
+        await page.fill('input[type="email"]', "athlete@yourbody.fyi");
         await page.fill('input[type="password"]', "password123");
         await page.click('button[type="submit"]');
         await page.waitForURL("**/workout");
@@ -7006,7 +7006,7 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
 
       try {
         await page.goto("/login");
-        await page.fill('input[type="email"]', "athlete@cybergym.io");
+        await page.fill('input[type="email"]', "athlete@yourbody.fyi");
         await page.fill('input[type="password"]', "password123");
         await page.click('button[type="submit"]');
         await page.waitForURL("**/workout");
@@ -7085,15 +7085,15 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
       const dishB = `e8200000-0000-0000-0000-000000000${width}`;
       const cleanupSql = `
         DELETE FROM public.nutrition_logs WHERE food_name LIKE 'HFB Toast Dish %'
-          AND user_id = (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io');
+          AND user_id = (SELECT id FROM public.users WHERE email = 'athlete@yourbody.fyi');
         DELETE FROM public.custom_dishes WHERE id IN ('${dishA}', '${dishB}');
       `;
       execSync(psqlCmd, {
         input: `${cleanupSql}
           INSERT INTO public.custom_dishes (id, user_id, name, calories, protein, carbs, fat, fiber, kind, use_count, notes, created_at)
           VALUES
-            ('${dishA}', (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io'), 'HFB Toast Dish A', 132, 22, 0, 4.8, 0, 'food', 999999, NULL, now()),
-            ('${dishB}', (SELECT id FROM public.users WHERE email = 'athlete@cybergym.io'), 'HFB Toast Dish B', 579, 47, 60, 12, 3, 'food', 999998, NULL, now());
+            ('${dishA}', (SELECT id FROM public.users WHERE email = 'athlete@yourbody.fyi'), 'HFB Toast Dish A', 132, 22, 0, 4.8, 0, 'food', 999999, NULL, now()),
+            ('${dishB}', (SELECT id FROM public.users WHERE email = 'athlete@yourbody.fyi'), 'HFB Toast Dish B', 579, 47, 60, 12, 3, 'food', 999998, NULL, now());
         `,
         encoding: 'utf8',
       });
@@ -7101,7 +7101,7 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
       let cleanupErr: unknown;
       try {
         await page.goto("/login");
-        await page.fill('input[type="email"]', "athlete@cybergym.io");
+        await page.fill('input[type="email"]', "athlete@yourbody.fyi");
         await page.fill('input[type="password"]', "password123");
         await page.click('button[type="submit"]');
         await page.waitForURL("**/workout");
@@ -7225,7 +7225,7 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
 
       try {
         await page.goto("/login");
-        await page.fill('input[type="email"]', "athlete@cybergym.io");
+        await page.fill('input[type="email"]', "athlete@yourbody.fyi");
         await page.fill('input[type="password"]', "password123");
         await page.click('button[type="submit"]');
         await page.waitForURL("**/workout");
@@ -7273,7 +7273,7 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
 
       try {
         await page.goto("/login");
-        await page.fill('input[type="email"]', "athlete@cybergym.io");
+        await page.fill('input[type="email"]', "athlete@yourbody.fyi");
         await page.fill('input[type="password"]', "password123");
         await page.click('button[type="submit"]');
         await page.waitForURL("**/workout");
@@ -7343,7 +7343,7 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
       const realExerciseId = getRealAthleteExerciseId();
 
       await page.goto('/login');
-      await page.fill('input[type="email"]', 'athlete@cybergym.io');
+      await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
       await page.fill('input[type="password"]', 'password123');
       await page.click('button[type="submit"]');
       await page.waitForURL('**/workout');
@@ -7359,7 +7359,7 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
       });
       expect(athleteUserId, 'athlete userId must be present').toBeTruthy();
 
-      const dbName = `cybergym-offline-${athleteUserId}`;
+      const dbName = `yourbody-offline-${athleteUserId}`;
 
       // Wait for the app to create the per-user IndexedDB
       await page.waitForFunction(async (name) => {
@@ -7461,7 +7461,7 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
       try {
         if (athleteUserId && !page.isClosed()) {
           await page.evaluate(async (uid) => {
-            const dbName = `cybergym-offline-${uid}`;
+            const dbName = `yourbody-offline-${uid}`;
             const openReq = indexedDB.open(dbName);
             await new Promise<void>((resolve, reject) => {
               openReq.onsuccess = () => {
@@ -7510,7 +7510,7 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
       const realExerciseId = getRealAthleteExerciseId();
 
       await page.goto('/login');
-      await page.fill('input[type="email"]', 'athlete@cybergym.io');
+      await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
       await page.fill('input[type="password"]', 'password123');
       await page.click('button[type="submit"]');
       await page.waitForURL('**/workout');
@@ -7522,7 +7522,7 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
       });
       expect(athleteUserId, 'athlete userId must be present').toBeTruthy();
 
-      const dbName = `cybergym-offline-${athleteUserId}`;
+      const dbName = `yourbody-offline-${athleteUserId}`;
 
       // Wait for the app to create the per-user IndexedDB
       await page.waitForFunction(async (name) => {
@@ -7654,7 +7654,7 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
       try {
         if (athleteUserId && !page.isClosed()) {
           await page.evaluate(async (uid) => {
-            const dbName = `cybergym-offline-${uid}`;
+            const dbName = `yourbody-offline-${uid}`;
             const openReq = indexedDB.open(dbName);
             await new Promise<void>((resolve, reject) => {
               openReq.onsuccess = () => {
@@ -7703,7 +7703,7 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
       const realExerciseId = getRealAthleteExerciseId();
 
       await page.goto('/login');
-      await page.fill('input[type="email"]', 'athlete@cybergym.io');
+      await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
       await page.fill('input[type="password"]', 'password123');
       await page.click('button[type="submit"]');
       await page.waitForURL('**/workout');
@@ -7715,7 +7715,7 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
       });
       expect(athleteUserId, 'athlete userId must be present').toBeTruthy();
 
-      const dbName = `cybergym-offline-${athleteUserId}`;
+      const dbName = `yourbody-offline-${athleteUserId}`;
 
       // Wait for the app to create the per-user IndexedDB
       await page.waitForFunction(async (name) => {
@@ -7852,7 +7852,7 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
       try {
         if (athleteUserId && !page.isClosed()) {
           await page.evaluate(async (uid) => {
-            const dbName = `cybergym-offline-${uid}`;
+            const dbName = `yourbody-offline-${uid}`;
             const openReq = indexedDB.open(dbName);
             await new Promise<void>((resolve, reject) => {
               openReq.onsuccess = () => {
@@ -7899,7 +7899,7 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
 
     try {
       await page.goto('/login');
-      await page.fill('input[type="email"]', 'athlete@cybergym.io');
+      await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
       await page.fill('input[type="password"]', 'password123');
       await page.click('button[type="submit"]');
       await page.waitForURL('**/workout');
@@ -7911,7 +7911,7 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
       });
       expect(athleteUserId, 'athlete userId must be present').toBeTruthy();
 
-      const dbName = `cybergym-offline-${athleteUserId}`;
+      const dbName = `yourbody-offline-${athleteUserId}`;
 
       // Wait for the app to create the per-user IndexedDB
       await page.waitForFunction(async (name) => {
@@ -8066,7 +8066,7 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
       try {
         if (athleteUserId && !page.isClosed()) {
           await page.evaluate(async (uid) => {
-            const dbName = `cybergym-offline-${uid}`;
+            const dbName = `yourbody-offline-${uid}`;
             const openReq = indexedDB.open(dbName);
             await new Promise<void>((resolve, reject) => {
               openReq.onsuccess = () => {
@@ -8110,7 +8110,7 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
 
     try {
       await page.goto('/login');
-      await page.fill('input[type="email"]', 'athlete@cybergym.io');
+      await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
       await page.fill('input[type="password"]', 'password123');
       await page.click('button[type="submit"]');
       await page.waitForURL('**/workout');
@@ -8179,6 +8179,77 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
       await expect(stagedCard).not.toBeVisible();
     } finally {
       await context.close();
+    }
+  });
+
+  test('R-SRC Rebrand: Header wordmark relational geometry and typography at 320px and 390px', async ({ browser }) => {
+    for (const width of [320, 390]) {
+      for (const accountEmail of ['athlete@yourbody.fyi', 'coach@yourbody.fyi']) {
+        const context = await browser.newContext({
+          viewport: { width, height: 844 },
+          deviceScaleFactor: 1,
+        });
+        const page = await context.newPage();
+
+        try {
+          await page.goto('/login');
+          await page.fill('input[type="email"]', accountEmail);
+          await page.fill('input[type="password"]', 'password123');
+          await page.click('button[type="submit"]');
+          await page.waitForURL('**/workout');
+
+          const header = page.locator('header');
+          await expect(header).toBeVisible();
+
+          const h1 = page.locator('header h1');
+          await expect(h1).toBeVisible();
+
+          const textContent = await h1.textContent();
+          expect(textContent?.trim()).toBe('Yourbody.fyi');
+
+          const metrics = await h1.evaluate((el) => {
+            const style = window.getComputedStyle(el);
+            return {
+              textTransform: style.textTransform,
+              fontSize: parseFloat(style.fontSize),
+              scrollWidth: el.scrollWidth,
+              clientWidth: el.clientWidth,
+            };
+          });
+
+          expect(metrics.textTransform, `h1 computed text-transform must be 'none' at ${width}px (${accountEmail})`).toBe('none');
+          expect(metrics.scrollWidth, `h1 scrollWidth (${metrics.scrollWidth}px) <= clientWidth (${metrics.clientWidth}px) at ${width}px (${accountEmail})`).toBeLessThanOrEqual(metrics.clientWidth);
+          expect(metrics.fontSize, `h1 font-size (${metrics.fontSize}px) >= 12px at ${width}px (${accountEmail})`).toBeGreaterThanOrEqual(12);
+
+          // Relational check: no intersection with badges or logout
+          const h1Box = await h1.boundingBox();
+          expect(h1Box, 'h1 bounding box exists').not.toBeNull();
+
+          const badgeLocators = [
+            page.locator('[data-testid="coach-dashboard-link"]'),
+            page.locator('[data-testid="connection-status"]'),
+            page.locator('[data-testid="role-switch-button"], [title="Athlete Account"]'),
+            page.locator('[data-testid="sign-out-button"]'),
+          ];
+
+          for (const loc of badgeLocators) {
+            if ((await loc.count()) > 0 && (await loc.isVisible())) {
+              const box = await loc.boundingBox();
+              if (box) {
+                const intersects = !(
+                  h1Box!.x + h1Box!.width <= box.x ||
+                  box.x + box.width <= h1Box!.x ||
+                  h1Box!.y + h1Box!.height <= box.y ||
+                  box.y + box.height <= h1Box!.y
+                );
+                expect(intersects, `h1 must not intersect with badge/action element at ${width}px (${accountEmail})`).toBe(false);
+              }
+            }
+          }
+        } finally {
+          await context.close();
+        }
+      }
     }
   });
 });

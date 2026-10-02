@@ -46,7 +46,7 @@ describe('WorkoutEngine React Profiler Baseline', () => {
     restTimerStore.resetForTesting();
     workoutSessionStore.resetForTesting();
     localStorage.setItem(
-      'cybergym_user',
+      'yourbody_user',
       JSON.stringify({
         id: 'test-user-id',
         email: 'athlete@example.com',

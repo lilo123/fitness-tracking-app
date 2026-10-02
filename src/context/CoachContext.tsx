@@ -12,7 +12,7 @@ export const CoachProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const isCoach = isCoachMode;
 
   const [athletes, setAthletes] = useState<AthleteInfo[]>(() => {
-    const saved = localStorage.getItem('cybergym_athletes');
+    const saved = localStorage.getItem('yourbody_athletes');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -27,7 +27,7 @@ export const CoachProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
 
   const [coachSelectedAthleteId, setCoachSelectedAthleteId] = useState<string>(() => {
-    const savedId = localStorage.getItem('cybergym_selected_athlete');
+    const savedId = localStorage.getItem('yourbody_selected_athlete');
     if (savedId && isValidUuid(savedId)) {
       return savedId;
     }
@@ -69,19 +69,19 @@ export const CoachProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               };
             });
             setAthletes(fetchedAthletes);
-            localStorage.setItem('cybergym_athletes', JSON.stringify(fetchedAthletes));
+            localStorage.setItem('yourbody_athletes', JSON.stringify(fetchedAthletes));
 
             setCoachSelectedAthleteId((prev) => {
               if (prev && fetchedAthletes.some((a) => a.id === prev)) return prev;
               const firstId = fetchedAthletes[0]?.id || '';
-              if (firstId) localStorage.setItem('cybergym_selected_athlete', firstId);
+              if (firstId) localStorage.setItem('yourbody_selected_athlete', firstId);
               return firstId;
             });
           } else {
             setAthletes([]);
             setCoachSelectedAthleteId('');
-            localStorage.removeItem('cybergym_athletes');
-            localStorage.removeItem('cybergym_selected_athlete');
+            localStorage.removeItem('yourbody_athletes');
+            localStorage.removeItem('yourbody_selected_athlete');
           }
         }
       } catch {
@@ -100,7 +100,7 @@ export const CoachProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const switchAthlete = useCallback((athleteId: string) => {
     setCoachSelectedAthleteId(athleteId);
-    localStorage.setItem('cybergym_selected_athlete', athleteId);
+    localStorage.setItem('yourbody_selected_athlete', athleteId);
   }, []);
 
   const addAthlete = useCallback(async (name: string, email?: string): Promise<AthleteInfo> => {
@@ -116,11 +116,11 @@ export const CoachProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const newAthlete: AthleteInfo = data.athlete;
         setAthletes((prev) => {
           const updated = [newAthlete, ...prev.filter((a) => a.id !== newAthlete.id)];
-          localStorage.setItem('cybergym_athletes', JSON.stringify(updated));
+          localStorage.setItem('yourbody_athletes', JSON.stringify(updated));
           return updated;
         });
         setCoachSelectedAthleteId(newAthlete.id);
-        localStorage.setItem('cybergym_selected_athlete', newAthlete.id);
+        localStorage.setItem('yourbody_selected_athlete', newAthlete.id);
         return newAthlete;
       }
     } catch (err) {
@@ -137,11 +137,11 @@ export const CoachProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
     setAthletes((prev) => {
       const updated = [fallbackAthlete, ...prev];
-      localStorage.setItem('cybergym_athletes', JSON.stringify(updated));
+      localStorage.setItem('yourbody_athletes', JSON.stringify(updated));
       return updated;
     });
     setCoachSelectedAthleteId(fallbackAthlete.id);
-    localStorage.setItem('cybergym_selected_athlete', fallbackAthlete.id);
+    localStorage.setItem('yourbody_selected_athlete', fallbackAthlete.id);
     return fallbackAthlete;
   }, []);
 

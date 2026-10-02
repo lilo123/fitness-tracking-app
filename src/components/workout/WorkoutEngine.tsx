@@ -34,9 +34,9 @@ export const WorkoutEngine: React.FC = () => {
   const unit = useWeightUnit();
 
   const targetUserId = user?.id || (() => {
-    try { return JSON.parse(localStorage.getItem('cybergym_user') || '{}')?.id || ''; } catch { return ''; }
+    try { return JSON.parse(localStorage.getItem('yourbody_user') || '{}')?.id || ''; } catch { return ''; }
   })();
-  const autoRestTimer = profile?.auto_rest_timer ?? (localStorage.getItem('cybergym_auto_rest_timer') !== 'false');
+  const autoRestTimer = profile?.auto_rest_timer ?? (localStorage.getItem('yourbody_auto_rest_timer') !== 'false');
 
   const [showRoutineModal, setShowRoutineModal] = useState(false);
   const [isExercisePickerOpen, setIsExercisePickerOpen] = useState(false);

@@ -1,5 +1,5 @@
 /**
- * CyberGym V1 -> V2 Historical Data Migration Utilities
+ * Yourbody V1 -> V2 Historical Data Migration Utilities
  *
  * Implements deterministic business logic, duplicate set purging,
  * volume calculations, and exercise aliasing.
@@ -9,7 +9,7 @@ export const TARGET_COACH_UID = '2d444ce2-c0cf-483f-a82e-43c8fb9807b1';
 export const TARGET_COACH_EMAIL = 'diehard643@gmail.com';
 
 /**
- * 12 Pre-seeded master exercises in CyberGym V2 catalog.
+ * 12 Pre-seeded master exercises in Yourbody V2 catalog.
  */
 export const MASTER_EXERCISE_NAMES = [
   'Incline Bench Press',

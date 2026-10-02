@@ -1,9 +1,9 @@
 import type { ActiveWorkoutSession } from './workoutSessionStore';
 
-export const SESSION_PREFIX = 'cybergym_active_session_';
-export const POINTER_PREFIX = 'cybergym_current_session_pointer_';
-export const DRAFT_EXERCISES_PREFIX = 'cybergym_active_exercises_';
-export const ROUTINE_PREFIX = 'cybergym_routine_';
+export const SESSION_PREFIX = 'yourbody_active_session_';
+export const POINTER_PREFIX = 'yourbody_current_session_pointer_';
+export const DRAFT_EXERCISES_PREFIX = 'yourbody_active_exercises_';
+export const ROUTINE_PREFIX = 'yourbody_routine_';
 export const TTL_MS = 24 * 60 * 60 * 1000;
 
 /**

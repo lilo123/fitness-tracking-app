@@ -18,10 +18,12 @@ import {
   setFlusherSessionUser,
 } from '../offline';
 
+export const AUTH_STORAGE_PREFIX = 'yourbody_';
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [profile, setProfile] = useState<UserProfile | null>(() => {
     try {
-      const cached = localStorage.getItem('cybergym_user');
+      const cached = localStorage.getItem('yourbody_user');
       return cached ? (JSON.parse(cached) as UserProfile) : null;
     } catch {
       return null;
@@ -29,7 +31,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   const [user, setUser] = useState<User | null>(() => {
     try {
-      const cached = localStorage.getItem('cybergym_user');
+      const cached = localStorage.getItem('yourbody_user');
       if (cached) {
         const parsed = JSON.parse(cached) as UserProfile;
         if (parsed?.id) {
@@ -50,7 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   const [loading, setLoading] = useState<boolean>(() => {
     try {
-      const cached = localStorage.getItem('cybergym_user');
+      const cached = localStorage.getItem('yourbody_user');
       if (cached) {
         const parsed = JSON.parse(cached);
         if (parsed?.id) return false;
@@ -61,7 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return true;
   });
   const [viewMode, setViewMode] = useState<UserRole>(() => {
-    return (localStorage.getItem('cybergym_view_mode') as UserRole) || 'coach';
+    return (localStorage.getItem('yourbody_view_mode') as UserRole) || 'coach';
   });
 
   const signedOutRef = useRef(false);
@@ -72,7 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return dedupeInFlight(`timezone:${userId}`, async () => {
       try {
         const deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const storageKey = `cybergym_user_timezone_${userId}`;
+        const storageKey = `yourbody_user_timezone_${userId}`;
         const cachedZone = typeof window !== 'undefined' && window.localStorage ? localStorage.getItem(storageKey) : null;
         if (deviceZone && (force || cachedZone !== deviceZone)) {
           const { error: tzErr } = await supabase
@@ -115,22 +117,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           const prModeVal: PrMode = (data as any)?.pr_mode === 'e1rm' ? 'e1rm' : 'weight';
 
-          const storedTz = typeof window !== 'undefined' && window.localStorage ? localStorage.getItem(`cybergym_user_timezone_${userId}`) : null;
+          const storedTz = typeof window !== 'undefined' && window.localStorage ? localStorage.getItem(`yourbody_user_timezone_${userId}`) : null;
           const userWithTz = {
             ...data,
             timezone: data.timezone || storedTz || deviceZone || null,
             pr_mode: prModeVal,
           } as UserProfile;
           setProfile(userWithTz);
-          localStorage.setItem('cybergym_user', JSON.stringify(userWithTz));
+          localStorage.setItem('yourbody_user', JSON.stringify(userWithTz));
           if (data.auto_rest_timer !== undefined && data.auto_rest_timer !== null) {
-            localStorage.setItem('cybergym_auto_rest_timer', String(data.auto_rest_timer));
+            localStorage.setItem('yourbody_auto_rest_timer', String(data.auto_rest_timer));
           }
           if (data.role === 'coach') {
-            const savedMode = localStorage.getItem('cybergym_view_mode') as UserRole;
+            const savedMode = localStorage.getItem('yourbody_view_mode') as UserRole;
             if (!savedMode) {
               setViewMode('coach');
-              localStorage.setItem('cybergym_view_mode', 'coach');
+              localStorage.setItem('yourbody_view_mode', 'coach');
             }
           }
         } else {
@@ -156,7 +158,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             pr_mode: 'weight',
           };
           setProfile(fallbackProfile);
-          localStorage.setItem('cybergym_user', JSON.stringify(fallbackProfile));
+          localStorage.setItem('yourbody_user', JSON.stringify(fallbackProfile));
         }
       } catch {
         // Retain current profile
@@ -217,7 +219,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setAuthRequiredStatus(true);
             setUser(null);
             setProfile(null);
-            localStorage.removeItem('cybergym_user');
+            localStorage.removeItem('yourbody_user');
             setLoading(false);
             return;
           }
@@ -228,7 +230,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             '[AuthContext] getSession timed out after 3000ms. Utilizing cached credentials if available.'
           );
           try {
-            const cached = localStorage.getItem('cybergym_user');
+            const cached = localStorage.getItem('yourbody_user');
             const parsed = cached ? JSON.parse(cached) : null;
             if (!parsed?.id) {
               setUser(null);
@@ -266,7 +268,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signedOutRef.current = true;
         setUser(null);
         setProfile(null);
-        localStorage.removeItem('cybergym_user');
+        localStorage.removeItem('yourbody_user');
       }
       setLoading(false);
     });
@@ -298,7 +300,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setAuthRequiredStatus(true);
               setUser(null);
               setProfile(null);
-              localStorage.removeItem('cybergym_user');
+              localStorage.removeItem('yourbody_user');
             }
           })
           .catch((err) => {
@@ -428,9 +430,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     restTimerStore.stop();
 
-    localStorage.removeItem('cybergym_user');
+    localStorage.removeItem('yourbody_user');
     Object.keys(localStorage).forEach((key) => {
-      if (key.startsWith('cybergym_')) {
+      if (key.startsWith(AUTH_STORAGE_PREFIX)) {
         localStorage.removeItem(key);
       }
     });
@@ -458,9 +460,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } = updates;
     const updated = { ...profile, ...safeUpdates };
     setProfile(updated);
-    localStorage.setItem('cybergym_user', JSON.stringify(updated));
+    localStorage.setItem('yourbody_user', JSON.stringify(updated));
     if (safeUpdates.auto_rest_timer !== undefined) {
-      localStorage.setItem('cybergym_auto_rest_timer', String(safeUpdates.auto_rest_timer));
+      localStorage.setItem('yourbody_auto_rest_timer', String(safeUpdates.auto_rest_timer));
     }
 
     try {
@@ -479,7 +481,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Only verified coaches can toggle between Coach View and Athlete Preview
     if (profile?.role !== 'coach') return;
     setViewMode(newRole);
-    localStorage.setItem('cybergym_view_mode', newRole);
+    localStorage.setItem('yourbody_view_mode', newRole);
   }, [profile?.role]);
 
   const refreshProfile = useCallback(async () => {

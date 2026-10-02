@@ -483,7 +483,7 @@ describe('Outbox Storage, Ordering & Dependent Blocking (§A4, §D)', () => {
     // but localStorage contains the cross-tab pending count from Tab B
     resetOutboxForTesting();
     // restore the localStorage key that Tab B wrote
-    localStorage.setItem(`cybergym_outbox_pending_${userA}`, '1');
+    localStorage.setItem(`yourbody_outbox_pending_${userA}`, '1');
 
     const subscriber = vi.fn();
     const unsubscribe = subscribeToOutbox(subscriber);
@@ -496,7 +496,7 @@ describe('Outbox Storage, Ordering & Dependent Blocking (§A4, §D)', () => {
     // Simulate cross-tab storage event fired in Tab A
     window.dispatchEvent(
       new StorageEvent('storage', {
-        key: `cybergym_outbox_pending_${userA}`,
+        key: `yourbody_outbox_pending_${userA}`,
         newValue: '1',
       })
     );

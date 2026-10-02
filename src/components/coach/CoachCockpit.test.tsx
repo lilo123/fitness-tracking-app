@@ -10,7 +10,7 @@ import { COACH_SETS_PER_WORKOUT_LIMIT } from '../workout/useWorkoutQueries';
 
 const { mockSession } = vi.hoisted(() => ({
   mockSession: {
-    user: { id: 'coach-id', email: 'coach@cybergym.io' },
+    user: { id: 'coach-id', email: 'coach@yourbody.fyi' },
   },
 }));
 
@@ -69,7 +69,7 @@ describe('CoachCockpit', () => {
           }
           return {
             id: 'coach-id',
-            email: 'coach@cybergym.io',
+            email: 'coach@yourbody.fyi',
             username: 'Coach Duy',
             role: 'coach',
             is_coach_mode: true,

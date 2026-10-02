@@ -35,7 +35,7 @@ describe('F-15: In-Flight Promise Deduplication', () => {
 
   const mockProfile: UserProfile = {
     id: 'user-dedupe-123',
-    email: 'dedupe@cybergym.io',
+    email: 'dedupe@yourbody.fyi',
     username: 'DedupeUser',
     role: 'coach',
     target_calories: 2200,
@@ -67,8 +67,8 @@ describe('F-15: In-Flight Promise Deduplication', () => {
     clearMockHistory();
     clearInFlight();
     localStorage.clear();
-    localStorage.setItem('cybergym_user', JSON.stringify(mockProfile));
-    localStorage.setItem(`cybergym_user_timezone_${mockProfile.id}`, mockProfile.timezone || 'UTC');
+    localStorage.setItem('yourbody_user', JSON.stringify(mockProfile));
+    localStorage.setItem(`yourbody_user_timezone_${mockProfile.id}`, mockProfile.timezone || 'UTC');
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'users') {

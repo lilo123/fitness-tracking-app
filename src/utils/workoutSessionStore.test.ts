@@ -31,14 +31,14 @@ describe('workoutSessionStore', () => {
     expect(session.completedAt).toBeNull();
 
     // Verify stored in localStorage
-    const raw = localStorage.getItem(`cybergym_active_session_${userId}_${today}`);
+    const raw = localStorage.getItem(`yourbody_active_session_${userId}_${today}`);
     expect(raw).toBeTruthy();
     const parsed = JSON.parse(raw!);
     expect(parsed.sessionId).toBe(session.sessionId);
     expect(parsed.schemaVersion).toBe(1);
 
     // Verify pointer set for today
-    expect(localStorage.getItem(`cybergym_current_session_pointer_${userId}`)).toBe(today);
+    expect(localStorage.getItem(`yourbody_current_session_pointer_${userId}`)).toBe(today);
   });
 
   it('2. immediate macro write on updateTargetSets', () => {
@@ -54,7 +54,7 @@ describe('workoutSessionStore', () => {
     const session = workoutSessionStore.getSession(userId, today);
     expect(session?.targetSetCounts['Bench Press']).toBe(5);
 
-    const raw = localStorage.getItem(`cybergym_active_session_${userId}_${today}`);
+    const raw = localStorage.getItem(`yourbody_active_session_${userId}_${today}`);
     expect(JSON.parse(raw!).targetSetCounts['Bench Press']).toBe(5);
   });
 
@@ -77,7 +77,7 @@ describe('workoutSessionStore', () => {
     expect(session?.inputDrafts['Leg Extension_1']).toBeUndefined();
 
     // Verify sessionStorage mirror updated
-    const mirror = sessionStorage.getItem(`cybergym_active_exercises_${userId}_${today}`);
+    const mirror = sessionStorage.getItem(`yourbody_active_exercises_${userId}_${today}`);
     expect(JSON.parse(mirror!)).toEqual(['Squat']);
   });
 
@@ -94,7 +94,7 @@ describe('workoutSessionStore', () => {
     const session = workoutSessionStore.getSession(userId, today);
     expect(session?.exercises).toEqual(['Row', 'Pull-up', 'Dip']);
 
-    const raw = localStorage.getItem(`cybergym_active_session_${userId}_${today}`);
+    const raw = localStorage.getItem(`yourbody_active_session_${userId}_${today}`);
     expect(JSON.parse(raw!).exercises).toEqual(['Row', 'Pull-up', 'Dip']);
   });
 
@@ -179,7 +179,7 @@ describe('workoutSessionStore', () => {
       targetRepCounts: {},
     });
 
-    const key = `cybergym_active_session_${userId}_${today}`;
+    const key = `yourbody_active_session_${userId}_${today}`;
     expect(localStorage.getItem(key)).not.toBeNull();
 
     // Advance time past TTL
@@ -225,16 +225,16 @@ describe('workoutSessionStore', () => {
       targetRepCounts: {},
     });
 
-    const mirrorEx = sessionStorage.getItem(`cybergym_active_exercises_${userId}_${today}`);
-    const mirrorRtn = sessionStorage.getItem(`cybergym_routine_${userId}_${today}`);
+    const mirrorEx = sessionStorage.getItem(`yourbody_active_exercises_${userId}_${today}`);
+    const mirrorRtn = sessionStorage.getItem(`yourbody_routine_${userId}_${today}`);
 
     expect(JSON.parse(mirrorEx!)).toEqual(['Squat', 'Bench Press']);
     expect(mirrorRtn).toBe('Full Body');
 
     // On clear workout
     workoutSessionStore.clearWorkout(userId, today);
-    expect(sessionStorage.getItem(`cybergym_active_exercises_${userId}_${today}`)).toBeNull();
-    expect(sessionStorage.getItem(`cybergym_routine_${userId}_${today}`)).toBe('Free Workout');
+    expect(sessionStorage.getItem(`yourbody_active_exercises_${userId}_${today}`)).toBeNull();
+    expect(sessionStorage.getItem(`yourbody_routine_${userId}_${today}`)).toBe('Free Workout');
   });
 
   it('11. sets completed session timestamp on completeSession() and clears pointer', () => {
@@ -245,7 +245,7 @@ describe('workoutSessionStore', () => {
       targetRepCounts: {},
     });
 
-    expect(localStorage.getItem(`cybergym_current_session_pointer_${userId}`)).toBe(today);
+    expect(localStorage.getItem(`yourbody_current_session_pointer_${userId}`)).toBe(today);
 
     workoutSessionStore.completeSession(userId, today);
 
@@ -253,7 +253,7 @@ describe('workoutSessionStore', () => {
     expect(session?.completedAt).toBeTruthy();
 
     // Pointer cleared
-    expect(localStorage.getItem(`cybergym_current_session_pointer_${userId}`)).toBeNull();
+    expect(localStorage.getItem(`yourbody_current_session_pointer_${userId}`)).toBeNull();
 
     // getActiveSession without date returns null when completed
     expect(workoutSessionStore.getActiveSession(userId)).toBeNull();
@@ -276,7 +276,7 @@ describe('workoutSessionStore', () => {
     workoutSessionStore.reopenSession(userId, today);
     const session = workoutSessionStore.getSession(userId, today);
     expect(session?.completedAt).toBeNull();
-    expect(localStorage.getItem(`cybergym_current_session_pointer_${userId}`)).toBe(today);
+    expect(localStorage.getItem(`yourbody_current_session_pointer_${userId}`)).toBe(today);
   });
 
   it('13. deleteSession removes session, cleans pointer, cleans mirrors, and cancels pending drafts', () => {
@@ -289,15 +289,15 @@ describe('workoutSessionStore', () => {
 
     workoutSessionStore.setDraftInput(userId, today, 'Bench Press', 1, { weight: '205', reps: '6' });
 
-    expect(localStorage.getItem(`cybergym_active_session_${userId}_${today}`)).not.toBeNull();
-    expect(localStorage.getItem(`cybergym_current_session_pointer_${userId}`)).toBe(today);
+    expect(localStorage.getItem(`yourbody_active_session_${userId}_${today}`)).not.toBeNull();
+    expect(localStorage.getItem(`yourbody_current_session_pointer_${userId}`)).toBe(today);
 
     workoutSessionStore.deleteSession(userId, today);
 
-    expect(localStorage.getItem(`cybergym_active_session_${userId}_${today}`)).toBeNull();
-    expect(localStorage.getItem(`cybergym_current_session_pointer_${userId}`)).toBeNull();
-    expect(sessionStorage.getItem(`cybergym_active_exercises_${userId}_${today}`)).toBeNull();
-    expect(sessionStorage.getItem(`cybergym_routine_${userId}_${today}`)).toBeNull();
+    expect(localStorage.getItem(`yourbody_active_session_${userId}_${today}`)).toBeNull();
+    expect(localStorage.getItem(`yourbody_current_session_pointer_${userId}`)).toBeNull();
+    expect(sessionStorage.getItem(`yourbody_active_exercises_${userId}_${today}`)).toBeNull();
+    expect(sessionStorage.getItem(`yourbody_routine_${userId}_${today}`)).toBeNull();
 
     // Flushing should not resurrect the session
     workoutSessionStore.flushPendingWrites();
@@ -338,7 +338,7 @@ describe('workoutSessionStore', () => {
     });
 
     // Point pointer to 2026-08-04
-    localStorage.setItem(`cybergym_current_session_pointer_${userId}`, '2026-08-04');
+    localStorage.setItem(`yourbody_current_session_pointer_${userId}`, '2026-08-04');
 
     // Advance past TTL
     vi.advanceTimersByTime(25 * 60 * 60 * 1000);
@@ -346,9 +346,9 @@ describe('workoutSessionStore', () => {
     workoutSessionStore.pruneExpiredSessions();
 
     dates.forEach((d) => {
-      expect(localStorage.getItem(`cybergym_active_session_${userId}_${d}`)).toBeNull();
+      expect(localStorage.getItem(`yourbody_active_session_${userId}_${d}`)).toBeNull();
     });
-    expect(localStorage.getItem(`cybergym_current_session_pointer_${userId}`)).toBeNull();
+    expect(localStorage.getItem(`yourbody_current_session_pointer_${userId}`)).toBeNull();
   });
 
   it('16. renameExercise migrates exercises, targets, and inputDrafts with cross-user isolation', () => {
@@ -394,7 +394,7 @@ describe('workoutSessionStore', () => {
     expect(session1?.inputDrafts['Incline DB_0']).toEqual({ weight: '50', reps: '10' });
 
     // SessionStorage mirror updated
-    const mirror1 = sessionStorage.getItem(`cybergym_active_exercises_${user1}_${today}`);
+    const mirror1 = sessionStorage.getItem(`yourbody_active_exercises_${user1}_${today}`);
     expect(JSON.parse(mirror1!)).toEqual(['Barbell Bench Press', 'Incline DB']);
 
     // User 2 session remains completely untouched
@@ -518,7 +518,7 @@ describe('workoutSessionStore', () => {
     workoutSessionStore.saveSession(session, true);
 
     // Pointer must be set to the past date
-    const pointer = localStorage.getItem('cybergym_current_session_pointer_user-w24');
+    const pointer = localStorage.getItem('yourbody_current_session_pointer_user-w24');
     expect(pointer).toBe(pastDate);
 
     // getActiveSession without date argument must resolve to the active past session

@@ -100,7 +100,7 @@ export async function resolveWorkoutRefForDate(
   } catch {}
 
   // 2. Check localStorage for previously generated client workout id on this device
-  const storageKey = `cybergym_client_workout_${userId}_${workoutDate}`;
+  const storageKey = `yourbody_client_workout_${userId}_${workoutDate}`;
   let clientWorkoutId: string | null = null;
   if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
     try {

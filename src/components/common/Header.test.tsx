@@ -19,7 +19,7 @@ const { mockUserProfile } = vi.hoisted(() => ({
   mockUserProfile: {
     id: 'test-user',
     role: 'coach',
-    email: 'coach@cybergym.io',
+    email: 'coach@yourbody.fyi',
   },
 }));
 
@@ -32,9 +32,9 @@ vi.mock('../../lib/supabase', () => ({
       return createSupabaseBuilder(table, []);
     }),
     auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user', email: 'coach@cybergym.io' } } }),
+      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user', email: 'coach@yourbody.fyi' } } }),
       getSession: vi.fn().mockResolvedValue({
-        data: { session: { user: { id: 'test-user', email: 'coach@cybergym.io' } } },
+        data: { session: { user: { id: 'test-user', email: 'coach@yourbody.fyi' } } },
       }),
       onAuthStateChange: vi.fn().mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } }),
     },
@@ -51,7 +51,7 @@ describe('Header connection status badge', () => {
     localStorage.clear();
     mockUserProfile.id = 'test-user';
     mockUserProfile.role = 'coach';
-    mockUserProfile.email = 'coach@cybergym.io';
+    mockUserProfile.email = 'coach@yourbody.fyi';
     queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     Object.defineProperty(navigator, 'onLine', {
       configurable: true,
@@ -211,7 +211,7 @@ describe('Header connection status badge', () => {
       renderHeader();
 
       await waitFor(() => {
-        expect(screen.getByText('CyberGym')).toBeDefined();
+        expect(screen.getByText('Yourbody.fyi')).toBeDefined();
       });
 
       expect(screen.queryByTestId('coach-dashboard-link')).toBeNull();
@@ -219,7 +219,7 @@ describe('Header connection status badge', () => {
 
     it('(b) coach in athlete mode off /coach: link is not rendered', async () => {
       mockUserProfile.role = 'coach';
-      localStorage.setItem('cybergym_view_mode', 'athlete');
+      localStorage.setItem('yourbody_view_mode', 'athlete');
       window.history.pushState({}, '', '/workout');
       renderHeader();
 
@@ -234,7 +234,7 @@ describe('Header connection status badge', () => {
 
     it('(c) coach mode on /coach: link is not rendered', async () => {
       mockUserProfile.role = 'coach';
-      localStorage.setItem('cybergym_view_mode', 'coach');
+      localStorage.setItem('yourbody_view_mode', 'coach');
       window.history.pushState({}, '', '/coach');
       renderHeader();
 
@@ -249,7 +249,7 @@ describe('Header connection status badge', () => {
 
     it('(d) coach mode elsewhere (off /coach): link is rendered (44x44, aria-label, href /coach)', async () => {
       mockUserProfile.role = 'coach';
-      localStorage.setItem('cybergym_view_mode', 'coach');
+      localStorage.setItem('yourbody_view_mode', 'coach');
       window.history.pushState({}, '', '/workout');
       const { container } = renderHeader();
 
@@ -269,12 +269,12 @@ describe('Header connection status badge', () => {
 
   describe('Header connection status badge states & A9 sign out confirm', () => {
     beforeEach(() => {
-      localStorage.setItem('cybergym_user', JSON.stringify({ id: 'test-user', email: 'coach@cybergym.io' }));
+      localStorage.setItem('yourbody_user', JSON.stringify({ id: 'test-user', email: 'coach@yourbody.fyi' }));
     });
 
     afterEach(() => {
       resetOutboxForTesting();
-      localStorage.removeItem('cybergym_user');
+      localStorage.removeItem('yourbody_user');
     });
 
     it('renders "Offline" when offline with 0 pending', async () => {
@@ -421,7 +421,7 @@ describe('Header connection status badge', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId('sign-out-confirm-dialog')).toBeDefined();
-        expect(screen.getByText(/1 unsynced changes stay on this device and sync the next time you sign in as coach@cybergym\.io\. Sign out\?/)).toBeDefined();
+        expect(screen.getByText(/1 unsynced changes stay on this device and sync the next time you sign in as coach@yourbody\.fyi\. Sign out\?/)).toBeDefined();
       });
     });
   });

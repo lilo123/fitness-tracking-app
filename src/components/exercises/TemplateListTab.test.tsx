@@ -19,7 +19,7 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
-const mockUser = { id: 'user-athlete-1', email: 'athlete@cybergym.io' };
+const mockUser = { id: 'user-athlete-1', email: 'athlete@yourbody.fyi' };
 const mockCoachState = {
   isCoach: false,
   selectedAthleteId: null as string | null,

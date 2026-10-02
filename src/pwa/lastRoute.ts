@@ -24,7 +24,7 @@ export function isTabRoute(path: string): path is TabRoute {
  * Returns the storage key for a user's last-visited route.
  */
 export function getLastRouteStorageKey(userId: string): string {
-  return `cybergym_last_route_${userId}`;
+  return `yourbody_last_route_${userId}`;
 }
 
 /**

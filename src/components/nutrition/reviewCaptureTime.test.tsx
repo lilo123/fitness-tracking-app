@@ -69,7 +69,7 @@ describe('reviewCaptureTime - O2 capture date and original timestamp preservatio
   function setupUserWithTimezone(timeZone: string) {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(
-        'cybergym_user',
+        'yourbody_user',
         JSON.stringify({
           id: mockUserId,
           email: 'athlete@example.com',
@@ -78,7 +78,7 @@ describe('reviewCaptureTime - O2 capture date and original timestamp preservatio
           timezone: timeZone,
         })
       );
-      localStorage.setItem(`cybergym_user_timezone_${mockUserId}`, timeZone);
+      localStorage.setItem(`yourbody_user_timezone_${mockUserId}`, timeZone);
     }
 
     (supabase.from as any).mockImplementation((table: string) => {

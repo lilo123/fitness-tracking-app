@@ -86,7 +86,7 @@ describe('WorkoutEngine', () => {
     workoutSessionStore.resetForTesting();
     delete (supabase as any).rpc;
     localStorage.setItem(
-      'cybergym_user',
+      'yourbody_user',
       JSON.stringify({
         id: '00000000-0000-4000-8000-000000000001',
         email: 'athlete@example.com',
@@ -845,7 +845,7 @@ describe('WorkoutEngine', () => {
   });
 
   it('respects auto_rest_timer=false preference: does not auto-start rest timer on set commit, but manual timer works', async () => {
-    localStorage.setItem('cybergym_auto_rest_timer', 'false');
+    localStorage.setItem('yourbody_auto_rest_timer', 'false');
 
     (supabase.from as any).mockImplementation((table: string) => {
       if (table === 'users') {
@@ -1241,7 +1241,7 @@ describe('WorkoutEngine', () => {
       expect(screen.getByText('Lat Pull Down')).toBeDefined();
     });
 
-    const draftKey = 'cybergym_active_exercises_00000000-0000-4000-8000-000000000001_2026-09-06';
+    const draftKey = 'yourbody_active_exercises_00000000-0000-4000-8000-000000000001_2026-09-06';
     expect(sessionStorage.getItem(draftKey)).toContain('Lat Pull Down');
 
     // Select Rest Day
@@ -1278,7 +1278,7 @@ describe('WorkoutEngine', () => {
       expect(screen.getByText("No exercises in today's workout yet")).toBeDefined();
     });
 
-    const routineKey = 'cybergym_routine_00000000-0000-4000-8000-000000000001_2026-09-06';
+    const routineKey = 'yourbody_routine_00000000-0000-4000-8000-000000000001_2026-09-06';
     expect(sessionStorage.getItem(routineKey)).toBe('Free Workout');
 
     // Simulate tab switch by unmounting and remounting
@@ -1334,7 +1334,7 @@ describe('WorkoutEngine', () => {
     const lastMoveUpBtn = moveUpBtns[moveUpBtns.length - 1];
     fireEvent.click(lastMoveUpBtn);
 
-    const draftKey = 'cybergym_active_exercises_00000000-0000-4000-8000-000000000001_2026-09-06';
+    const draftKey = 'yourbody_active_exercises_00000000-0000-4000-8000-000000000001_2026-09-06';
     const stored = JSON.parse(sessionStorage.getItem(draftKey) || '[]');
     expect(stored.indexOf('Lat Pull Down')).toBe(stored.length - 2);
 
@@ -1512,7 +1512,7 @@ describe('WorkoutEngine', () => {
 
       await selectWorkoutA();
 
-      expect(localStorage.getItem('cybergym_current_session_pointer_00000000-0000-4000-8000-000000000001')).toBe('2026-09-08');
+      expect(localStorage.getItem('yourbody_current_session_pointer_00000000-0000-4000-8000-000000000001')).toBe('2026-09-08');
 
       unmount();
 
@@ -1535,18 +1535,18 @@ describe('WorkoutEngine', () => {
       const athleteBId = '22222222-2222-4222-8222-222222222222';
 
       localStorage.setItem(
-        'cybergym_user',
+        'yourbody_user',
         JSON.stringify({ id: 'coach-id', email: 'coach@example.com', role: 'coach', is_coach_mode: true })
       );
-      localStorage.setItem('cybergym_view_mode', 'coach');
+      localStorage.setItem('yourbody_view_mode', 'coach');
       localStorage.setItem(
-        'cybergym_athletes',
+        'yourbody_athletes',
         JSON.stringify([
           { id: athleteAId, name: 'Athlete A', email: 'a@example.com', status: 'Active' },
           { id: athleteBId, name: 'Athlete B', email: 'b@example.com', status: 'Active' },
         ])
       );
-      localStorage.setItem('cybergym_selected_athlete', athleteAId);
+      localStorage.setItem('yourbody_selected_athlete', athleteAId);
       (supabase.auth.getUser as any).mockResolvedValue({ data: { user: { id: 'coach-id' } } });
       (supabase.auth.getSession as any).mockResolvedValue({
         data: { session: { user: { id: 'coach-id', email: 'coach@example.com' } } },
@@ -1849,7 +1849,7 @@ describe('WorkoutEngine', () => {
         completedAt: null,
       };
       localStorage.setItem(
-        `cybergym_active_session_00000000-0000-4000-8000-000000000001_${today}`,
+        `yourbody_active_session_00000000-0000-4000-8000-000000000001_${today}`,
         JSON.stringify(corruptedSession)
       );
 
@@ -2028,7 +2028,7 @@ describe('WorkoutEngine', () => {
       };
 
       localStorage.setItem(
-        `cybergym_active_session_00000000-0000-4000-8000-000000000001_${today}`,
+        `yourbody_active_session_00000000-0000-4000-8000-000000000001_${today}`,
         JSON.stringify(corruptedSession)
       );
 
@@ -2227,7 +2227,7 @@ describe('WorkoutEngine', () => {
           data: { session: { user: { id: 'malformed-athlete-id-not-uuid', email: 'mal@example.com' } } },
         });
         localStorage.setItem(
-          'cybergym_user',
+          'yourbody_user',
           JSON.stringify({
             id: 'malformed-athlete-id-not-uuid',
             email: 'mal@example.com',
@@ -2267,7 +2267,7 @@ describe('WorkoutEngine', () => {
           data: { session: { user: { id: injectionPayload, email: 'attacker@example.com' } } },
         });
         localStorage.setItem(
-          'cybergym_user',
+          'yourbody_user',
           JSON.stringify({
             id: injectionPayload,
             email: 'attacker@example.com',

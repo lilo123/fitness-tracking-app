@@ -244,7 +244,7 @@ describe('dataExport utilities', () => {
 
     it('serializes bundle to valid formatted JSON file', () => {
       const file = serializeToExportJson(mockBundle);
-      expect(file.filename).toBe('cybergym-export-alex_runner-2026-09-23.json');
+      expect(file.filename).toBe('yourbody-export-alex_runner-2026-09-23.json');
       expect(file.mimeType).toBe('application/json;charset=utf-8');
 
       const parsed = JSON.parse(file.content);
@@ -444,7 +444,7 @@ describe('dataExport utilities', () => {
       const files = serializeToExportCsvFiles(mockBundle, '2026-09-23');
       expect(files).toHaveLength(5);
 
-      const workoutsFile = files.find((f) => f.filename === 'cybergym-workouts-2026-09-23.csv')!;
+      const workoutsFile = files.find((f) => f.filename === 'yourbody-workouts-2026-09-23.csv')!;
       expect(workoutsFile).toBeDefined();
       expect(workoutsFile.content).toContain(
         'workout_id,workout_date,workout_name,set_index,set_type,exercise_name,body_part,weight,reps,rpe,set_created_at'
@@ -454,28 +454,28 @@ describe('dataExport utilities', () => {
       // w-2 has 0 sets, emits 1 summary row
       expect(workoutsFile.content).toContain('w-2,2026-09-22,Rest Day Walk,,,,,,,,');
 
-      const nutritionFile = files.find((f) => f.filename === 'cybergym-nutrition-2026-09-23.csv')!;
+      const nutritionFile = files.find((f) => f.filename === 'yourbody-nutrition-2026-09-23.csv')!;
       expect(nutritionFile).toBeDefined();
       expect(nutritionFile.content).toContain(
         'log_id,logged_at,meal_type,food_name,calories,protein_g,carbs_g,fat_g,fiber_g,serving_size,serving_unit,has_components,components_breakdown,notes'
       );
       expect(nutritionFile.content).toContain('nl-1,2026-09-21T12:30:00Z,lunch,Chicken Rice Bowl,650,52,70,16,6,1,bowl,true');
 
-      const dishesFile = files.find((f) => f.filename === 'cybergym-custom-dishes-2026-09-23.csv')!;
+      const dishesFile = files.find((f) => f.filename === 'yourbody-custom-dishes-2026-09-23.csv')!;
       expect(dishesFile).toBeDefined();
       expect(dishesFile.content).toContain(
         'dish_id,name,kind,use_count,calories,protein_g,carbs_g,fat_g,fiber_g,components_breakdown,notes,created_at'
       );
       expect(dishesFile.content).toContain('cd-1,Morning Oats,recipe,12,450,25,60,10,8');
 
-      const routinesFile = files.find((f) => f.filename === 'cybergym-routines-2026-09-23.csv')!;
+      const routinesFile = files.find((f) => f.filename === 'yourbody-routines-2026-09-23.csv')!;
       expect(routinesFile).toBeDefined();
       expect(routinesFile.content).toContain(
         'template_id,routine_name,days_of_week,is_master,assigned_to,order_index,exercise_name,body_part,target_sets,target_reps'
       );
       expect(routinesFile.content).toContain('rt-1,3-Day Split,Mon;Wed;Fri,false,,0,Bench Press,Chest,4,8');
 
-      const profileFile = files.find((f) => f.filename === 'cybergym-profile-2026-09-23.csv')!;
+      const profileFile = files.find((f) => f.filename === 'yourbody-profile-2026-09-23.csv')!;
       expect(profileFile).toBeDefined();
       expect(profileFile.content).toContain(
         'user_id,username,email,role,target_calories,target_protein_g,target_carbs_g,target_fat_g,target_fiber_g,auto_rest_timer,weight_unit'
@@ -493,7 +493,7 @@ describe('dataExport utilities', () => {
       };
       const files = serializeToExportCsvFiles(partialBundle, '2026-09-23');
       expect(files).toHaveLength(1);
-      expect(files[0].filename).toBe('cybergym-workouts-2026-09-23.csv');
+      expect(files[0].filename).toBe('yourbody-workouts-2026-09-23.csv');
     });
 
     it('exports profile CSV with weight_unit and preserves canonical lb weight column in workouts CSV', () => {
@@ -540,14 +540,14 @@ describe('dataExport utilities', () => {
       };
 
       const files = serializeToExportCsvFiles(bundle, '2026-09-28');
-      const profileCsv = files.find((f) => f.filename === 'cybergym-profile-2026-09-28.csv')!;
+      const profileCsv = files.find((f) => f.filename === 'yourbody-profile-2026-09-28.csv')!;
       expect(profileCsv).toBeDefined();
       expect(profileCsv.content).toContain(
         'user_id,username,email,role,target_calories,target_protein_g,target_carbs_g,target_fat_g,target_fiber_g,auto_rest_timer,weight_unit'
       );
       expect(profileCsv.content).toContain('usr-1,alex_runner,alex@example.com,athlete,2400,180,250,70,35,true,kg');
 
-      const workoutsCsv = files.find((f) => f.filename === 'cybergym-workouts-2026-09-28.csv')!;
+      const workoutsCsv = files.find((f) => f.filename === 'yourbody-workouts-2026-09-28.csv')!;
       expect(workoutsCsv).toBeDefined();
       expect(workoutsCsv.content).toContain(
         'workout_id,workout_date,workout_name,set_index,set_type,exercise_name,body_part,weight,reps,rpe,set_created_at'

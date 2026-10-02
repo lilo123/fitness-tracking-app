@@ -2,7 +2,7 @@ import { workoutSessionStore } from '../utils/workoutSessionStore';
 
 export type UpdateBlockerFn = () => string | null | undefined | boolean;
 
-const POINTER_PREFIX = 'cybergym_current_session_pointer_';
+const POINTER_PREFIX = 'yourbody_current_session_pointer_';
 const customBlockers = new Map<string, UpdateBlockerFn>();
 const dirtyForms = new Set<string>();
 
@@ -41,7 +41,7 @@ function checkActiveWorkoutSession(): string | null {
   try {
     const userIdsToCheck: string[] = [];
 
-    // Scan pointer keys in localStorage (cybergym_current_session_pointer_<userId>)
+    // Scan pointer keys in localStorage (yourbody_current_session_pointer_<userId>)
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (key && key.startsWith(POINTER_PREFIX)) {
@@ -54,7 +54,7 @@ function checkActiveWorkoutSession(): string | null {
 
     // Also check cached user ID if present
     try {
-      const rawUser = localStorage.getItem('cybergym_user');
+      const rawUser = localStorage.getItem('yourbody_user');
       if (rawUser) {
         const parsed = JSON.parse(rawUser);
         if (parsed?.id && !userIdsToCheck.includes(parsed.id)) {

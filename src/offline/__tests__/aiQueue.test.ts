@@ -36,7 +36,7 @@ describe('AI Queue (aiq) & Processor (§N6, §E5)', () => {
 
   describe('DB Upgrade v1 -> v2', () => {
     it('creates v1 DB with outbox & idmap data, reopens at v2, data intact, aiq store added', async () => {
-      const dbName = `cybergym-offline-${userA}`;
+      const dbName = `yourbody-offline-${userA}`;
 
       // 1. Manually open DB at version 1 (before O2 aiq store existed)
       const v1Db = await openDB(dbName, 1, {

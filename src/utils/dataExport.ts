@@ -171,7 +171,7 @@ export function serializeToExportJson(bundle: ExportBundle): GeneratedExportFile
   const rawUsername = bundle.target_user.username || bundle.target_user.id || 'user';
   const safeUsername = rawUsername.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
   const dateStamp = (bundle.exported_at ? bundle.exported_at.slice(0, 10) : '') || getLocalDateStr();
-  const filename = `cybergym-export-${safeUsername}-${dateStamp}.json`;
+  const filename = `yourbody-export-${safeUsername}-${dateStamp}.json`;
 
   return {
     filename,
@@ -239,7 +239,7 @@ export function serializeToExportCsvFiles(bundle: ExportBundle, dateStamp: strin
       }
 
       files.push({
-        filename: `cybergym-workouts-${dateStamp}.csv`,
+        filename: `yourbody-workouts-${dateStamp}.csv`,
         mimeType: 'text/csv;charset=utf-8',
         content: rows.join('\n'),
       });
@@ -285,7 +285,7 @@ export function serializeToExportCsvFiles(bundle: ExportBundle, dateStamp: strin
       }
 
       files.push({
-        filename: `cybergym-nutrition-${dateStamp}.csv`,
+        filename: `yourbody-nutrition-${dateStamp}.csv`,
         mimeType: 'text/csv;charset=utf-8',
         content: rows.join('\n'),
       });
@@ -326,7 +326,7 @@ export function serializeToExportCsvFiles(bundle: ExportBundle, dateStamp: strin
       }
 
       files.push({
-        filename: `cybergym-custom-dishes-${dateStamp}.csv`,
+        filename: `yourbody-custom-dishes-${dateStamp}.csv`,
         mimeType: 'text/csv;charset=utf-8',
         content: rows.join('\n'),
       });
@@ -383,7 +383,7 @@ export function serializeToExportCsvFiles(bundle: ExportBundle, dateStamp: strin
       }
 
       files.push({
-        filename: `cybergym-routines-${dateStamp}.csv`,
+        filename: `yourbody-routines-${dateStamp}.csv`,
         mimeType: 'text/csv;charset=utf-8',
         content: rows.join('\n'),
       });
@@ -421,7 +421,7 @@ export function serializeToExportCsvFiles(bundle: ExportBundle, dateStamp: strin
       rows.push(cells.map(escapeCsvCell).join(','));
 
       files.push({
-        filename: `cybergym-profile-${dateStamp}.csv`,
+        filename: `yourbody-profile-${dateStamp}.csv`,
         mimeType: 'text/csv;charset=utf-8',
         content: rows.join('\n'),
       });

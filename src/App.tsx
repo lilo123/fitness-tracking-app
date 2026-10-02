@@ -71,7 +71,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center space-y-4">
         <div className="w-8 h-8 rounded-full border-2 border-cyan-500/20 border-t-cyan-400 animate-spin" />
-        <div className="text-cyan-400 text-xs tracking-wider">Connecting to CyberGym...</div>
+        <div className="text-cyan-400 text-xs tracking-wider">Connecting to Yourbody...</div>
         {showRetry && (
           <button
             type="button"
@@ -82,7 +82,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
             data-testid="auth-retry-button"
             className="px-4 py-2 min-h-[44px] rounded-xl text-xs font-bold bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 transition shadow-neon-cyan active:scale-95 touch-manipulation flex items-center justify-center"
           >
-            Connecting to CyberGym... Tap to Retry
+            Connecting to Yourbody... Tap to Retry
           </button>
         )}
       </div>

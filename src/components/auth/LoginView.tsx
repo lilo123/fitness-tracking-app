@@ -101,7 +101,7 @@ export const LoginView: React.FC = () => {
           <Zap className="w-8 h-8 text-zinc-950 fill-zinc-950" />
         </div>
         <h1 className="text-2xl font-bold tracking-wider uppercase bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
-          CyberGym
+          Yourbody.fyi
         </h1>
         <p className="text-xs text-zinc-400 tracking-wider mt-1 uppercase">
           Fitness & Nutrition
@@ -199,7 +199,7 @@ export const LoginView: React.FC = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="athlete@cybergym.io"
+                placeholder="you@example.com"
                 autoComplete="email"
                 className="w-full bg-zinc-950 border border-border-interactive text-white rounded-xl p-3 text-base sm:text-sm font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 outline-none transition"
                 required

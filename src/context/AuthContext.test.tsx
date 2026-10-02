@@ -43,7 +43,7 @@ describe('AuthContext - iOS PWA Resilience & Lifecycle', () => {
 
   const mockProfile: UserProfile = {
     id: 'cached-user-123',
-    email: 'test@cybergym.io',
+    email: 'test@yourbody.fyi',
     username: 'CyberRunner',
     role: 'athlete',
     target_calories: 2200,
@@ -85,7 +85,7 @@ describe('AuthContext - iOS PWA Resilience & Lifecycle', () => {
   });
 
   it('1. synchronously hydrates user and profile from localStorage on initial render', () => {
-    localStorage.setItem('cybergym_user', JSON.stringify(mockProfile));
+    localStorage.setItem('yourbody_user', JSON.stringify(mockProfile));
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -128,7 +128,7 @@ describe('AuthContext - iOS PWA Resilience & Lifecycle', () => {
   });
 
   it('2b. retains cached credentials when getSession fast-rejects (e.g. airplane mode / offline)', async () => {
-    localStorage.setItem('cybergym_user', JSON.stringify(mockProfile));
+    localStorage.setItem('yourbody_user', JSON.stringify(mockProfile));
     (supabase.auth.getSession as any).mockRejectedValue(new Error('Failed to fetch'));
 
     render(
@@ -145,14 +145,14 @@ describe('AuthContext - iOS PWA Resilience & Lifecycle', () => {
 
     expect(screen.getByTestId('auth-user-id').textContent).toBe(mockProfile.id);
     expect(screen.getByTestId('auth-profile-username').textContent).toBe(mockProfile.username);
-    expect(localStorage.getItem('cybergym_user')).not.toBeNull();
+    expect(localStorage.getItem('yourbody_user')).not.toBeNull();
   });
 
   it('3. silently revalidates session upon iOS WebKit resume (visibilitychange and pageshow)', async () => {
     const getSessionSpy = vi.fn().mockResolvedValue({
       data: {
         session: {
-          user: { id: 'refreshed-user-id', email: 'refreshed@cybergym.io' },
+          user: { id: 'refreshed-user-id', email: 'refreshed@yourbody.fyi' },
         },
       },
     });
@@ -196,10 +196,12 @@ describe('AuthContext - iOS PWA Resilience & Lifecycle', () => {
     });
   });
 
-  it('4. completely cleans up cybergym storage and resets state on signOut()', async () => {
-    localStorage.setItem('cybergym_user', JSON.stringify(mockProfile));
-    localStorage.setItem('cybergym_view_mode', 'coach');
-    localStorage.setItem('cybergym_auto_rest_timer', 'true');
+  it('4. completely cleans up yourbody storage and resets state on signOut()', async () => {
+    localStorage.setItem('yourbody_user', JSON.stringify(mockProfile));
+    localStorage.setItem('yourbody_view_mode', 'coach');
+    localStorage.setItem('yourbody_auto_rest_timer', 'true');
+    localStorage.setItem('yourbody_extra_custom_key', 'some_val');
+    localStorage.setItem('unrelated_app_key', 'preserve_me');
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -218,15 +220,17 @@ describe('AuthContext - iOS PWA Resilience & Lifecycle', () => {
       fireEvent.click(signOutBtn);
     });
 
-    expect(localStorage.getItem('cybergym_user')).toBeNull();
-    expect(localStorage.getItem('cybergym_view_mode')).toBeNull();
-    expect(localStorage.getItem('cybergym_auto_rest_timer')).toBeNull();
+    expect(localStorage.getItem('yourbody_user')).toBeNull();
+    expect(localStorage.getItem('yourbody_view_mode')).toBeNull();
+    expect(localStorage.getItem('yourbody_auto_rest_timer')).toBeNull();
+    expect(localStorage.getItem('yourbody_extra_custom_key')).toBeNull();
+    expect(localStorage.getItem('unrelated_app_key')).toBe('preserve_me');
     expect(screen.getByTestId('auth-user-id').textContent).toBe('none');
     expect(screen.getByTestId('auth-profile-username').textContent).toBe('none');
   });
 
   it('5. re-fetches user profile successfully on refreshProfile()', async () => {
-    localStorage.setItem('cybergym_user', JSON.stringify(mockProfile));
+    localStorage.setItem('yourbody_user', JSON.stringify(mockProfile));
 
     const updatedProfile = {
       ...mockProfile,
@@ -264,7 +268,7 @@ describe('AuthContext - iOS PWA Resilience & Lifecycle', () => {
   });
 
   it('6. successfully re-authenticates and fetches profile after signOut without being blocked by signedOutRef', async () => {
-    localStorage.setItem('cybergym_user', JSON.stringify(mockProfile));
+    localStorage.setItem('yourbody_user', JSON.stringify(mockProfile));
 
     let authStateCallback: any = null;
     (supabase.auth.onAuthStateChange as any).mockImplementation((cb: any) => {
@@ -298,7 +302,7 @@ describe('AuthContext - iOS PWA Resilience & Lifecycle', () => {
       ...mockProfile,
       id: 'new-athlete-789',
       username: 'NeoRacer',
-      email: 'neo@cybergym.io',
+      email: 'neo@yourbody.fyi',
     };
 
     (supabase.from as any).mockImplementation((table: string) => {
@@ -415,7 +419,7 @@ describe('AuthContext - iOS PWA Resilience & Lifecycle', () => {
   });
 
   it('8. clears user state and localStorage when background session revalidation determines session is expired/invalid', async () => {
-    localStorage.setItem('cybergym_user', JSON.stringify(mockProfile));
+    localStorage.setItem('yourbody_user', JSON.stringify(mockProfile));
 
     // getSession returns null session (expired or revoked)
     (supabase.auth.getSession as any).mockResolvedValue({
@@ -438,15 +442,15 @@ describe('AuthContext - iOS PWA Resilience & Lifecycle', () => {
     await waitFor(() => {
       expect(screen.getByTestId('auth-user-id').textContent).toBe('none');
       expect(screen.getByTestId('auth-profile-username').textContent).toBe('none');
-      expect(localStorage.getItem('cybergym_user')).toBeNull();
+      expect(localStorage.getItem('yourbody_user')).toBeNull();
     });
   });
 
   it('9. does not cache in localStorage when timezone sync fails, enabling retry on subsequent revalidation', async () => {
-    localStorage.setItem('cybergym_user', JSON.stringify(mockProfile));
+    localStorage.setItem('yourbody_user', JSON.stringify(mockProfile));
 
     const deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const storageKey = `cybergym_user_timezone_${mockProfile.id}`;
+    const storageKey = `yourbody_user_timezone_${mockProfile.id}`;
 
     let updateAttempts = 0;
     let shouldFailUpdate = true;

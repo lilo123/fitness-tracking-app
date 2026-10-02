@@ -24,10 +24,14 @@ import type {
 // In-tab mutex fallback when navigator.locks is unavailable
 const userMutexes = new Map<string, Promise<void>>();
 
+export function getOutboxLockName(userId: string): string {
+  return `yourbody-outbox-${userId}`;
+}
+
 async function runWithMutex(userId: string, fn: () => Promise<void>): Promise<void> {
   if (typeof navigator !== 'undefined' && navigator.locks && typeof navigator.locks.request === 'function') {
     try {
-      return await navigator.locks.request(`cybergym-outbox-${userId}`, fn);
+      return await navigator.locks.request(getOutboxLockName(userId), fn);
     } catch (lockErr) {
       console.warn('[flusher] navigator.locks.request failed, using in-tab fallback:', lockErr);
     }

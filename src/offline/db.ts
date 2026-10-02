@@ -7,7 +7,7 @@ export function getOfflineDbName(userId: string): string {
   if (!userId) {
     throw new Error('userId is required to access offline database');
   }
-  return `cybergym-offline-${userId}`;
+  return `yourbody-offline-${userId}`;
 }
 
 const dbCache = new Map<string, Promise<IDBPDatabase<OfflineDBSchema>>>();

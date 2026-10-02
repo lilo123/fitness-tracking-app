@@ -39,9 +39,9 @@ describe('restTimerStore', () => {
     expect(snap.totalDuration).toBe(90);
     expect(snap.targetEndTime).toBe(Date.now() + 90000);
 
-    expect(localStorage.getItem('cybergym_rest_timer_end')).toBe(String(snap.targetEndTime));
-    expect(localStorage.getItem('cybergym_rest_timer_total')).toBe('90');
-    expect(localStorage.getItem('cybergym_rest_timer_paused')).toBe('0');
+    expect(localStorage.getItem('yourbody_rest_timer_end')).toBe(String(snap.targetEndTime));
+    expect(localStorage.getItem('yourbody_rest_timer_total')).toBe('90');
+    expect(localStorage.getItem('yourbody_rest_timer_paused')).toBe('0');
   });
 
   it('4. pauses timer without losing remaining time', () => {
@@ -58,9 +58,9 @@ describe('restTimerStore', () => {
     expect(pausedSnap.remainingSeconds).toBe(80);
     expect(pausedSnap.targetEndTime).toBeNull();
 
-    expect(localStorage.getItem('cybergym_rest_timer_remaining')).toBe('80');
-    expect(localStorage.getItem('cybergym_rest_timer_paused')).toBe('1');
-    expect(localStorage.getItem('cybergym_rest_timer_end')).toBeNull();
+    expect(localStorage.getItem('yourbody_rest_timer_remaining')).toBe('80');
+    expect(localStorage.getItem('yourbody_rest_timer_paused')).toBe('1');
+    expect(localStorage.getItem('yourbody_rest_timer_end')).toBeNull();
   });
 
   it('5. resumes timer recalculating future target timestamp', () => {
@@ -80,8 +80,8 @@ describe('restTimerStore', () => {
     expect(resumedSnap.remainingSeconds).toBe(80);
     expect(resumedSnap.targetEndTime).toBe(Date.now() + 80000);
 
-    expect(localStorage.getItem('cybergym_rest_timer_end')).toBe(String(Date.now() + 80000));
-    expect(localStorage.getItem('cybergym_rest_timer_paused')).toBe('0');
+    expect(localStorage.getItem('yourbody_rest_timer_end')).toBe(String(Date.now() + 80000));
+    expect(localStorage.getItem('yourbody_rest_timer_paused')).toBe('0');
   });
 
   it('6. adds 90 seconds to running and paused timers', () => {
@@ -103,17 +103,17 @@ describe('restTimerStore', () => {
 
   it('7. stops timer and purges localStorage', () => {
     restTimerStore.start(90);
-    expect(localStorage.getItem('cybergym_rest_timer_end')).toBeTruthy();
+    expect(localStorage.getItem('yourbody_rest_timer_end')).toBeTruthy();
 
     restTimerStore.stop();
     const snap = restTimerStore.getSnapshot();
 
     expect(snap.isRunning).toBe(false);
     expect(snap.remainingSeconds).toBe(0);
-    expect(localStorage.getItem('cybergym_rest_timer_end')).toBeNull();
-    expect(localStorage.getItem('cybergym_rest_timer_remaining')).toBeNull();
-    expect(localStorage.getItem('cybergym_rest_timer_total')).toBeNull();
-    expect(localStorage.getItem('cybergym_rest_timer_paused')).toBeNull();
+    expect(localStorage.getItem('yourbody_rest_timer_end')).toBeNull();
+    expect(localStorage.getItem('yourbody_rest_timer_remaining')).toBeNull();
+    expect(localStorage.getItem('yourbody_rest_timer_total')).toBeNull();
+    expect(localStorage.getItem('yourbody_rest_timer_paused')).toBeNull();
   });
 
   it('8. toggleHeaderTimer() transitions running -> pause, paused -> resume, idle -> start(90)', () => {
@@ -154,11 +154,11 @@ describe('restTimerStore', () => {
 
     // 10a. Simulate another tab starting the timer
     const futureEnd = Date.now() + 45000;
-    localStorage.setItem('cybergym_rest_timer_end', String(futureEnd));
-    localStorage.setItem('cybergym_rest_timer_total', '90');
-    localStorage.setItem('cybergym_rest_timer_paused', '0');
+    localStorage.setItem('yourbody_rest_timer_end', String(futureEnd));
+    localStorage.setItem('yourbody_rest_timer_total', '90');
+    localStorage.setItem('yourbody_rest_timer_paused', '0');
 
-    window.dispatchEvent(new StorageEvent('storage', { key: 'cybergym_rest_timer_end' }));
+    window.dispatchEvent(new StorageEvent('storage', { key: 'yourbody_rest_timer_end' }));
 
     let snap = restTimerStore.getSnapshot();
     expect(snap.isRunning).toBe(true);
@@ -167,11 +167,11 @@ describe('restTimerStore', () => {
 
     // 10b. Simulate another tab pausing the timer
     listener.mockClear();
-    localStorage.setItem('cybergym_rest_timer_paused', '1');
-    localStorage.setItem('cybergym_rest_timer_remaining', '40');
-    localStorage.removeItem('cybergym_rest_timer_end');
+    localStorage.setItem('yourbody_rest_timer_paused', '1');
+    localStorage.setItem('yourbody_rest_timer_remaining', '40');
+    localStorage.removeItem('yourbody_rest_timer_end');
 
-    window.dispatchEvent(new StorageEvent('storage', { key: 'cybergym_rest_timer_paused' }));
+    window.dispatchEvent(new StorageEvent('storage', { key: 'yourbody_rest_timer_paused' }));
 
     snap = restTimerStore.getSnapshot();
     expect(snap.isRunning).toBe(false);
@@ -181,12 +181,12 @@ describe('restTimerStore', () => {
 
     // 10c. Simulate another tab stopping the timer
     listener.mockClear();
-    localStorage.removeItem('cybergym_rest_timer_paused');
-    localStorage.removeItem('cybergym_rest_timer_remaining');
-    localStorage.removeItem('cybergym_rest_timer_total');
-    localStorage.removeItem('cybergym_rest_timer_end');
+    localStorage.removeItem('yourbody_rest_timer_paused');
+    localStorage.removeItem('yourbody_rest_timer_remaining');
+    localStorage.removeItem('yourbody_rest_timer_total');
+    localStorage.removeItem('yourbody_rest_timer_end');
 
-    window.dispatchEvent(new StorageEvent('storage', { key: 'cybergym_rest_timer_end' }));
+    window.dispatchEvent(new StorageEvent('storage', { key: 'yourbody_rest_timer_end' }));
 
     snap = restTimerStore.getSnapshot();
     expect(snap.isRunning).toBe(false);

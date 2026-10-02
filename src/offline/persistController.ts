@@ -35,7 +35,7 @@ export function setupQueryDefaults(queryClient: QueryClient): void {
  * Initialize persistence for an authenticated user.
  * - Stops persisting previous user
  * - Clears memory queryClient on user switch to ensure cross-user isolation
- * - Restores persisted state from IndexedDB cybergym-offline-<userId>
+ * - Restores persisted state from IndexedDB yourbody-offline-<userId>
  * - Subscribes queryClient to auto-save whitelisted queries
  */
 export async function initPersistForUser(

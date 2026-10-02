@@ -44,7 +44,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
   const [targetFiber, setTargetFiber] = useState(profile?.target_fiber ?? 30);
   const [autoRestTimer, setAutoRestTimer] = useState<boolean>(() => {
     if (profile?.auto_rest_timer !== undefined) return profile.auto_rest_timer;
-    const localVal = localStorage.getItem('cybergym_auto_rest_timer');
+    const localVal = localStorage.getItem('yourbody_auto_rest_timer');
     return localVal !== null ? localVal !== 'false' : true;
   });
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -59,7 +59,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
     if (!isOnline) return;
     const nextVal = !autoRestTimer;
     setAutoRestTimer(nextVal);
-    localStorage.setItem('cybergym_auto_rest_timer', String(nextVal));
+    localStorage.setItem('yourbody_auto_rest_timer', String(nextVal));
 
     try {
       await updateProfile({ auto_rest_timer: nextVal });

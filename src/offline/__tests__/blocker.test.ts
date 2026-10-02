@@ -75,7 +75,7 @@ describe('registerOutboxUpdateBlocker', () => {
   it('blocks PWA update when active user has pending ops in localStorage from another tab', () => {
     vi.spyOn(flusherModule, 'getActiveUserId').mockReturnValue(userId);
     vi.spyOn(outboxModule, 'getSyncingStatus').mockReturnValue(false);
-    localStorage.setItem(`cybergym_outbox_pending_${userId}`, '2');
+    localStorage.setItem(`yourbody_outbox_pending_${userId}`, '2');
 
     registerOutboxUpdateBlocker(registerUpdateBlocker);
     const result = canApplyUpdate();
@@ -83,14 +83,14 @@ describe('registerOutboxUpdateBlocker', () => {
     expect(result.ok).toBe(false);
     expect(result.reason).toBe('Sync pending changes first');
 
-    localStorage.removeItem(`cybergym_outbox_pending_${userId}`);
+    localStorage.removeItem(`yourbody_outbox_pending_${userId}`);
   });
 
   it('allows PWA update when another user has pending ops in localStorage but active user has 0', () => {
     vi.spyOn(flusherModule, 'getActiveUserId').mockReturnValue(userId);
     vi.spyOn(outboxModule, 'getSyncingStatus').mockReturnValue(false);
     // Another user's retained outbox
-    localStorage.setItem('cybergym_outbox_pending_other-user', '5');
+    localStorage.setItem('yourbody_outbox_pending_other-user', '5');
 
     registerOutboxUpdateBlocker(registerUpdateBlocker);
     const result = canApplyUpdate();
@@ -98,7 +98,7 @@ describe('registerOutboxUpdateBlocker', () => {
     expect(result.ok).toBe(true);
     expect(result.reason).toBeUndefined();
 
-    localStorage.removeItem('cybergym_outbox_pending_other-user');
+    localStorage.removeItem('yourbody_outbox_pending_other-user');
   });
 });
 

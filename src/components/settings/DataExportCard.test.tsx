@@ -20,7 +20,7 @@ vi.mock('../../utils/dataExport', async () => {
   return {
     ...actual,
     executeDataExport: vi.fn().mockResolvedValue([
-      { filename: 'cybergym-export.json', mimeType: 'application/json', content: '{}' },
+      { filename: 'yourbody-export.json', mimeType: 'application/json', content: '{}' },
     ]),
     downloadExportFiles: vi.fn(),
   };

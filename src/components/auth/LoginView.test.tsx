@@ -57,8 +57,8 @@ describe('LoginView', () => {
     expect(userBuilder.tableName).toBe('users');
     expect(getRecordedTables()).toContain('users');
     renderComponent();
-    expect(screen.getByText('CyberGym')).toBeDefined();
-    expect(screen.getByPlaceholderText('athlete@cybergym.io')).toBeDefined();
+    expect(screen.getByText('Yourbody.fyi')).toBeDefined();
+    expect(screen.getByPlaceholderText('you@example.com')).toBeDefined();
     expect(getRecordedSelects()).toHaveLength(0);
   });
 
@@ -79,10 +79,10 @@ describe('LoginView', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Register' }));
 
-    const emailInput = screen.getByPlaceholderText('athlete@cybergym.io');
+    const emailInput = screen.getByPlaceholderText('you@example.com');
     const [passwordInput, confirmInput] = screen.getAllByPlaceholderText('••••••••');
 
-    fireEvent.change(emailInput, { target: { value: 'athlete@cybergym.io' } });
+    fireEvent.change(emailInput, { target: { value: 'athlete@yourbody.fyi' } });
     fireEvent.change(passwordInput, { target: { value: '123' } });
     fireEvent.change(confirmInput, { target: { value: '123' } });
 
@@ -98,10 +98,10 @@ describe('LoginView', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Register' }));
 
-    const emailInput = screen.getByPlaceholderText('athlete@cybergym.io');
+    const emailInput = screen.getByPlaceholderText('you@example.com');
     const [passwordInput, confirmInput] = screen.getAllByPlaceholderText('••••••••');
 
-    fireEvent.change(emailInput, { target: { value: 'athlete@cybergym.io' } });
+    fireEvent.change(emailInput, { target: { value: 'athlete@yourbody.fyi' } });
     fireEvent.change(passwordInput, { target: { value: 'password123' } });
     fireEvent.change(confirmInput, { target: { value: 'password456' } });
 
@@ -120,14 +120,14 @@ describe('LoginView', () => {
 
     expect(screen.getByRole('button', { name: 'Send Reset Link' })).toBeDefined();
 
-    const emailInput = screen.getByPlaceholderText('athlete@cybergym.io');
-    fireEvent.change(emailInput, { target: { value: 'athlete@cybergym.io' } });
+    const emailInput = screen.getByPlaceholderText('you@example.com');
+    fireEvent.change(emailInput, { target: { value: 'athlete@yourbody.fyi' } });
 
     fireEvent.click(screen.getByRole('button', { name: 'Send Reset Link' }));
 
     expect(await screen.findAllByText('Password reset link sent! Check your inbox.')).toBeDefined();
     expect(mockResetPasswordForEmail).toHaveBeenCalledWith(
-      'athlete@cybergym.io',
+      'athlete@yourbody.fyi',
       expect.objectContaining({ redirectTo: expect.stringContaining('/reset-password') })
     );
   });
@@ -214,7 +214,7 @@ describe('LoginView', () => {
     const registerTab = screen.getByRole('button', { name: 'Register' });
     fireEvent.click(registerTab);
 
-    const emailInput = screen.getByPlaceholderText('athlete@cybergym.io');
+    const emailInput = screen.getByPlaceholderText('you@example.com');
     const [passwordInput, confirmInput] = screen.getAllByPlaceholderText('••••••••');
     const submitBtn = screen.getByRole('button', { name: 'Create Account' });
 

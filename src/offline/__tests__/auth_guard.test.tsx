@@ -42,7 +42,7 @@ describe('auth_guard (A8 + A9 Offline Auth Guarantees)', () => {
 
   const mockUser: UserProfile = {
     id: 'user-offline-guard-123',
-    email: 'guard@cybergym.io',
+    email: 'guard@yourbody.fyi',
     username: 'OfflineWarrior',
     role: 'athlete',
     target_calories: 2200,
@@ -84,7 +84,7 @@ describe('auth_guard (A8 + A9 Offline Auth Guarantees)', () => {
       value: false,
     });
 
-    localStorage.setItem('cybergym_user', JSON.stringify(mockUser));
+    localStorage.setItem('yourbody_user', JSON.stringify(mockUser));
 
     // getSession fails or returns null while offline
     (supabase.auth.getSession as any).mockResolvedValue({
@@ -118,7 +118,7 @@ describe('auth_guard (A8 + A9 Offline Auth Guarantees)', () => {
 
     // User is NOT cleared and authRequired is NOT flagged
     expect(screen.getByTestId('auth-user-id').textContent).toBe(mockUser.id);
-    expect(localStorage.getItem('cybergym_user')).not.toBeNull();
+    expect(localStorage.getItem('yourbody_user')).not.toBeNull();
     expect(getAuthRequiredStatus()).toBe(false);
   });
 
@@ -128,7 +128,7 @@ describe('auth_guard (A8 + A9 Offline Auth Guarantees)', () => {
       value: true,
     });
 
-    localStorage.setItem('cybergym_user', JSON.stringify(mockUser));
+    localStorage.setItem('yourbody_user', JSON.stringify(mockUser));
 
     // Session is invalid online
     (supabase.auth.getSession as any).mockResolvedValue({
@@ -147,13 +147,13 @@ describe('auth_guard (A8 + A9 Offline Auth Guarantees)', () => {
       expect(screen.getByTestId('auth-user-id').textContent).toBe('none');
     });
 
-    expect(localStorage.getItem('cybergym_user')).toBeNull();
+    expect(localStorage.getItem('yourbody_user')).toBeNull();
     expect(getAuthRequiredStatus()).toBe(true);
   });
 
   it('signOut clears rq store while preserving outbox and idmap in IndexedDB', async () => {
     const userId = mockUser.id;
-    localStorage.setItem('cybergym_user', JSON.stringify(mockUser));
+    localStorage.setItem('yourbody_user', JSON.stringify(mockUser));
 
     (supabase.auth.getSession as any).mockResolvedValue({
       data: {

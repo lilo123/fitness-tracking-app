@@ -8,7 +8,7 @@ import { createSupabaseBuilder, clearMockHistory } from './supabaseBuilderMock';
 
 const { mockSession } = vi.hoisted(() => ({
   mockSession: {
-    user: { id: 'test-user-id', email: 'coach@cybergym.io' },
+    user: { id: 'test-user-id', email: 'coach@yourbody.fyi' },
   },
 }));
 
@@ -100,7 +100,7 @@ describe('History Keep-Alive Shell (RD-17 / D-P5a-6)', () => {
 
     const mockUser = {
       id: 'test-user-id',
-      email: 'coach@cybergym.io',
+      email: 'coach@yourbody.fyi',
       username: 'Coach Duy',
       role: 'athlete',
       target_calories: 2400,
@@ -316,7 +316,7 @@ describe('History Keep-Alive Shell (RD-17 / D-P5a-6)', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByPlaceholderText('athlete@cybergym.io')).toBeDefined();
+      expect(screen.getByPlaceholderText('you@example.com')).toBeDefined();
     });
 
     // HistoryView should be completely unmounted from the DOM

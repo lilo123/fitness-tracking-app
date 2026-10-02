@@ -6,7 +6,7 @@ import { compactIncomingOp } from './compaction';
 const globalSubscribers = new Set<() => void>();
 const userSubscribers = new Map<string, Set<() => void>>();
 
-const BROADCAST_CHANNEL_NAME = 'cybergym_outbox_channel';
+export const BROADCAST_CHANNEL_NAME = 'yourbody_outbox_channel';
 let outboxBroadcastChannel: BroadcastChannel | null = null;
 let storageEventListener: ((event: StorageEvent) => void) | null = null;
 
@@ -56,8 +56,8 @@ function ensureListeners(): void {
 
   if (!storageEventListener && typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
     storageEventListener = (event: StorageEvent) => {
-      if (event.key?.startsWith('cybergym_outbox_pending_')) {
-        const uId = event.key.slice('cybergym_outbox_pending_'.length);
+      if (event.key?.startsWith('yourbody_outbox_pending_')) {
+        const uId = event.key.slice('yourbody_outbox_pending_'.length);
         if (uId) {
           scheduleOutboxRefresh(uId);
         }
@@ -199,7 +199,7 @@ export function resetOutboxForTesting(): void {
       const keysToRemove: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && k.startsWith('cybergym_outbox_pending_')) {
+        if (k && k.startsWith('yourbody_outbox_pending_')) {
           keysToRemove.push(k);
         }
       }
@@ -246,7 +246,7 @@ export function getCachedOutboxSummary(userId: string): OutboxSummary {
   // Cross-tab fallback: if in-memory cache has 0 pending, check localStorage
   if (pending === 0 && typeof localStorage !== 'undefined') {
     try {
-      const storedPending = parseInt(localStorage.getItem('cybergym_outbox_pending_' + userId) || '0', 10);
+      const storedPending = parseInt(localStorage.getItem('yourbody_outbox_pending_' + userId) || '0', 10);
       if (storedPending > 0) {
         pending = storedPending;
       }
@@ -315,7 +315,7 @@ export function updateUserCache(userId: string, ops: OutboxOp[]): OutboxSummary 
 
   if (typeof localStorage !== 'undefined') {
     try {
-      localStorage.setItem('cybergym_outbox_pending_' + userId, String(pending));
+      localStorage.setItem('yourbody_outbox_pending_' + userId, String(pending));
     } catch (e) {
       console.warn('[outbox] Failed to update pending summary in localStorage', e);
     }

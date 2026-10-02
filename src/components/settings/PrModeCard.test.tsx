@@ -23,7 +23,7 @@ describe('PrModeCard', () => {
     vi.mocked(useOnlineStatus).mockReturnValue(true);
     mockProfile = {
       id: userId,
-      email: 'athlete@cybergym.io',
+      email: 'athlete@yourbody.fyi',
       username: 'CyberAthlete',
       role: 'athlete',
       pr_mode: 'weight',

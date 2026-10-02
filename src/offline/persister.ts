@@ -218,7 +218,7 @@ export function applyPageCaps(persistedClient: PersistedClient): PersistedClient
 }
 
 /**
- * Creates a custom React Query persister storing cache in `cybergym-offline-<userId>` IndexedDB store `rq`.
+ * Creates a custom React Query persister storing cache in `yourbody-offline-<userId>` IndexedDB store `rq`.
  */
 export function createIdbPersister(userId: string): Persister {
   return {

@@ -624,18 +624,18 @@ describe('Ghost Sets Algorithm & Benchmarks', () => {
       const cp = (await import(/* @vite-ignore */ cpMod)) as any;
 
       // 1. Resolve fixture data dynamically from the live database:
-      // - bench athlete id by email ('bench-athlete@cybergym.io')
+      // - bench athlete id by email ('bench-athlete@yourbody.fyi')
       // - target date as max(date) + 1 day
       // - exercise id and names dynamically from public.exercises
       // - qualifying truth sessions and expected capped set counts per exercise
       const fixtureQuery = `
         SELECT json_build_object(
-          'benchAthleteId', (SELECT id FROM auth.users WHERE email = 'bench-athlete@cybergym.io'),
-          'targetDate', (SELECT (max((date AT TIME ZONE 'UTC')::date) + 1)::text FROM public.workouts WHERE user_id = (SELECT id FROM auth.users WHERE email = 'bench-athlete@cybergym.io')),
+          'benchAthleteId', (SELECT id FROM auth.users WHERE email = 'bench-athlete@yourbody.fyi'),
+          'targetDate', (SELECT (max((date AT TIME ZONE 'UTC')::date) + 1)::text FROM public.workouts WHERE user_id = (SELECT id FROM auth.users WHERE email = 'bench-athlete@yourbody.fyi')),
           'exercises', (SELECT json_agg(json_build_object('id', id, 'name', name)) FROM (SELECT id, name FROM public.exercises ORDER BY name) e),
           'qualifyingTruth', (
             WITH bench_user AS (
-              SELECT id FROM auth.users WHERE email = 'bench-athlete@cybergym.io'
+              SELECT id FROM auth.users WHERE email = 'bench-athlete@yourbody.fyi'
             ),
             target AS (
               SELECT (max((date AT TIME ZONE 'UTC')::date) + 1) AS target_date, (SELECT id FROM bench_user) AS user_id
