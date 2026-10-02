@@ -8243,7 +8243,15 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
           await page.fill('input[type="email"]', accountEmail);
           await page.fill('input[type="password"]', 'password123');
           await page.click('button[type="submit"]');
-          await page.waitForURL('**/workout');
+
+          // Coach sign-in routes to /coach; navigate to /workout to test maximum 4-badge coach density (dashboard link is only rendered off /coach)
+          if (accountEmail.startsWith('coach')) {
+            await page.waitForURL('**/coach');
+            await page.goto('/workout');
+            await page.waitForURL('**/workout');
+          } else {
+            await page.waitForURL('**/workout');
+          }
 
           const header = page.locator('header');
           await expect(header).toBeVisible();
@@ -8253,24 +8261,6 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
 
           const textContent = await h1.textContent();
           expect(textContent?.trim()).toBe('Yourbody.fyi');
-
-          const metrics = await h1.evaluate((el) => {
-            const style = window.getComputedStyle(el);
-            return {
-              textTransform: style.textTransform,
-              fontSize: parseFloat(style.fontSize),
-              scrollWidth: el.scrollWidth,
-              clientWidth: el.clientWidth,
-            };
-          });
-
-          expect(metrics.textTransform, `h1 computed text-transform must be 'none' at ${width}px (${accountEmail})`).toBe('none');
-          expect(metrics.scrollWidth, `h1 scrollWidth (${metrics.scrollWidth}px) <= clientWidth (${metrics.clientWidth}px) at ${width}px (${accountEmail})`).toBeLessThanOrEqual(metrics.clientWidth);
-          expect(metrics.fontSize, `h1 font-size (${metrics.fontSize}px) >= 12px at ${width}px (${accountEmail})`).toBeGreaterThanOrEqual(12);
-
-          // Relational check: no intersection with badges or logout
-          const h1Box = await h1.boundingBox();
-          expect(h1Box, 'h1 bounding box exists').not.toBeNull();
 
           const isCoach = accountEmail.startsWith('coach');
           const badgeLocators = isCoach
@@ -8286,9 +8276,74 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
                 page.locator('[data-testid="sign-out-button"]'),
               ];
 
+          // Wait for connection status to settle to 'Online' so outbox sync and pill geometry are stable
+          await expect(page.locator('[data-testid="connection-status"]')).toHaveAttribute('title', 'Online', { timeout: 10000 });
+
+          // Wait for all expected badges for this role to be visible
           for (const loc of badgeLocators) {
-            await expect(loc).toBeVisible();
-            const box = await loc.boundingBox();
+            await expect(loc).toBeVisible({ timeout: 10000 });
+          }
+
+          const metrics = await h1.evaluate((el) => {
+            const style = window.getComputedStyle(el);
+            return {
+              textTransform: style.textTransform,
+              fontSize: parseFloat(style.fontSize),
+              scrollWidth: el.scrollWidth,
+              clientWidth: el.clientWidth,
+            };
+          });
+
+          expect(metrics.textTransform, `h1 computed text-transform must be 'none' at ${width}px (${accountEmail})`).toBe('none');
+          expect(metrics.scrollWidth, `h1 scrollWidth (${metrics.scrollWidth}px) <= clientWidth (${metrics.clientWidth}px) at ${width}px (${accountEmail})`).toBeLessThanOrEqual(metrics.clientWidth);
+          expect(metrics.fontSize, `h1 font-size (${metrics.fontSize}px) >= 12px at ${width}px (${accountEmail})`).toBeGreaterThanOrEqual(12);
+
+          // Measure h1 bounding box with stability check across two ticks
+          let h1Box: { x: number; y: number; width: number; height: number } | null = null;
+          await expect.poll(async () => {
+            const b1 = await h1.boundingBox();
+            if (!b1 || b1.width <= 0 || b1.height <= 0) return false;
+            const b2 = await h1.boundingBox();
+            if (!b2) return false;
+            if (
+              Math.abs(b1.x - b2.x) < 1 &&
+              Math.abs(b1.y - b2.y) < 1 &&
+              Math.abs(b1.width - b2.width) < 1 &&
+              Math.abs(b1.height - b2.height) < 1
+            ) {
+              h1Box = b2;
+              return true;
+            }
+            return false;
+          }, {
+            message: `h1 bounding box must be non-null and stable at ${width}px (${accountEmail})`,
+            timeout: 5000,
+          }).toBe(true);
+
+          expect(h1Box, 'h1 bounding box exists').not.toBeNull();
+
+          for (const loc of badgeLocators) {
+            let box: { x: number; y: number; width: number; height: number } | null = null;
+            await expect.poll(async () => {
+              const b1 = await loc.boundingBox();
+              if (!b1 || b1.width <= 0 || b1.height <= 0) return false;
+              const b2 = await loc.boundingBox();
+              if (!b2) return false;
+              if (
+                Math.abs(b1.x - b2.x) < 1 &&
+                Math.abs(b1.y - b2.y) < 1 &&
+                Math.abs(b1.width - b2.width) < 1 &&
+                Math.abs(b1.height - b2.height) < 1
+              ) {
+                box = b2;
+                return true;
+              }
+              return false;
+            }, {
+              message: `badge bounding box must be non-null and stable for ${loc}`,
+              timeout: 5000,
+            }).toBe(true);
+
             expect(box, 'badge bounding box exists').not.toBeNull();
             const intersects = !(
               h1Box!.x + h1Box!.width <= box!.x ||
