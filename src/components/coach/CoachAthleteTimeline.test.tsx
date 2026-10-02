@@ -218,4 +218,51 @@ describe('CoachAthleteTimeline accessibility (NEW-15)', () => {
     expect(container.textContent).not.toContain('No workouts or nutrition logged for this athlete yet');
   });
 
+  it('formats timeline day calories and macro totals without IEEE-754 float drift (STD-DAT-2)', () => {
+    const timelineDays = [
+      {
+        date: '2026-09-15',
+        workouts: [],
+        nutrition: [
+          {
+            id: 'n-1',
+            food_name: 'Chicken Snack',
+            calories: 100.1,
+            protein: 12.1,
+            carbs: 10.1,
+            fat: 5.1,
+          },
+          {
+            id: 'n-2',
+            food_name: 'Protein Shake',
+            calories: 200.2,
+            protein: 12.7,
+            carbs: 10.2,
+            fat: 5.2,
+          },
+        ],
+      },
+    ];
+
+    const { container } = render(
+      <CoachAthleteTimeline
+        {...defaultProps}
+        timelineDays={timelineDays as any}
+      />
+    );
+
+    // 12.1 + 12.7 = 24.799999999999997 -> must format as 24.8g P and never raw float
+    expect(container.textContent).toContain('24.8g P');
+    expect(container.textContent).not.toContain('24.799999999999997');
+
+    // 100.1 + 200.2 = 300.29999999999995 -> must format as whole kcal (300 kcal)
+    expect(container.textContent).toContain('Nutrition (300 kcal)');
+    expect(container.textContent).not.toContain('300.29999999999995');
+
+    // Individual item calories 100.1 -> 100 kcal, 200.2 -> 200 kcal
+    expect(container.textContent).toContain('100 kcal');
+    expect(container.textContent).toContain('200 kcal');
+    expect(container.textContent).not.toContain('100.1 kcal');
+    expect(container.textContent).not.toContain('200.2 kcal');
+  });
 });

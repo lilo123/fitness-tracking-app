@@ -68,4 +68,17 @@ describe('ExerciseSparkline', () => {
     const polyline = svg.querySelector('polyline');
     expect(polyline?.getAttribute('stroke-width')).toBe('3');
   });
+
+  it('formats weight with float drift in aria-label per STD-DAT-2', () => {
+    // 135.50000000000003 -> 135.5, 185.50000000000003 -> 185.5 in lb mode
+    render(<ExerciseSparkline points={[135.50000000000003, 185.50000000000003]} />);
+    const svg = screen.getByRole('img');
+    expect(svg).toHaveAttribute('aria-label', 'Trend: first 135.5, last 185.5 over 2 sessions');
+    expect(svg.getAttribute('aria-label')).not.toContain('135.50000000000003');
+
+    // In kg mode with showUnit
+    render(<ExerciseSparkline points={[100, 150]} unit="kg" testId="sparkline-kg" />);
+    const svgKg = screen.getByTestId('sparkline-kg');
+    expect(svgKg).toHaveAttribute('aria-label', expect.stringContaining('kg'));
+  });
 });

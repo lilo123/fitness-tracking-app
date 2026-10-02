@@ -7,6 +7,7 @@ import { type OutboxOp } from '../../offline';
 import { useOutboxStatus } from './useOutboxStatus';
 import { useAttentionOps } from './useAttentionOps';
 import { useAuth } from '../../hooks/useAuth';
+import { formatWeight } from '../../utils/weight';
 import { RefreshCw, Trash2, AlertTriangle, CloudOff, LogIn, CheckCircle2 } from 'lucide-react';
 
 export interface SyncStatusSheetProps {
@@ -17,7 +18,7 @@ export interface SyncStatusSheetProps {
 function formatOpKind(op: OutboxOp): string {
   switch (op.kind) {
     case 'set.create':
-      return `Create set (${op.payload.weight} × ${op.payload.reps})`;
+      return `Create set (${formatWeight(op.payload.weight)} × ${op.payload.reps})`;
     case 'set.update':
       return 'Update set';
     case 'set.delete':

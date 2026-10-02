@@ -70,5 +70,54 @@ export function groupSessionSetsByExercise<T extends {
     });
   });
 
+  // Track encounter order for stable sort tie-breaking (D-YB-8)
+  const groupEncounterIndex = new Map<ExerciseGroup<T>, number>();
+  groups.forEach((g, idx) => {
+    groupEncounterIndex.set(g, idx);
+  });
+
+  // Helper to extract earliest valid timestamp (ms) among sets in a group
+  const getEarliestTimestamp = (group: ExerciseGroup<T>): number | null => {
+    let earliest: number | null = null;
+    for (const s of group.sets) {
+      if (!s.created_at || typeof s.created_at !== 'string') continue;
+      try {
+        const time = Date.parse(s.created_at);
+        if (!Number.isNaN(time)) {
+          if (earliest === null || time < earliest) {
+            earliest = time;
+          }
+        }
+      } catch {
+        // Fall back gracefully on unparseable dates; never throw
+      }
+    }
+    return earliest;
+  };
+
+  // Order exercise groups by the EARLIEST created_at among the sets the card shows (working sets),
+  // oldest first. Stable sort: ties (e.g. batchCreate) keep encounter order. Missing/invalid created_at
+  // falls back to encounter order and never throws.
+  groups.sort((a, b) => {
+    const timeA = getEarliestTimestamp(a);
+    const timeB = getEarliestTimestamp(b);
+    const idxA = groupEncounterIndex.get(a) ?? 0;
+    const idxB = groupEncounterIndex.get(b) ?? 0;
+
+    if (timeA !== null && timeB !== null) {
+      if (timeA !== timeB) {
+        return timeA - timeB;
+      }
+      return idxA - idxB;
+    }
+    if (timeA !== null && timeB === null) {
+      return -1;
+    }
+    if (timeA === null && timeB !== null) {
+      return 1;
+    }
+    return idxA - idxB;
+  });
+
   return groups;
 }

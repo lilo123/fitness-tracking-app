@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { useNutritionData } from './useNutritionData';
 import { supabase } from '../../lib/supabase';
+import * as toastHook from '../../hooks/useToast';
 import { getDayBounds, localCivilToUtcMs, isWithinDayBounds } from '../../utils/date';
 import { createSupabaseBuilder, getRecordedSelects, getRecordedTables, clearMockHistory } from '../../test/supabaseBuilderMock';
 
@@ -911,6 +912,65 @@ describe('useNutritionData (src/components/nutrition/useNutritionData.ts)', () =
       } finally {
         Object.defineProperty(navigator, 'onLine', { value: originalOnLine, configurable: true });
       }
+    });
+  });
+
+  describe('triggerToast formatting (STD-DAT-2)', () => {
+    it('formats fractional calories to whole kcal in toast detail', () => {
+      const mockShowToast = vi.fn();
+      vi.spyOn(toastHook, 'useToast').mockReturnValue({
+        show: mockShowToast,
+        dismiss: vi.fn(),
+        activeToast: null,
+        offset: 0,
+        setOffset: vi.fn(),
+      });
+
+      const { result } = renderHook(
+        () =>
+          useNutritionData({
+            targetUserId: 'user-toast-test',
+            selectedDate: '2026-10-01',
+            profile: null,
+            onMutationSuccessReset: vi.fn(),
+            setStatus: vi.fn(),
+            setIsError: vi.fn(),
+          }),
+        { wrapper }
+      );
+
+      // Invoke triggerToast with fractional calories dish (250.6 kcal -> 251 kcal)
+      act(() => {
+        result.current.triggerToast(
+          { name: 'Rice Bowl', calories: 250.6 },
+          { variant: 'updated' }
+        );
+      });
+      expect(mockShowToast).toHaveBeenCalledWith(
+        expect.objectContaining({ detail: '251 kcal' })
+      );
+
+      // Variant 'added'
+      act(() => {
+        result.current.triggerToast(
+          { name: 'Rice Bowl', calories: 250.6 },
+          { variant: 'added' }
+        );
+      });
+      expect(mockShowToast).toHaveBeenCalledWith(
+        expect.objectContaining({ detail: '+251 kcal' })
+      );
+
+      // Variant 'logged'
+      act(() => {
+        result.current.triggerToast(
+          { name: 'Rice Bowl', calories: 250.6 },
+          { variant: 'logged' }
+        );
+      });
+      expect(mockShowToast).toHaveBeenCalledWith(
+        expect.objectContaining({ detail: '+251 kcal' })
+      );
     });
   });
 });

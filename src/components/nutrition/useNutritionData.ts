@@ -32,7 +32,7 @@ import {
   formatLocalTimestamp,
 } from '../../utils/date';
 import { nutritionDayKey } from '../../utils/nutritionDayKey';
-import { roundTo1Decimal, calculateRemainingFuel } from '../../utils/nutrition';
+import { roundTo1Decimal, calculateRemainingFuel, formatCalories } from '../../utils/nutrition';
 import { useToast } from '../../hooks/useToast';
 import { restTimerStore } from '../../utils/restTimerStore';
 import {
@@ -494,7 +494,7 @@ export function useNutritionData({
           kind: 'undo',
           verb: 'Updated',
           subject: dishName,
-          detail: `${calories} kcal`,
+          detail: `${formatCalories(calories)} kcal`,
           durationMs: 5000,
           onUndo: options?.onUndo,
           undoAriaLabel: `Undo update ${dishName}`,
@@ -521,7 +521,7 @@ export function useNutritionData({
           kind: 'undo',
           verb: 'Added to meal',
           subject: dishName,
-          detail: `+${calories} kcal`,
+          detail: `+${formatCalories(calories)} kcal`,
           durationMs: 5000,
           onUndo: options?.onUndo,
           undoAriaLabel: `Undo add ${dishName}`,
@@ -590,7 +590,7 @@ export function useNutritionData({
         kind: 'undo',
         verb: 'Logged',
         subject: dishName,
-        detail: `+${calories} kcal`,
+        detail: `+${formatCalories(calories)} kcal`,
         durationMs: 5000,
         onUndo,
         undoAriaLabel: `Undo log ${dishName}`,

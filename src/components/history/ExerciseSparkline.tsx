@@ -47,8 +47,8 @@ export const ExerciseSparkline: React.FC<ExerciseSparklineProps> = ({
     })
     .join(' ');
 
-  const firstDisplay = unit === 'kg' ? formatWeight(first, 'kg', { showUnit: true }) : first;
-  const lastDisplay = unit === 'kg' ? formatWeight(last, 'kg', { showUnit: true }) : last;
+  const firstDisplay = unit === 'kg' ? formatWeight(first, 'kg', { showUnit: true }) : formatWeight(first, 'lb');
+  const lastDisplay = unit === 'kg' ? formatWeight(last, 'kg', { showUnit: true }) : formatWeight(last, 'lb');
   const ariaLabel = `Trend: first ${firstDisplay}, last ${lastDisplay} over ${points.length} sessions`;
 
   return (

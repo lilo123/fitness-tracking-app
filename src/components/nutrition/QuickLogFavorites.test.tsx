@@ -961,5 +961,30 @@ describe('QuickLogFavorites (Horizontal Bar Redesign)', () => {
       expect(searchInput.className).not.toContain('sm:text-xs');
       expect(searchInput.className).not.toContain('sm:text-sm');
     });
+
+    it('formats dish calories and protein in aria-label without float drift (STD-DAT-2)', () => {
+      const dish = createMockDish({
+        id: 'dish-drift',
+        name: 'Custom Mix',
+        calories: 100.1,
+        protein: 24.799999999999997,
+      });
+
+      render(
+        <QuickLogFavorites
+          customDishes={[dish]}
+          onOpenNewDishModal={vi.fn()}
+          onStageCustomDish={vi.fn()}
+          onOpenEditDishModal={vi.fn()}
+          onQuickLogCustomDishDirect={vi.fn()}
+          onDismissToast={vi.fn()}
+        />
+      );
+
+      const card = screen.getByTestId('custom-dish-card-dish-drift');
+      expect(card.getAttribute('aria-label')).toContain('100 calories, 24.8 grams protein');
+      expect(card.getAttribute('aria-label')).not.toContain('24.799999999999997');
+      expect(card.getAttribute('aria-label')).not.toContain('100.1');
+    });
   });
 });

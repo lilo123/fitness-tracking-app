@@ -421,7 +421,7 @@ describe('useWorkoutHistory Data Layer (P5a W2)', () => {
         delete: deleteMock,
       } as any);
 
-      const lsKey = 'cybergym_client_workout_user-delete_2026-09-30';
+      const lsKey = 'yourbody_client_workout_user-delete_2026-09-30';
       localStorage.setItem(lsKey, 'client-w-stale');
       expect(localStorage.getItem(lsKey)).toBe('client-w-stale');
 
@@ -588,7 +588,8 @@ describe('useWorkoutHistory Data Layer (P5a W2)', () => {
       ];
 
       const limitMock = vi.fn().mockResolvedValue({ data: mockSets, error: null });
-      const orderMock = vi.fn().mockReturnValue({ limit: limitMock });
+      const orderMock = vi.fn();
+      orderMock.mockReturnValue({ order: orderMock, limit: limitMock });
       const eqMock = vi.fn().mockReturnValue({ order: orderMock });
       const selectMock = vi.fn().mockReturnValue({ eq: eqMock });
       vi.mocked((supabase as any)['from']).mockReturnValue({ select: selectMock } as any);
@@ -599,6 +600,9 @@ describe('useWorkoutHistory Data Layer (P5a W2)', () => {
       expect(selectMock).toHaveBeenCalledWith(
         'id, workout_id, exercise_id, weight, reps, set_index, created_at, rpe, set_type'
       );
+      expect(orderMock).toHaveBeenCalledWith('set_index', { ascending: true });
+      expect(orderMock).toHaveBeenCalledWith('created_at', { ascending: true });
+      expect(orderMock).toHaveBeenCalledWith('id', { ascending: true });
       expect(sets).toHaveLength(1);
       expect(sets[0].id).toBe('s-1');
       expect(sets[0].set_type).toBe('working');

@@ -66,6 +66,8 @@ export async function fetchSessionSets(workoutId: string): Promise<HistorySet[]>
     .select('id, workout_id, exercise_id, weight, reps, set_index, created_at, rpe, set_type')
     .eq('workout_id', workoutId)
     .order('set_index', { ascending: true })
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true })
     .limit(500);
 
   if (error) throw error;
@@ -340,7 +342,7 @@ export function useWorkoutHistory(
 
       if (sessionDate && typeof localStorage !== 'undefined') {
         try {
-          localStorage.removeItem(`cybergym_client_workout_${targetUserId}_${sessionDate}`);
+          localStorage.removeItem(`yourbody_client_workout_${targetUserId}_${sessionDate}`);
         } catch {}
       }
 

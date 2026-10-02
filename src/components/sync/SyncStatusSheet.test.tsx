@@ -137,6 +137,33 @@ describe('SyncStatusSheet', () => {
     expect(screen.getByText('Foreign key violation or permission denied')).toBeDefined();
   });
 
+  it('formats fractional weight without float drift (STD-DAT-2)', () => {
+    const mockOp: OutboxOp = {
+      opId: 'op-drift',
+      userId: 'test-user-id',
+      clientMutationId: 'client-mut-drift',
+      kind: 'set.create',
+      table: 'workout_sets',
+      rowId: 'row-drift',
+      payload: { weight: 220.462262185, reps: 10 },
+      createdAt: '2026-09-30T12:00:00.000Z',
+      retryCount: 1,
+      status: 'attention',
+      error: 'Sync error',
+    } as any;
+
+    vi.mocked(useAttentionOps).mockReturnValue({
+      ops: [mockOp],
+      count: 1,
+      retry: mockRetry,
+      discard: mockDiscard,
+    });
+
+    renderSheet();
+    expect(screen.getByText('Create set (220.5 × 10)')).toBeDefined();
+    expect(screen.queryByText(/220\.4622/)).toBeNull();
+  });
+
   it('calls retry when Retry button is clicked on an attention item', async () => {
     const mockOp: OutboxOp = {
       opId: 'op-456',

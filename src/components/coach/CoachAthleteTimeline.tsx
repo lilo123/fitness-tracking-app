@@ -17,6 +17,7 @@ import { Skeleton } from '../common/Skeleton';
 import { FALLBACK_WINDOW } from '../history/virtualizationConstants';
 import { useWeightUnit } from '../../hooks/useWeightUnit';
 import { formatVolume, formatWeight } from '../../utils/weight';
+import { formatCalories, formatMacro } from '../../utils/nutrition';
 
 export interface CoachWorkoutSet {
   id?: string;
@@ -327,7 +328,7 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
                           <Flame className="w-3 h-3 text-amber-400" />
                         </div>
                         <span className="font-bold text-white text-xs truncate">
-                          Nutrition ({dayCal} kcal)
+                          Nutrition ({formatCalories(dayCal)} kcal)
                         </span>
                       </div>
                       <div>
@@ -348,11 +349,11 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
                     </div>
 
                     <div className="text-xs text-zinc-400 tabular-nums flex items-center gap-2">
-                      <span className="text-cyan-400 font-bold">{dayPro}g P</span>
+                      <span className="text-cyan-400 font-bold">{formatMacro(dayPro)}g P</span>
                       <span>•</span>
-                      <span className="text-emerald-400 font-bold">{dayCarb}g C</span>
+                      <span className="text-emerald-400 font-bold">{formatMacro(dayCarb)}g C</span>
                       <span>•</span>
-                      <span className="text-violet-400 font-bold">{dayFat}g F</span>
+                      <span className="text-violet-400 font-bold">{formatMacro(dayFat)}g F</span>
                     </div>
 
                     <div className="space-y-1 pt-1 border-t border-zinc-800/60">
@@ -365,7 +366,7 @@ export const CoachAthleteTimeline: React.FC<CoachAthleteTimelineProps> = ({
                             {n.food_name}
                           </span>
                           <span className="text-amber-400 tabular-nums text-xs font-bold shrink-0">
-                            {n.calories} kcal
+                            {formatCalories(n.calories)} kcal
                           </span>
                         </div>
                       ))}

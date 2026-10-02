@@ -127,12 +127,40 @@ export function useHistorySessionSets({
       });
 
       combined = combined.filter((s) => !s.set_type || s.set_type === 'working');
-      combined.sort((a, b) => (a.set_index ?? 0) - (b.set_index ?? 0));
+      combined.sort((a, b) => {
+        const idxDiff = (a.set_index ?? 0) - (b.set_index ?? 0);
+        if (idxDiff !== 0) return idxDiff;
+        const timeDiff = (a.created_at || '').localeCompare(b.created_at || '');
+        if (timeDiff !== 0) return timeDiff;
+        return (a.id || '').localeCompare(b.id || '');
+      });
 
-      const catalogExercises = queryClient.getQueryData<Array<{ id?: string; name?: string }>>([
-        'exercises',
-        'workout',
-      ]);
+      let catalogExercises =
+        queryClient.getQueryData<Array<{ id?: string; name?: string }>>(['exercises', 'workout']) ||
+        queryClient.getQueryData<Array<{ id?: string; name?: string }>>(['exercises']);
+
+      if (!catalogExercises) {
+        // Pre-existing race: on initial mount of HistoryView, auto-expansion of the newest session
+        // triggers loadSetsForSession while the ['exercises'] query is in flight. Awaiting it prevents
+        // un-enriched sets from rendering duplicate "Unknown Exercise" React keys that corrupt DOM reconciliation.
+        // Both ['exercises'] (HistoryView) and ['exercises', 'workout'] (Active Workout) return Exercise[]
+        // containing { id, name, ... }.
+        const queryState = queryClient.getQueryState(['exercises']);
+        if (queryState?.fetchStatus === 'fetching') {
+          try {
+            const fetched = await queryClient.fetchQuery<Array<{ id?: string; name?: string }>>({
+              queryKey: ['exercises'],
+              staleTime: 5 * 60 * 1000,
+            });
+            if (fetched && Array.isArray(fetched) && fetched.length > 0) {
+              catalogExercises = fetched;
+            }
+          } catch (catalogErr) {
+            // Explicit error handling: if catalog query fails, gracefully proceed with fallback exercise_id rather than failing session load
+            console.warn('[useHistorySessionSets] In-flight catalog query fetch failed during enrichment:', catalogErr);
+          }
+        }
+      }
       const ninetySets = queryClient.getQueryData<
         Array<{ id?: string; exercise_id?: string; exercise_name?: string }>
       >(['workout_sets', targetUserId, '90d']);

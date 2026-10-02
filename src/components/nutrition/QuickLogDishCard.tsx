@@ -54,8 +54,8 @@ export const QuickLogDishCard: React.FC<QuickLogDishCardProps> = memo(({
         data-testid={`custom-dish-card-${dish.id}`}
         aria-label={
           isStaged
-            ? `Add ${dish.name} to staged meal, ${dish.calories ?? 0} calories, ${dish.protein ?? 0} grams protein${hasNote ? ', note attached' : ''}`
-            : `Stage ${dish.name}, ${dish.calories ?? 0} calories, ${dish.protein ?? 0} grams protein${hasNote ? ', note attached' : ''}`
+            ? `Add ${dish.name} to staged meal, ${formatCalories(dish.calories)} calories, ${formatMacro(dish.protein)} grams protein${hasNote ? ', note attached' : ''}`
+            : `Stage ${dish.name}, ${formatCalories(dish.calories)} calories, ${formatMacro(dish.protein)} grams protein${hasNote ? ', note attached' : ''}`
         }
         className="flex items-center gap-2.5 min-w-0 flex-1 text-left min-h-[40px] h-10 outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 rounded-xl touch-manipulation relative before:absolute before:right-0 before:bottom-0 before:min-w-[44px] before:min-h-[44px] before:content-['']"
       >
