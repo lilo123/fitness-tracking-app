@@ -34,7 +34,7 @@ test.describe('PWA Service Worker Update Flow & Safety Blockers', () => {
     }
   });
 
-  test('update flow: banner appears, blocked by open dialog or active workout, never auto-reloads, and applies on tap when safe', async ({
+  test('update flow: banner appears, soft workout drafts trigger confirm dialog, hard modal blocks reload, and applies on tap when safe', async ({
     page,
   }) => {
     // 1. Initial sign-in and SW activation
@@ -84,8 +84,7 @@ test.describe('PWA Service Worker Update Flow & Safety Blockers', () => {
     const reloadBtn = page.locator('[data-testid="update-reload-btn"]');
     const reason = page.locator('[data-testid="update-block-reason"]');
 
-    // 4. Blocker 1: Active workout session
-    // On /workout, ensure an uncompleted active workout session pointer is active
+    // 4. Soft Blocker: Active workout session with typed draft inputs (D-YB2-3)
     await page.evaluate((uid) => {
       const now = new Date();
       const year = now.getFullYear();
@@ -101,11 +100,11 @@ test.describe('PWA Service Worker Update Flow & Safety Blockers', () => {
           userId: uid,
           workoutDate: today,
           routineName: 'Active Session Routine',
-          exercises: [],
-          targetSetCounts: {},
-          targetRepCounts: {},
-          expandedExercises: [],
-          inputDrafts: {},
+          exercises: ['Bench Press'],
+          targetSetCounts: { 'Bench Press': 3 },
+          targetRepCounts: { 'Bench Press': 10 },
+          expandedExercises: ['Bench Press'],
+          inputDrafts: { 'Bench Press_0': { weight: '135', reps: '10' } },
           startedAt: now.toISOString(),
           lastModifiedAt: now.toISOString(),
           completedAt: null,
@@ -113,24 +112,39 @@ test.describe('PWA Service Worker Update Flow & Safety Blockers', () => {
       );
     }, user.id);
 
+    // Clicking reload opens the update confirmation dialog (soft blocker)
     await reloadBtn.click();
-    // Verify reload did not happen and workout blocker reason is shown
     expect(navigations).toBe(0);
-    await expect(reason).toBeVisible();
-    await expect(reason).toContainText('Finish your workout and sync first');
 
-    // Clear active workout session so workout blocker is cleared
+    const dialog = page.locator('[data-testid="update-confirm-dialog"]');
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText('Update now?');
+    await expect(dialog).toContainText(
+      'Your open workout and the values you typed will still be here after the update.'
+    );
+
+    // Cancel out of dialog via "Keep logging"
+    const cancelBtn = page.locator('[data-testid="update-confirm-dialog-cancel"]');
+    await cancelBtn.click();
+    await expect(dialog).toBeHidden();
+    expect(navigations).toBe(0);
+
+    // Clear active workout session
     await page.evaluate((uid) => {
       localStorage.removeItem(`yourbody_current_session_pointer_${uid}`);
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const key = localStorage.key(i);
-        if (key && (key.startsWith('yourbody_current_session_pointer_') || key.startsWith('yourbody_active_session_'))) {
+        if (
+          key &&
+          (key.startsWith('yourbody_current_session_pointer_') ||
+            key.startsWith('yourbody_active_session_'))
+        ) {
           localStorage.removeItem(key);
         }
       }
     }, user.id);
 
-    // 5. Blocker 2: Open accessible dialog
+    // 5. Hard Blocker: Open accessible dialog
     await page.evaluate(() => {
       const d = document.createElement('div');
       d.id = 'test-modal-dialog-blocker';
@@ -139,16 +153,20 @@ test.describe('PWA Service Worker Update Flow & Safety Blockers', () => {
       document.body.appendChild(d);
     });
 
-    await reloadBtn.click();
-    // Verify reload did not happen and modal blocker reason is shown
-    expect(navigations).toBe(0);
+    // Hard blocker disables the reload button and shows the reason
+    await expect(reloadBtn).toBeDisabled();
     await expect(reason).toBeVisible();
     await expect(reason).toContainText('Close open dialog before updating');
+    expect(navigations).toBe(0);
 
     // Remove dialog blocker
     await page.evaluate(() => {
       document.getElementById('test-modal-dialog-blocker')?.remove();
     });
+
+    // Reload button automatically re-enables
+    await expect(reloadBtn).toBeEnabled();
+    await expect(reason).toBeHidden();
 
     // 6. With no blockers, tap reloads once onto the new SW
     const reloadPromise = page.waitForNavigation({ waitUntil: 'load' });

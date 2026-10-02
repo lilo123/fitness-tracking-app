@@ -1,8 +1,26 @@
+import type { QueryClient } from '@tanstack/react-query';
 import { workoutSessionStore } from '../utils/workoutSessionStore';
+import { getSyncingStatus, getCachedOutboxSummary } from '../offline/outbox';
+import { getCachedAiQueue } from '../offline/aiQueue';
+
+export type SoftItem =
+  | { kind: 'workout' }
+  | { kind: 'outbox'; count: number }
+  | { kind: 'meal' }
+  | { kind: 'form' };
+
+export type UpdateSafetyResult =
+  | { status: 'clear' }
+  | { status: 'hard'; reason: string }
+  | { status: 'soft'; items: SoftItem[] };
+
+export interface EvaluateUpdateSafetyOptions {
+  userId?: string | null;
+  queryClient?: QueryClient | null;
+}
 
 export type UpdateBlockerFn = () => string | null | undefined | boolean;
 
-const POINTER_PREFIX = 'yourbody_current_session_pointer_';
 const customBlockers = new Map<string, UpdateBlockerFn>();
 const dirtyForms = new Set<string>();
 
@@ -33,59 +51,21 @@ export function markFormDirty(id: string, dirty: boolean): void {
 }
 
 /**
- * Read-only check for active workout sessions via workoutSessionStore pointer API.
- */
-function checkActiveWorkoutSession(): string | null {
-  if (typeof localStorage === 'undefined') return null;
-
-  try {
-    const userIdsToCheck: string[] = [];
-
-    // Scan pointer keys in localStorage (yourbody_current_session_pointer_<userId>)
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith(POINTER_PREFIX)) {
-        const uId = key.slice(POINTER_PREFIX.length);
-        if (uId && !userIdsToCheck.includes(uId)) {
-          userIdsToCheck.push(uId);
-        }
-      }
-    }
-
-    // Also check cached user ID if present
-    try {
-      const rawUser = localStorage.getItem('yourbody_user');
-      if (rawUser) {
-        const parsed = JSON.parse(rawUser);
-        if (parsed?.id && !userIdsToCheck.includes(parsed.id)) {
-          userIdsToCheck.push(parsed.id);
-        }
-      }
-    } catch {
-      // Ignore JSON parse error
-    }
-
-    for (const userId of userIdsToCheck) {
-      const activeSession = workoutSessionStore.getActiveSession(userId);
-      if (activeSession && activeSession.completedAt === null) {
-        return 'Finish your workout and sync first';
-      }
-    }
-  } catch {
-    // Ignore storage errors
-  }
-
-  return null;
-}
-
-/**
  * Built-in check for open accessible modals.
+ * Excludes our own update confirmation dialog (marked with data-testid="update-confirm-dialog").
  */
 function checkOpenModal(): string | null {
   if (typeof document === 'undefined') return null;
 
-  const openModal = document.querySelector('[role="dialog"][aria-modal="true"]');
-  if (openModal) {
+  const openModals = document.querySelectorAll('[role="dialog"][aria-modal="true"]');
+  for (let i = 0; i < openModals.length; i++) {
+    const modal = openModals[i];
+    if (
+      modal.getAttribute('data-testid') === 'update-confirm-dialog' ||
+      modal.closest('[data-testid="update-confirm-dialog"]')
+    ) {
+      continue;
+    }
     return 'Close open dialog before updating';
   }
 
@@ -93,55 +73,147 @@ function checkOpenModal(): string | null {
 }
 
 /**
- * Built-in check for unsaved form state.
+ * Evaluates all built-in and registered update blockers per D-YB2-3.
+ *
+ * Hard blockers:
+ * - Outbox replay in flight
+ * - AI parse in flight
+ * - Another aria-modal open dialog (excluding update confirm dialog)
+ * - Unknown registered string blockers
+ *
+ * Soft blockers:
+ * - Active workout session for the current user with non-blank typed drafts or logged sets
+ * - Outbox pending > 0 (while not syncing)
+ * - Dirty meal forms ('staged-meal' / 'manual-meal-form')
+ * - Other dirty forms
+ *
+ * Clear:
+ * - No hard blockers and no soft blockers present
  */
-function checkDirtyForms(): string | null {
-  if (dirtyForms.size > 0) {
-    return 'Save changes before updating';
-  }
-  return null;
-}
-
-/**
- * Evaluates all built-in and registered update blockers.
- * Returns { ok: true } if safe to reload, or { ok: false, reason: string } if blocked.
- */
-export function canApplyUpdate(): { ok: boolean; reason?: string } {
-  // 1. Built-in: Active workout session
-  const workoutReason = checkActiveWorkoutSession();
-  if (workoutReason) {
-    return { ok: false, reason: workoutReason };
+export function evaluateUpdateSafety(
+  options: EvaluateUpdateSafetyOptions = {}
+): UpdateSafetyResult {
+  // 1. Hard: Outbox replay in flight
+  try {
+    if (getSyncingStatus()) {
+      return { status: 'hard', reason: 'Syncing changes in progress' };
+    }
+  } catch {
+    // Ignore outbox status errors
   }
 
-  // 2. Built-in: Open modal
-  const modalReason = checkOpenModal();
-  if (modalReason) {
-    return { ok: false, reason: modalReason };
-  }
-
-  // 3. Built-in: Dirty forms
-  const dirtyReason = checkDirtyForms();
-  if (dirtyReason) {
-    return { ok: false, reason: dirtyReason };
-  }
-
-  // 4. Custom registered blockers
-  for (const [, blocker] of customBlockers) {
+  // 2. Hard: AI parse in flight
+  if (options.userId) {
     try {
-      const result = blocker();
-      if (typeof result === 'string' && result.trim().length > 0) {
-        return { ok: false, reason: result };
-      }
-      if (result === false) {
-        return { ok: false, reason: 'Update currently blocked' };
+      const aiQueueState = getCachedAiQueue(options.userId);
+      if (aiQueueState.isAnalyzing) {
+        return { status: 'hard', reason: 'AI analysis in progress' };
       }
     } catch {
-      // Blocker threw; fail safe by blocking update
-      return { ok: false, reason: 'Safety check error' };
+      // Ignore AI queue errors
     }
   }
 
-  return { ok: true };
+  // 3. Hard: Another open accessible modal
+  const modalReason = checkOpenModal();
+  if (modalReason) {
+    return { status: 'hard', reason: modalReason };
+  }
+
+  // 4. Hard: Unknown registered custom blockers (fail safe)
+  for (const [id, blocker] of customBlockers) {
+    if (id === 'outbox') {
+      // Outbox is evaluated natively
+      continue;
+    }
+    try {
+      const result = blocker();
+      if (typeof result === 'string' && result.trim().length > 0) {
+        return { status: 'hard', reason: result.trim() };
+      }
+      if (result === false) {
+        return { status: 'hard', reason: 'Update currently blocked' };
+      }
+    } catch {
+      return { status: 'hard', reason: 'Safety check error' };
+    }
+  }
+
+  // Collect soft blocker items
+  const softItems: SoftItem[] = [];
+
+  // Soft 1: Active workout session with typed drafts or logged sets
+  // D-YB2-3: Signed out -> never gated by workout pointers. Ghost-only is not a blocker.
+  if (options.userId) {
+    try {
+      const activeSession = workoutSessionStore.getActiveSession(options.userId);
+      if (activeSession && activeSession.completedAt === null) {
+        const hasDrafts = Object.values(activeSession.inputDrafts || {}).some(
+          (draft) =>
+            (Boolean(draft?.weight) && String(draft.weight).trim().length > 0) ||
+            (Boolean(draft?.reps) && String(draft.reps).trim().length > 0)
+        );
+
+        let hasLoggedSets = false;
+        if (options.queryClient && activeSession.workoutDate) {
+          try {
+            const cachedSets = options.queryClient.getQueryData([
+              'workout_sets',
+              options.userId,
+              activeSession.workoutDate,
+            ]);
+            if (Array.isArray(cachedSets) && cachedSets.length > 0) {
+              hasLoggedSets = true;
+            }
+          } catch {
+            // Ignore cache read errors
+          }
+        }
+
+        if (hasDrafts || hasLoggedSets) {
+          softItems.push({ kind: 'workout' });
+        }
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }
+
+  // Soft 2: Outbox pending > 0 (not syncing)
+  if (options.userId) {
+    try {
+      const summary = getCachedOutboxSummary(options.userId);
+      if (summary.pending > 0) {
+        softItems.push({ kind: 'outbox', count: summary.pending });
+      }
+    } catch {
+      // Ignore outbox errors
+    }
+  }
+
+  // Soft 3: Dirty meal form ('staged-meal' / 'manual-meal-form')
+  const hasMeal = dirtyForms.has('staged-meal') || dirtyForms.has('manual-meal-form');
+  if (hasMeal) {
+    softItems.push({ kind: 'meal' });
+  }
+
+  // Soft 4: Other dirty forms
+  let hasOtherForm = false;
+  for (const id of dirtyForms) {
+    if (id !== 'staged-meal' && id !== 'manual-meal-form') {
+      hasOtherForm = true;
+      break;
+    }
+  }
+  if (hasOtherForm) {
+    softItems.push({ kind: 'form' });
+  }
+
+  if (softItems.length > 0) {
+    return { status: 'soft', items: softItems };
+  }
+
+  return { status: 'clear' };
 }
 
 /**

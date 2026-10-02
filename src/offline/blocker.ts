@@ -1,9 +1,9 @@
-import { getOutboxOps, getSyncingStatus, getCachedOutboxSummary } from './outbox';
+import { getOutboxOps, getSyncingStatus } from './outbox';
 import { getActiveUserId } from './flusher';
 
 /**
  * Registers an update safety blocker with W2's PWA update registry.
- * Prevents applying service worker updates if outbox has pending changes or is actively syncing.
+ * Prevents applying service worker updates if outbox is actively syncing.
  */
 export function registerOutboxUpdateBlocker(
   register: (id: string, fn: () => string | null) => void
@@ -13,14 +13,6 @@ export function registerOutboxUpdateBlocker(
     if (isSyncing) {
       return 'Syncing changes in progress';
     }
-    const userId = getActiveUserId();
-    if (userId) {
-      const summary = getCachedOutboxSummary(userId);
-      if (summary.pending > 0) {
-        return 'Sync pending changes first';
-      }
-    }
-
     return null;
   });
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { registerOutboxUpdateBlocker, pendingBeforeSignOut } from '../blocker';
 import {
-  canApplyUpdate,
+  evaluateUpdateSafety,
   registerUpdateBlocker,
   unregisterUpdateBlocker,
   resetUpdateSafetyForTesting,
@@ -23,7 +23,7 @@ describe('registerOutboxUpdateBlocker', () => {
     vi.restoreAllMocks();
   });
 
-  it('blocks PWA update when outbox has pending ops', () => {
+  it('evaluates outbox pending ops as soft update blocker', () => {
     vi.spyOn(flusherModule, 'getActiveUserId').mockReturnValue(userId);
     vi.spyOn(outboxModule, 'getSyncingStatus').mockReturnValue(false);
     vi.spyOn(outboxModule, 'getCachedOutboxSummary').mockReturnValue({
@@ -36,21 +36,25 @@ describe('registerOutboxUpdateBlocker', () => {
     });
 
     registerOutboxUpdateBlocker(registerUpdateBlocker);
-    const result = canApplyUpdate();
+    const safety = evaluateUpdateSafety({ userId });
 
-    expect(result.ok).toBe(false);
-    expect(result.reason).toBe('Sync pending changes first');
+    expect(safety.status).toBe('soft');
+    if (safety.status === 'soft') {
+      expect(safety.items).toEqual([{ kind: 'outbox', count: 2 }]);
+    }
   });
 
-  it('blocks PWA update when outbox is actively syncing', () => {
+  it('evaluates outbox syncing as hard update blocker', () => {
     vi.spyOn(flusherModule, 'getActiveUserId').mockReturnValue(userId);
     vi.spyOn(outboxModule, 'getSyncingStatus').mockReturnValue(true);
 
     registerOutboxUpdateBlocker(registerUpdateBlocker);
-    const result = canApplyUpdate();
+    const safety = evaluateUpdateSafety({ userId });
 
-    expect(result.ok).toBe(false);
-    expect(result.reason).toBe('Syncing changes in progress');
+    expect(safety.status).toBe('hard');
+    if (safety.status === 'hard') {
+      expect(safety.reason).toBe('Syncing changes in progress');
+    }
   });
 
   it('allows PWA update when outbox has 0 pending ops', () => {
@@ -66,39 +70,39 @@ describe('registerOutboxUpdateBlocker', () => {
     });
 
     registerOutboxUpdateBlocker(registerUpdateBlocker);
-    const result = canApplyUpdate();
+    const safety = evaluateUpdateSafety({ userId });
 
-    expect(result.ok).toBe(true);
-    expect(result.reason).toBeUndefined();
+    expect(safety.status).toBe('clear');
   });
 
-  it('blocks PWA update when active user has pending ops in localStorage from another tab', () => {
+  it('allows PWA update when another user has pending ops but active user has 0', () => {
     vi.spyOn(flusherModule, 'getActiveUserId').mockReturnValue(userId);
     vi.spyOn(outboxModule, 'getSyncingStatus').mockReturnValue(false);
-    localStorage.setItem(`yourbody_outbox_pending_${userId}`, '2');
+    vi.spyOn(outboxModule, 'getCachedOutboxSummary').mockImplementation((targetUserId: string) => {
+      if (targetUserId === userId) {
+        return {
+          pending: 0,
+          attention: 0,
+          syncing: false,
+          authRequired: false,
+          lastSyncedCount: 0,
+          needsAttentionOps: [],
+        };
+      }
+      return {
+        pending: 5,
+        attention: 0,
+        syncing: false,
+        authRequired: false,
+        lastSyncedCount: 0,
+        needsAttentionOps: [],
+      };
+    });
 
     registerOutboxUpdateBlocker(registerUpdateBlocker);
-    const result = canApplyUpdate();
+    const safety = evaluateUpdateSafety({ userId });
 
-    expect(result.ok).toBe(false);
-    expect(result.reason).toBe('Sync pending changes first');
-
-    localStorage.removeItem(`yourbody_outbox_pending_${userId}`);
-  });
-
-  it('allows PWA update when another user has pending ops in localStorage but active user has 0', () => {
-    vi.spyOn(flusherModule, 'getActiveUserId').mockReturnValue(userId);
-    vi.spyOn(outboxModule, 'getSyncingStatus').mockReturnValue(false);
-    // Another user's retained outbox
-    localStorage.setItem('yourbody_outbox_pending_other-user', '5');
-
-    registerOutboxUpdateBlocker(registerUpdateBlocker);
-    const result = canApplyUpdate();
-
-    expect(result.ok).toBe(true);
-    expect(result.reason).toBeUndefined();
-
-    localStorage.removeItem('yourbody_outbox_pending_other-user');
+    expect(safety.status).toBe('clear');
   });
 });
 
