@@ -8363,7 +8363,7 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
   test('D-YB2-1: Header content edges align with page content column across routes and viewports', async ({ browser }) => {
     test.setTimeout(120000);
     const viewports = [320, 390, 768, 993, 1280, 1440];
-    const shotsDir = '/usr/local/google/home/duynguyenn/fitness-overnight/yb2/scratch/shots';
+    const shotsDir = test.info().outputPath('shots');
 
     for (const width of viewports) {
       // 1. Coach on /coach

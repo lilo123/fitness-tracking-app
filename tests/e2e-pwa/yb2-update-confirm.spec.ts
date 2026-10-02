@@ -334,7 +334,10 @@ test.describe('YB2 Update Gate Confirmation Dialog Flow (D-YB2-3)', () => {
     await goOnline(context, page);
     await expect(page.locator('[data-testid="pending-mark"]')).toHaveCount(0, { timeout: 15000 });
 
-    const totalSets = countRows('public.sets', `exercise_id = '${user.exerciseId}'`);
+    const totalSets = countRows(
+      'public.sets',
+      `exercise_id = '${user.exerciseId}' AND workout_id IN (SELECT id FROM public.workouts WHERE user_id = '${user.id}')`
+    );
     expect(totalSets).toBe(1);
   });
 
@@ -486,7 +489,7 @@ test.describe('YB2 Update Gate Confirmation Dialog Flow (D-YB2-3)', () => {
     await expect(dialog).toBeVisible();
 
     // Capture screenshot of dialog at 320px
-    const shotPath = '/usr/local/google/home/duynguyenn/fitness-overnight/yb2/scratch/shots/upd_dialog_320.png';
+    const shotPath = test.info().outputPath('upd_dialog_320.png');
     await page.screenshot({ path: shotPath });
     expect(fs.existsSync(shotPath)).toBe(true);
 
