@@ -8272,9 +8272,13 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
               ]
             : [
                 page.locator('[data-testid="connection-status"]'),
-                page.locator('[title="Athlete Account"]'),
                 page.locator('[data-testid="sign-out-button"]'),
               ];
+
+          if (!isCoach) {
+            // YB3: Static non-interactive Athlete chip is hidden below sm
+            await expect(page.locator('[title="Athlete Account"]')).toBeHidden();
+          }
 
           // Wait for connection status to settle to 'Online' so outbox sync and pill geometry are stable
           await expect(page.locator('[data-testid="connection-status"]')).toHaveAttribute('title', 'Online', { timeout: 10000 });
@@ -8582,9 +8586,13 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
             ]
           : [
               page.locator('[data-testid="connection-status"]'),
-              page.locator('[title="Athlete Account"]'),
               page.locator('[data-testid="sign-out-button"]'),
             ];
+
+        if (!isCoach) {
+          // YB3: Non-coach static Athlete chip is hidden below sm
+          await expect(page.locator('[title="Athlete Account"]')).toBeHidden();
+        }
 
         for (const loc of badgeLocators) {
           await expect(loc).toBeVisible({ timeout: 5000 });
@@ -8803,6 +8811,298 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
           await page.unroute('**/rest/v1/sets*').catch(() => {});
           await page.unroute('**/auth/v1/token*').catch(() => {});
           cleanupSpecWorkouts(accountEmail);
+          await context.close();
+        }
+      }
+    }
+  });
+
+  test('YB3: header controls', async ({ browser }) => {
+    test.setTimeout(180000);
+
+    const verifyHeaderControlsGeometry = async (page: Page, width: number, desc: string) => {
+      const result = await page.evaluate(() => {
+        const controls = Array.from(document.querySelectorAll<HTMLElement>(
+          'header div.shrink-0 > button, header div.shrink-0 > a'
+        )).filter((el) => {
+          const s = window.getComputedStyle(el);
+          return s.display !== 'none' && s.visibility !== 'hidden';
+        });
+
+        const issues: string[] = [];
+
+        // (a) every control hit box >= 44x44 and no two hit boxes overlap
+        const boxes = controls.map((ctrl) => {
+          const r = ctrl.getBoundingClientRect();
+          return {
+            id: ctrl.getAttribute('data-testid') || ctrl.tagName,
+            x: r.x,
+            y: r.y,
+            width: r.width,
+            height: r.height,
+            right: r.right,
+            bottom: r.bottom,
+          };
+        });
+
+        for (const b of boxes) {
+          if (b.width < 43.5 || b.height < 43.5) {
+            issues.push(`Control ${b.id} hit box ${b.width.toFixed(1)}x${b.height.toFixed(1)} < 44x44`);
+          }
+        }
+
+        for (let i = 0; i < boxes.length - 1; i++) {
+          const b1 = boxes[i];
+          const b2 = boxes[i + 1];
+          const hOverlap = Math.max(0, Math.min(b1.right, b2.right) - Math.max(b1.x, b2.x));
+          const vOverlap = Math.max(0, Math.min(b1.bottom, b2.bottom) - Math.max(b1.y, b2.y));
+          const overlapArea = hOverlap * vOverlap;
+          if (overlapArea > 0.5) {
+            issues.push(`Hit box overlap between ${b1.id} and ${b2.id}: ${overlapArea.toFixed(1)}px²`);
+          }
+        }
+
+        // (b) visual gap between adjacent controls' inner visuals >= 6px
+        const innerVisuals = controls.map((ctrl) => {
+          const iv = (ctrl.firstElementChild as HTMLElement) || ctrl;
+          const r = iv.getBoundingClientRect();
+          return {
+            ctrlId: ctrl.getAttribute('data-testid') || ctrl.tagName,
+            r,
+            el: iv,
+          };
+        });
+
+        for (let i = 0; i < innerVisuals.length - 1; i++) {
+          const iv1 = innerVisuals[i];
+          const iv2 = innerVisuals[i + 1];
+          const visualGap = iv2.r.left - iv1.r.right;
+          if (visualGap < 5.5) {
+            issues.push(`Visual gap between ${iv1.ctrlId} and ${iv2.ctrlId} inner visuals is ${visualGap.toFixed(1)}px < 6px`);
+          }
+        }
+
+        // (c) computed box-shadow is 'none' on every control and inner visual
+        for (const ctrl of controls) {
+          const s = window.getComputedStyle(ctrl).boxShadow;
+          if (s && s !== 'none') {
+            issues.push(`Control ${ctrl.getAttribute('data-testid')} has non-none box-shadow: ${s}`);
+          }
+          for (const desc of Array.from(ctrl.querySelectorAll('*'))) {
+            const ds = window.getComputedStyle(desc).boxShadow;
+            if (ds && ds !== 'none') {
+              issues.push(`Control descendant ${desc.tagName} has non-none box-shadow: ${ds}`);
+            }
+          }
+        }
+
+        // (d) all inner visuals of icon controls have equal height (36 ±1)
+        for (const iv of innerVisuals) {
+          if (Math.abs(iv.r.height - 36) > 1.5) {
+            issues.push(`Inner visual of ${iv.ctrlId} height is ${iv.r.height.toFixed(1)}px (expected 36 ±1)`);
+          }
+        }
+
+        // (e) brand name computed font-size >= 14px and scrollWidth <= clientWidth, no overlap with the first control
+        const h1 = document.querySelector('header h1') as HTMLElement;
+        if (!h1) {
+          issues.push('Brand name h1 not found');
+        } else {
+          const h1Style = window.getComputedStyle(h1);
+          const fs = parseFloat(h1Style.fontSize);
+          if (fs < 13.5) {
+            issues.push(`Brand name font-size ${fs}px < 14px`);
+          }
+          if (h1.scrollWidth > h1.clientWidth + 1) {
+            issues.push(`Brand name scrollWidth (${h1.scrollWidth}) > clientWidth (${h1.clientWidth})`);
+          }
+          if (boxes.length > 0) {
+            const firstCtrl = boxes[0];
+            const h1Rect = h1.getBoundingClientRect();
+            if (h1Rect.right > firstCtrl.x + 0.5) {
+              issues.push(`Brand name overlaps first control ${firstCtrl.id}: h1.right (${h1Rect.right.toFixed(1)}) > ctrl.x (${firstCtrl.x.toFixed(1)})`);
+            }
+          }
+        }
+
+        // (f) tagline either display:none or scrollWidth <= clientWidth
+        const tagline = document.querySelector('header h1 + div') as HTMLElement;
+        if (tagline) {
+          const tagStyle = window.getComputedStyle(tagline);
+          if (tagStyle.display !== 'none') {
+            if (tagline.scrollWidth > tagline.clientWidth + 1) {
+              issues.push(`Tagline scrollWidth (${tagline.scrollWidth}) > clientWidth (${tagline.clientWidth})`);
+            }
+          }
+        }
+
+        return {
+          issues,
+          controlCount: controls.length,
+          boxes,
+        };
+      });
+
+      expect(result.issues, `Header controls geometry issues for ${desc} at ${width}px`).toEqual([]);
+      expect(result.controlCount, `Expected controls for ${desc} at ${width}px`).toBeGreaterThan(0);
+    };
+
+    const seed99Pending = async (page: Page) => {
+      await page.waitForFunction(async () => {
+        const dbs = await indexedDB.databases();
+        const dbEntry = dbs.find((d) => d.name && d.name.startsWith('yourbody-offline-'));
+        if (!dbEntry?.name) return false;
+        return new Promise<boolean>((resolve) => {
+          const req = indexedDB.open(dbEntry.name, 2);
+          req.onsuccess = () => {
+            const db = req.result;
+            const ready = db.objectStoreNames.contains('outbox');
+            db.close();
+            resolve(ready);
+          };
+          req.onerror = () => resolve(false);
+        });
+      }, null, { timeout: 10000 });
+
+      const userId = await page.evaluate(() => {
+        const authKey = Object.keys(localStorage).find((k) => k.startsWith('sb-') && k.endsWith('-auth-token'));
+        if (authKey) {
+          try { return JSON.parse(localStorage.getItem(authKey) || '{}')?.user?.id; } catch {}
+        }
+        const u = localStorage.getItem('yourbody_user');
+        if (u) {
+          try { return JSON.parse(u).id; } catch {}
+        }
+        return '';
+      });
+
+      const dbName = `yourbody-offline-${userId}`;
+      await page.evaluate(
+        async ({ name, uid }) => {
+          const req = indexedDB.open(name, 2);
+          const db: IDBDatabase = await new Promise((res, rej) => {
+            req.onsuccess = () => res(req.result);
+            req.onerror = () => rej(req.error);
+          });
+          const tx = db.transaction(['outbox'], 'readwrite');
+          const store = tx.objectStore('outbox');
+          const now = new Date().toISOString();
+          const baseSeq = Date.now();
+          for (let i = 1; i <= 99; i++) {
+            store.put({
+              opId: `p-${i}`,
+              userId: uid,
+              seq: baseSeq + i,
+              kind: 'set.create',
+              payload: { id: `s-${i}`, workoutRef: 'w1', exercise_id: 'e1', weight: 100, reps: 5, set_index: i, set_type: 'working', created_at: now },
+              createdAt: now,
+              attempts: 0,
+              state: 'pending',
+            });
+          }
+          await new Promise((resolve, reject) => {
+            tx.oncomplete = () => {
+              db.close();
+              resolve(undefined);
+            };
+            tx.onerror = () => {
+              db.close();
+              reject(tx.error);
+            };
+          });
+        },
+        { name: dbName, uid: userId }
+      );
+
+      await page.route('**/rest/v1/sets*', (route) => {
+        if (['POST', 'PATCH', 'DELETE'].includes(route.request().method())) {
+          return route.abort('internetdisconnected');
+        }
+        return route.continue();
+      });
+      await page.route('**/rest/v1/workouts*', (route) => {
+        if (['POST', 'PATCH', 'DELETE'].includes(route.request().method())) {
+          return route.abort('internetdisconnected');
+        }
+        return route.continue();
+      });
+
+      await page.reload();
+      await page.waitForLoadState('domcontentloaded');
+
+      await page.evaluate(() => {
+        Object.defineProperty(navigator, 'onLine', { configurable: true, writable: true, value: false });
+        window.dispatchEvent(new Event('offline'));
+      });
+      const statusPill = page.locator('[data-testid="connection-status"]');
+      await expect(statusPill).toHaveAttribute('title', /99 pending/, { timeout: 10000 });
+    };
+
+    for (const width of [320, 390]) {
+      // 1. Athlete on /workout
+      {
+        const context = await browser.newContext({
+          viewport: { width, height: 844 },
+          deviceScaleFactor: 1,
+        });
+        const page = await context.newPage();
+        try {
+          await page.goto('/login');
+          await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
+          await page.fill('input[type="password"]', 'password123');
+          await page.click('button[type="submit"]');
+          await page.waitForURL('**/workout');
+
+          // (1a) online state
+          await verifyHeaderControlsGeometry(page, width, 'athlete /workout (online)');
+
+          // (1b) widest pill state
+          await seed99Pending(page);
+          await verifyHeaderControlsGeometry(page, width, 'athlete /workout (widest pill)');
+        } finally {
+          await context.close();
+        }
+      }
+
+      // 2. Coach on /coach and /workout
+      {
+        const context = await browser.newContext({
+          viewport: { width, height: 844 },
+          deviceScaleFactor: 1,
+        });
+        const page = await context.newPage();
+        try {
+          await page.goto('/login');
+          await page.fill('input[type="email"]', 'coach@yourbody.fyi');
+          await page.fill('input[type="password"]', 'password123');
+          await page.click('button[type="submit"]');
+          await page.waitForURL('**/coach');
+
+          // (2a) coach on /coach (online)
+          await verifyHeaderControlsGeometry(page, width, 'coach /coach (online)');
+
+          // (2b) coach on /coach (widest pill)
+          await seed99Pending(page);
+          await verifyHeaderControlsGeometry(page, width, 'coach /coach (widest pill)');
+
+          // Reset online and navigate to /workout
+          await page.unroute('**/rest/v1/sets*').catch(() => {});
+          await page.unroute('**/rest/v1/workouts*').catch(() => {});
+          await page.evaluate(() => {
+            Object.defineProperty(navigator, 'onLine', { configurable: true, writable: true, value: true });
+            window.dispatchEvent(new Event('online'));
+          });
+          await page.goto('/workout');
+          await page.waitForURL('**/workout');
+
+          // (2c) coach on /workout (online)
+          await expect(page.locator('[data-testid="coach-dashboard-link"]')).toBeVisible({ timeout: 5000 });
+          await verifyHeaderControlsGeometry(page, width, 'coach /workout (online)');
+
+          // (2d) coach on /workout (widest pill)
+          await seed99Pending(page);
+          await verifyHeaderControlsGeometry(page, width, 'coach /workout (widest pill)');
+        } finally {
           await context.close();
         }
       }

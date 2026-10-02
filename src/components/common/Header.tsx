@@ -94,32 +94,38 @@ export const Header: React.FC = () => {
           {/* Brand */}
           <Link
             to="/workout"
-            className="flex items-center gap-0.5 sm:gap-2.5 min-w-0 min-h-[44px] group relative before:absolute before:inset-0 before:min-w-[44px] before:min-h-[44px] before:content-['']"
+            className="flex items-center gap-2 min-w-0 min-h-[44px] group relative before:absolute before:inset-0 before:min-w-[44px] before:min-h-[44px] before:content-['']"
           >
-            <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-[0_0_15px_rgba(6,182,212,0.4)] shrink-0 group-hover:scale-105 transition-transform">
-              <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-zinc-950 fill-zinc-950" />
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+              <Zap className="w-3.5 h-3.5 text-zinc-950 fill-zinc-950" />
             </div>
             <div className="min-w-0">
-              <h1 className="font-bold tracking-tighter sm:tracking-normal text-xs sm:text-base bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
+              <h1 className="font-bold tracking-tight sm:tracking-normal text-sm sm:text-base bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent leading-none">
                 Yourbody.fyi
               </h1>
-              <div className="text-xs font-semibold tracking-wider text-cyan-400 -mt-1 truncate">
+              <div
+                className={`text-xs font-semibold tracking-normal text-cyan-400/70 mt-0.5 truncate max-[359px]:hidden ${
+                  role === 'coach' ? 'max-sm:hidden' : ''
+                }`}
+              >
                 Fitness & Nutrition
               </div>
             </div>
           </Link>
 
           {/* Right Action Badges */}
-          <div className="flex items-center gap-[1px] sm:gap-2 shrink-0">
+          <div className="flex items-center gap-0 min-[360px]:gap-1 sm:gap-2 shrink-0">
             {showCoachDashboard && (
               <Link
                 to="/coach"
                 data-testid="coach-dashboard-link"
                 aria-label="Coach dashboard"
                 title="Coach dashboard"
-                className="text-cyan-300 bg-cyan-500/15 border border-cyan-500/40 hover:bg-cyan-500/25 min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center transition touch-manipulation focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-zinc-900"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center transition touch-manipulation focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-zinc-900 group"
               >
-                <LayoutDashboard className="w-4 h-4 text-cyan-400" aria-hidden="true" />
+                <span className="w-9 h-9 rounded-full flex items-center justify-center text-zinc-300 hover:text-white hover:bg-zinc-800 transition-colors">
+                  <LayoutDashboard className="w-4 h-4" aria-hidden="true" />
+                </span>
               </Link>
             )}
 
@@ -130,31 +136,51 @@ export const Header: React.FC = () => {
               data-testid="connection-status"
               title={statusText}
               aria-label={`Connection status: ${statusText}`}
-              className={`text-xs font-bold px-2.5 py-1 min-h-[44px] min-w-[44px] rounded-full border flex items-center justify-center gap-1.5 transition touch-manipulation cursor-pointer select-none focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-zinc-900 ${
-                badgeTone === 'online'
-                  ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.15)]'
-                  : badgeTone === 'syncing'
-                  ? 'text-cyan-300 bg-cyan-500/15 border-cyan-500/40 shadow-[0_0_10px_rgba(6,182,212,0.2)]'
-                  : 'text-amber-400 bg-amber-500/10 border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.15)]'
-              }`}
+              className="min-w-[44px] min-h-[44px] flex items-center justify-center transition touch-manipulation cursor-pointer select-none focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-zinc-900"
             >
-              <span
-                aria-hidden="true"
-                className={`w-2 h-2 rounded-full inline-block shrink-0 ${
-                  badgeTone === 'online'
-                    ? 'bg-emerald-500 animate-pulse'
-                    : badgeTone === 'syncing'
-                    ? 'bg-cyan-400 animate-spin'
-                    : 'bg-amber-500'
-                }`}
-              />
-              <span
-                role="status"
-                aria-live="polite"
-                className={badgeTone === 'online' ? 'hidden sm:inline' : 'max-[359px]:sr-only inline'}
-              >
-                {statusText}
-              </span>
+              {badgeTone === 'online' ? (
+                <span className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-zinc-800 transition-colors">
+                  <span
+                    aria-hidden="true"
+                    className="w-2 h-2 rounded-full bg-emerald-500 inline-block shrink-0"
+                  />
+                  <span
+                    role="status"
+                    aria-live="polite"
+                    className="sr-only"
+                  >
+                    {statusText}
+                  </span>
+                </span>
+              ) : (
+                <span
+                  className={`h-9 rounded-full border text-xs font-bold flex items-center justify-center gap-1.5 px-2.5 ${
+                    showCoachDashboard ? 'max-sm:w-9 max-sm:px-0' : 'max-[359px]:w-9 max-[359px]:px-0'
+                  } transition-colors ${
+                    badgeTone === 'syncing'
+                      ? 'text-cyan-300 bg-cyan-500/15 border-cyan-500/30'
+                      : 'text-amber-400 bg-amber-500/10 border-amber-500/30'
+                  }`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`w-2 h-2 rounded-full inline-block shrink-0 ${
+                      badgeTone === 'syncing'
+                        ? 'bg-cyan-400 animate-spin'
+                        : 'bg-amber-500'
+                    }`}
+                  />
+                  <span
+                    role="status"
+                    aria-live="polite"
+                    className={`${
+                      showCoachDashboard ? 'max-sm:sr-only' : 'max-[359px]:sr-only'
+                    } inline`}
+                  >
+                    {statusText}
+                  </span>
+                </span>
+              )}
             </button>
 
             {/* Role Pill Switcher (Interactive only for verified coaches) */}
@@ -170,27 +196,31 @@ export const Header: React.FC = () => {
                       : 'Athlete mode active. Switch to Coach mode.'
                   }
                   title={role === 'coach' ? 'Switch to Athlete mode' : 'Switch to Coach mode'}
-                  className={`text-xs font-bold px-1 sm:px-3.5 py-1.5 sm:py-2 min-h-[44px] min-w-[44px] rounded-full border flex items-center justify-center gap-0.5 sm:gap-1.5 transition touch-manipulation focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-zinc-900 ${
-                    role === 'coach'
-                      ? 'text-cyan-300 bg-cyan-500/15 border-cyan-500/40 shadow-[0_0_10px_rgba(6,182,212,0.2)]'
-                      : 'text-zinc-400 bg-zinc-800 border-border-interactive'
-                  }`}
+                  className="min-w-[44px] min-h-[44px] flex items-center justify-center transition touch-manipulation focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-zinc-900"
                 >
-                  {role === 'coach' ? (
-                    <>
-                      <Shield className="w-3.5 h-3.5 text-cyan-400" aria-hidden="true" />
-                      <span>Coach</span>
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="w-3.5 h-3.5 text-zinc-400" aria-hidden="true" />
-                      <span>Athlete</span>
-                    </>
-                  )}
+                  <span
+                    className={`h-9 rounded-full text-xs font-bold flex items-center justify-center w-9 sm:w-auto sm:px-3.5 sm:gap-1.5 transition-colors ${
+                      role === 'coach'
+                        ? 'text-cyan-300 bg-cyan-500/15 border border-cyan-500/30 hover:bg-cyan-500/25'
+                        : 'text-zinc-300 hover:text-white hover:bg-zinc-800'
+                    }`}
+                  >
+                    {role === 'coach' ? (
+                      <>
+                        <Shield className="w-4 h-4 text-cyan-400 shrink-0" aria-hidden="true" />
+                        <span className="max-sm:sr-only">Coach</span>
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-4 h-4 text-zinc-400 shrink-0" aria-hidden="true" />
+                        <span className="max-sm:sr-only">Athlete</span>
+                      </>
+                    )}
+                  </span>
                 </button>
               ) : (
                 <div
-                  className="text-xs font-bold px-2 sm:px-2.5 py-1 rounded-full border text-zinc-400 bg-zinc-800/80 border-zinc-700/80 flex items-center gap-1 sm:gap-1.5 select-none"
+                  className="hidden sm:flex text-xs font-bold px-2.5 h-9 rounded-full border text-zinc-400 bg-zinc-800/80 border-zinc-700/80 items-center gap-1.5 select-none"
                   title="Athlete Account"
                 >
                   <Zap className="w-3.5 h-3.5 text-cyan-400" aria-hidden="true" />
@@ -205,11 +235,13 @@ export const Header: React.FC = () => {
                 type="button"
                 onClick={handleSignOutClick}
                 data-testid="sign-out-button"
-                className="text-zinc-400 hover:text-rose-400 min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-lg hover:bg-rose-500/10 transition focus:outline-none focus:ring-2 focus:ring-rose-500"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center transition touch-manipulation focus:outline-none focus:ring-2 focus:ring-rose-500"
                 title="Sign Out"
                 aria-label="Sign Out"
               >
-                <LogOut className="w-4 h-4" aria-hidden="true" />
+                <span className="w-9 h-9 rounded-full flex items-center justify-center text-zinc-300 hover:text-rose-400 hover:bg-rose-500/10 transition-colors">
+                  <LogOut className="w-4 h-4" aria-hidden="true" />
+                </span>
               </button>
             )}
           </div>

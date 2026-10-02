@@ -450,4 +450,142 @@ describe('Header connection status badge', () => {
       });
     });
   });
+
+  describe('YB3: header polish unit tests', () => {
+    it('YB3: Brand name uses text-sm (<sm) and tagline has quieter styling with max-[359px]:hidden', () => {
+      const { container } = renderHeader();
+      const h1 = container.querySelector('header h1');
+      expect(h1).not.toBeNull();
+      expect(h1?.className).toContain('text-sm');
+      expect(h1?.className).toContain('font-bold');
+      expect(h1?.className).not.toContain('text-xs');
+
+      const tagline = container.querySelector('header h1 + div');
+      expect(tagline).not.toBeNull();
+      expect(tagline?.className).toContain('max-[359px]:hidden');
+      expect(tagline?.className).toContain('text-cyan-400/70');
+      expect(tagline?.className).not.toContain('tracking-wider');
+    });
+
+    it('YB3: Controls have no shadow-[ glow classes', async () => {
+      mockUserProfile.role = 'coach';
+      localStorage.setItem('yourbody_view_mode', 'coach');
+      window.history.pushState({}, '', '/workout');
+      const { container } = renderHeader();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('coach-dashboard-link')).toBeDefined();
+        expect(screen.getByTestId('role-switch-button')).toBeDefined();
+      });
+
+      const controlsContainer = container.querySelector('header > div > div.flex');
+      expect(controlsContainer).not.toBeNull();
+
+      // Check all elements within right controls container have no glow shadows
+      const allControlElements = [controlsContainer!, ...Array.from(controlsContainer!.querySelectorAll('*'))];
+      for (const el of allControlElements) {
+        const cls = (typeof el.className === 'string' ? el.className : el.getAttribute('class')) || '';
+        expect(cls).not.toMatch(/shadow-\[/);
+      }
+
+      // Check logo tile has no glow shadow
+      const logoTile = container.querySelector('header a[href="/workout"] > div:first-child');
+      const logoCls = (typeof logoTile?.className === 'string' ? logoTile.className : logoTile?.getAttribute('class')) || '';
+      expect(logoCls).not.toMatch(/shadow-\[/);
+    });
+
+    it('YB3: Online connection status has no border or background classes and an sr-only status text', () => {
+      renderHeader();
+
+      const badge = screen.getByTestId('connection-status');
+      expect(badge).toBeDefined();
+
+      // Outer button or inner visual container should not have bg-emerald or border classes
+      expect(badge.className).not.toMatch(/bg-emerald/);
+      expect(badge.className).not.toMatch(/\bborder\b/);
+
+      const innerVisual = badge.firstElementChild;
+      expect(innerVisual).not.toBeNull();
+      expect(innerVisual?.className).not.toMatch(/bg-emerald/);
+      expect(innerVisual?.className).not.toMatch(/\bborder\b/);
+
+      // Status text is sr-only at all widths
+      const statusSpan = badge.querySelector('[role="status"]');
+      expect(statusSpan).not.toBeNull();
+      expect(statusSpan?.className).toContain('sr-only');
+
+      // Dot has no pulse animation
+      const dot = badge.querySelector('span[aria-hidden="true"]');
+      expect(dot?.className).toContain('bg-emerald-500');
+      expect(dot?.className).not.toContain('animate-pulse');
+    });
+
+    it('YB3: Role switch button label has max-sm:sr-only for icon-only mobile display', async () => {
+      mockUserProfile.role = 'coach';
+      renderHeader();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('role-switch-button')).toBeDefined();
+      });
+
+      const roleButton = screen.getByTestId('role-switch-button');
+      const innerVisual = roleButton.firstElementChild;
+      const labelSpan = innerVisual?.querySelector('span:not([aria-hidden])');
+      expect(labelSpan).not.toBeNull();
+      expect(labelSpan?.className).toContain('max-sm:sr-only');
+    });
+
+    it('YB3: Container gaps follow gap-0 min-[360px]:gap-1 sm:gap-2 and brand gap-2', () => {
+      const { container } = renderHeader();
+
+      const brandLink = container.querySelector('header a[href="/workout"]');
+      expect(brandLink?.className).toContain('gap-2');
+      expect(brandLink?.className).not.toContain('gap-0.5');
+
+      const controlsContainer = container.querySelector('header > div > div.flex');
+      expect(controlsContainer?.className).toContain('gap-0');
+      expect(controlsContainer?.className).toContain('min-[360px]:gap-1');
+      expect(controlsContainer?.className).toContain('sm:gap-2');
+    });
+
+    it('YB3: Non-coach static Athlete chip is hidden below sm', async () => {
+      mockUserProfile.role = 'athlete';
+      const { container } = renderHeader();
+
+      await waitFor(() => {
+        expect(screen.getByText('Yourbody.fyi')).toBeDefined();
+      });
+
+      const athleteChip = container.querySelector('header [title="Athlete Account"]');
+      expect(athleteChip).not.toBeNull();
+      expect(athleteChip?.className).toContain('hidden');
+      expect(athleteChip?.className).toContain('sm:flex');
+    });
+
+    it('YB3: Controls have min-w-[44px] min-h-[44px] and inner visuals have h-9 rounded-full', async () => {
+      mockUserProfile.role = 'coach';
+      localStorage.setItem('yourbody_view_mode', 'coach');
+      window.history.pushState({}, '', '/workout');
+      renderHeader();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('coach-dashboard-link')).toBeDefined();
+        expect(screen.getByTestId('role-switch-button')).toBeDefined();
+        expect(screen.getByTestId('connection-status')).toBeDefined();
+        expect(screen.getByTestId('sign-out-button')).toBeDefined();
+      });
+
+      const controlTestIds = ['coach-dashboard-link', 'role-switch-button', 'connection-status', 'sign-out-button'];
+      for (const testId of controlTestIds) {
+        const ctrl = screen.getByTestId(testId);
+        expect(ctrl.className).toContain('min-w-[44px]');
+        expect(ctrl.className).toContain('min-h-[44px]');
+
+        const innerVisual = ctrl.firstElementChild;
+        expect(innerVisual).not.toBeNull();
+        expect(innerVisual?.className).toContain('h-9');
+        expect(innerVisual?.className).toContain('rounded-full');
+      }
+    });
+  });
 });
