@@ -8272,26 +8272,31 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
           const h1Box = await h1.boundingBox();
           expect(h1Box, 'h1 bounding box exists').not.toBeNull();
 
-          const badgeLocators = [
-            page.locator('[data-testid="coach-dashboard-link"]'),
-            page.locator('[data-testid="connection-status"]'),
-            page.locator('[data-testid="role-switch-button"], [title="Athlete Account"]'),
-            page.locator('[data-testid="sign-out-button"]'),
-          ];
+          const isCoach = accountEmail.startsWith('coach');
+          const badgeLocators = isCoach
+            ? [
+                page.locator('[data-testid="coach-dashboard-link"]'),
+                page.locator('[data-testid="connection-status"]'),
+                page.locator('[data-testid="role-switch-button"]'),
+                page.locator('[data-testid="sign-out-button"]'),
+              ]
+            : [
+                page.locator('[data-testid="connection-status"]'),
+                page.locator('[title="Athlete Account"]'),
+                page.locator('[data-testid="sign-out-button"]'),
+              ];
 
           for (const loc of badgeLocators) {
-            if ((await loc.count()) > 0 && (await loc.isVisible())) {
-              const box = await loc.boundingBox();
-              if (box) {
-                const intersects = !(
-                  h1Box!.x + h1Box!.width <= box.x ||
-                  box.x + box.width <= h1Box!.x ||
-                  h1Box!.y + h1Box!.height <= box.y ||
-                  box.y + box.height <= h1Box!.y
-                );
-                expect(intersects, `h1 must not intersect with badge/action element at ${width}px (${accountEmail})`).toBe(false);
-              }
-            }
+            await expect(loc).toBeVisible();
+            const box = await loc.boundingBox();
+            expect(box, 'badge bounding box exists').not.toBeNull();
+            const intersects = !(
+              h1Box!.x + h1Box!.width <= box!.x ||
+              box!.x + box!.width <= h1Box!.x ||
+              h1Box!.y + h1Box!.height <= box!.y ||
+              box!.y + box!.height <= h1Box!.y
+            );
+            expect(intersects, `h1 must not intersect with badge/action element at ${width}px (${accountEmail})`).toBe(false);
           }
         } finally {
           await context.close();
