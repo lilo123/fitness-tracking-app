@@ -106,7 +106,7 @@ test.describe('D-YB-9: Nutrition History Day Accordion', () => {
     { width: 320, height: 700, label: '320px' },
     { width: 390, height: 844, label: '390px' },
   ]) {
-    test(`accordion behavior, touch targets, and non-overlap at ${viewport.label}`, async ({ page }) => {
+    test(`accordion behavior, touch targets, and non-overlap at ${viewport.label}`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await loginUser(page);
 
@@ -191,7 +191,7 @@ test.describe('D-YB-9: Nutrition History Day Accordion', () => {
       // 5. Save collapsed screenshot at 320px
       if (viewport.width === 320) {
         await page.screenshot({
-          path: '/usr/local/google/home/duynguyenn/fitness-overnight/yourbody/scratch/shots/yb_nutrition_collapsed_320.png',
+          path: testInfo.outputPath('yb_nutrition_collapsed_320.png'),
           fullPage: false,
         });
       }
@@ -212,7 +212,7 @@ test.describe('D-YB-9: Nutrition History Day Accordion', () => {
       // 7. Save expanded screenshot at 320px
       if (viewport.width === 320) {
         await page.screenshot({
-          path: '/usr/local/google/home/duynguyenn/fitness-overnight/yourbody/scratch/shots/yb_nutrition_expanded_320.png',
+          path: testInfo.outputPath('yb_nutrition_expanded_320.png'),
           fullPage: false,
         });
       }

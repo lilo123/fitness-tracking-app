@@ -28,9 +28,16 @@ function openMealAction(logId: string, action: 'edit' | 'delete') {
  * D-YB-9: Nutrition history day cards start collapsed by default.
  * Helper to expand a day card so its meals and meal actions enter the DOM.
  */
-async function expandNutritionDay(date = '2026-09-01') {
-  const expandBtn = await screen.findByTestId(`expand-day-btn-${date}`);
-  fireEvent.click(expandBtn);
+async function expandNutritionDay(date?: string) {
+  if (date) {
+    const expandBtn = await screen.findByTestId(`expand-day-btn-${date}`);
+    fireEvent.click(expandBtn);
+  } else {
+    const expandBtns = await screen.findAllByTestId(/^expand-day-btn-/);
+    for (const btn of expandBtns) {
+      fireEvent.click(btn);
+    }
+  }
 }
 
 

@@ -139,7 +139,6 @@ async function seedTestUser(): Promise<TestUser> {
 
 test.describe('History Exercise Card Order (D-YB-8)', () => {
   test.describe.configure({ mode: 'serial' });
-  test.use({ baseURL: process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:5184' });
 
   test.beforeAll(async () => {
     testUser = await seedTestUser();
