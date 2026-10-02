@@ -8359,4 +8359,453 @@ test.describe("P8.1 HF-B: Workout Shell & Overlays", () => {
       }
     }
   });
+
+  test('D-YB2-1: Header content edges align with page content column across routes and viewports', async ({ browser }) => {
+    test.setTimeout(120000);
+    const viewports = [320, 390, 768, 993, 1280, 1440];
+    const shotsDir = '/usr/local/google/home/duynguyenn/fitness-overnight/yb2/scratch/shots';
+
+    for (const width of viewports) {
+      // 1. Coach on /coach
+      {
+        const context = await browser.newContext({
+          viewport: { width, height: 844 },
+          deviceScaleFactor: 1,
+        });
+        const page = await context.newPage();
+        try {
+          await page.goto('/login');
+          await page.fill('input[type="email"]', 'coach@yourbody.fyi');
+          await page.fill('input[type="password"]', 'password123');
+          await page.click('button[type="submit"]');
+          await page.waitForURL('**/coach');
+
+          const card = page.locator('main div.rounded-2xl, main div.rounded-3xl').first();
+          await expect(card).toBeVisible({ timeout: 10000 });
+          const cardBox = await card.boundingBox();
+          expect(cardBox, `cardBox exists on /coach at ${width}px`).not.toBeNull();
+
+          const logo = page.locator('header a[href="/workout"] > div:first-child');
+          await expect(logo).toBeVisible({ timeout: 10000 });
+          const logoBox = await logo.boundingBox();
+          expect(logoBox, `logoBox exists on /coach at ${width}px`).not.toBeNull();
+
+          const signout = page.locator('[data-testid="sign-out-button"]');
+          await expect(signout).toBeVisible({ timeout: 10000 });
+          const signoutBox = await signout.boundingBox();
+          expect(signoutBox, `signoutBox exists on /coach at ${width}px`).not.toBeNull();
+
+          const leftDelta = Math.abs(logoBox!.x - cardBox!.x);
+          const rightDelta = Math.abs((signoutBox!.x + signoutBox!.width) - (cardBox!.x + cardBox!.width));
+
+          expect(leftDelta, `logo-icon left (${logoBox!.x}px) == card left (${cardBox!.x}px) ±1px at ${width}px on /coach (delta: ${leftDelta.toFixed(2)}px)`).toBeLessThanOrEqual(1);
+          expect(rightDelta, `last control right (${signoutBox!.x + signoutBox!.width}px) == card right (${cardBox!.x + cardBox!.width}px) ±1px at ${width}px on /coach (delta: ${rightDelta.toFixed(2)}px)`).toBeLessThanOrEqual(1);
+
+          if ([320, 390, 993].includes(width)) {
+            await page.screenshot({ path: `${shotsDir}/hdr_coach_${width}.png` });
+          }
+        } finally {
+          await context.close();
+        }
+      }
+
+      // 2. Athlete on /workout, /history, /nutrition, /settings
+      {
+        const context = await browser.newContext({
+          viewport: { width, height: 844 },
+          deviceScaleFactor: 1,
+        });
+        const page = await context.newPage();
+        try {
+          await page.goto('/login');
+          await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
+          await page.fill('input[type="password"]', 'password123');
+          await page.click('button[type="submit"]');
+          await page.waitForURL('**/workout');
+
+          for (const route of ['/workout', '/history', '/nutrition', '/settings']) {
+            if (route !== '/workout') {
+              await page.goto(route);
+              await page.waitForURL(`**${route}`);
+            }
+
+            const card = page.locator('main div.rounded-2xl, main div.rounded-3xl').first();
+            await expect(card).toBeVisible({ timeout: 10000 });
+            const cardBox = await card.boundingBox();
+            expect(cardBox, `cardBox exists on ${route} at ${width}px`).not.toBeNull();
+
+            const logo = page.locator('header a[href="/workout"] > div:first-child');
+            await expect(logo).toBeVisible({ timeout: 10000 });
+            const logoBox = await logo.boundingBox();
+            expect(logoBox, `logoBox exists on ${route} at ${width}px`).not.toBeNull();
+
+            const signout = page.locator('[data-testid="sign-out-button"]');
+            await expect(signout).toBeVisible({ timeout: 10000 });
+            const signoutBox = await signout.boundingBox();
+            expect(signoutBox, `signoutBox exists on ${route} at ${width}px`).not.toBeNull();
+
+            const leftDelta = Math.abs(logoBox!.x - cardBox!.x);
+            const rightDelta = Math.abs((signoutBox!.x + signoutBox!.width) - (cardBox!.x + cardBox!.width));
+
+            expect(leftDelta, `logo-icon left (${logoBox!.x}px) == card left (${cardBox!.x}px) ±1px at ${width}px on ${route} (delta: ${leftDelta.toFixed(2)}px)`).toBeLessThanOrEqual(1);
+            expect(rightDelta, `last control right (${signoutBox!.x + signoutBox!.width}px) == card right (${cardBox!.x + cardBox!.width}px) ±1px at ${width}px on ${route} (delta: ${rightDelta.toFixed(2)}px)`).toBeLessThanOrEqual(1);
+
+            if (route === '/workout' && [320, 390, 993].includes(width)) {
+              await page.screenshot({ path: `${shotsDir}/hdr_workout_${width}.png` });
+            }
+          }
+        } finally {
+          await context.close();
+        }
+      }
+
+      // 3. /login signed out
+      {
+        const context = await browser.newContext({
+          viewport: { width, height: 844 },
+          deviceScaleFactor: 1,
+        });
+        const page = await context.newPage();
+        try {
+          await page.goto('/login');
+          const expectedLeft = Math.max(16, (width - 576) / 2 + 16);
+          const expectedRight = width - expectedLeft;
+
+          const logo = page.locator('header a[href="/workout"] > div:first-child');
+          await expect(logo).toBeVisible({ timeout: 10000 });
+          const logoBox = await logo.boundingBox();
+          expect(logoBox, `logoBox exists on /login at ${width}px`).not.toBeNull();
+
+          const status = page.locator('[data-testid="connection-status"]');
+          await expect(status).toBeVisible({ timeout: 10000 });
+          const statusBox = await status.boundingBox();
+          expect(statusBox, `statusBox exists on /login at ${width}px`).not.toBeNull();
+
+          const leftDelta = Math.abs(logoBox!.x - expectedLeft);
+          const rightDelta = Math.abs((statusBox!.x + statusBox!.width) - expectedRight);
+
+          expect(leftDelta, `logo-icon left (${logoBox!.x}px) == column left (${expectedLeft}px) ±1px at ${width}px on /login (delta: ${leftDelta.toFixed(2)}px)`).toBeLessThanOrEqual(1);
+          expect(rightDelta, `last control right (${statusBox!.x + statusBox!.width}px) == column right (${expectedRight}px) ±1px at ${width}px on /login (delta: ${rightDelta.toFixed(2)}px)`).toBeLessThanOrEqual(1);
+        } finally {
+          await context.close();
+        }
+      }
+    }
+  });
+
+  test('D-YB2-1: 320px header wordmark relational geometry under widest pill states (athlete and coach)', async ({ browser }) => {
+    test.setTimeout(120000);
+    const width = 320;
+
+    for (const accountEmail of ['athlete@yourbody.fyi', 'coach@yourbody.fyi']) {
+      const isCoach = accountEmail.startsWith('coach');
+
+      const setupWorkoutPage = async () => {
+        const context = await browser.newContext({
+          viewport: { width, height: 844 },
+          deviceScaleFactor: 1,
+        });
+        const page = await context.newPage();
+
+        await page.goto('/login');
+        await page.fill('input[type="email"]', accountEmail);
+        await page.fill('input[type="password"]', 'password123');
+        await page.click('button[type="submit"]');
+
+        if (isCoach) {
+          await page.waitForURL('**/coach');
+          await page.goto('/workout');
+          await page.waitForURL('**/workout');
+        } else {
+          await page.waitForURL('**/workout');
+        }
+
+        await page.waitForFunction(async () => {
+          const dbs = await indexedDB.databases();
+          const dbEntry = dbs.find((d) => d.name && d.name.startsWith('yourbody-offline-'));
+          if (!dbEntry?.name) return false;
+          return new Promise<boolean>((resolve) => {
+            const req = indexedDB.open(dbEntry.name, 2);
+            req.onsuccess = () => {
+              const db = req.result;
+              const ready = db.objectStoreNames.contains('outbox');
+              db.close();
+              resolve(ready);
+            };
+            req.onerror = () => resolve(false);
+          });
+        }, null, { timeout: 10000 });
+
+        const userId = await page.evaluate(() => {
+          const authKey = Object.keys(localStorage).find((k) => k.startsWith('sb-') && k.endsWith('-auth-token'));
+          if (authKey) {
+            try { return JSON.parse(localStorage.getItem(authKey) || '{}')?.user?.id; } catch {}
+          }
+          const u = localStorage.getItem('yourbody_user');
+          if (u) {
+            try { return JSON.parse(u).id; } catch {}
+          }
+          return '';
+        });
+        expect(userId, 'userId must exist').toBeTruthy();
+
+        return { context, page, userId };
+      };
+
+      const verifyWordmarkGeometry = async (page: Page, stateDesc: string) => {
+        const h1 = page.locator('header h1');
+        await expect(h1).toBeVisible({ timeout: 5000 });
+
+        const metrics = await h1.evaluate((el) => {
+          const style = window.getComputedStyle(el);
+          return {
+            textTransform: style.textTransform,
+            fontSize: parseFloat(style.fontSize),
+            scrollWidth: el.scrollWidth,
+            clientWidth: el.clientWidth,
+          };
+        });
+
+        expect(metrics.textTransform, `h1 textTransform must be 'none' (${accountEmail}, ${stateDesc})`).toBe('none');
+        expect(metrics.scrollWidth, `h1 scrollWidth (${metrics.scrollWidth}px) <= clientWidth (${metrics.clientWidth}px) (${accountEmail}, ${stateDesc})`).toBeLessThanOrEqual(metrics.clientWidth);
+        expect(metrics.fontSize, `h1 font-size (${metrics.fontSize}px) >= 12px (${accountEmail}, ${stateDesc})`).toBeGreaterThanOrEqual(12);
+
+        const h1Box = await h1.boundingBox();
+        expect(h1Box, `h1Box exists (${accountEmail}, ${stateDesc})`).not.toBeNull();
+
+        const badgeLocators = isCoach
+          ? [
+              page.locator('[data-testid="coach-dashboard-link"]'),
+              page.locator('[data-testid="connection-status"]'),
+              page.locator('[data-testid="role-switch-button"]'),
+              page.locator('[data-testid="sign-out-button"]'),
+            ]
+          : [
+              page.locator('[data-testid="connection-status"]'),
+              page.locator('[title="Athlete Account"]'),
+              page.locator('[data-testid="sign-out-button"]'),
+            ];
+
+        for (const loc of badgeLocators) {
+          await expect(loc).toBeVisible({ timeout: 5000 });
+          const box = await loc.boundingBox();
+          expect(box, `badge bounding box exists (${loc})`).not.toBeNull();
+
+          const intersects = !(
+            h1Box!.x + h1Box!.width <= box!.x ||
+            box!.x + box!.width <= h1Box!.x ||
+            h1Box!.y + h1Box!.height <= box!.y ||
+            box!.y + box!.height <= h1Box!.y
+          );
+          expect(intersects, `h1 must not intersect with badge (${loc}) at 320px (${accountEmail}, ${stateDesc})`).toBe(false);
+        }
+      };
+
+      // State 1: "Offline · 99 pending"
+      {
+        const { context, page, userId } = await setupWorkoutPage();
+        const dbName = `yourbody-offline-${userId}`;
+        try {
+          await page.evaluate(
+            async ({ name, uid }) => {
+              const req = indexedDB.open(name);
+              const db: IDBDatabase = await new Promise((res, rej) => {
+                req.onsuccess = () => res(req.result);
+                req.onerror = () => rej(req.error);
+              });
+              const tx = db.transaction(['outbox'], 'readwrite');
+              const store = tx.objectStore('outbox');
+              const now = new Date().toISOString();
+              const baseSeq = Date.now();
+              for (let i = 1; i <= 99; i++) {
+                store.put({
+                  opId: `p-${i}`,
+                  userId: uid,
+                  seq: baseSeq + i,
+                  kind: 'set.create',
+                  payload: { id: `s-${i}`, workoutRef: 'w1', exercise_id: 'e1', weight: 100, reps: 5, set_index: i, set_type: 'working', created_at: now },
+                  createdAt: now,
+                  attempts: 0,
+                  state: 'pending',
+                });
+              }
+              await new Promise((resolve, reject) => {
+                tx.oncomplete = () => {
+                  db.close();
+                  resolve(undefined);
+                };
+                tx.onerror = () => {
+                  db.close();
+                  reject(tx.error);
+                };
+              });
+            },
+            { name: dbName, uid: userId }
+          );
+
+          await page.route('**/rest/v1/sets*', (route) => {
+            if (['POST', 'PATCH', 'DELETE'].includes(route.request().method())) {
+              return route.abort('internetdisconnected');
+            }
+            return route.continue();
+          });
+          await page.route('**/rest/v1/workouts*', (route) => {
+            if (['POST', 'PATCH', 'DELETE'].includes(route.request().method())) {
+              return route.abort('internetdisconnected');
+            }
+            return route.continue();
+          });
+
+          await page.evaluate(() => {
+            Object.defineProperty(navigator, 'onLine', { configurable: true, writable: true, value: false });
+            window.dispatchEvent(new Event('offline'));
+          });
+          const statusPill = page.locator('[data-testid="connection-status"]');
+          await expect(statusPill).toHaveAttribute('title', /99 pending/, { timeout: 10000 });
+
+          await verifyWordmarkGeometry(page, 'Offline · 99 pending');
+        } finally {
+          await context.close();
+        }
+      }
+
+      // State 2: "3 need attention"
+      {
+        const { context, page, userId } = await setupWorkoutPage();
+        const dbName = `yourbody-offline-${userId}`;
+        try {
+          await page.route('**/rest/v1/**', (route) => {
+            if (['POST', 'PATCH', 'DELETE'].includes(route.request().method())) {
+              return route.abort('internetdisconnected');
+            }
+            return route.continue();
+          });
+
+          await page.evaluate(
+            async ({ name, uid }) => {
+              const req = indexedDB.open(name);
+              const db: IDBDatabase = await new Promise((res, rej) => {
+                req.onsuccess = () => res(req.result);
+                req.onerror = () => rej(req.error);
+              });
+              const tx = db.transaction(['outbox'], 'readwrite');
+              const store = tx.objectStore('outbox');
+              const now = new Date().toISOString();
+              const baseSeq = Date.now();
+              for (let i = 1; i <= 3; i++) {
+                store.put({
+                  opId: `att-${i}`,
+                  userId: uid,
+                  seq: baseSeq + i,
+                  kind: 'set.create',
+                  payload: { id: `as-${i}`, workoutRef: 'w1', exercise_id: 'e1', weight: 100, reps: 5, set_index: i, set_type: 'working', created_at: now },
+                  createdAt: now,
+                  attempts: 3,
+                  state: 'attention',
+                  error: 'Server conflict',
+                });
+              }
+              await new Promise((resolve, reject) => {
+                tx.oncomplete = () => {
+                  db.close();
+                  resolve(undefined);
+                };
+                tx.onerror = () => {
+                  db.close();
+                  reject(tx.error);
+                };
+              });
+            },
+            { name: dbName, uid: userId }
+          );
+
+          await page.reload();
+          await page.waitForLoadState('domcontentloaded');
+
+          const statusPill = page.locator('[data-testid="connection-status"]');
+          await expect(statusPill).toHaveAttribute('title', '3 need attention', { timeout: 10000 });
+
+          await verifyWordmarkGeometry(page, '3 need attention');
+        } finally {
+          await context.close();
+        }
+      }
+
+      // State 3: "Sign in to sync"
+      {
+        const specWorkoutDate = '2026-10-31';
+        const cleanupSpecWorkouts = (email: string) => {
+          const sql = `
+            DELETE FROM public.sets
+            WHERE workout_id IN (
+              SELECT id FROM public.workouts
+              WHERE user_id = (SELECT id FROM public.users WHERE email = '${email}')
+                AND (workout_date = '${specWorkoutDate}' OR date = '${specWorkoutDate}')
+            );
+            DELETE FROM public.workouts
+            WHERE user_id = (SELECT id FROM public.users WHERE email = '${email}')
+              AND (workout_date = '${specWorkoutDate}' OR date = '${specWorkoutDate}');
+          `;
+          try {
+            const cmd = getPsqlCommand();
+            execSync(cmd, { input: sql, encoding: 'utf8' });
+          } catch (err) {
+            console.error('[visual-density] Error cleaning up spec workouts:', err);
+            throw err;
+          }
+        };
+
+        cleanupSpecWorkouts(accountEmail);
+        const { context, page } = await setupWorkoutPage();
+        try {
+          await page.goto(`/workout?date=${specWorkoutDate}`);
+          await page.waitForURL(`**/workout?date=${specWorkoutDate}`);
+
+          await page.locator('button:has-text("Choose Routine")').click();
+          await page.locator('[data-testid="routine-picker-modal"] button:has-text("Workout A (Push, Quads & Core)")').click();
+          await page.locator('[data-testid="routine-picker-modal"]').waitFor({ state: 'hidden' });
+          await expect(page.locator('[data-testid="ghost-weight-0-0"]')).toBeVisible({ timeout: 10000 });
+          await expect(page.locator('[data-testid="ghost-reps-0-0"]')).toBeVisible({ timeout: 10000 });
+          await expect(page.locator('[data-testid="commit-set-btn-0-0"]')).toBeVisible({ timeout: 10000 });
+
+          await page.locator('[data-testid="ghost-weight-0-0"]').fill('135');
+          await page.locator('[data-testid="ghost-reps-0-0"]').fill('10');
+
+          await page.route('**/auth/v1/token*', async (route) => {
+            await route.fulfill({
+              status: 400,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                error: 'invalid_grant',
+                error_description: 'Invalid Refresh Token: Refresh Token Not Found',
+                code: 'refresh_token_not_found',
+              }),
+            });
+          });
+
+          await page.route('**/rest/v1/sets*', async (route) => {
+            await route.fulfill({
+              status: 401,
+              contentType: 'application/json',
+              headers: { 'www-authenticate': 'Bearer error="invalid_token"' },
+              body: JSON.stringify({ message: 'JWT expired', code: 401 }),
+            });
+          });
+
+          const commitBtn = page.locator('[data-testid="commit-set-btn-0-0"]');
+          await commitBtn.click();
+
+          const statusPill = page.locator('[data-testid="connection-status"]');
+          await expect(statusPill).toHaveAttribute('title', 'Sign in to sync', { timeout: 10000 });
+
+          await verifyWordmarkGeometry(page, 'Sign in to sync');
+        } finally {
+          await page.unroute('**/rest/v1/sets*').catch(() => {});
+          await page.unroute('**/auth/v1/token*').catch(() => {});
+          cleanupSpecWorkouts(accountEmail);
+          await context.close();
+        }
+      }
+    }
+  });
 });

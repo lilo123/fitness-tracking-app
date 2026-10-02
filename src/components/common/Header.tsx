@@ -89,18 +89,18 @@ export const Header: React.FC = () => {
 
   return (
     <>
-      <header className="bg-zinc-900/90 backdrop-blur-xl border-b border-zinc-800/80 sticky top-0 z-30 px-1.5 sm:px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 shadow-lg">
-        <div className="max-w-xl mx-auto flex items-center justify-between">
+      <header className="bg-zinc-900/90 backdrop-blur-xl border-b border-zinc-800/80 sticky top-0 z-30 pt-[max(env(safe-area-inset-top),12px)] pb-3 shadow-lg">
+        <div className="max-w-xl mx-auto px-4 flex items-center justify-between">
           {/* Brand */}
           <Link
             to="/workout"
-            className="flex items-center gap-1 sm:gap-2.5 min-w-0 min-h-[44px] group relative before:absolute before:inset-0 before:min-w-[44px] before:min-h-[44px] before:content-['']"
+            className="flex items-center gap-0.5 sm:gap-2.5 min-w-0 min-h-[44px] group relative before:absolute before:inset-0 before:min-w-[44px] before:min-h-[44px] before:content-['']"
           >
             <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-[0_0_15px_rgba(6,182,212,0.4)] shrink-0 group-hover:scale-105 transition-transform">
               <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-zinc-950 fill-zinc-950" />
             </div>
             <div className="min-w-0">
-              <h1 className="font-bold tracking-normal text-xs sm:text-base bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
+              <h1 className="font-bold tracking-tighter sm:tracking-normal text-xs sm:text-base bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
                 Yourbody.fyi
               </h1>
               <div className="text-xs font-semibold tracking-wider text-cyan-400 -mt-1 truncate">
@@ -110,7 +110,7 @@ export const Header: React.FC = () => {
           </Link>
 
           {/* Right Action Badges */}
-          <div className="flex items-center gap-0.5 sm:gap-2 shrink-0">
+          <div className="flex items-center gap-[1px] sm:gap-2 shrink-0">
             {showCoachDashboard && (
               <Link
                 to="/coach"
@@ -151,7 +151,7 @@ export const Header: React.FC = () => {
               <span
                 role="status"
                 aria-live="polite"
-                className={badgeTone === 'online' ? 'hidden sm:inline' : 'inline'}
+                className={badgeTone === 'online' ? 'hidden sm:inline' : 'max-[359px]:sr-only inline'}
               >
                 {statusText}
               </span>
@@ -170,7 +170,7 @@ export const Header: React.FC = () => {
                       : 'Athlete mode active. Switch to Coach mode.'
                   }
                   title={role === 'coach' ? 'Switch to Athlete mode' : 'Switch to Coach mode'}
-                  className={`text-xs font-bold px-1.5 sm:px-3.5 py-1.5 sm:py-2 min-h-[44px] min-w-[44px] rounded-full border flex items-center justify-center gap-1 sm:gap-1.5 transition touch-manipulation focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-zinc-900 ${
+                  className={`text-xs font-bold px-1 sm:px-3.5 py-1.5 sm:py-2 min-h-[44px] min-w-[44px] rounded-full border flex items-center justify-center gap-0.5 sm:gap-1.5 transition touch-manipulation focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-zinc-900 ${
                     role === 'coach'
                       ? 'text-cyan-300 bg-cyan-500/15 border-cyan-500/40 shadow-[0_0_10px_rgba(6,182,212,0.2)]'
                       : 'text-zinc-400 bg-zinc-800 border-border-interactive'

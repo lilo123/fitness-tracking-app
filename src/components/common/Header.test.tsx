@@ -424,5 +424,30 @@ describe('Header connection status badge', () => {
         expect(screen.getByText(/1 unsynced changes stay on this device and sync the next time you sign in as coach@yourbody\.fyi\. Sign out\?/)).toBeDefined();
       });
     });
+
+    it('D-YB2-1: header inner container has max-w-xl mx-auto px-4 and header has no horizontal padding', () => {
+      const { container } = renderHeader();
+      const header = container.querySelector('header');
+      expect(header).toBeDefined();
+      expect(header?.className).not.toMatch(/\bpx-\S+/);
+      expect(header?.className).not.toMatch(/\bsm:px-\S+/);
+
+      const innerContainer = container.querySelector('header > div');
+      expect(innerContainer?.className).toContain('max-w-xl');
+      expect(innerContainer?.className).toContain('mx-auto');
+      expect(innerContainer?.className).toContain('px-4');
+    });
+
+    it('D-YB2-1: connection status badge hides text below 360px via max-[359px]:sr-only for non-online states', async () => {
+      setAuthRequiredStatus(true);
+      renderHeader();
+      await waitFor(() => {
+        const badge = screen.getByTestId('connection-status');
+        const statusSpan = badge.querySelector('[role="status"]');
+        expect(statusSpan).not.toBeNull();
+        expect(statusSpan?.className).toContain('max-[359px]:sr-only');
+        expect(statusSpan?.textContent).toBe('Sign in to sync');
+      });
+    });
   });
 });
