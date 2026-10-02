@@ -1,7 +1,7 @@
 import React from 'react';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import type { NutritionLog } from '../../types/database';
-import { Calendar } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronUp } from 'lucide-react';
 import { formatCalories, formatMacro } from '../../utils/nutrition';
 import { MealLogRow } from '../nutrition/MealLogRow';
 import type { NutritionItem } from '../../utils/itemModel';
@@ -51,6 +51,21 @@ export const NutritionHistoryTimeline: React.FC<NutritionHistoryTimelineProps> =
 }) => {
   const parentRef = React.useRef<HTMLDivElement | null>(null);
   const [scrollMargin, setScrollMargin] = React.useState(0);
+
+  // In-memory accordion expansion state (D-YB-9); resets on remount, survives range change & paging
+  const [expandedDates, setExpandedDates] = React.useState<Set<string>>(() => new Set());
+
+  const handleToggle = (date: string) => {
+    setExpandedDates((prev) => {
+      const next = new Set(prev);
+      if (next.has(date)) {
+        next.delete(date);
+      } else {
+        next.add(date);
+      }
+      return next;
+    });
+  };
 
   // Filter out pending delete meals from days (RD-7, H27)
   const displayDays = React.useMemo(() => {
@@ -137,7 +152,10 @@ export const NutritionHistoryTimeline: React.FC<NutritionHistoryTimelineProps> =
     count: displayDays.length,
     estimateSize: (index) => {
       const day = displayDays[index];
-      const mealsCount = day?.meals?.length ?? 1;
+      if (!day) return 96;
+      const isExpanded = expandedDates.has(day.date);
+      if (!isExpanded) return 96;
+      const mealsCount = day.meals?.length ?? 1;
       return 200 + mealsCount * 80;
     },
     overscan: 0,
@@ -153,10 +171,18 @@ export const NutritionHistoryTimeline: React.FC<NutritionHistoryTimelineProps> =
       }
       const index = Number(element?.getAttribute('data-index'));
       const day = displayDays[index];
-      const mealsCount = day?.meals?.length ?? 1;
+      if (!day) return 96;
+      const isExpanded = expandedDates.has(day.date);
+      if (!isExpanded) return 96;
+      const mealsCount = day.meals?.length ?? 1;
       return 200 + mealsCount * 80;
     },
   });
+
+  // Re-measure virtualizer rows on accordion toggle
+  React.useEffect(() => {
+    virtualizer.measure?.();
+  }, [expandedDates, virtualizer]);
 
   const virtualItems = virtualizer.getVirtualItems();
   const isVirtual = virtualItems.length > 0;
@@ -198,6 +224,7 @@ export const NutritionHistoryTimeline: React.FC<NutritionHistoryTimelineProps> =
 
   const renderDayCard = (day: NutritionDaySummary) => {
     const { title, subtitle } = formatNutritionDayHeader(day.date, day.meals.length);
+    const isExpanded = expandedDates.has(day.date);
 
     return (
       <div
@@ -205,16 +232,31 @@ export const NutritionHistoryTimeline: React.FC<NutritionHistoryTimelineProps> =
         className="bg-zinc-900/90 border border-zinc-800/80 rounded-3xl p-5 shadow-2xl space-y-4"
       >
         {/* Date Header & Macro Summary Pills */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 pb-3">
-          <div>
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-emerald-400" />
-              <span>{title}</span>
-            </h3>
-            <div className="text-xs text-zinc-400 mt-0.5">
-              <span>{subtitle}</span>
-              <span className="sr-only">{day.date} • {day.meals.length} {day.meals.length === 1 ? "meal" : "meals"} logged</span>
+        <div className={`space-y-3 ${isExpanded ? 'border-b border-zinc-800 pb-3' : ''}`}>
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span className="truncate">{title}</span>
+              </h3>
+              <div className="text-xs text-zinc-400 mt-0.5 truncate">
+                <span>{subtitle}</span>
+                <span className="sr-only">{day.date} • {day.meals.length} {day.meals.length === 1 ? "meal" : "meals"} logged</span>
+              </div>
             </div>
+
+            {/* D-YB-9: 44px Chevron toggle with aria-expanded & aria-controls */}
+            <button
+              type="button"
+              onClick={() => handleToggle(day.date)}
+              aria-expanded={isExpanded}
+              aria-controls={`nutrition-day-details-${day.date}`}
+              aria-label={isExpanded ? `Collapse ${title}` : `Expand ${title}`}
+              data-testid={`expand-day-btn-${day.date}`}
+              className="min-w-[44px] min-h-[44px] rounded-xl bg-zinc-800/60 hover:bg-cyan-500/20 text-zinc-400 hover:text-cyan-300 flex items-center justify-center transition active:scale-95 touch-manipulation cursor-pointer shrink-0"
+            >
+              {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
           </div>
 
           {/* Daily Macro Summary Pills */}
@@ -237,71 +279,75 @@ export const NutritionHistoryTimeline: React.FC<NutritionHistoryTimelineProps> =
           </div>
         </div>
 
-        {/* Proportional Caloric Macro Distribution Bar */}
-        {day.macroCalories.total > 0 && (
-          <div className="bg-zinc-950/80 border border-zinc-800/80 rounded-2xl p-3 space-y-2">
-            <div className="flex items-center justify-between text-xs font-bold uppercase text-zinc-400 tracking-wider">
-              <span>Caloric Macro Distribution</span>
-              <span className="text-zinc-400 tabular-nums font-normal text-xs">
-                {formatCalories(day.macroCalories.total)} macro kcal
-              </span>
-            </div>
+        {/* Proportional Caloric Macro Distribution Bar and Meals list when expanded */}
+        {isExpanded && (
+          <div id={`nutrition-day-details-${day.date}`} className="space-y-4">
+            {day.macroCalories.total > 0 && (
+              <div className="bg-zinc-950/80 border border-zinc-800/80 rounded-2xl p-3 space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold uppercase text-zinc-400 tracking-wider">
+                  <span>Caloric Macro Distribution</span>
+                  <span className="text-zinc-400 tabular-nums font-normal text-xs">
+                    {formatCalories(day.macroCalories.total)} macro kcal
+                  </span>
+                </div>
 
-            {/* Multi-segment ratio bar */}
-            <div className="h-2.5 rounded-full bg-zinc-900 border border-zinc-800 overflow-hidden flex shadow-inner">
-              {day.percentages.protein > 0 && (
-                <div
-                  style={{ width: `${day.percentages.protein}%` }}
-                  className="bg-cyan-400 transition-all duration-500"
-                  title={`Protein: ${day.percentages.protein}% (${formatCalories(day.macroCalories.protein)} kcal)`}
-                />
-              )}
-              {day.percentages.carbs > 0 && (
-                <div
-                  style={{ width: `${day.percentages.carbs}%` }}
-                  className="bg-emerald-400 transition-all duration-500"
-                  title={`Carbs: ${day.percentages.carbs}% (${formatCalories(day.macroCalories.carbs)} kcal)`}
-                />
-              )}
-              {day.percentages.fat > 0 && (
-                <div
-                  style={{ width: `${day.percentages.fat}%` }}
-                  className="bg-violet-400 transition-all duration-500"
-                  title={`Fat: ${day.percentages.fat}% (${formatCalories(day.macroCalories.fat)} kcal)`}
-                />
-              )}
-            </div>
+                {/* Multi-segment ratio bar */}
+                <div className="h-2.5 rounded-full bg-zinc-900 border border-zinc-800 overflow-hidden flex shadow-inner">
+                  {day.percentages.protein > 0 && (
+                    <div
+                      style={{ width: `${day.percentages.protein}%` }}
+                      className="bg-cyan-400 transition-all duration-500"
+                      title={`Protein: ${day.percentages.protein}% (${formatCalories(day.macroCalories.protein)} kcal)`}
+                    />
+                  )}
+                  {day.percentages.carbs > 0 && (
+                    <div
+                      style={{ width: `${day.percentages.carbs}%` }}
+                      className="bg-emerald-400 transition-all duration-500"
+                      title={`Carbs: ${day.percentages.carbs}% (${formatCalories(day.macroCalories.carbs)} kcal)`}
+                    />
+                  )}
+                  {day.percentages.fat > 0 && (
+                    <div
+                      style={{ width: `${day.percentages.fat}%` }}
+                      className="bg-violet-400 transition-all duration-500"
+                      title={`Fat: ${day.percentages.fat}% (${formatCalories(day.macroCalories.fat)} kcal)`}
+                    />
+                  )}
+                </div>
 
-            {/* Legend */}
-            <div className="flex items-center justify-between text-xs tabular-nums text-zinc-400 pt-0.5">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-cyan-400 inline-block"></span>
-                <span className="text-cyan-300 font-bold">{day.percentages.protein}% P</span>
+                {/* Legend */}
+                <div className="flex items-center justify-between text-xs tabular-nums text-zinc-400 pt-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-cyan-400 inline-block"></span>
+                    <span className="text-cyan-300 font-bold">{day.percentages.protein}% P</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
+                    <span className="text-emerald-300 font-bold">{day.percentages.carbs}% C</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-violet-400 inline-block"></span>
+                    <span className="text-violet-300 font-bold">{day.percentages.fat}% F</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
-                <span className="text-emerald-300 font-bold">{day.percentages.carbs}% C</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-violet-400 inline-block"></span>
-                <span className="text-violet-300 font-bold">{day.percentages.fat}% F</span>
-              </div>
+            )}
+
+            {/* Meals timeline for this day */}
+            <div className="space-y-2 pt-1">
+              {day.meals.map((meal) => (
+                <MealLogRow
+                  key={meal.id}
+                  log={meal}
+                  onEdit={onEditMeal}
+                  onDelete={(m) => onDeleteMeal(m.id, m)}
+                  readOnly={isInspectingAthlete}
+                />
+              ))}
             </div>
           </div>
         )}
-
-        {/* Meals timeline for this day */}
-        <div className="space-y-2 pt-1">
-          {day.meals.map((meal) => (
-            <MealLogRow
-              key={meal.id}
-              log={meal}
-              onEdit={onEditMeal}
-              onDelete={(m) => onDeleteMeal(m.id, m)}
-              readOnly={isInspectingAthlete}
-            />
-          ))}
-        </div>
       </div>
     );
   };

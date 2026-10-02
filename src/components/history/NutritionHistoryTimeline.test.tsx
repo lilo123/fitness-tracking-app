@@ -207,6 +207,9 @@ describe('NutritionHistoryTimeline', () => {
         />
       );
 
+      // Expand day card (D-YB-9) to inspect meal rows
+      fireEvent.click(screen.getByTestId('expand-day-btn-2026-09-27'));
+
       // Meal 1 ('Oatmeal & Berries') should be hidden
       expect(screen.queryByText('Oatmeal & Berries')).toBeNull();
       // Meal 2 ('Grilled Chicken Salad') should be visible
@@ -259,8 +262,168 @@ describe('NutritionHistoryTimeline', () => {
         />
       );
 
+      // Expand day card (D-YB-9) to reveal meal rows
+      fireEvent.click(screen.getByTestId('expand-day-btn-2026-09-27'));
+
       expect(screen.getByText('Oatmeal & Berries')).toBeDefined();
       expect(screen.getByText('Grilled Chicken Salad')).toBeDefined();
+    });
+  });
+
+  describe('D-YB-9: Day Accordion Collapsible Behavior', () => {
+    it('starts collapsed by default: no meals or caloric macro distribution in DOM, aria-expanded=false', () => {
+      render(
+        <NutritionHistoryTimeline
+          filteredNutritionDays={[sampleDay]}
+          timeRange="all"
+          isInspectingAthlete={false}
+          onEditMeal={vi.fn()}
+          onDeleteMeal={vi.fn()}
+        />
+      );
+
+      // Header row & macro summary pills are rendered
+      expect(screen.getByText(/Sun, Sep 27/)).toBeDefined();
+      expect(screen.getByText('Sunday · 2 meals logged')).toBeDefined();
+      expect(screen.getAllByText('850 kcal').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText('60g P')).toBeDefined();
+
+      // Accordion toggle button exists and indicates collapsed state
+      const toggleBtn = screen.getByTestId('expand-day-btn-2026-09-27');
+      expect(toggleBtn.getAttribute('aria-expanded')).toBe('false');
+      expect(toggleBtn.getAttribute('aria-controls')).toBe('nutrition-day-details-2026-09-27');
+
+      // Caloric macro distribution bar and meal rows are NOT in the DOM
+      expect(screen.queryByText('Caloric Macro Distribution')).toBeNull();
+      expect(screen.queryByText('Oatmeal & Berries')).toBeNull();
+      expect(screen.queryByText('Grilled Chicken Salad')).toBeNull();
+      expect(document.getElementById('nutrition-day-details-2026-09-27')).toBeNull();
+    });
+
+    it('toggles open on click and closes on subsequent click, flipping aria-expanded and updating DOM', () => {
+      render(
+        <NutritionHistoryTimeline
+          filteredNutritionDays={[sampleDay]}
+          timeRange="all"
+          isInspectingAthlete={false}
+          onEditMeal={vi.fn()}
+          onDeleteMeal={vi.fn()}
+        />
+      );
+
+      const toggleBtn = screen.getByTestId('expand-day-btn-2026-09-27');
+      expect(toggleBtn.getAttribute('aria-expanded')).toBe('false');
+
+      // Click to expand
+      fireEvent.click(toggleBtn);
+      expect(toggleBtn.getAttribute('aria-expanded')).toBe('true');
+      expect(toggleBtn.getAttribute('aria-label')).toContain('Collapse');
+
+      const body = document.getElementById('nutrition-day-details-2026-09-27');
+      expect(body).not.toBeNull();
+      expect(screen.getByText('Caloric Macro Distribution')).toBeDefined();
+      expect(screen.getByText('Oatmeal & Berries')).toBeDefined();
+      expect(screen.getByText('Grilled Chicken Salad')).toBeDefined();
+
+      // Click to collapse
+      fireEvent.click(toggleBtn);
+      expect(toggleBtn.getAttribute('aria-expanded')).toBe('false');
+      expect(toggleBtn.getAttribute('aria-label')).toContain('Expand');
+      expect(document.getElementById('nutrition-day-details-2026-09-27')).toBeNull();
+      expect(screen.queryByText('Caloric Macro Distribution')).toBeNull();
+      expect(screen.queryByText('Oatmeal & Berries')).toBeNull();
+      expect(screen.queryByText('Grilled Chicken Salad')).toBeNull();
+    });
+
+    it('preserves expanded state across timeRange filter changes', () => {
+      const { rerender } = render(
+        <NutritionHistoryTimeline
+          filteredNutritionDays={[sampleDay]}
+          timeRange="all"
+          isInspectingAthlete={false}
+          onEditMeal={vi.fn()}
+          onDeleteMeal={vi.fn()}
+        />
+      );
+
+      const toggleBtn = screen.getByTestId('expand-day-btn-2026-09-27');
+      fireEvent.click(toggleBtn);
+      expect(toggleBtn.getAttribute('aria-expanded')).toBe('true');
+      expect(screen.getByText('Oatmeal & Berries')).toBeDefined();
+
+      // Change timeRange to 90d (survives in mounted view)
+      rerender(
+        <NutritionHistoryTimeline
+          filteredNutritionDays={[sampleDay]}
+          timeRange="90d"
+          isInspectingAthlete={false}
+          onEditMeal={vi.fn()}
+          onDeleteMeal={vi.fn()}
+        />
+      );
+
+      const updatedToggleBtn = screen.getByTestId('expand-day-btn-2026-09-27');
+      expect(updatedToggleBtn.getAttribute('aria-expanded')).toBe('true');
+      expect(screen.getByText('Oatmeal & Berries')).toBeDefined();
+    });
+
+    it('updates header chips during deferred delete while collapsed, and undo restores', () => {
+      const { rerender } = render(
+        <NutritionHistoryTimeline
+          filteredNutritionDays={[sampleDay]}
+          timeRange="all"
+          isInspectingAthlete={false}
+          onEditMeal={vi.fn()}
+          onDeleteMeal={vi.fn()}
+          pendingDeleteMealId={null}
+        />
+      );
+
+      // Card starts collapsed
+      const toggleBtn = screen.getByTestId('expand-day-btn-2026-09-27');
+      expect(toggleBtn.getAttribute('aria-expanded')).toBe('false');
+      expect(screen.queryByText('Oatmeal & Berries')).toBeNull();
+
+      // Original total in header chips: 850 kcal, 60g P, 80g C, 21g F, 13g Fib
+      expect(screen.getAllByText('850 kcal').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText('60g P')).toBeDefined();
+
+      // Simulate deferred delete of meal-1 (Oatmeal & Berries: 350 kcal, 15g P)
+      rerender(
+        <NutritionHistoryTimeline
+          filteredNutritionDays={[sampleDay]}
+          timeRange="all"
+          isInspectingAthlete={false}
+          onEditMeal={vi.fn()}
+          onDeleteMeal={vi.fn()}
+          pendingDeleteMealId="meal-1"
+        />
+      );
+
+      // Still collapsed
+      expect(screen.getByTestId('expand-day-btn-2026-09-27').getAttribute('aria-expanded')).toBe('false');
+      expect(screen.queryByText('Oatmeal & Berries')).toBeNull();
+
+      // Header chips updated to Meal 2 only: 500 kcal, 45g P, 20g C, 15g F, 5g Fib
+      expect(screen.getAllByText('500 kcal').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText('45g P')).toBeDefined();
+      expect(screen.getByText('20g C')).toBeDefined();
+
+      // Simulate Undo restoring meal-1
+      rerender(
+        <NutritionHistoryTimeline
+          filteredNutritionDays={[sampleDay]}
+          timeRange="all"
+          isInspectingAthlete={false}
+          onEditMeal={vi.fn()}
+          onDeleteMeal={vi.fn()}
+          pendingDeleteMealId={null}
+        />
+      );
+
+      // Totals restored in header chips
+      expect(screen.getAllByText('850 kcal').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText('60g P')).toBeDefined();
     });
   });
 });

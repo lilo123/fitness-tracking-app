@@ -1,9 +1,9 @@
 import { execSync } from 'child_process';
 import { test, expect, type Page } from '@playwright/test';
 
-const P5B_USER_EMAIL = 'p5b-history-e2e@cybergym.io';
+const P5B_USER_EMAIL = 'p5b-history-e2e@yourbody.fyi';
 const P5B_USER_PASSWORD = 'password123';
-const COACH_EMAIL = 'coach@cybergym.io';
+const COACH_EMAIL = 'coach@yourbody.fyi';
 const COACH_PASSWORD = 'password123';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'http://127.0.0.1:58821';
@@ -467,6 +467,11 @@ test.describe('P5b History Suite (p5b-history)', () => {
     // Switch to Nutrition tab
     const nutritionTab = page.locator('[data-testid="history-tab-nutrition"]');
     await nutritionTab.click();
+
+    // Days start collapsed by default (D-YB-9). Expand day to reveal meals.
+    const expandBtn = page.locator('button[data-testid^="expand-day-btn-"]').first();
+    await expect(expandBtn).toBeVisible({ timeout: 10000 });
+    await expandBtn.click();
     await expect(page.locator('text=P5b Undo Breakfast')).toBeVisible({ timeout: 10000 });
 
     const toast = page.locator('[data-testid="quick-log-toast"]');
@@ -528,9 +533,12 @@ test.describe('P5b History Suite (p5b-history)', () => {
     await expect(loadOlderBtn).toBeVisible({ timeout: 10000 });
     await loadOlderBtn.scrollIntoViewIfNeeded();
 
-    // Day 5 is in window 1 (rendered into view)
+    // Day 5 is in window 1 (rendered into view). Expand day card (D-YB-9).
+    const day5Card = page.locator('.rounded-3xl').filter({ hasText: '1000 kcal' });
+    const day5Expand = day5Card.locator('button[data-testid^="expand-day-btn-"]');
+    await expect(day5Expand).toBeVisible({ timeout: 10000 });
+    await day5Expand.click();
     await expect(page.locator('text=P5b Day 5 Meal A')).toBeVisible({ timeout: 10000 });
-    const day5Card = page.locator('.rounded-3xl:has-text("P5b Day 5 Meal A")');
     const day5Header = day5Card.locator('h3').first();
     const day5HeaderText = await day5Header.innerText();
     expect(day5HeaderText).toMatch(/^(Sun|Mon|Tue|Wed|Thu|Fri|Sat), [A-Z][a-z]{2} \d+/);
@@ -543,15 +551,22 @@ test.describe('P5b History Suite (p5b-history)', () => {
     await expect(loadOlderBtn).toBeVisible({ timeout: 10000 });
     await loadOlderBtn.click();
     await loadOlderBtn.scrollIntoViewIfNeeded();
+    const day20Card = page.locator('.rounded-3xl').filter({ hasText: '750 kcal' });
+    const day20Expand = day20Card.locator('button[data-testid^="expand-day-btn-"]');
+    await expect(day20Expand).toBeVisible({ timeout: 10000 });
+    await day20Expand.click();
     await expect(page.locator('text=P5b Day 20 Meal')).toBeVisible({ timeout: 10000 });
 
     // Click Load older days to load window 3 (Day 40)
     await expect(loadOlderBtn).toBeVisible({ timeout: 10000 });
     await loadOlderBtn.click();
+    const day40Card = page.locator('.rounded-3xl').filter({ hasText: '800 kcal' });
+    const day40Expand = day40Card.locator('button[data-testid^="expand-day-btn-"]');
+    await expect(day40Expand).toBeVisible({ timeout: 10000 });
+    await day40Expand.click();
     await expect(page.locator('text=P5b Day 40 Meal A')).toBeVisible({ timeout: 10000 });
 
     // Day 40 total is 300 + 500 = 800 kcal
-    const day40Card = page.locator('.rounded-3xl:has-text("P5b Day 40 Meal A")');
     await expect(day40Card).toContainText('800 kcal');
 
     // Oldest day reached -> Load older days button disappears

@@ -270,6 +270,9 @@ describe('DIR-C2: List Virtualization with @tanstack/react-virtual', () => {
 
     // Two-sided virtualization verification:
     // 1. Lower-bound / presence: initial visible nutrition day ARE mounted in the DOM
+    // Days start collapsed by default (D-YB-9); expand the visible day card to inspect its meals
+    const expandBtn = screen.getByTestId(`expand-day-btn-${days[0].date}`);
+    fireEvent.click(expandBtn);
     expect(screen.getByText('High Protein Lunch #1')).toBeDefined();
 
     // 2. Absence: off-screen nutrition days are unmounted from the DOM

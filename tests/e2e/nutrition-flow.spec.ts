@@ -157,7 +157,7 @@ test.describe('Nutrition Flow E2E', () => {
     });
 
     await safeGoto(page, '/login');
-    await page.fill('input[type="email"]', 'athlete@cybergym.io');
+    await page.fill('input[type="email"]', 'athlete@yourbody.fyi');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/workout');
@@ -613,6 +613,11 @@ Total Fiber: 8 g`;
     const nutritionTab = page.locator('[data-testid="history-tab-nutrition"]');
     await nutritionTab.click();
     await expect(page.locator('text=Nutrition History')).toBeVisible();
+
+    // Days start collapsed by default (D-YB-9). Expand day to reveal meals.
+    const expandBtn = page.locator('button[data-testid^="expand-day-btn-"]').first();
+    await expect(expandBtn).toBeVisible({ timeout: 10000 });
+    await expandBtn.click();
 
     // Verify originalMealName is visible in history
     const historyRow = page.locator('[data-testid="meal-log-item"]').filter({ hasText: originalMealName });

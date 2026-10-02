@@ -24,6 +24,15 @@ function openMealAction(logId: string, action: 'edit' | 'delete') {
   fireEvent.click(screen.getByTestId(`${action}-meal-${logId}`));
 }
 
+/**
+ * D-YB-9: Nutrition history day cards start collapsed by default.
+ * Helper to expand a day card so its meals and meal actions enter the DOM.
+ */
+async function expandNutritionDay(date = '2026-09-01') {
+  const expandBtn = await screen.findByTestId(`expand-day-btn-${date}`);
+  fireEvent.click(expandBtn);
+}
+
 
 const { mockSession, mockUpdate, mockUpdateEq } = vi.hoisted(() => {
   const mockUpdateEq = vi.fn().mockReturnValue({
@@ -340,6 +349,9 @@ describe('HistoryView', () => {
     // Verify Nutrition History header
     expect(screen.getByText('Nutrition History')).toBeDefined();
 
+    // Days start collapsed by default (D-YB-9). Expand day to reveal meals and distribution bar.
+    await expandNutritionDay('2026-09-01');
+
     // Verify meals and macro totals rendered
     await waitFor(() => {
       expect(screen.getByText('Grilled Chicken & Rice')).toBeDefined();
@@ -363,6 +375,7 @@ describe('HistoryView', () => {
 
     // Switch to Nutrition tab
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
+    await expandNutritionDay();
 
     await waitFor(() => {
       expect(screen.getByTestId('meal-actions-log-1')).toBeDefined();
@@ -421,6 +434,7 @@ describe('HistoryView', () => {
 
     renderComponent();
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
+    await expandNutritionDay();
 
     await screen.findByTestId('meal-actions-log-items');
     openMealAction('log-items', 'edit');
@@ -499,6 +513,7 @@ describe('HistoryView', () => {
 
     renderComponent();
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
+    await expandNutritionDay();
 
     await screen.findByTestId('meal-actions-log-scale-test');
     openMealAction('log-scale-test', 'edit');
@@ -594,6 +609,7 @@ describe('HistoryView', () => {
     renderComponent();
 
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
+    await expandNutritionDay();
 
     await waitFor(() => {
       expect(screen.getByTestId('meal-actions-log-1')).toBeDefined();
@@ -628,6 +644,7 @@ describe('HistoryView', () => {
     expect(mutationAlert.textContent).toBe('');
 
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
+    await expandNutritionDay();
 
     await waitFor(() => {
       expect(screen.getByTestId('meal-actions-log-1')).toBeDefined();
@@ -678,6 +695,7 @@ describe('HistoryView', () => {
     renderComponent();
 
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
+    await expandNutritionDay();
 
     await waitFor(() => {
       expect(screen.getByTestId('meal-actions-log-1')).toBeDefined();
@@ -699,6 +717,7 @@ describe('HistoryView', () => {
     renderComponent();
 
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
+    await expandNutritionDay();
 
     await waitFor(() => {
       expect(screen.getByTestId('meal-actions-log-1')).toBeDefined();
@@ -741,6 +760,7 @@ describe('HistoryView', () => {
     renderComponent();
 
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
+    await expandNutritionDay();
 
     await waitFor(() => {
       expect(screen.getByTestId('meal-actions-log-1')).toBeDefined();
@@ -766,6 +786,7 @@ describe('HistoryView', () => {
     renderComponent();
 
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
+    await expandNutritionDay();
 
     await waitFor(() => {
       expect(screen.getByTestId('meal-actions-log-1')).toBeDefined();
@@ -788,6 +809,7 @@ describe('HistoryView', () => {
     renderComponent();
 
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
+    await expandNutritionDay();
 
     await waitFor(() => {
       expect(screen.getByTestId('meal-actions-log-1')).toBeDefined();
@@ -812,6 +834,7 @@ describe('HistoryView', () => {
     renderComponent();
 
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
+    await expandNutritionDay();
 
     await waitFor(() => {
       expect(screen.getByTestId('meal-actions-log-1')).toBeDefined();
@@ -837,6 +860,7 @@ describe('HistoryView', () => {
     renderComponent();
 
     fireEvent.click(screen.getByTestId('history-tab-nutrition'));
+    await expandNutritionDay();
 
     await waitFor(() => {
       expect(screen.getByTestId('meal-actions-log-1')).toBeDefined();
@@ -1323,7 +1347,7 @@ describe('HistoryView', () => {
   describe('Coach Inspection Mode', () => {
     it('renders inspection banner and enforces read-only mode for athlete records', async () => {
       const coachSession = {
-        user: { id: 'coach-id', email: 'coach@cybergym.io' },
+        user: { id: 'coach-id', email: 'coach@yourbody.fyi' },
       };
 
       (supabase.auth.getUser as any).mockResolvedValue({ data: { user: coachSession.user } });
@@ -1346,7 +1370,7 @@ describe('HistoryView', () => {
           return createSupabaseBuilder('users', {
             data: {
               id: 'coach-id',
-              email: 'coach@cybergym.io',
+              email: 'coach@yourbody.fyi',
               username: 'Coach Duy',
               role: 'coach',
               is_coach_mode: true,
@@ -1415,6 +1439,7 @@ describe('HistoryView', () => {
 
       // Switch to Nutrition tab
       fireEvent.click(screen.getByTestId('history-tab-nutrition'));
+      await expandNutritionDay();
       await waitFor(() => {
         expect(screen.getByText('Athlete Chicken & Rice')).toBeDefined();
       });
@@ -1431,7 +1456,7 @@ describe('HistoryView', () => {
 
     it('resets editingMealLog and editingSet when switching athletes or toggling inspect mode', async () => {
       const coachSession = {
-        user: { id: 'coach-id', email: 'coach@cybergym.io' },
+        user: { id: 'coach-id', email: 'coach@yourbody.fyi' },
       };
 
       (supabase.auth.getUser as any).mockResolvedValue({ data: { user: coachSession.user } });
@@ -1454,7 +1479,7 @@ describe('HistoryView', () => {
           return createSupabaseBuilder('users', {
             data: {
               id: 'coach-id',
-              email: 'coach@cybergym.io',
+              email: 'coach@yourbody.fyi',
               username: 'Coach Duy',
               role: 'coach',
               is_coach_mode: true,
@@ -1546,6 +1571,7 @@ describe('HistoryView', () => {
       fireEvent.click(screen.getByTestId('toggle-inspect-mode-btn'));
       // Switch to nutrition tab
       fireEvent.click(screen.getByTestId('history-tab-nutrition'));
+      await expandNutritionDay();
       await screen.findByTestId('meal-actions-log-coach-1');
       openMealAction('log-coach-1', 'edit');
       expect(await screen.findByTestId('edit-meal-sheet')).toBeDefined();
@@ -1566,7 +1592,7 @@ describe('HistoryView', () => {
         });
 
       const coachSession = {
-        user: { id: 'coach-id', email: 'coach@cybergym.io' },
+        user: { id: 'coach-id', email: 'coach@yourbody.fyi' },
       };
 
       (supabase.auth.getUser as any).mockResolvedValue({ data: { user: coachSession.user } });
@@ -1627,7 +1653,7 @@ describe('HistoryView', () => {
           return createSupabaseBuilder('users', {
             data: {
               id: 'coach-id',
-              email: 'coach@cybergym.io',
+              email: 'coach@yourbody.fyi',
               username: 'Coach Duy',
               role: 'coach',
               is_coach_mode: true,
@@ -1653,6 +1679,7 @@ describe('HistoryView', () => {
 
       // Switch to Nutrition tab
       fireEvent.click(screen.getByTestId('history-tab-nutrition'));
+      await expandNutritionDay('2026-09-22');
 
       // Both meals should appear
       expect(await screen.findByText('NY Breakfast Bagel')).toBeDefined();
@@ -2237,6 +2264,7 @@ describe('HistoryView', () => {
       );
 
       fireEvent.click(screen.getByTestId('history-tab-nutrition'));
+      await expandNutritionDay();
 
       await waitFor(() => {
         expect(screen.getByTestId('meal-actions-log-1')).toBeDefined();
