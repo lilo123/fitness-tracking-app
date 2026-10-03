@@ -35,6 +35,9 @@ export interface NutritionHistoryTimelineProps {
   pendingDeleteMealId?: string | null;
 }
 
+// D-YB4-2: Realistic collapsed day-card height estimate derived from 390px/320px browser measurements
+const COLLAPSED_DAY_CARD_ESTIMATE_PX = 156;
+
 export const NutritionHistoryTimeline: React.FC<NutritionHistoryTimelineProps> = ({
   filteredNutritionDays,
   timeRange,
@@ -148,13 +151,19 @@ export const NutritionHistoryTimeline: React.FC<NutritionHistoryTimelineProps> =
     };
   }, [measureScrollMargin]);
 
+  const getItemKey = React.useCallback(
+    (index: number) => displayDays[index]?.date ?? index,
+    [displayDays]
+  );
+
   const virtualizer = useWindowVirtualizer({
     count: displayDays.length,
+    getItemKey,
     estimateSize: (index) => {
       const day = displayDays[index];
-      if (!day) return 96;
+      if (!day) return COLLAPSED_DAY_CARD_ESTIMATE_PX;
       const isExpanded = expandedDates.has(day.date);
-      if (!isExpanded) return 96;
+      if (!isExpanded) return COLLAPSED_DAY_CARD_ESTIMATE_PX;
       const mealsCount = day.meals?.length ?? 1;
       return 200 + mealsCount * 80;
     },
@@ -171,18 +180,13 @@ export const NutritionHistoryTimeline: React.FC<NutritionHistoryTimelineProps> =
       }
       const index = Number(element?.getAttribute('data-index'));
       const day = displayDays[index];
-      if (!day) return 96;
+      if (!day) return COLLAPSED_DAY_CARD_ESTIMATE_PX;
       const isExpanded = expandedDates.has(day.date);
-      if (!isExpanded) return 96;
+      if (!isExpanded) return COLLAPSED_DAY_CARD_ESTIMATE_PX;
       const mealsCount = day.meals?.length ?? 1;
       return 200 + mealsCount * 80;
     },
   });
-
-  // Re-measure virtualizer rows on accordion toggle
-  React.useEffect(() => {
-    virtualizer.measure?.();
-  }, [expandedDates, virtualizer]);
 
   const virtualItems = virtualizer.getVirtualItems();
   const isVirtual = virtualItems.length > 0;
